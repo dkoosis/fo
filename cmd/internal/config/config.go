@@ -8,7 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config holds the command-line options.
+// Config holds the command-line options.// In cmd/internal/config/config.go
 type Config struct {
 	Label         string            `yaml:"label"`
 	Stream        bool              `yaml:"stream"`
@@ -16,6 +16,7 @@ type Config struct {
 	NoTimer       bool              `yaml:"no_timer"`
 	NoColor       bool              `yaml:"no_color"`
 	CI            bool              `yaml:"ci"`
+	Debug         bool              `yaml:"debug"`
 	MaxBufferSize int64             `yaml:"max_buffer_size"`
 	MaxLineLength int               `yaml:"max_line_length"`
 	Visual        VisualConfig      `yaml:"visual"`
@@ -195,32 +196,39 @@ func ApplyCommandPreset(config *Config, cmdName string) {
 
 // MergeWithFlags merges file config with command-line flags
 func MergeWithFlags(fileConfig *Config, flagConfig *Config) *Config {
-	result := *fileConfig
+	result := *fileConfig // Start with file config as base
 
-	// Command-line flags take precedence over file config
+	// Command-line flags take precedence
 	if flagConfig.Label != "" {
 		result.Label = flagConfig.Label
 	}
-
-	// Only override Stream if explicitly set via flag
-	if flagConfig.Stream {
+	if flagConfig.Stream { // If -s or --stream was set
 		result.Stream = true
 	}
-
-	if flagConfig.ShowOutput != "on-fail" {
+	// Only override ShowOutput if flag was explicitly set (not empty string)
+	if flagConfig.ShowOutput != "" {
 		result.ShowOutput = flagConfig.ShowOutput
 	}
-
 	if flagConfig.NoTimer {
 		result.NoTimer = true
 	}
-
 	if flagConfig.NoColor {
 		result.NoColor = true
 	}
-
-	if flagConfig.CI {
+	if flagConfig.CI { // CI implies NoColor and NoTimer
 		result.CI = true
+		result.NoColor = true
+		result.NoTimer = true
+	}
+	if flagConfig.Debug { // If --debug or -d was set
+		result.Debug = true
+	}
+	// Handle MaxBufferSize and MaxLineLength from flags if they were set (non-zero)
+	if flagConfig.MaxBufferSize > 0 {
+		result.MaxBufferSize = flagConfig.MaxBufferSize
+	}
+	if flagConfig.MaxLineLength > 0 {
+		result.MaxLineLength = flagConfig.MaxLineLength
 	}
 
 	return &result

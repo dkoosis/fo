@@ -3,22 +3,27 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
+	"io" // Added for io.ReadCloser in scanOutputPipe
 	"os"
 	"os/exec"
 	"os/signal"
-	"reflect"
 	"sort"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	// Assuming your config package is correctly located here
 	"github.com/davidkoosis/fo/cmd/internal/config"
+	// Assuming your version package is correctly located here
+	"github.com/davidkoosis/fo/cmd/internal/version"
 )
 
-// Config holds the command-line options.
+// Config holds the command-line options relevant to fo's execution logic.
+// This is distinct from config.Config which is used for loading/merging.
 type Config struct {
 	Label         string
 	Stream        bool
@@ -26,6 +31,7 @@ type Config struct {
 	NoTimer       bool
 	NoColor       bool
 	CI            bool
+	Debug         bool  // New field for the debug flag
 	MaxBufferSize int64 // Total buffer size (in bytes)
 	MaxLineLength int   // Maximum line length (in bytes)
 }
@@ -68,14 +74,29 @@ type TimestampedLine struct {
 	Truncated bool
 }
 
+// versionFlag is set if the --version or -v flag is passed.
+// It's a package-level variable to be checked after flag parsing.
+var versionFlag bool
+
 func main() {
-	// Parse flags
+	// Parse flags (this will also set the global versionFlag if -version is used)
 	flagConfig := parseFlags()
+
+	// Handle --version flag immediately after parsing
+	if versionFlag {
+		fmt.Printf("fo version %s\n", version.Version)
+		fmt.Printf("Commit: %s\n", version.CommitHash)
+		fmt.Printf("Built: %s\n", version.BuildDate)
+		os.Exit(0)
+	}
 
 	// Load config file
 	fileConfig := config.LoadConfig()
 
 	// Merge configurations (flags take precedence)
+	// The MergeWithFlags function in your config package should be aware of the new Debug field
+	// if you want it to be settable via .fo.yaml (though typically debug is CLI only).
+	// For now, we assume flagConfig.Debug will correctly pass the CLI value.
 	mergedConfig := config.MergeWithFlags(fileConfig, flagConfig)
 
 	// Find the command to execute (after --).
@@ -83,7 +104,7 @@ func main() {
 	if len(cmdArgs) == 0 {
 		fmt.Fprintln(os.Stderr, "Error: No command specified after --")
 		fmt.Fprintln(os.Stderr, "Usage: fo [flags] -- <COMMAND> [ARGS...]")
-		os.Exit(1)
+		os.Exit(1) // Exit with error code 1 for bad arguments
 	}
 
 	// Apply command-specific preset
@@ -91,13 +112,13 @@ func main() {
 		config.ApplyCommandPreset(mergedConfig, cmdArgs[0])
 	}
 
-	// Set default label if not provided
+	// Set default label if not provided and not overridden by preset
 	if mergedConfig.Label == "" {
 		mergedConfig.Label = cmdArgs[0] // Use command name as default label.
 	}
 
 	// Convert to the local Config type used by executeCommand
-	localConfig := convertToInternalConfig(mergedConfig)
+	localAppConfig := convertToInternalConfig(mergedConfig)
 
 	// Set up signal handling
 	ctx, cancel := context.WithCancel(context.Background())
@@ -109,15 +130,22 @@ func main() {
 	defer signal.Stop(sigChan)
 
 	// Execute the command with the given config.
-	exitCode := executeCommand(ctx, cancel, sigChan, localConfig, cmdArgs)
+	exitCode := executeCommand(ctx, cancel, sigChan, localAppConfig, cmdArgs)
 
-	fmt.Fprintf(os.Stderr, "[DEBUG main()] about to os.Exit(%d). Config: %+v\n", exitCode, mergedConfig)
+	// Conditionally print the debug information
+	if localAppConfig.Debug {
+		// Use mergedConfig here if you want to see the state of the config.Config struct
+		// or localAppConfig to see the state of the main.Config struct.
+		// Using mergedConfig as it was the one used for the original debug message.
+		fmt.Fprintf(os.Stderr, "[DEBUG main()] about to os.Exit(%d). Final Merged Config: %+v\n", exitCode, mergedConfig)
+		fmt.Fprintf(os.Stderr, "[DEBUG main()] Local App Config: %+v\n", localAppConfig)
+	}
 
-	// Exit with the same code as the wrapped command.
+	// Exit with the same code as the wrapped command or fo's own error code.
 	os.Exit(exitCode)
 }
 
-// Add a helper function to convert from config.Config to our internal Config structure
+// convertToInternalConfig converts from the shared config.Config to the local Config struct.
 func convertToInternalConfig(cfg *config.Config) Config {
 	return Config{
 		Label:         cfg.Label,
@@ -126,464 +154,345 @@ func convertToInternalConfig(cfg *config.Config) Config {
 		NoTimer:       cfg.NoTimer,
 		NoColor:       cfg.NoColor,
 		CI:            cfg.CI,
+		Debug:         cfg.Debug, // Transfer the Debug field
 		MaxBufferSize: cfg.MaxBufferSize,
 		MaxLineLength: cfg.MaxLineLength,
 	}
 }
 
+// parseFlags defines and parses command-line flags.
+// It returns a config.Config struct populated with values from flags.
 func parseFlags() *config.Config {
-	cfg := &config.Config{}
+	// cfg stores values from command-line flags.
+	cfg := &config.Config{} // Note: This is config.Config from your internal package
 
+	// Define the --version flag (sets the global versionFlag)
+	flag.BoolVar(&versionFlag, "version", false, "Print fo version and exit.")
+	flag.BoolVar(&versionFlag, "v", false, "Print fo version and exit (shorthand).")
+
+	// Define the --debug flag
+	flag.BoolVar(&cfg.Debug, "debug", false, "Enable debug output.")
+	flag.BoolVar(&cfg.Debug, "d", false, "Enable debug output (shorthand).")
+
+	// Define other flags
 	flag.StringVar(&cfg.Label, "l", "", "Label for the task.")
 	flag.StringVar(&cfg.Label, "label", "", "Label for the task (shorthand: -l).")
 
 	flag.BoolVar(&cfg.Stream, "s", false, "Stream mode - print command's stdout/stderr live.")
 	flag.BoolVar(&cfg.Stream, "stream", false, "Stream mode - print command's stdout/stderr live (shorthand: -s).")
 
-	flag.StringVar(&cfg.ShowOutput, "show-output", "on-fail", "When to show captured output: on-fail (default), always, never.")
+	flag.StringVar(&cfg.ShowOutput, "show-output", "", "When to show captured output: on-fail, always, never. (Overrides file config)")
 
 	flag.BoolVar(&cfg.NoTimer, "no-timer", false, "Disable showing the duration.")
 	flag.BoolVar(&cfg.NoColor, "no-color", false, "Disable ANSI color/styling output.")
 	flag.BoolVar(&cfg.CI, "ci", false, "Enable CI-friendly, plain-text output (implies --no-color, --no-timer).")
 
-	maxBufferSizeMB := flag.Int("max-buffer-size", int(config.DefaultMaxBufferSize/1024/1024),
-		"Maximum total buffer size in MB (per stream) for capturing command output. Default: 10MB")
+	var maxBufferSizeMB int
+	var maxLineLengthKB int
+	flag.IntVar(&maxBufferSizeMB, "max-buffer-size", 0,
+		fmt.Sprintf("Maximum total buffer size in MB (per stream). Default from config: %dMB", config.DefaultMaxBufferSize/1024/1024))
 
-	maxLineLengthKB := flag.Int("max-line-length", int(config.DefaultMaxLineLength/1024),
-		"Maximum length in KB for a single line of output. Default: 1024KB (1MB)")
+	flag.IntVar(&maxLineLengthKB, "max-line-length", 0,
+		fmt.Sprintf("Maximum length in KB for a single line. Default from config: %dKB", config.DefaultMaxLineLength/1024))
 
-	// Parse flags but stop at --.
 	flag.Parse()
 
-	// Apply implications of --ci flag.
 	if cfg.CI {
 		cfg.NoColor = true
 		cfg.NoTimer = true
 	}
 
-	// Validate ShowOutput value.
-	if !validShowOutputValues[cfg.ShowOutput] {
-		fmt.Fprintf(os.Stderr, "Error: Invalid value for --show-output: %s\n", cfg.ShowOutput)
+	if val := cfg.ShowOutput; val != "" && !validShowOutputValues[val] {
+		fmt.Fprintf(os.Stderr, "Error: Invalid value for --show-output: %s\n", val)
 		fmt.Fprintln(os.Stderr, "Valid values are: on-fail, always, never")
 		os.Exit(1)
 	}
 
-	// Convert MB to bytes for buffer size
-	cfg.MaxBufferSize = int64(*maxBufferSizeMB) * 1024 * 1024
-
-	// Convert KB to bytes for line length
-	cfg.MaxLineLength = *maxLineLengthKB * 1024
+	if maxBufferSizeMB > 0 {
+		cfg.MaxBufferSize = int64(maxBufferSizeMB) * 1024 * 1024
+	}
+	if maxLineLengthKB > 0 {
+		cfg.MaxLineLength = maxLineLengthKB * 1024
+	}
 
 	return cfg
 }
 
+// findCommandArgs extracts the command and its arguments that appear after "--".
 func findCommandArgs() []string {
 	for i, arg := range os.Args {
-		if arg == "--" && i < len(os.Args)-1 {
-			return os.Args[i+1:]
+		if arg == "--" {
+			if i < len(os.Args)-1 {
+				return os.Args[i+1:]
+			}
+			return []string{}
 		}
 	}
-	return nil
+	return []string{}
 }
 
-func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan os.Signal, config Config, cmdArgs []string) int {
-	// Print start line.
-	printStartLine(config)
-
+func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan os.Signal, appConfig Config, cmdArgs []string) int {
+	printStartLine(appConfig)
 	startTime := time.Now()
 
-	// Create command using the provided context
 	cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
-	cmd.Env = os.Environ() // Inherit environment.
+	cmd.Env = os.Environ()
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-	// Set process group for better signal handling
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true, // Create a new process group
-	}
-
-	// Handle signals in a goroutine
 	cmdDone := make(chan struct{})
 	go func() {
+		defer close(cmdDone)
 		select {
 		case sig := <-sigChan:
-			fmt.Fprintf(os.Stderr, "[DEBUG signal handler] Received signal: %v\n", sig)
-
-			// Try to forward the signal to the process group
+			if cmd.Process == nil {
+				cancel()
+				return
+			}
 			pgid, err := syscall.Getpgid(cmd.Process.Pid)
 			if err == nil {
-				_, _ = fmt.Fprintf(os.Stderr, "[DEBUG signal handler] Forwarding signal to process group %d\n", pgid)
-				// Send the signal to the process group
-				if err := syscall.Kill(-pgid, sig.(syscall.Signal)); err != nil {
-					_, _ = fmt.Fprintf(os.Stderr, "[DEBUG signal handler] Error sending signal to process group: %v\n", err)
-				}
+				_ = syscall.Kill(-pgid, sig.(syscall.Signal))
 			} else {
-				_, _ = fmt.Fprintf(os.Stderr, "[DEBUG signal handler] Failed to get pgid, sending signal directly: %v\n", err)
-				// Fall back to sending to just the process
-				if err := cmd.Process.Signal(sig); err != nil {
-					_, _ = fmt.Fprintf(os.Stderr, "[DEBUG signal handler] Error sending signal directly to process: %v\n", err)
-				}
+				_ = cmd.Process.Signal(sig)
 			}
-
-			// Cancel our context after a brief delay if the command doesn't exit
 			go func() {
 				select {
 				case <-cmdDone:
-					// Command exited, no need to cancel
-					return
 				case <-time.After(2 * time.Second):
-					// Command didn't exit after signal, cancel the context
-					_, _ = fmt.Fprintf(os.Stderr, "Warning: Command did not exit after signal, forcibly terminating\n")
 					cancel()
 				}
 			}()
-
-		case <-cmdDone:
-			// Command is done, stop handling signals
-			return
+		case <-ctx.Done():
+			if cmd.Process != nil && cmd.ProcessState == nil {
+				pgid, err := syscall.Getpgid(cmd.Process.Pid)
+				if err == nil {
+					_ = syscall.Kill(-pgid, syscall.SIGKILL)
+				} else {
+					_ = cmd.Process.Kill()
+				}
+			}
 		}
 	}()
 
 	var exitCode int
-	if config.Stream {
-		// STREAM MODE.
-		exitCode = executeStreamMode(cmd, config, startTime)
+	if appConfig.Stream {
+		exitCode = executeStreamMode(cmd, appConfig, startTime)
 	} else {
-		// CAPTURE MODE.
-		exitCode = executeCaptureMode(cmd, config, startTime)
+		exitCode = executeCaptureMode(cmd, appConfig, startTime, cmdArgs)
 	}
-
-	// Signal that command is done
-	close(cmdDone)
-
 	return exitCode
 }
 
-func executeStreamMode(cmd *exec.Cmd, config Config, startTime time.Time) int {
-	// Set up direct streaming of output.
+func executeStreamMode(cmd *exec.Cmd, appConfig Config, startTime time.Time) int {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-
-	// Run the command.
 	err := cmd.Run()
-
-	// Print end status.
 	duration := time.Since(startTime)
 	exitCode := getExitCode(err)
-	printEndLine(config, exitCode, duration)
-
+	printEndLine(appConfig, exitCode, duration)
 	return exitCode
 }
 
-func executeCaptureMode(cmd *exec.Cmd, config Config, startTime time.Time) int {
+func executeCaptureMode(cmd *exec.Cmd, appConfig Config, startTime time.Time, cmdArgs []string) int {
 	var wg sync.WaitGroup
 	var bufferExceeded sync.Once
 
-	// Create channels for line output with timestamps
-	stdoutLines := make(chan TimestampedLine, 100)
-	stderrLines := make(chan TimestampedLine, 100)
-	allLines := make([]TimestampedLine, 0, 200)
+	stdoutLinesChan := make(chan TimestampedLine, 200)
+	stderrLinesChan := make(chan TimestampedLine, 200)
+	allCapturedLines := make([]TimestampedLine, 0, 400)
 
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error creating stdout pipe: %v\n", err)
+		printEndLine(appConfig, 1, time.Since(startTime))
 		return 1
 	}
-
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error creating stderr pipe: %v\n", err)
+		printEndLine(appConfig, 1, time.Since(startTime))
 		return 1
 	}
 
-	// Process stdout
 	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		defer close(stdoutLines)
-
-		scanner := bufio.NewScanner(stdoutPipe)
-		// Use config.MaxLineLength for the scanner's buffer, not MaxBufferSize
-		scanner.Buffer(make([]byte, 1024*64), config.MaxLineLength)
-
-		var totalBytes int64
-		for scanner.Scan() {
-			line := scanner.Text()
-			lineSize := int64(len(line))
-			totalBytes += lineSize
-
-			// Check for total buffer size limit
-			if totalBytes > config.MaxBufferSize {
-				// Buffer limit reached
-				bufferExceeded.Do(func() {
-					exceededMsg := fmt.Sprintf("[fo] ERROR: Total stdout buffer size limit (%d MB) exceeded. Further output truncated.", config.MaxBufferSize/1024/1024)
-					stdoutLines <- TimestampedLine{
-						Time:      time.Now(),
-						Source:    "stdout",
-						Content:   exceededMsg,
-						Truncated: true,
-					}
-					_, _ = fmt.Fprintf(os.Stderr, "%s\n", exceededMsg)
-				})
-				break // Stop reading more lines
-			}
-
-			stdoutLines <- TimestampedLine{
-				Time:    time.Now(),
-				Source:  "stdout",
-				Content: line,
-			}
-		}
-
-		// Check if scanners are still valid
-		if scanner.Err() != nil {
-			err := scanner.Err()
-			if strings.Contains(err.Error(), "token too long") || strings.Contains(err.Error(), "buffer size exceeded") {
-				bufferExceeded.Do(func() {
-					exceededMsg := fmt.Sprintf("[fo] ERROR: Maximum line length (%d KB) exceeded in stdout. Line truncated.", config.MaxLineLength/1024)
-					stdoutLines <- TimestampedLine{
-						Time:      time.Now(),
-						Source:    "stdout",
-						Content:   exceededMsg,
-						Truncated: true,
-					}
-					_, _ = fmt.Fprintf(os.Stderr, "%s\n", exceededMsg)
-				})
-			} else if !strings.Contains(err.Error(), "file already closed") && !strings.Contains(err.Error(), "broken pipe") {
-				_, _ = fmt.Fprintf(os.Stderr, "Error reading stdout: %v\n", err)
-			}
-		}
-	}()
-
-	// Process stderr
+	go scanOutputPipe(stdoutPipe, "stdout", stdoutLinesChan, appConfig, &bufferExceeded, &wg)
 	wg.Add(1)
+	go scanOutputPipe(stderrPipe, "stderr", stderrLinesChan, appConfig, &bufferExceeded, &wg)
+
+	collectionDone := make(chan struct{})
 	go func() {
-		defer wg.Done()
-		defer close(stderrLines)
-
-		scanner := bufio.NewScanner(stderrPipe)
-		// Use config.MaxLineLength for the scanner's buffer, not MaxBufferSize
-		scanner.Buffer(make([]byte, 1024*64), config.MaxLineLength)
-
-		var totalBytes int64
-		for scanner.Scan() {
-			line := scanner.Text()
-			lineSize := int64(len(line))
-			totalBytes += lineSize
-
-			// Check for total buffer size limit
-			if totalBytes > config.MaxBufferSize {
-				// Buffer limit reached
-				bufferExceeded.Do(func() {
-					exceededMsg := fmt.Sprintf("[fo] ERROR: Total stderr buffer size limit (%d MB) exceeded. Further output truncated.", config.MaxBufferSize/1024/1024)
-					stderrLines <- TimestampedLine{
-						Time:      time.Now(),
-						Source:    "stderr",
-						Content:   exceededMsg,
-						Truncated: true,
-					}
-					_, _ = fmt.Fprintf(os.Stderr, "%s\n", exceededMsg)
-				})
-				break // Stop reading more lines
-			}
-
-			stderrLines <- TimestampedLine{
-				Time:    time.Now(),
-				Source:  "stderr",
-				Content: line,
-			}
-		}
-
-		// Check if scanners are still valid
-		if scanner.Err() != nil {
-			err := scanner.Err()
-			if strings.Contains(err.Error(), "token too long") || strings.Contains(err.Error(), "buffer size exceeded") {
-				bufferExceeded.Do(func() {
-					exceededMsg := fmt.Sprintf("[fo] ERROR: Maximum line length (%d KB) exceeded in stderr. Line truncated.", config.MaxLineLength/1024)
-					stderrLines <- TimestampedLine{
-						Time:      time.Now(),
-						Source:    "stderr",
-						Content:   exceededMsg,
-						Truncated: true,
-					}
-					_, _ = fmt.Fprintf(os.Stderr, "%s\n", exceededMsg)
-				})
-			} else if !strings.Contains(err.Error(), "file already closed") && !strings.Contains(err.Error(), "broken pipe") {
-				_, _ = fmt.Fprintf(os.Stderr, "Error reading stderr: %v\n", err)
-			}
-		}
-	}()
-
-	// Collect all lines in a merged goroutine
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		stdoutOpen, stderrOpen := true, true
-		for stdoutOpen || stderrOpen {
+		defer close(collectionDone)
+		activeStdoutChan := stdoutLinesChan
+		activeStderrChan := stderrLinesChan
+		for activeStdoutChan != nil || activeStderrChan != nil {
 			select {
-			case line, ok := <-stdoutLines:
+			case line, ok := <-activeStdoutChan:
 				if !ok {
-					stdoutOpen = false
+					activeStdoutChan = nil
 					continue
 				}
-				allLines = append(allLines, line)
-			case line, ok := <-stderrLines:
+				allCapturedLines = append(allCapturedLines, line)
+			case line, ok := <-activeStderrChan:
 				if !ok {
-					stderrOpen = false
+					activeStderrChan = nil
 					continue
 				}
-				allLines = append(allLines, line)
+				allCapturedLines = append(allCapturedLines, line)
 			}
 		}
 	}()
 
-	// Start the command.
 	startErr := cmd.Start()
-
-	// Always wait for output collection to complete, regardless of cmd.Start() outcome
 	var cmdWaitErr error
-	if startErr == nil {
-		// Only wait for command to complete if it started successfully
-		cmdWaitErr = cmd.Wait()
+	if startErr != nil {
+		if len(cmdArgs) > 0 {
+			_, _ = fmt.Fprintf(os.Stderr, "Error starting command '%s': %v\n", cmdArgs[0], startErr)
+		} else {
+			_, _ = fmt.Fprintf(os.Stderr, "Error starting command (name unavailable): %v\n", startErr)
+		}
 	} else {
-		_, _ = fmt.Fprintf(os.Stderr, "Error starting command: %v\n", startErr)
+		cmdWaitErr = cmd.Wait()
 	}
 
-	// Wait for output collection to complete.
 	wg.Wait()
+	<-collectionDone
 
-	// Get exit code and duration.
 	duration := time.Since(startTime)
-
-	// Use the appropriate error based on what happened
-	exitCode := 1
-	if startErr == nil {
-		exitCode = getExitCode(cmdWaitErr)
+	var finalErr error
+	if startErr != nil {
+		finalErr = startErr
+	} else {
+		finalErr = cmdWaitErr
 	}
+	exitCode := getExitCode(finalErr)
+	printEndLine(appConfig, exitCode, duration)
 
-	// Print end status.
-	printEndLine(config, exitCode, duration)
-
-	// Sort lines by timestamp
-	sort.Slice(allLines, func(i, j int) bool {
-		return allLines[i].Time.Before(allLines[j].Time)
+	sort.Slice(allCapturedLines, func(i, j int) bool {
+		return allCapturedLines[i].Time.Before(allCapturedLines[j].Time)
 	})
 
-	// Determine if we should show the captured output.
 	showOutput := false
-	switch config.ShowOutput {
+	switch appConfig.ShowOutput {
 	case "always":
 		showOutput = true
 	case "on-fail":
 		showOutput = (exitCode != 0)
-	case "never":
-		showOutput = false
 	}
 
-	// Print captured output if needed.
-	if showOutput && len(allLines) > 0 {
+	if showOutput && len(allCapturedLines) > 0 {
 		_, _ = fmt.Println("--- Captured output: ---")
-
-		for _, line := range allLines {
-			// For truncated warning lines, print in a distinctive way
+		for _, line := range allCapturedLines {
 			if line.Truncated {
-				_, _ = fmt.Printf("%s%s%s\n", colorRed, line.Content, colorReset)
+				if appConfig.NoColor || appConfig.CI {
+					_, _ = fmt.Printf("%s\n", line.Content)
+				} else {
+					_, _ = fmt.Printf("%s%s%s\n", colorRed, line.Content, colorReset)
+				}
 			} else {
 				_, _ = fmt.Println(line.Content)
 			}
 		}
-
-		// End with a newline for better readability
 		_, _ = fmt.Println()
 	}
-
 	return exitCode
 }
 
-func printStartLine(config Config) {
-	if config.NoColor {
-		fmt.Printf("%s %s...\n", getStartIcon(config), config.Label)
-	} else {
-		fmt.Printf("%s %s%s...%s\n", getStartIcon(config), colorBlue, config.Label, colorReset)
+func scanOutputPipe(pipe io.ReadCloser, source string, outChan chan<- TimestampedLine, appConfig Config, bufferExceeded *sync.Once, wg *sync.WaitGroup) {
+	defer wg.Done()
+	defer close(outChan)
+
+	scanner := bufio.NewScanner(pipe)
+	scanner.Buffer(make([]byte, 0, 64*1024), appConfig.MaxLineLength)
+
+	var totalBytes int64
+	for scanner.Scan() {
+		line := scanner.Text()
+		lineSize := int64(len(line))
+		if totalBytes+lineSize > appConfig.MaxBufferSize {
+			bufferExceeded.Do(func() {
+				exceededMsg := fmt.Sprintf("[fo] ERROR: Total %s buffer size limit (%d MB) exceeded. Further output truncated.", source, appConfig.MaxBufferSize/1024/1024)
+				outChan <- TimestampedLine{Time: time.Now(), Source: source, Content: exceededMsg, Truncated: true}
+				_, _ = fmt.Fprintf(os.Stderr, "%s\n", exceededMsg)
+			})
+			break
+		}
+		totalBytes += lineSize
+		outChan <- TimestampedLine{Time: time.Now(), Source: source, Content: line}
+	}
+	if err := scanner.Err(); err != nil {
+		if errors.Is(err, bufio.ErrTooLong) {
+			bufferExceeded.Do(func() {
+				exceededMsg := fmt.Sprintf("[fo] ERROR: Maximum line length (%d KB) exceeded in %s. Line truncated.", appConfig.MaxLineLength/1024, source)
+				outChan <- TimestampedLine{Time: time.Now(), Source: source, Content: exceededMsg, Truncated: true}
+				_, _ = fmt.Fprintf(os.Stderr, "%s\n", exceededMsg)
+			})
+		} else if !strings.Contains(err.Error(), "file already closed") && !strings.Contains(err.Error(), "broken pipe") {
+			fmt.Fprintf(os.Stderr, "[fo] Error reading %s: %v\n", source, err)
+		}
 	}
 }
 
-func printEndLine(config Config, exitCode int, duration time.Duration) {
-	var icon string
-	var colorCode string
-
-	if exitCode == 0 {
-		icon = getSuccessIcon(config)
-		colorCode = colorGreen
+func printStartLine(appConfig Config) {
+	label := appConfig.Label
+	icon := iconStart
+	color := colorBlue
+	if appConfig.CI || appConfig.NoColor {
+		fmt.Printf("[START] %s...\n", label)
 	} else {
-		icon = getFailureIcon(config)
-		colorCode = colorRed
+		fmt.Printf("%s %s%s...%s\n", icon, color, label, colorReset)
 	}
+}
 
+func printEndLine(appConfig Config, exitCode int, duration time.Duration) {
+	label := appConfig.Label
+	var icon string
+	var color string
+	if exitCode == 0 {
+		icon = iconSuccess
+		color = colorGreen
+	} else {
+		icon = iconFailure
+		color = colorRed
+	}
 	durationStr := ""
-	if !config.NoTimer {
+	if !appConfig.CI && !appConfig.NoTimer {
 		durationStr = fmt.Sprintf(" (%s)", formatDuration(duration))
 	}
-
-	if config.NoColor {
-		fmt.Printf("%s %s%s\n", icon, config.Label, durationStr)
+	if appConfig.CI || appConfig.NoColor {
+		statusText := "[SUCCESS]"
+		if exitCode != 0 {
+			statusText = "[FAILED]"
+		}
+		fmt.Printf("%s %s%s\n", statusText, label, durationStr)
 	} else {
-		fmt.Printf("%s %s%s%s%s\n", icon, colorCode, config.Label, durationStr, colorReset)
+		fmt.Printf("%s %s%s%s%s\n", icon, color, label, durationStr, colorReset)
 	}
-}
-
-func getStartIcon(config Config) string {
-	if config.CI || config.NoColor {
-		return "[START]"
-	}
-	return iconStart
-}
-
-func getSuccessIcon(config Config) string {
-	if config.CI || config.NoColor {
-		return "[SUCCESS]"
-	}
-	return iconSuccess
-}
-
-func getFailureIcon(config Config) string {
-	if config.CI || config.NoColor {
-		return "[FAILED]"
-	}
-	return iconFailure
 }
 
 func formatDuration(d time.Duration) string {
-	// Format duration in a human-readable way.
-	if d.Hours() >= 1 {
-		h := int(d.Hours())
-		m := int(d.Minutes()) % 60
-		s := int(d.Seconds()) % 60
-		return fmt.Sprintf("%dh%dm%ds", h, m, s)
-	} else if d.Minutes() >= 1 {
-		m := int(d.Minutes())
-		s := int(d.Seconds()) % 60
-		ms := int(d.Milliseconds()) % 1000
-		return fmt.Sprintf("%dm%d.%ds", m, s, ms/100) // Corrected to ms/100 for one decimal place.
-	} else {
-		s := d.Seconds()
-		return fmt.Sprintf("%.1fs", s)
+	if d < time.Millisecond {
+		return fmt.Sprintf("%dµs", d.Microseconds())
 	}
+	if d < time.Second {
+		return fmt.Sprintf("%dms", d.Milliseconds())
+	}
+	if d < time.Minute {
+		return fmt.Sprintf("%.1fs", d.Seconds())
+	}
+	if d < time.Hour {
+		minutes := int(d.Minutes())
+		secondsFraction := d.Seconds() - float64(minutes*60)
+		return fmt.Sprintf("%dm%.1fs", minutes, secondsFraction)
+	}
+	return fmt.Sprintf("%dh%dm", int(d.Hours()), int(d.Minutes())%60)
 }
 
 func getExitCode(err error) int {
 	if err == nil {
 		return 0
 	}
-	// These are debug logs; if they fail, we can continue execution
-	_, _ = fmt.Fprintf(os.Stderr, "[DEBUG getExitCode] Received err: <%v> (type: <%s>)\n", err, reflect.TypeOf(err))
-
-	if exitErr, ok := err.(*exec.ExitError); ok {
-		_, _ = fmt.Fprintf(os.Stderr, "[DEBUG getExitCode] Successfully asserted to *exec.ExitError, code: %d\n", exitErr.ExitCode())
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
 		return exitErr.ExitCode()
 	}
-
-	_, _ = fmt.Fprintf(os.Stderr, "[DEBUG getExitCode] Failed to assert to *exec.ExitError. Falling back to generic error.\n")
-	_, _ = fmt.Fprintf(os.Stderr, "Command execution error: %v\n", err)
 	return 1
 }
