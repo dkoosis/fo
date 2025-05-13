@@ -1,0 +1,19 @@
+﻿Verma, P. (2013). Gracoli. CHI ’13 Extended Abstracts on Human Factors in Computing Systems, 3143–3146. https://doi.org/10.1145/2468356.2479631
+
+Rachel, B. C. (2017). Re-imagining the Command Line User Experience for Problem Solving.
+
+Sampath, H., Merrick, A., & Macvean, A. (2021). Accessibility of Command Line Interfaces. Proceedings of the 2021 CHI Conference on Human Factors in Computing Systems, 1–10. https://doi.org/10.1145/3411764.3445544
+
+Baecker, R., & Marcus, A. (1986). Design principles for the enhanced presentation of computer program source text. Proceedings of the SIGCHI Conference on Human Factors in Computing Systems, 51–58. https://doi.org/10.1145/22627.22348
+
+Will, C. (2020). Documentation Generation as Information Visualization. arXiv.Org.
+
+Baecker, R., & Marcus, A. (1983). On enhancing the interface to the source code of computer programs. Proceedings of the SIGCHI Conference on Human Factors in Computing Systems  - CHI ’83, 251–255. https://doi.org/10.1145/800045.801621
+
+Isaacs, K. E., & Gamblin, T. (2019). Preserving Command Line Workflow for a Package Management System Using ASCII DAG Visualization. IEEE Transactions on Visualization and Computer Graphics, 25(9), 2804–2820. https://doi.org/10.1109/tvcg.2018.2859974
+
+Murillo, S. R., Sánchez, J. A., & Sánchez-Lara, E. (2015). Enhancing Interfaces for Network Security Administrators with Legacy Attributes. Proceedings of the Latin American Conference on Human Computer Interaction, 1–8. https://doi.org/10.1145/2824893.2824896
+
+Jacques, J. T., & Kristensson, P. O. (2015). Understanding the effects of code presentation. Proceedings of the 6th Workshop on Evaluation and Usability of Programming Languages and Tools, 27–30. https://doi.org/10.1145/2846680.2846685
+
+Hayatpur, D., Hempel, B., Chen, K., Duan, W., Guo, P., & Xia, H. (2024). Taking ASCII Drawings Seriously: How Programmers Diagram Code. Proceedings of the CHI Conference on Human Factors in Computing Systems, 1–16. https://doi.org/10.1145/3613904.3642683
