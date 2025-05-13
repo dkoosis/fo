@@ -1,6 +1,70 @@
 O: Future Self
 FROM: Past Self
 DATE: 2025-05-13
+
+Defensive Strategies for fo in Makefiles
+
+Shell Processing Scenarios
+
+Shell glob expansion
+
+Scenario: @fo -- rm *.log → shell expands before fo sees it
+
+Strategy: Use sh -c to preserve intended behavior: @fo -- sh -c "rm *.log"
+
+Quoted arguments with spaces
+
+Scenario: @fo -- echo "Hello World" → quotes processed by shell
+
+Strategy: Add --shell flag option to execute command in shell: @fo --shell -- echo "Hello World"
+
+Shell operators (|, >, &&)
+
+Scenario: @fo -- find . -name "*.go" | grep "pattern"
+
+Strategy: Wrap in sh -c: @fo -- sh -c 'find . -name "*.go" | grep "pattern"'
+
+Environment Scenarios
+
+Working directory sensitivity
+
+Scenario: Command expects paths relative to Makefile
+
+Strategy: Add --dir=<path> option to set working directory
+
+Ctrl+C interruption
+
+Scenario: SIGINT not properly forwarded to wrapped command
+
+Strategy: Implement signal forwarding in fo code
+
+Make variable expansion
+
+Scenario: @fo -- command $(MAKE_VAR) → variables expanded by Make before fo
+
+Strategy: Document this behavior; ensure critical variables use proper escaping
+
+Output Handling Scenarios
+
+Extremely large output
+
+Scenario: GBs of output exhaust memory in CAPTURE mode
+
+Strategy: Add max buffer size limit; fail gracefully or auto-switch to STREAM mode
+
+Mixed stdout/stderr ordering
+
+Scenario: Interleaved output appears in different order when displayed
+
+Strategy: Add timestamps to lines in CAPTURE mode or implement unified capture
+
+Command requires terminal
+
+Scenario: Interactive commands fail without TTY
+
+Strategy: Add --tty flag to allocate pseudo-terminal
+
+These defensive measures would significantly improve robustness in complex environments while maintaining the tool's simplicity.
 RE: Design Specification and Vision for fo (fmtout) Go CLI Utility
 
 1. GOAL:

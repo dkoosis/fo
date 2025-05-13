@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -63,6 +64,8 @@ func main() {
 
 	// Execute the command with the given config.
 	exitCode := executeCommand(config, cmdArgs)
+
+	fmt.Fprintf(os.Stderr, "[DEBUG main()] about to os.Exit(%d). Config: %+v\n", exitCode, config)
 
 	// Exit with the same code as the wrapped command.
 	os.Exit(exitCode)
@@ -310,13 +313,12 @@ func getExitCode(err error) int {
 	if err == nil {
 		return 0
 	}
-
-	// Try to get the exit code.
+	fmt.Fprintf(os.Stderr, "[DEBUG getExitCode] Received err: <%v> (type: <%s>)\n", err, reflect.TypeOf(err))
 	if exitErr, ok := err.(*exec.ExitError); ok {
+		fmt.Fprintf(os.Stderr, "[DEBUG getExitCode] Successfully asserted to *exec.ExitError, code: %d\n", exitErr.ExitCode())
 		return exitErr.ExitCode()
 	}
-
-	// For other errors (e.g., command not found).
+	fmt.Fprintf(os.Stderr, "[DEBUG getExitCode] Failed to assert to *exec.ExitError. Falling back to generic error.\n")
 	fmt.Fprintf(os.Stderr, "Command execution error: %v\n", err)
 	return 1
 }
