@@ -108,6 +108,18 @@ lint-yaml:
 		printf "  $(ICON_INFO) $(YELLOW)No YAML files found$(NC)\n"; \
 	fi
 
+ensure-fo:
+	@if [ ! -f bin/fo ] || [ bin/fo -ot cmd/main.go ]; then \
+		mkdir -p bin && \
+		echo "Building fo..." && \
+		go build -o bin/fo ./cmd; \
+	fi
+
+# Start with one simple target as a test
+fo-vet: ensure-fo
+	@bin/fo -l "Vetting code" -- go vet ./...
+
+
 # Check file line length
 check-line-length:
 	@printf "$(ICON_START) $(BOLD)$(BLUE)Checking file line length...$(NC)\n"
@@ -155,10 +167,11 @@ deps:
 	@printf "  $(ICON_OK) $(GREEN)Dependencies synchronized$(NC)\n"
 
 # Run go vet
-vet:
-	@printf "$(ICON_START) $(BOLD)$(BLUE)Vetting code...$(NC)\n"
-	@go vet ./...
-	@printf "  $(ICON_OK) $(GREEN)Vetting passed$(NC)\n"
+vet: ensure-fo
+	@bin/fo -l "Vetting code" -- go vet ./...
+
+deps: ensure-fo
+	@bin/fo -l "Syncing dependencies" -- sh -c "go mod tidy -v && go mod download"
 
 # Scan for vulnerabilities
 check-vulns: install-tools

@@ -1,0 +1,38 @@
+---
+# .fo.yaml - Configuration file for fo command
+
+# Visual appearance settings
+visual:
+  start_icon: "▶️"
+  success_icon: "✅"
+  failure_icon: "❌"
+  color_start: "\033[34m" # Blue
+  color_success: "\033[32m" # Green
+  color_failure: "\033[31m" # Red
+
+# Default output behavior
+stream: false
+show_output: "on-fail"
+max_buffer_size: 10485760 # 10MB
+max_line_length: 1048576 # 1MB
+
+# Global settings
+no_timer: false
+no_color: false
+ci: false
+
+# Command-specific presets
+presets:
+  go:
+    label: "Go Build"
+    stream: true
+
+  golangci-lint:
+    label: "Linting"
+
+  test:
+    label: "Testing"
+    stream: true
+
+  make:
+    stream: true

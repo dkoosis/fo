@@ -14,6 +14,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/davidkoosis/fo/cmd/internal/config"
 )
 
 // Config holds the command-line options.
@@ -67,7 +69,14 @@ type TimestampedLine struct {
 }
 
 func main() {
-	config := parseFlags()
+	// Parse flags
+	flagConfig := parseFlags()
+
+	// Load config file
+	fileConfig := config.LoadConfig()
+
+	// Merge configurations (flags take precedence)
+	mergedConfig := config.MergeWithFlags(fileConfig, flagConfig)
 
 	// Find the command to execute (after --).
 	cmdArgs := findCommandArgs()
@@ -77,10 +86,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Set default label if not provided.
-	if config.Label == "" {
-		config.Label = cmdArgs[0] // Use command name as default label.
+	// Apply command-specific preset
+	if len(cmdArgs) > 0 {
+		config.ApplyCommandPreset(mergedConfig, cmdArgs[0])
 	}
+
+	// Set default label if not provided
+	if mergedConfig.Label == "" {
+		mergedConfig.Label = cmdArgs[0] // Use command name as default label.
+	}
+
+	// Convert to the local Config type used by executeCommand
+	localConfig := convertToInternalConfig(mergedConfig)
 
 	// Set up signal handling
 	ctx, cancel := context.WithCancel(context.Background())
@@ -92,58 +109,72 @@ func main() {
 	defer signal.Stop(sigChan)
 
 	// Execute the command with the given config.
-	exitCode := executeCommand(ctx, cancel, sigChan, config, cmdArgs)
+	exitCode := executeCommand(ctx, cancel, sigChan, localConfig, cmdArgs)
 
-	fmt.Fprintf(os.Stderr, "[DEBUG main()] about to os.Exit(%d). Config: %+v\n", exitCode, config)
+	fmt.Fprintf(os.Stderr, "[DEBUG main()] about to os.Exit(%d). Config: %+v\n", exitCode, mergedConfig)
 
 	// Exit with the same code as the wrapped command.
 	os.Exit(exitCode)
 }
 
-func parseFlags() Config {
-	var config Config
+// Add a helper function to convert from config.Config to our internal Config structure
+func convertToInternalConfig(cfg *config.Config) Config {
+	return Config{
+		Label:         cfg.Label,
+		Stream:        cfg.Stream,
+		ShowOutput:    cfg.ShowOutput,
+		NoTimer:       cfg.NoTimer,
+		NoColor:       cfg.NoColor,
+		CI:            cfg.CI,
+		MaxBufferSize: cfg.MaxBufferSize,
+		MaxLineLength: cfg.MaxLineLength,
+	}
+}
 
-	flag.StringVar(&config.Label, "l", "", "Label for the task.")
-	flag.StringVar(&config.Label, "label", "", "Label for the task (shorthand: -l).")
+func parseFlags() *config.Config {
+	cfg := &config.Config{}
 
-	flag.BoolVar(&config.Stream, "s", false, "Stream mode - print command's stdout/stderr live.")
-	flag.BoolVar(&config.Stream, "stream", false, "Stream mode - print command's stdout/stderr live (shorthand: -s).")
+	flag.StringVar(&cfg.Label, "l", "", "Label for the task.")
+	flag.StringVar(&cfg.Label, "label", "", "Label for the task (shorthand: -l).")
 
-	flag.StringVar(&config.ShowOutput, "show-output", "on-fail", "When to show captured output: on-fail (default), always, never.")
+	flag.BoolVar(&cfg.Stream, "s", false, "Stream mode - print command's stdout/stderr live.")
+	flag.BoolVar(&cfg.Stream, "stream", false, "Stream mode - print command's stdout/stderr live (shorthand: -s).")
 
-	flag.BoolVar(&config.NoTimer, "no-timer", false, "Disable showing the duration.")
-	flag.BoolVar(&config.NoColor, "no-color", false, "Disable ANSI color/styling output.")
-	flag.BoolVar(&config.CI, "ci", false, "Enable CI-friendly, plain-text output (implies --no-color, --no-timer).")
+	flag.StringVar(&cfg.ShowOutput, "show-output", "on-fail", "When to show captured output: on-fail (default), always, never.")
 
-	maxBufferSizeMB := flag.Int("max-buffer-size", int(DefaultMaxBufferSize/1024/1024),
+	flag.BoolVar(&cfg.NoTimer, "no-timer", false, "Disable showing the duration.")
+	flag.BoolVar(&cfg.NoColor, "no-color", false, "Disable ANSI color/styling output.")
+	flag.BoolVar(&cfg.CI, "ci", false, "Enable CI-friendly, plain-text output (implies --no-color, --no-timer).")
+
+	maxBufferSizeMB := flag.Int("max-buffer-size", int(config.DefaultMaxBufferSize/1024/1024),
 		"Maximum total buffer size in MB (per stream) for capturing command output. Default: 10MB")
 
-	maxLineLengthKB := flag.Int("max-line-length", int(DefaultMaxLineLength/1024),
+	maxLineLengthKB := flag.Int("max-line-length", int(config.DefaultMaxLineLength/1024),
 		"Maximum length in KB for a single line of output. Default: 1024KB (1MB)")
 
 	// Parse flags but stop at --.
 	flag.Parse()
 
 	// Apply implications of --ci flag.
-	if config.CI {
-		config.NoColor = true
-		config.NoTimer = true
+	if cfg.CI {
+		cfg.NoColor = true
+		cfg.NoTimer = true
 	}
 
 	// Validate ShowOutput value.
-	if !validShowOutputValues[config.ShowOutput] {
-		fmt.Fprintf(os.Stderr, "Error: Invalid value for --show-output: %s\n", config.ShowOutput)
+	if !validShowOutputValues[cfg.ShowOutput] {
+		fmt.Fprintf(os.Stderr, "Error: Invalid value for --show-output: %s\n", cfg.ShowOutput)
 		fmt.Fprintln(os.Stderr, "Valid values are: on-fail, always, never")
 		os.Exit(1)
 	}
 
 	// Convert MB to bytes for buffer size
-	config.MaxBufferSize = int64(*maxBufferSizeMB) * 1024 * 1024
+	cfg.MaxBufferSize = int64(*maxBufferSizeMB) * 1024 * 1024
 
 	// Convert KB to bytes for line length
-	config.MaxLineLength = *maxLineLengthKB * 1024
+	cfg.MaxLineLength = *maxLineLengthKB * 1024
 
-	return config
+	return cfg
 }
 
 func findCommandArgs() []string {
