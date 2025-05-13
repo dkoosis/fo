@@ -3,6 +3,7 @@ package design
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -40,7 +41,9 @@ func (t *Task) RenderStartLine() string {
 
 	if t.Config.Style.UseBoxes {
 		paddingWidth := calculateWidth(t.Label) - len(t.formatIntentLabel()) - 4 // Adjust for icon and ellipsis
-		sb.WriteString(strings.Repeat(" ", paddingWidth))
+		if paddingWidth > 0 {                                                    // Ensure padding is not negative
+			sb.WriteString(strings.Repeat(" ", paddingWidth))
+		}
 		sb.WriteString("│")
 	}
 
@@ -53,7 +56,7 @@ func (t *Task) formatIntentLabel() string {
 		return filepath.Base(t.Command)
 	}
 
-	// Capitalize first letter, ensure it ends with "ing"
+	// Capitalize first letter
 	intent := t.Intent
 	if len(intent) > 0 {
 		intent = strings.ToUpper(intent[:1]) + intent[1:]
@@ -86,22 +89,29 @@ func (t *Task) RenderEndLine() string {
 		color = t.Config.Colors.Error
 		statusText = "Failed"
 	default:
-		icon = t.Config.Icons.Info
-		color = t.Config.Colors.Process
-		statusText = "Done"
+		icon = t.Config.Icons.Info      // Fallback icon
+		color = t.Config.Colors.Process // Fallback color
+		statusText = "Done"             // Fallback text
 	}
 
 	// Format duration
-	durationStr := formatDuration(t.Duration)
+	durationStr := ""
+	// Access NoTimer from t.Config.Style.NoTimer
+	if !t.Config.Style.NoTimer { // Check the NoTimer field from the Style struct
+		durationStr = formatDuration(t.Duration) // formatDuration is now local to this file
+	}
 
 	// Status line
-	sb.WriteString(fmt.Sprintf("%s %s%s (%s)%s",
+	sb.WriteString(fmt.Sprintf("%s %s%s%s%s",
 		icon, color, statusText, durationStr, t.Config.Colors.Reset))
 
 	if t.Config.Style.UseBoxes {
 		// Add padding to align with right border
 		width := calculateWidth(t.Label)
-		paddingWidth := width - len(statusText) - len(durationStr) - 4 // Adjust for icon and parentheses
+		// Calculate current line length more accurately
+		// Length of icon (often 2 for emoji) + space + statusText + durationStr
+		currentLength := len(icon) + 1 + len(statusText) + len(durationStr)
+		paddingWidth := width - currentLength
 		if paddingWidth > 0 {
 			sb.WriteString(strings.Repeat(" ", paddingWidth))
 		}
@@ -112,7 +122,7 @@ func (t *Task) RenderEndLine() string {
 	if t.Config.Style.UseBoxes {
 		width := calculateWidth(t.Label)
 		sb.WriteString("\n└")
-		sb.WriteString(strings.Repeat("─", width+1))
+		sb.WriteString(strings.Repeat("─", width+1)) // +1 to account for the left box char
 		sb.WriteString("┘")
 	}
 
@@ -146,7 +156,7 @@ func (t *Task) RenderOutputLine(line OutputLine) string {
 	switch line.Type {
 	case TypeError:
 		// Research: Red italics reduce cognitive load for critical info (Zhou et al.)
-		if line.Context.CognitiveLoad == LoadHigh {
+		if line.Context.CognitiveLoad == LoadHigh && !t.Config.Accessibility.ScreenReaderFriendly {
 			sb.WriteString(fmt.Sprintf("%s%s%s%s%s",
 				t.Config.Colors.Error,
 				"\033[3m", // Italics
@@ -172,37 +182,50 @@ func (t *Task) RenderOutputLine(line OutputLine) string {
 			t.Config.Colors.Reset))
 	case TypeInfo:
 		sb.WriteString(fmt.Sprintf("%s%s %s%s",
-			t.Config.Colors.Process,
+			t.Config.Colors.Process, // Using process color for info
 			t.Config.Icons.Info,
 			content,
 			t.Config.Colors.Reset))
 	case TypeSummary:
 		// Bold formatting for summary
-		sb.WriteString(fmt.Sprintf("%s%s%s%s",
-			t.Config.Colors.Process,
-			"\033[1m", // Bold
-			content,
-			"\033[0m"+t.Config.Colors.Reset)) // Reset bold and color
+		if !t.Config.Accessibility.ScreenReaderFriendly {
+			sb.WriteString(fmt.Sprintf("%s%s%s%s",
+				t.Config.Colors.Process, // Using process color for summary
+				"\033[1m",               // Bold
+				content,
+				"\033[0m"+t.Config.Colors.Reset)) // Reset bold and color
+		} else {
+			sb.WriteString(fmt.Sprintf("%s%s%s",
+				t.Config.Colors.Process,
+				content,
+				t.Config.Colors.Reset))
+		}
 	case TypeProgress:
 		sb.WriteString(fmt.Sprintf("%s%s%s",
 			t.Config.Colors.Muted,
 			content,
 			t.Config.Colors.Reset))
 	default: // TypeDetail
-		sb.WriteString(content)
+		sb.WriteString(fmt.Sprintf("%s%s%s", // Apply detail color
+			t.Config.Colors.Detail,
+			content,
+			t.Config.Colors.Reset))
 	}
 
 	// Add right border padding if using boxes
 	if t.Config.Style.UseBoxes {
-		paddingWidth := calculateWidth(t.Label) - len(content) - t.Config.getIndentation(indentLevel).Length()
+		visibleContentLength := len(stripANSI(content)) // Basic ANSI stripping for length
+		// Calculate current line length more accurately
+		currentLineLength := len(t.Config.getIndentation(indentLevel)) + visibleContentLength
 		if t.Config.Style.ShowTimestamps {
-			// Adjust for timestamp
-			paddingWidth -= 10 // Approximate timestamp width
+			// A more precise calculation for timestamp length would be better
+			currentLineLength += len(formatDuration(line.Timestamp.Sub(t.StartTime))) + 3 // for "[ts] "
 		}
 		if line.Type == TypeWarning || line.Type == TypeInfo {
-			// Adjust for icon
-			paddingWidth -= 2
+			currentLineLength += len(t.Config.Icons.Warning) + 1 // Icon and space
 		}
+
+		paddingWidth := calculateWidth(t.Label) - currentLineLength
 		if paddingWidth > 0 {
 			sb.WriteString(strings.Repeat(" ", paddingWidth))
 		}
@@ -212,40 +235,65 @@ func (t *Task) RenderOutputLine(line OutputLine) string {
 	return sb.String()
 }
 
+// stripANSI removes ANSI escape codes from a string for length calculation.
+// This is a basic implementation and might not cover all ANSI sequences.
+func stripANSI(s string) string {
+	// This regex matches typical SGR (Select Graphic Rendition) escape sequences.
+	// \x1b is the ESC character.
+	// \[ is the literal '['.
+	// [0-9;]* matches zero or more digits or semicolons (parameters for the SGR command).
+	// [mKHF] matches common SGR terminators (m for SGR, K for EL, H for CUP, F for CPL - though m is most relevant for color/style).
+	re := regexp.MustCompile(`\x1b\[[0-9;]*[mKHF]`)
+	return re.ReplaceAllString(s, "")
+}
+
 // RenderSummary creates a summary section for the output
 func (t *Task) RenderSummary() string {
 	errorCount, warningCount := 0, 0
 
 	for _, line := range t.OutputLines {
-		if line.Type == TypeError {
+		switch line.Type {
+		case TypeError:
 			errorCount++
-		} else if line.Type == TypeWarning {
+		case TypeWarning:
 			warningCount++
 		}
 	}
 
 	if errorCount == 0 && warningCount == 0 {
-		return ""
+		return "" // No summary needed if no issues
 	}
 
 	var sb strings.Builder
 
 	if t.Config.Style.UseBoxes {
-		sb.WriteString("│ ")
+		sb.WriteString("│ ") // Indent summary within box
 	}
 
 	// Summary heading
-	sb.WriteString(fmt.Sprintf("%s%s%s%s\n",
-		t.Config.Colors.Process,
-		"\033[1m", // Bold
-		"SUMMARY:",
-		"\033[0m"+t.Config.Colors.Reset)) // Reset bold and color
+	summaryHeading := "SUMMARY:"
+	if !t.Config.Accessibility.ScreenReaderFriendly {
+		sb.WriteString(fmt.Sprintf("%s%s%s%s\n",
+			t.Config.Colors.Process, // Use process color for summary heading
+			"\033[1m",               // Bold
+			summaryHeading,
+			"\033[0m"+t.Config.Colors.Reset)) // Reset bold and then color
+	} else {
+		sb.WriteString(fmt.Sprintf("%s%s%s\n",
+			t.Config.Colors.Process,
+			summaryHeading,
+			t.Config.Colors.Reset))
+	}
+
+	indentStr := ""
+	if t.Config.Style.UseBoxes {
+		indentStr = "│ " + t.Config.getIndentation(1) // Box prefix + one level of indentation
+	} else {
+		indentStr = t.Config.getIndentation(1) // Just one level of indentation
+	}
 
 	if errorCount > 0 {
-		if t.Config.Style.UseBoxes {
-			sb.WriteString("│ ")
-		}
-		sb.WriteString(t.Config.getIndentation(1))
+		sb.WriteString(indentStr)
 		sb.WriteString(fmt.Sprintf("%s• %d error%s detected%s\n",
 			t.Config.Colors.Error,
 			errorCount,
@@ -254,10 +302,7 @@ func (t *Task) RenderSummary() string {
 	}
 
 	if warningCount > 0 {
-		if t.Config.Style.UseBoxes {
-			sb.WriteString("│ ")
-		}
-		sb.WriteString(t.Config.getIndentation(1))
+		sb.WriteString(indentStr)
 		sb.WriteString(fmt.Sprintf("%s• %d warning%s present%s\n",
 			t.Config.Colors.Warning,
 			warningCount,
@@ -265,170 +310,162 @@ func (t *Task) RenderSummary() string {
 			t.Config.Colors.Reset))
 	}
 
-	// Empty line after summary
+	// Empty line after summary for visual separation, only if using boxes
 	if t.Config.Style.UseBoxes {
 		sb.WriteString("│")
 		sb.WriteString(strings.Repeat(" ", calculateWidth(t.Label)))
 		sb.WriteString("│\n")
-	} else {
+	} else if errorCount > 0 || warningCount > 0 { // Add newline if not using boxes and summary was printed
 		sb.WriteString("\n")
 	}
 
 	return sb.String()
 }
 
-// RenderCompleteOutput creates the fully formatted output
+// RenderCompleteOutput creates the fully formatted output.
+// This function assumes that cmd/main.go will call RenderStartLine, then conditionally
+// print the summary and output lines, and finally call RenderEndLine.
+// This function itself might not be directly called if main.go orchestrates parts.
 func (t *Task) RenderCompleteOutput(showOutput string) string {
 	var sb strings.Builder
 
-	// Start line
 	sb.WriteString(t.RenderStartLine())
 	sb.WriteString("\n")
 
-	// Determine if we should show output
 	showDetailedOutput := false
 	switch showOutput {
 	case "always":
 		showDetailedOutput = true
 	case "on-fail":
 		showDetailedOutput = (t.Status == StatusError || t.Status == StatusWarning)
-	case "never":
-		showDetailedOutput = false
+		// "never" case means showDetailedOutput remains false
 	}
 
-	// Add output lines if we should show them
 	if showDetailedOutput && len(t.OutputLines) > 0 {
-		// Empty line for visual separation
 		if t.Config.Style.UseBoxes {
-			sb.WriteString("│")
+			sb.WriteString("│") // Empty line with borders
 			sb.WriteString(strings.Repeat(" ", calculateWidth(t.Label)))
 			sb.WriteString("│\n")
 		}
 
-		// Summary section
 		if summary := t.RenderSummary(); summary != "" {
-			sb.WriteString(summary)
+			sb.WriteString(summary) // RenderSummary already adds newlines appropriately
 		}
 
-		// Group lines by type if the cognitive load is high
 		var renderedLines []string
-
 		if t.Context.CognitiveLoad == LoadHigh && t.Config.Output.SummarizeSimilar {
-			// Group similar lines and summarize if there are many
-			similarGroups := t.SummarizeOutput()
+			similarGroups := t.SummarizeOutputGroups()
 			for _, groupedLines := range similarGroups {
 				for _, line := range groupedLines {
 					renderedLines = append(renderedLines, t.RenderOutputLine(line))
 				}
 			}
 		} else {
-			// Regular output rendering
 			for _, line := range t.OutputLines {
 				renderedLines = append(renderedLines, t.RenderOutputLine(line))
 			}
 		}
+		if len(renderedLines) > 0 {
+			sb.WriteString(strings.Join(renderedLines, "\n"))
+			sb.WriteString("\n") // Add a final newline after all output lines
+		}
 
-		// Add all rendered lines with newlines
-		sb.WriteString(strings.Join(renderedLines, "\n"))
-		sb.WriteString("\n")
-
-		// Empty line for visual separation
 		if t.Config.Style.UseBoxes {
-			sb.WriteString("│")
+			sb.WriteString("│") // Empty line with borders
 			sb.WriteString(strings.Repeat(" ", calculateWidth(t.Label)))
 			sb.WriteString("│\n")
 		}
 	}
 
-	// End line
 	sb.WriteString(t.RenderEndLine())
-
 	return sb.String()
 }
 
-// SummarizeOutput groups similar output lines for better readability
-func (t *Task) SummarizeOutput() [][]OutputLine {
+// SummarizeOutputGroups groups similar output lines for better readability.
+func (t *Task) SummarizeOutputGroups() [][]OutputLine {
 	pm := NewPatternMatcher(t.Config)
 	groups := pm.FindSimilarLines(t.OutputLines)
 
-	// Convert groups to a slice for ordering
 	var result [][]OutputLine
-
-	// First add error groups
-	for key, lines := range groups {
-		if strings.HasPrefix(key, TypeError) {
-			// If many similar errors, just show a sample
-			if len(lines) > t.Config.Output.MaxErrorSamples && t.Config.Output.SummarizeSimilar {
-				sampleLines := lines[:t.Config.Output.MaxErrorSamples]
-				// Add a summary line
-				summaryLine := OutputLine{
-					Content:     fmt.Sprintf("... %d similar errors", len(lines)-t.Config.Output.MaxErrorSamples),
-					Type:        TypeSummary,
-					Timestamp:   time.Now(),
-					Indentation: 1,
-					Context:     LineContext{CognitiveLoad: t.Context.CognitiveLoad, Importance: 3},
-				}
-				sampleLines = append(sampleLines, summaryLine)
-				result = append(result, sampleLines)
-			} else {
-				result = append(result, lines)
+	// Process groups by type to control order (e.g., errors first)
+	processGroupType := func(targetType string, groupNameForSummary string) {
+		for key, lines := range groups {
+			if strings.HasPrefix(key, targetType) {
+				result = append(result, t.sampleAndSummarizeGroup(lines, groupNameForSummary))
+				delete(groups, key) // Remove processed group
 			}
 		}
 	}
 
-	// Then add warning groups
-	for key, lines := range groups {
-		if strings.HasPrefix(key, TypeWarning) {
-			if len(lines) > t.Config.Output.MaxErrorSamples && t.Config.Output.SummarizeSimilar {
-				sampleLines := lines[:t.Config.Output.MaxErrorSamples]
-				summaryLine := OutputLine{
-					Content:     fmt.Sprintf("... %d similar warnings", len(lines)-t.Config.Output.MaxErrorSamples),
-					Type:        TypeSummary,
-					Timestamp:   time.Now(),
-					Indentation: 1,
-					Context:     LineContext{CognitiveLoad: t.Context.CognitiveLoad, Importance: 3},
-				}
-				sampleLines = append(sampleLines, summaryLine)
-				result = append(result, sampleLines)
-			} else {
-				result = append(result, lines)
-			}
-		}
-	}
+	processGroupType(TypeError, "errors")
+	processGroupType(TypeWarning, "warnings")
 
-	// Finally add other groups
-	for key, lines := range groups {
-		if !strings.HasPrefix(key, TypeError) && !strings.HasPrefix(key, TypeWarning) {
-			result = append(result, lines)
-		}
+	// Process remaining groups
+	for _, lines := range groups {
+		result = append(result, lines) // Or apply generic sampling
 	}
-
 	return result
+}
+
+// sampleAndSummarizeGroup is a helper to sample lines and add a summary line.
+func (t *Task) sampleAndSummarizeGroup(lines []OutputLine, groupType string) []OutputLine {
+	if len(lines) > t.Config.Output.MaxErrorSamples && t.Config.Output.SummarizeSimilar {
+		sampleLines := lines[:t.Config.Output.MaxErrorSamples]
+		summaryLine := OutputLine{
+			Content:     fmt.Sprintf("... %d similar %s", len(lines)-t.Config.Output.MaxErrorSamples, groupType),
+			Type:        TypeSummary,
+			Timestamp:   time.Now(), // Or consider timestamp of last sampled line
+			Indentation: 1,          // Consistent indentation for summary line
+			Context:     LineContext{CognitiveLoad: t.Context.CognitiveLoad, Importance: 3},
+		}
+		return append(sampleLines, summaryLine)
+	}
+	return lines
 }
 
 // Helper functions
 
-// calculateWidth determines the appropriate width for task display
+// calculateWidth determines the appropriate width for task display.
 func calculateWidth(label string) int {
-	// Base width on label length, with minimum and maximum values
 	minWidth := 50
 	maxWidth := 80
-
-	width := len(label) + 40 // Add space for formatting
+	// Base width on label length, with added space for icons, status, timer.
+	// This is an estimate; precise calculation is complex due to variable content.
+	width := len(label) + 25 // Increased padding for better fitting
 
 	if width < minWidth {
 		return minWidth
-	} else if width > maxWidth {
+	}
+	if width > maxWidth {
 		return maxWidth
 	}
-
 	return width
 }
 
-// pluralSuffix returns "s" for counts not equal to 1
+// pluralSuffix returns "s" for counts not equal to 1.
 func pluralSuffix(count int) string {
 	if count == 1 {
 		return ""
 	}
 	return "s"
+}
+
+// formatDuration converts a time.Duration to a human-readable string.
+// This function is now defined only in render.go.
+func formatDuration(d time.Duration) string {
+	if d < time.Millisecond {
+		return fmt.Sprintf("%dµs", d.Microseconds())
+	}
+	if d < time.Second {
+		return fmt.Sprintf("%dms", d.Milliseconds())
+	}
+	if d < time.Minute {
+		return fmt.Sprintf("%.1fs", d.Seconds())
+	}
+	if d < time.Hour {
+		minutes := int(d.Minutes())
+		secondsFraction := d.Seconds() - float64(minutes*60)
+		return fmt.Sprintf("%dm%.1fs", minutes, secondsFraction)
+	}
+	return fmt.Sprintf("%dh%dm", int(d.Hours()), int(d.Minutes())%60)
 }

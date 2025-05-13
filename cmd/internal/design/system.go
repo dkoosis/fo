@@ -129,7 +129,7 @@ func (t *Task) Complete(exitCode int) {
 		// Check for errors/warnings in output
 		hasErrors, hasWarnings := t.hasOutputIssues()
 
-		if hasErrors {
+		if hasErrors { // If there are errors in output, mark status as error even if exit code is 0
 			t.Status = StatusError
 		} else if hasWarnings {
 			t.Status = StatusWarning
@@ -137,16 +137,17 @@ func (t *Task) Complete(exitCode int) {
 			t.Status = StatusSuccess
 		}
 	} else {
-		t.Status = StatusError
+		t.Status = StatusError // Non-zero exit code always means error status
 	}
 }
 
 // hasOutputIssues checks if the output contains errors or warnings
 func (t *Task) hasOutputIssues() (hasErrors, hasWarnings bool) {
 	for _, line := range t.OutputLines {
-		if line.Type == TypeError {
+		switch line.Type { // Applied QF1003 fix: Changed from if/else if to switch
+		case TypeError:
 			hasErrors = true
-		} else if line.Type == TypeWarning {
+		case TypeWarning:
 			hasWarnings = true
 		}
 	}
@@ -160,9 +161,10 @@ func (t *Task) UpdateTaskContext() {
 	warningCount := 0
 
 	for _, line := range t.OutputLines {
-		if line.Type == TypeError {
+		switch line.Type { // Applied QF1003 fix: Changed from if/else if to switch
+		case TypeError:
 			errorCount++
-		} else if line.Type == TypeWarning {
+		case TypeWarning:
 			warningCount++
 		}
 	}
@@ -176,7 +178,7 @@ func (t *Task) UpdateTaskContext() {
 	} else if outputSize > 20 {
 		t.Context.Complexity = 3
 	} else {
-		t.Context.Complexity = 2
+		t.Context.Complexity = 2 // Default complexity for smaller outputs
 	}
 
 	// Update cognitive load based on research-backed heuristics

@@ -157,24 +157,24 @@ func (pm *PatternMatcher) findToolConfig(cmd string, args []string) *ToolConfig 
 // and returns the category type along with the updated context
 func adjustCategoryImportance(category string, context *LineContext) (string, LineContext) {
 	switch category {
-	case "error", TypeError:
+	case TypeError:
 		context.Importance = 5
 		context.CognitiveLoad = LoadHigh
 		return TypeError, *context
-	case "warning", TypeWarning:
+	case TypeWarning:
 		context.Importance = 4
 		context.CognitiveLoad = LoadMedium
 		return TypeWarning, *context
-	case "success", TypeSuccess:
+	case TypeSuccess:
 		context.Importance = 3
 		return TypeSuccess, *context
-	case "info", TypeInfo:
+	case TypeInfo:
 		context.Importance = 3
 		return TypeInfo, *context
-	case "progress", TypeProgress:
+	case TypeProgress:
 		context.Importance = 2
 		return TypeProgress, *context
-	case "summary", TypeSummary:
+	case TypeSummary:
 		context.Importance = 4
 		context.IsSummary = true
 		return TypeSummary, *context
@@ -238,9 +238,10 @@ func (pm *PatternMatcher) DetermineCognitiveLoad(lines []OutputLine) CognitiveLo
 	outputSize := len(lines)
 
 	for _, line := range lines {
-		if line.Type == TypeError {
+		switch line.Type { // Changed from if/else if to switch
+		case TypeError:
 			errorCount++
-		} else if line.Type == TypeWarning {
+		case TypeWarning:
 			warningCount++
 		}
 	}
