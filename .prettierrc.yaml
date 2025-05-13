@@ -1,0 +1,4 @@
+# .prettierrc.yaml
+printWidth: 120
+tabWidth: 2
+# Add other options if desired (e.g., singleQuote: true)
