@@ -16,8 +16,8 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
-# bin/
-# cmd/fo_test_binary_generated_by_TestMain
+bin/
+cmd/fo_test_binary_generated_by_TestMain
 
 # Go workspace file
 go.work
