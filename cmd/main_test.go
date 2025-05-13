@@ -207,22 +207,37 @@ func TestFoCoreExecution(t *testing.T) {
 			t.Errorf("Expected 'fo' to exit non-zero for command not found, got %d. Error from runFo: %v", res.exitCode, res.err)
 		}
 
+		// Check for the start line pattern in fo's stdout
 		expectedStartPattern := buildPattern(plainIconStart, commandName, true, false)
 		if !expectedStartPattern.MatchString(res.stdout) {
 			t.Errorf("Expected 'fo' stdout to contain start line matching pattern /%s/, got:\n%s", expectedStartPattern.String(), res.stdout)
 		}
 
-		expectedEndPattern := buildPattern(plainIconFailure, commandName, false, true) // No-color still has timer
+		// Check for the failure end line pattern in fo's stdout (no-color still has timer)
+		expectedEndPattern := buildPattern(plainIconFailure, commandName, false, true)
 		if !expectedEndPattern.MatchString(res.stdout) {
 			t.Errorf("Expected 'fo' stdout to contain end line matching pattern /%s/, got:\n%s", expectedEndPattern.String(), res.stdout)
 		}
 
-		expectedFoErrCmdStart := "Error starting command: exec: \"" + commandName + "\": executable file not found"
-		if !strings.Contains(res.stderr, expectedFoErrCmdStart) {
-			expectedFoErrCmdStartAlternate := "Error starting command: exec: \"" + commandName + "\": No such file or directory"
-			if !strings.Contains(res.stderr, expectedFoErrCmdStartAlternate) {
-				t.Errorf("Expected 'fo' stderr to contain specific 'Error starting command...' message for '%s', got:\n%s", commandName, res.stderr)
-			}
+		// Construct the precise prefix expected in the stderr message from 'fo'.
+		// The 'fo' application formats the error as: "Error starting command '<commandName>': <os_exec_error>"
+		// The <os_exec_error> itself starts with "exec: \"<commandName>\": "
+		// So, the full prefix we need to check is:
+		// "Error starting command '<commandName>': exec: \"<commandName>\": "
+		expectedStderrPrefix := "Error starting command '" + commandName + "': exec: \"" + commandName + "\": "
+		actualStderr := strings.TrimSpace(res.stderr)
+
+		if !strings.HasPrefix(actualStderr, expectedStderrPrefix) {
+			t.Errorf("Expected 'fo' stderr to start with the prefix '%s', got:\n%s", expectedStderrPrefix, actualStderr)
+		}
+
+		// Additionally, check that one of meninas's known underlying OS error messages is present
+		// after the prefix.
+		mentionsExecutableNotFound := strings.Contains(actualStderr, "executable file not found")
+		mentionsNoSuchFile := strings.Contains(actualStderr, "No such file or directory")
+
+		if !mentionsExecutableNotFound && !mentionsNoSuchFile {
+			t.Errorf("Expected 'fo' stderr to contain either 'executable file not found' or 'No such file or directory' after the prefix, got:\n%s", actualStderr)
 		}
 	})
 
