@@ -6,24 +6,23 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io" // Added for io.ReadCloser in scanOutputPipe
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
-	"sort"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
-	// Assuming your config package is correctly located here
 	"github.com/davidkoosis/fo/cmd/internal/config"
-	// Assuming your version package is correctly located here
+	"github.com/davidkoosis/fo/cmd/internal/design"
 	"github.com/davidkoosis/fo/cmd/internal/version"
 )
 
 // Config holds the command-line options relevant to fo's execution logic.
 // This is distinct from config.Config which is used for loading/merging.
+// Config holds the command-line options relevant to fo's execution logic.
 type Config struct {
 	Label         string
 	Stream        bool
@@ -31,9 +30,9 @@ type Config struct {
 	NoTimer       bool
 	NoColor       bool
 	CI            bool
-	Debug         bool  // New field for the debug flag
-	MaxBufferSize int64 // Total buffer size (in bytes)
-	MaxLineLength int   // Maximum line length (in bytes)
+	Debug         bool
+	MaxBufferSize int64
+	MaxLineLength int
 }
 
 // ANSI color codes.
@@ -232,13 +231,39 @@ func findCommandArgs() []string {
 }
 
 func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan os.Signal, appConfig Config, cmdArgs []string) int {
-	printStartLine(appConfig)
-	startTime := time.Now()
+	// Create design system configuration
+	var designConfig *design.Config
+	if appConfig.NoColor || appConfig.CI {
+		designConfig = design.NoColorConfig()
+	} else {
+		designConfig = design.DefaultConfig()
+	}
 
+	// Create pattern matcher for intent detection
+	patternMatcher := design.NewPatternMatcher(designConfig)
+
+	// Detect command intent
+	intent := patternMatcher.DetectCommandIntent(cmdArgs[0], cmdArgs[1:])
+
+	// Determine label
+	label := appConfig.Label
+	if label == "" {
+		// Use command base name if label not provided
+		label = intent
+	}
+
+	// Create task
+	task := design.NewTask(label, intent, cmdArgs[0], cmdArgs[1:], designConfig)
+
+	// Print task start
+	fmt.Println(task.RenderStartLine())
+
+	// Set up command execution
 	cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
 	cmd.Env = os.Environ()
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
+	// Set up signal handling
 	cmdDone := make(chan struct{})
 	go func() {
 		defer close(cmdDone)
@@ -254,6 +279,7 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 			} else {
 				_ = cmd.Process.Signal(sig)
 			}
+			// Wait for process to exit or force kill after timeout
 			go func() {
 				select {
 				case <-cmdDone:
@@ -273,127 +299,179 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 		}
 	}()
 
+	// Execute command based on mode
 	var exitCode int
 	if appConfig.Stream {
-		exitCode = executeStreamMode(cmd, appConfig, startTime)
+		exitCode = executeStreamMode(cmd, task)
 	} else {
-		exitCode = executeCaptureMode(cmd, appConfig, startTime, cmdArgs)
+		exitCode = executeCaptureMode(cmd, task, patternMatcher, appConfig)
 	}
+
+	// Complete the task
+	task.Complete(exitCode)
+
+	// Print task completion
+	fmt.Println(task.RenderEndLine())
+
 	return exitCode
 }
 
-func executeStreamMode(cmd *exec.Cmd, appConfig Config, startTime time.Time) int {
+func executeStreamMode(cmd *exec.Cmd, task *design.Task) int {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
-	duration := time.Since(startTime)
-	exitCode := getExitCode(err)
-	printEndLine(appConfig, exitCode, duration)
-	return exitCode
+	return getExitCode(err)
 }
 
-func executeCaptureMode(cmd *exec.Cmd, appConfig Config, startTime time.Time, cmdArgs []string) int {
+func executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design.PatternMatcher, appConfig Config) int {
 	var wg sync.WaitGroup
 	var bufferExceeded sync.Once
 
-	stdoutLinesChan := make(chan TimestampedLine, 200)
-	stderrLinesChan := make(chan TimestampedLine, 200)
-	allCapturedLines := make([]TimestampedLine, 0, 400)
-
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Error creating stdout pipe: %v\n", err)
-		printEndLine(appConfig, 1, time.Since(startTime))
+		task.AddOutputLine(
+			fmt.Sprintf("Error creating stdout pipe: %v", err),
+			design.TypeError,
+			design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5},
+		)
+		fmt.Println(task.RenderOutputLine(task.OutputLines[len(task.OutputLines)-1]))
 		return 1
 	}
+
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Error creating stderr pipe: %v\n", err)
-		printEndLine(appConfig, 1, time.Since(startTime))
+		task.AddOutputLine(
+			fmt.Sprintf("Error creating stderr pipe: %v", err),
+			design.TypeError,
+			design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5},
+		)
+		fmt.Println(task.RenderOutputLine(task.OutputLines[len(task.OutputLines)-1]))
 		return 1
 	}
 
+	// Process stdout
 	wg.Add(1)
-	go scanOutputPipe(stdoutPipe, "stdout", stdoutLinesChan, appConfig, &bufferExceeded, &wg)
-	wg.Add(1)
-	go scanOutputPipe(stderrPipe, "stderr", stderrLinesChan, appConfig, &bufferExceeded, &wg)
-
-	collectionDone := make(chan struct{})
 	go func() {
-		defer close(collectionDone)
-		activeStdoutChan := stdoutLinesChan
-		activeStderrChan := stderrLinesChan
-		for activeStdoutChan != nil || activeStderrChan != nil {
-			select {
-			case line, ok := <-activeStdoutChan:
-				if !ok {
-					activeStdoutChan = nil
-					continue
+		defer wg.Done()
+		scanner := bufio.NewScanner(stdoutPipe)
+		scanner.Buffer(make([]byte, 0, 64*1024), int(appConfig.MaxLineLength))
+
+		for scanner.Scan() {
+			line := scanner.Text()
+
+			// Classify the line
+			lineType, lineContext := patternMatcher.ClassifyOutputLine(line, task.Command, task.Args)
+
+			// Add to task output
+			task.AddOutputLine(line, lineType, lineContext)
+
+			// Update task context based on output
+			task.UpdateTaskContext()
+
+			// Print the line if in always-show mode
+			if appConfig.ShowOutput == "always" {
+				fmt.Println(task.RenderOutputLine(task.OutputLines[len(task.OutputLines)-1]))
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			if errors.Is(err, bufio.ErrTooLong) {
+				bufferExceeded.Do(func() {
+					exceededMsg := fmt.Sprintf("Maximum line length (%d KB) exceeded in stdout. Line truncated.", appConfig.MaxLineLength/1024)
+					context := design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4}
+					task.AddOutputLine(exceededMsg, design.TypeWarning, context)
+
+					if appConfig.ShowOutput == "always" {
+						fmt.Println(task.RenderOutputLine(task.OutputLines[len(task.OutputLines)-1]))
+					}
+				})
+			} else if !strings.Contains(err.Error(), "file already closed") && !strings.Contains(err.Error(), "broken pipe") {
+				context := design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4}
+				task.AddOutputLine(fmt.Sprintf("Error reading stdout: %v", err), design.TypeError, context)
+
+				if appConfig.ShowOutput == "always" {
+					fmt.Println(task.RenderOutputLine(task.OutputLines[len(task.OutputLines)-1]))
 				}
-				allCapturedLines = append(allCapturedLines, line)
-			case line, ok := <-activeStderrChan:
-				if !ok {
-					activeStderrChan = nil
-					continue
-				}
-				allCapturedLines = append(allCapturedLines, line)
 			}
 		}
 	}()
 
-	startErr := cmd.Start()
-	var cmdWaitErr error
-	if startErr != nil {
-		if len(cmdArgs) > 0 {
-			_, _ = fmt.Fprintf(os.Stderr, "Error starting command '%s': %v\n", cmdArgs[0], startErr)
-		} else {
-			_, _ = fmt.Fprintf(os.Stderr, "Error starting command (name unavailable): %v\n", startErr)
-		}
-	} else {
-		cmdWaitErr = cmd.Wait()
-	}
+	// Process stderr (similar to stdout)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		scanner := bufio.NewScanner(stderrPipe)
+		scanner.Buffer(make([]byte, 0, 64*1024), int(appConfig.MaxLineLength))
 
-	wg.Wait()
-	<-collectionDone
+		for scanner.Scan() {
+			line := scanner.Text()
 
-	duration := time.Since(startTime)
-	var finalErr error
-	if startErr != nil {
-		finalErr = startErr
-	} else {
-		finalErr = cmdWaitErr
-	}
-	exitCode := getExitCode(finalErr)
-	printEndLine(appConfig, exitCode, duration)
+			// Stderr output is more likely to be errors or warnings
+			lineType, lineContext := patternMatcher.ClassifyOutputLine(line, task.Command, task.Args)
 
-	sort.Slice(allCapturedLines, func(i, j int) bool {
-		return allCapturedLines[i].Time.Before(allCapturedLines[j].Time)
-	})
+			// Default to error for stderr if not specifically classified
+			if lineType == design.TypeDetail {
+				lineType = design.TypeError
+				lineContext.Importance = 4
+				lineContext.CognitiveLoad = design.LoadHigh
+			}
 
-	showOutput := false
-	switch appConfig.ShowOutput {
-	case "always":
-		showOutput = true
-	case "on-fail":
-		showOutput = (exitCode != 0)
-	}
+			// Add to task output
+			task.AddOutputLine(line, lineType, lineContext)
 
-	if showOutput && len(allCapturedLines) > 0 {
-		_, _ = fmt.Println("--- Captured output: ---")
-		for _, line := range allCapturedLines {
-			if line.Truncated {
-				if appConfig.NoColor || appConfig.CI {
-					_, _ = fmt.Printf("%s\n", line.Content)
-				} else {
-					_, _ = fmt.Printf("%s%s%s\n", colorRed, line.Content, colorReset)
-				}
-			} else {
-				_, _ = fmt.Println(line.Content)
+			// Update task context based on output
+			task.UpdateTaskContext()
+
+			// Print the line if in always-show mode
+			if appConfig.ShowOutput == "always" {
+				fmt.Println(task.RenderOutputLine(task.OutputLines[len(task.OutputLines)-1]))
 			}
 		}
-		_, _ = fmt.Println()
+
+		// Handle scanner errors (similar to stdout)
+		if err := scanner.Err(); err != nil {
+			// Handle errors similar to stdout
+		}
+	}()
+
+	// Start the command
+	if err := cmd.Start(); err != nil {
+		context := design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5}
+		task.AddOutputLine(fmt.Sprintf("Error starting command: %v", err), design.TypeError, context)
+		fmt.Println(task.RenderOutputLine(task.OutputLines[len(task.OutputLines)-1]))
+		return 1
 	}
+
+	// Wait for IO processing to finish
+	err = cmd.Wait()
+	wg.Wait()
+
+	// Determine exit code
+	exitCode := getExitCode(err)
+
+	// Show output if needed
+	if appConfig.ShowOutput == "on-fail" && exitCode != 0 {
+		// Print all captured output when command fails
+		for _, line := range task.OutputLines {
+			fmt.Println(task.RenderOutputLine(line))
+		}
+	}
+
 	return exitCode
+}
+
+// Helper function to get exit code from error
+func getExitCode(err error) int {
+	if err == nil {
+		return 0
+	}
+
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr.ExitCode()
+	}
+
+	return 1
 }
 
 func scanOutputPipe(pipe io.ReadCloser, source string, outChan chan<- TimestampedLine, appConfig Config, bufferExceeded *sync.Once, wg *sync.WaitGroup) {
