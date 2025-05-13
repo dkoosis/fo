@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -65,10 +66,6 @@ func main() {
 
 	if len(cmdArgs) > 0 {
 		config.ApplyCommandPreset(mergedConfig, cmdArgs[0])
-	}
-
-	if mergedConfig.Label == "" {
-		mergedConfig.Label = cmdArgs[0]
 	}
 
 	localAppConfig := convertToInternalConfig(mergedConfig)
@@ -163,18 +160,22 @@ func findCommandArgs() []string {
 func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan os.Signal, appConfig Config, cmdArgs []string) int {
 	var designConfig *design.Config
 	if appConfig.NoColor || appConfig.CI {
-		designConfig = design.NoColorConfig()
-		designConfig.Style.NoTimer = true // Ensure timer is off for CI/NoColor in design
+		designConfig = design.NoColorConfig() // This sets UseBoxes=false, NoTimer=true, plain icons
 	} else {
 		designConfig = design.DefaultConfig()
-		designConfig.Style.NoTimer = appConfig.NoTimer // Respect NoTimer flag from appConfig
+		designConfig.Style.NoTimer = appConfig.NoTimer // Respect appConfig's NoTimer for colored output
 	}
 
 	patternMatcher := design.NewPatternMatcher(designConfig)
 	intent := patternMatcher.DetectCommandIntent(cmdArgs[0], cmdArgs[1:])
-	label := appConfig.Label
-	if label == "" {
-		label = intent
+
+	label := appConfig.Label // Label from flags or merged config (already has preset applied)
+	if label == "" {         // If still empty after flags and presets
+		if intent != "" && intent != "running" { // Prefer specific detected intent
+			label = intent
+		} else {
+			label = filepath.Base(cmdArgs[0]) // Fallback to command basename
+		}
 	}
 
 	task := design.NewTask(label, intent, cmdArgs[0], cmdArgs[1:], designConfig)
@@ -228,47 +229,89 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 
 	var exitCode int
 	if appConfig.Stream {
-		exitCode = executeStreamMode(cmd)
+		exitCode = executeStreamMode(cmd, task)
 	} else {
 		exitCode = executeCaptureMode(cmd, task, patternMatcher, appConfig)
 	}
 
-	task.Complete(exitCode) // This must be called before RenderEndLine
+	task.Complete(exitCode)
 
-	// Print output for capture mode if necessary
+	// Printing logic for captured output and summary
 	if !appConfig.Stream {
-		// Condition for printing captured output
-		shouldPrintCapturedOutput := (appConfig.ShowOutput == "on-fail" && exitCode != 0) || appConfig.ShowOutput == "always"
-
-		if shouldPrintCapturedOutput {
+		if appConfig.ShowOutput == "on-fail" && exitCode != 0 {
 			summary := task.RenderSummary()
 			if summary != "" {
 				fmt.Print(summary)
 			}
 			for _, line := range task.OutputLines {
-				// This logic is to avoid re-printing [fo] messages if they were already shown live by processOutputPipe
-				// when appConfig.ShowOutput == "always" during a buffer/line limit event.
-				isFoBufferMessage := strings.Contains(line.Content, "[fo] BUFFER LIMIT")
-				isFoLineMessage := strings.Contains(line.Content, "[fo] LINE LIMIT")
-
-				// Apply De Morgan's Law: !(A || B) is equivalent to !A && !B
-				// So, if it's NOT a buffer message AND NOT a line message, OR if we always show output, then print.
-				if (!isFoBufferMessage && !isFoLineMessage) || appConfig.ShowOutput == "always" {
-					fmt.Println(task.RenderOutputLine(line))
+				fmt.Println(task.RenderOutputLine(line))
+			}
+		} else if appConfig.ShowOutput == "always" {
+			// Lines were already printed by processOutputPipe.
+			// Print summary if there were issues (errors or warnings).
+			if task.Status == design.StatusError || task.Status == design.StatusWarning {
+				summary := task.RenderSummary()
+				if summary != "" {
+					fmt.Print(summary)
 				}
 			}
 		}
+	} else { // Stream mode
+		// If stream mode resulted in an error or warning status, print summary.
+		if task.Status == design.StatusError || task.Status == design.StatusWarning {
+			summary := task.RenderSummary()
+			if summary != "" {
+				fmt.Print(summary)
+			}
+		}
 	}
-	fmt.Println(task.RenderEndLine())
 
+	fmt.Println(task.RenderEndLine())
 	return exitCode
 }
 
-func executeStreamMode(cmd *exec.Cmd) int {
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err := cmd.Run()
-	return getExitCode(err)
+func executeStreamMode(cmd *exec.Cmd, task *design.Task) int {
+	// In stream mode, we want to pipe stdout directly.
+	// For stderr, we can tee it: one to os.Stderr for live view, one to a buffer for task.OutputLines.
+	// This allows Task.Complete to correctly assess status based on stderr content if needed.
+
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		// Cannot create stderr pipe, fallback to direct os.Stderr and lose capture for summary
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		runErr := cmd.Run()
+		// Add a generic error to task if pipe creation failed, as we can't capture details
+		task.AddOutputLine(fmt.Sprintf("Error setting up stderr pipe for stream mode: %v", err), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
+		return getExitCode(runErr)
+	}
+	cmd.Stdout = os.Stdout // Stdout goes directly to os.Stdout
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		// Tee stderr: print to os.Stderr and also add to task.OutputLines
+		scanner := bufio.NewScanner(stderrPipe)
+		for scanner.Scan() {
+			line := scanner.Text()
+			fmt.Fprintln(os.Stderr, line) // Print to actual stderr
+			// Use a simple classification for streamed stderr, or enhance if needed
+			// For now, just add as TypeInfo to allow summary generation
+			task.AddOutputLine(line, design.TypeInfo, design.LineContext{CognitiveLoad: design.LoadMedium, Importance: 2})
+		}
+		if err := scanner.Err(); err != nil {
+			// Log scanner error for stderr if necessary, but don't let it change main exit code path
+			// This error is about reading the pipe, not the command's exit status.
+			// Add it to the task for potential summary.
+			task.AddOutputLine(fmt.Sprintf("Error reading stderr in stream mode: %v", err), design.TypeError, design.LineContext{CognitiveLoad: design.LoadMedium, Importance: 3})
+		}
+	}()
+
+	runErr := cmd.Run() // This runs the command and waits for it.
+	wg.Wait()           // Wait for stderr processing to complete.
+
+	return getExitCode(runErr)
 }
 
 func executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design.PatternMatcher, appConfig Config) int {
@@ -280,7 +323,9 @@ func executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design
 		errMsg := fmt.Sprintf("Error creating stdout pipe: %v", err)
 		errCtx := design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5}
 		task.AddOutputLine(errMsg, design.TypeError, errCtx)
-		fmt.Println(task.RenderOutputLine(task.OutputLines[len(task.OutputLines)-1]))
+		if appConfig.ShowOutput == "always" || appConfig.ShowOutput == "on-fail" {
+			fmt.Println(task.RenderOutputLine(task.OutputLines[len(task.OutputLines)-1]))
+		}
 		return 1
 	}
 
@@ -289,7 +334,9 @@ func executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design
 		errMsg := fmt.Sprintf("Error creating stderr pipe: %v", err)
 		errCtx := design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5}
 		task.AddOutputLine(errMsg, design.TypeError, errCtx)
-		fmt.Println(task.RenderOutputLine(task.OutputLines[len(task.OutputLines)-1]))
+		if appConfig.ShowOutput == "always" || appConfig.ShowOutput == "on-fail" {
+			fmt.Println(task.RenderOutputLine(task.OutputLines[len(task.OutputLines)-1]))
+		}
 		return 1
 	}
 
@@ -317,10 +364,11 @@ func executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design
 			currentTotalBytes += lineLength
 
 			lineType, lineContext := patternMatcher.ClassifyOutputLine(line, task.Command, task.Args)
+			// If pattern matcher classifies as TypeDetail (default for unrecognised lines) AND source is stderr,
+			// then re-classify as TypeInfo. This prevents generic stderr from becoming TypeError via hasOutputIssues.
 			if source == "stderr" && lineType == design.TypeDetail {
-				lineType = design.TypeError
-				lineContext.Importance = 4
-				lineContext.CognitiveLoad = design.LoadHigh
+				lineType = design.TypeInfo // Default unclassified stderr to Info
+				lineContext.Importance = 3 // Adjust importance for info
 			}
 			task.AddOutputLine(line, lineType, lineContext)
 			task.UpdateTaskContext()
@@ -340,9 +388,7 @@ func executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design
 						fmt.Println(task.RenderOutputLine(task.OutputLines[len(task.OutputLines)-1]))
 					}
 				})
-				// Applied De Morgan's Law for QF1001 and to satisfy SA9003 (no empty final else)
 			} else if !strings.Contains(errScan.Error(), "file already closed") && !strings.Contains(errScan.Error(), "broken pipe") {
-				// This 'else if' handles errors that are NOT ErrTooLong, "file already closed", or "broken pipe".
 				errMsg := fmt.Sprintf("Error reading %s: %v", source, errScan)
 				errCtx := design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4}
 				task.AddOutputLine(errMsg, design.TypeError, errCtx)
@@ -350,7 +396,6 @@ func executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design
 					fmt.Println(task.RenderOutputLine(task.OutputLines[len(task.OutputLines)-1]))
 				}
 			}
-			// "file already closed" and "broken pipe" errors are intentionally ignored here.
 		}
 	}
 
