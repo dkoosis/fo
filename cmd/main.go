@@ -173,34 +173,48 @@ func executeCaptureMode(cmd *exec.Cmd, config Config, startTime time.Time) int {
 	go func() {
 		defer wg.Done()
 		if _, copyErr := io.Copy(&stdout, stdoutPipe); copyErr != nil {
-			fmt.Fprintf(os.Stderr, "Error copying stdout: %v\n", copyErr)
+			// Only log unexpected errors, not normal pipe closures
+			if !strings.Contains(copyErr.Error(), "file already closed") &&
+				!strings.Contains(copyErr.Error(), "broken pipe") {
+				fmt.Fprintf(os.Stderr, "Error copying stdout: %v\n", copyErr)
+			}
 		}
 	}()
 
 	go func() {
 		defer wg.Done()
 		if _, copyErr := io.Copy(&stderr, stderrPipe); copyErr != nil {
-			fmt.Fprintf(os.Stderr, "Error copying stderr: %v\n", copyErr)
+			// Only log unexpected errors, not normal pipe closures
+			if !strings.Contains(copyErr.Error(), "file already closed") &&
+				!strings.Contains(copyErr.Error(), "broken pipe") {
+				fmt.Fprintf(os.Stderr, "Error copying stderr: %v\n", copyErr)
+			}
 		}
 	}()
 
 	// Start the command.
-	if err := cmd.Start(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error starting command: %v\n", err)
-		duration := time.Since(startTime)
-		printEndLine(config, 1, duration) // Mark as failed.
-		return 1
-	}
+	startErr := cmd.Start()
 
-	// Wait for command to complete.
-	err = cmd.Wait()
+	// Always wait for output collection to complete, regardless of cmd.Start() outcome
+	var cmdWaitErr error
+	if startErr == nil {
+		// Only wait for command to complete if it started successfully
+		cmdWaitErr = cmd.Wait()
+	} else {
+		fmt.Fprintf(os.Stderr, "Error starting command: %v\n", startErr)
+	}
 
 	// Wait for output collection to complete.
 	wg.Wait()
 
 	// Get exit code and duration.
 	duration := time.Since(startTime)
-	exitCode := getExitCode(err)
+
+	// Use the appropriate error based on what happened
+	exitCode := 1
+	if startErr == nil {
+		exitCode = getExitCode(cmdWaitErr)
+	}
 
 	// Print end status.
 	printEndLine(config, exitCode, duration)
