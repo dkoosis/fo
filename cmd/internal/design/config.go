@@ -25,6 +25,7 @@ type Config struct {
 		ShowTimestamps bool   `yaml:"show_timestamps"`
 		ReduceContrast bool   `yaml:"reduce_contrast"` // Based on Zhou research
 		Density        string `yaml:"density"`         // compact, balanced, relaxed
+		NoTimer        bool   `yaml:"no_timer"`        // Whether to hide execution time
 	} `yaml:"style"`
 
 	// Border configuration
@@ -107,6 +108,7 @@ func DefaultConfig() *Config {
 	cfg.Style.ShowTimestamps = false
 	cfg.Style.ReduceContrast = false
 	cfg.Style.Density = "balanced"
+	cfg.Style.NoTimer = false // Show timer by default
 
 	// Border defaults - set the double-bar style as default
 	cfg.Border.Style = BorderLeftDouble
@@ -230,6 +232,9 @@ func NoColorConfig() *Config {
 	cfg.Border.VerticalChar = "|"
 	cfg.Border.TopCornerChar = "+"
 	cfg.Border.BottomCornerChar = "+"
+
+	// Hide timer in no-color mode
+	cfg.Style.NoTimer = true
 
 	return cfg
 }

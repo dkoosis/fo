@@ -3,6 +3,7 @@ package design
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 // RenderStartLine returns the formatted start line for the task
@@ -447,4 +448,22 @@ func pluralSuffix(count int) string {
 		return ""
 	}
 	return "s"
+}
+
+// formatDuration formats a duration as a human-readable string
+func formatDuration(d time.Duration) string {
+	// For durations less than a second, use milliseconds
+	if d < time.Second {
+		return fmt.Sprintf("%.0fms", float64(d)/float64(time.Millisecond))
+	}
+
+	// For durations less than a minute, use seconds with decimal
+	if d < time.Minute {
+		return fmt.Sprintf("%.1fs", float64(d)/float64(time.Second))
+	}
+
+	// For longer durations, use minutes and seconds
+	minutes := int(d / time.Minute)
+	seconds := int((d % time.Minute) / time.Second)
+	return fmt.Sprintf("%dm%ds", minutes, seconds)
 }
