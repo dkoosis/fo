@@ -4,16 +4,39 @@ import (
 	"strings"
 )
 
+// BorderStyle defines the type of border to use for task output
+type BorderStyle string
+
+const (
+	BorderLeftOnly   BorderStyle = "left_only"   // Only left border (│)
+	BorderLeftDouble BorderStyle = "left_double" // Left border with double-bar header
+	BorderHeaderBox  BorderStyle = "header_box"  // Header in box, content with left border
+	BorderFull       BorderStyle = "full_box"    // Full box around everything
+	BorderNone       BorderStyle = "none"        // No borders, just indentation
+	BorderAscii      BorderStyle = "ascii"       // ASCII-only borders (-, =, +)
+)
+
 // Config holds design system configuration
 type Config struct {
+	// Visual style configuration
 	Style struct {
 		UseBoxes       bool   `yaml:"use_boxes"`
 		Indentation    string `yaml:"indentation"`
 		ShowTimestamps bool   `yaml:"show_timestamps"`
-		ReduceContrast bool   `yaml:"reduce_contrast"`
-		Density        string `yaml:"density"`
-		NoTimer        bool   `yaml:"no_timer"`
+		ReduceContrast bool   `yaml:"reduce_contrast"` // Based on Zhou research
+		Density        string `yaml:"density"`         // compact, balanced, relaxed
 	} `yaml:"style"`
+
+	// Border configuration
+	Border struct {
+		Style            BorderStyle `yaml:"style"`
+		HeaderChar       string      `yaml:"header_char"`        // Character for header lines
+		VerticalChar     string      `yaml:"vertical_char"`      // Character for vertical lines
+		TopCornerChar    string      `yaml:"top_corner_char"`    // Character for top corners
+		BottomCornerChar string      `yaml:"bottom_corner_char"` // Character for bottom corners
+	} `yaml:"border"`
+
+	// Color configuration (ANSI color codes)
 	Colors struct {
 		Process string `yaml:"process"`
 		Success string `yaml:"success"`
@@ -23,6 +46,8 @@ type Config struct {
 		Muted   string `yaml:"muted"`
 		Reset   string `yaml:"reset"`
 	} `yaml:"colors"`
+
+	// Icons for status indicators
 	Icons struct {
 		Start   string `yaml:"start"`
 		Success string `yaml:"success"`
@@ -30,27 +55,38 @@ type Config struct {
 		Error   string `yaml:"error"`
 		Info    string `yaml:"info"`
 	} `yaml:"icons"`
+
+	// Cognitive load settings
 	CognitiveLoad struct {
 		AutoDetect bool                 `yaml:"auto_detect"`
 		Default    CognitiveLoadContext `yaml:"default"`
 	} `yaml:"cognitive_load"`
+
+	// Output control
 	Output struct {
 		MaxErrorSamples  int  `yaml:"max_error_samples"`
 		SummarizeSimilar bool `yaml:"summarize_similar"`
 		UseAsciiGraphs   bool `yaml:"use_ascii_graphs"`
 		ShowFullPath     bool `yaml:"show_full_path"`
 	} `yaml:"output"`
+
+	// Accessibility options
 	Accessibility struct {
 		ScreenReaderFriendly bool `yaml:"screen_reader_friendly"`
 		HighContrast         bool `yaml:"high_contrast"`
 	} `yaml:"accessibility"`
+
+	// Pattern matching configuration
 	Patterns struct {
 		Intent map[string][]string `yaml:"intent"`
 		Output map[string][]string `yaml:"output"`
 	} `yaml:"patterns"`
+
+	// Tool-specific configurations
 	Tools map[string]*ToolConfig `yaml:"tools"`
 }
 
+// ToolConfig holds configuration for a specific tool
 type ToolConfig struct {
 	Label          string              `yaml:"label"`
 	Intent         string              `yaml:"intent"`
@@ -61,38 +97,59 @@ type ToolConfig struct {
 	} `yaml:"layout"`
 }
 
+// DefaultConfig returns a design system config with research-backed defaults
 func DefaultConfig() *Config {
 	cfg := &Config{}
+
+	// Style defaults
 	cfg.Style.UseBoxes = true
 	cfg.Style.Indentation = "  "
 	cfg.Style.ShowTimestamps = false
 	cfg.Style.ReduceContrast = false
 	cfg.Style.Density = "balanced"
-	cfg.Style.NoTimer = false
 
-	cfg.Colors.Process = "\033[0;34m" // Blue
-	cfg.Colors.Success = "\033[0;32m" // Green
-	cfg.Colors.Warning = "\033[0;33m" // Yellow
-	cfg.Colors.Error = "\033[0;31m"   // Red
-	cfg.Colors.Detail = ""            // No color for detail, relies on Reset
+	// Border defaults - set the double-bar style as default
+	cfg.Border.Style = BorderLeftDouble
+	cfg.Border.HeaderChar = "═"       // Double horizontal
+	cfg.Border.VerticalChar = "│"     // Single vertical
+	cfg.Border.TopCornerChar = "╒"    // Corner connecting double horizontal to single vertical
+	cfg.Border.BottomCornerChar = "└" // Bottom corner
+
+	// Color defaults - research-informed (Zhou et al.)
+	cfg.Colors.Process = "\033[0;34m" // Blue - use with caution for cognitive load
+	cfg.Colors.Success = "\033[0;32m" // Green - universally positive
+	cfg.Colors.Warning = "\033[0;33m" // Yellow - attention required
+	cfg.Colors.Error = "\033[0;31m"   // Red - shown to reduce cognitive load for key info
+	cfg.Colors.Detail = "\033[0m"     // Default
 	cfg.Colors.Muted = "\033[2m"      // Dim
-	cfg.Colors.Reset = "\033[0m"
+	cfg.Colors.Reset = "\033[0m"      // Reset
 
+	// Icon defaults
 	cfg.Icons.Start = "▶️"
 	cfg.Icons.Success = "✅"
 	cfg.Icons.Warning = "⚠️"
 	cfg.Icons.Error = "❌"
 	cfg.Icons.Info = "ℹ️"
 
+	// Cognitive load defaults
 	cfg.CognitiveLoad.AutoDetect = true
 	cfg.CognitiveLoad.Default = LoadMedium
+
+	// Output defaults
 	cfg.Output.MaxErrorSamples = 3
 	cfg.Output.SummarizeSimilar = true
 	cfg.Output.UseAsciiGraphs = true
 	cfg.Output.ShowFullPath = false
+
+	// Accessibility defaults
 	cfg.Accessibility.ScreenReaderFriendly = false
 	cfg.Accessibility.HighContrast = false
 
+	// Initialize pattern maps
+	cfg.Patterns.Intent = make(map[string][]string)
+	cfg.Patterns.Output = make(map[string][]string)
+
+	// Add default intent patterns
 	cfg.Patterns.Intent = map[string][]string{
 		"building":    {"go build", "make", "gcc", "g++", "javac", "npm build", "yarn build"},
 		"testing":     {"go test", "npm test", "pytest", "jest", "rspec"},
@@ -102,127 +159,82 @@ func DefaultConfig() *Config {
 		"running":     {"go run", "python", "node", "ruby"},
 		"downloading": {"curl", "wget", "git clone"},
 	}
+
+	// Add default output classification patterns
 	cfg.Patterns.Output = map[string][]string{
-		"error":   {"^Error:", "^ERROR:", "^error:", "failed", "failure", "exception", "panic:", "fatal:", "undefined", "not found"},
-		"warning": {"^Warning:", "^WARNING:", "^warning:", "deprecated", "consider", "note:", "caution:"}, // Removed "STDERR: Info output"
-		"success": {"^ok ", "^passed", "^success", "^done", "0 issues", "no problems", "completed successfully"},
-		"info":    {"^info:", "^Info:", "^INFO:", "STDERR: Info output from success.sh"}, // Added specific pattern for test
+		"error": {
+			"^Error:",
+			"^ERROR:",
+			"^error:",
+			"failed",
+			"failure",
+			"exception",
+			"panic:",
+			"fatal:",
+			"undefined",
+			"not found",
+		},
+		"warning": {
+			"^Warning:",
+			"^WARNING:",
+			"^warning:",
+			"deprecated",
+			"consider",
+			"note:",
+			"caution:",
+		},
+		"success": {
+			"^ok ",
+			"^passed",
+			"^success",
+			"^done",
+			"0 issues",
+			"no problems",
+			"completed successfully",
+		},
+		"info": {
+			"^info:",
+			"^Info:",
+			"^INFO:",
+		},
 	}
+
+	// Initialize tools map
 	cfg.Tools = make(map[string]*ToolConfig)
+
 	return cfg
 }
 
+// NoColorConfig returns a config with colors disabled
 func NoColorConfig() *Config {
 	cfg := DefaultConfig()
+
+	// Disable colors
 	cfg.Colors.Process = ""
 	cfg.Colors.Success = ""
 	cfg.Colors.Warning = ""
 	cfg.Colors.Error = ""
 	cfg.Colors.Detail = ""
 	cfg.Colors.Muted = ""
-	cfg.Colors.Reset = "" // Ensure Reset is also empty for true no-color
+	cfg.Colors.Reset = ""
 
+	// Use plain text icons
 	cfg.Icons.Start = "[START]"
 	cfg.Icons.Success = "[SUCCESS]"
 	cfg.Icons.Warning = "[WARNING]"
 	cfg.Icons.Error = "[FAILED]"
 	cfg.Icons.Info = "[INFO]"
 
-	cfg.Style.UseBoxes = false // CRITICAL: Disable boxes for no-color/CI
-	cfg.Style.NoTimer = true   // CRITICAL: Disable timer for no-color/CI
+	// Use ASCII border chars for non-color mode
+	cfg.Border.HeaderChar = "-"
+	cfg.Border.VerticalChar = "|"
+	cfg.Border.TopCornerChar = "+"
+	cfg.Border.BottomCornerChar = "+"
+
 	return cfg
 }
 
-func MergeWithDefaults(configFromFile *Config) *Config {
-	if configFromFile == nil {
-		return DefaultConfig()
-	}
-	defaultConfig := DefaultConfig()
-	defaultConfig.Style.UseBoxes = configFromFile.Style.UseBoxes
-	if configFromFile.Style.Indentation != "" {
-		defaultConfig.Style.Indentation = configFromFile.Style.Indentation
-	}
-	defaultConfig.Style.ShowTimestamps = configFromFile.Style.ShowTimestamps
-	defaultConfig.Style.ReduceContrast = configFromFile.Style.ReduceContrast
-	if configFromFile.Style.Density != "" {
-		defaultConfig.Style.Density = configFromFile.Style.Density
-	}
-	defaultConfig.Style.NoTimer = configFromFile.Style.NoTimer
-
-	if configFromFile.Colors.Process != "" {
-		defaultConfig.Colors.Process = configFromFile.Colors.Process
-	}
-	if configFromFile.Colors.Success != "" {
-		defaultConfig.Colors.Success = configFromFile.Colors.Success
-	}
-	if configFromFile.Colors.Warning != "" {
-		defaultConfig.Colors.Warning = configFromFile.Colors.Warning
-	}
-	if configFromFile.Colors.Error != "" {
-		defaultConfig.Colors.Error = configFromFile.Colors.Error
-	}
-	if configFromFile.Colors.Detail != "" {
-		defaultConfig.Colors.Detail = configFromFile.Colors.Detail
-	}
-	if configFromFile.Colors.Muted != "" {
-		defaultConfig.Colors.Muted = configFromFile.Colors.Muted
-	}
-	if configFromFile.Colors.Reset != "" {
-		defaultConfig.Colors.Reset = configFromFile.Colors.Reset
-	}
-
-	if configFromFile.Icons.Start != "" {
-		defaultConfig.Icons.Start = configFromFile.Icons.Start
-	}
-	if configFromFile.Icons.Success != "" {
-		defaultConfig.Icons.Success = configFromFile.Icons.Success
-	}
-	if configFromFile.Icons.Warning != "" {
-		defaultConfig.Icons.Warning = configFromFile.Icons.Warning
-	}
-	if configFromFile.Icons.Error != "" {
-		defaultConfig.Icons.Error = configFromFile.Icons.Error
-	}
-	if configFromFile.Icons.Info != "" {
-		defaultConfig.Icons.Info = configFromFile.Icons.Info
-	}
-
-	defaultConfig.CognitiveLoad.AutoDetect = configFromFile.CognitiveLoad.AutoDetect
-	if configFromFile.CognitiveLoad.Default != "" {
-		defaultConfig.CognitiveLoad.Default = configFromFile.CognitiveLoad.Default
-	}
-
-	if configFromFile.Output.MaxErrorSamples != 0 {
-		defaultConfig.Output.MaxErrorSamples = configFromFile.Output.MaxErrorSamples
-	}
-	defaultConfig.Output.SummarizeSimilar = configFromFile.Output.SummarizeSimilar
-	defaultConfig.Output.UseAsciiGraphs = configFromFile.Output.UseAsciiGraphs
-	defaultConfig.Output.ShowFullPath = configFromFile.Output.ShowFullPath
-
-	defaultConfig.Accessibility.ScreenReaderFriendly = configFromFile.Accessibility.ScreenReaderFriendly
-	defaultConfig.Accessibility.HighContrast = configFromFile.Accessibility.HighContrast
-
-	if len(configFromFile.Patterns.Intent) > 0 {
-		for intent, patterns := range configFromFile.Patterns.Intent {
-			defaultConfig.Patterns.Intent[intent] = patterns
-		}
-	}
-	if len(configFromFile.Patterns.Output) > 0 {
-		for outputType, patterns := range configFromFile.Patterns.Output {
-			defaultConfig.Patterns.Output[outputType] = patterns
-		}
-	}
-	if len(configFromFile.Tools) > 0 {
-		for toolName, toolCfg := range configFromFile.Tools {
-			defaultConfig.Tools[toolName] = toolCfg
-		}
-	}
-	return defaultConfig
-}
-
+// getIndentation returns the appropriate indentation string
 func (c *Config) getIndentation(level int) string {
-	if level <= 0 {
-		return ""
-	}
 	return strings.Repeat(c.Style.Indentation, level)
 }

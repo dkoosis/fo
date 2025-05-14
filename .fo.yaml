@@ -1,14 +1,43 @@
 ---
 # .fo.yaml - Configuration file for fo command
 
+# .fo.yaml - User's fo configuration
+
+# Border settings
+border:
+  # Style options: left_double, left_only, header_box, full_box, none, ascii
+  style: left_double
+
+  # Border characters
+  header_char: "═" # Double horizontal line for header
+  vertical_char: "│" # Single vertical line
+  top_corner_char: "╒" # Top corner
+  bottom_corner_char: "└" # Bottom corner
+
 # Visual appearance settings
-visual:
-  start_icon: "▶️"
-  success_icon: "✅"
-  failure_icon: "❌"
-  color_start: "\033[34m" # Blue
-  color_success: "\033[32m" # Green
-  color_failure: "\033[31m" # Red
+style:
+  indentation: "  "
+  show_timestamps: false
+  reduce_contrast: false
+  density: "balanced"
+
+# Colors (ANSI codes)
+colors:
+  process: "\033[0;34m" # Blue
+  success: "\033[0;32m" # Green
+  warning: "\033[0;33m" # Yellow
+  error: "\033[0;31m" # Red
+  detail: "\033[0m" # Default
+  muted: "\033[2m" # Dim
+  reset: "\033[0m" # Reset
+
+# Icons
+icons:
+  start: "▶️" # Process indicator
+  success: "✅" # Success indicator
+  warning: "⚠️" # Warning indicator
+  error: "❌" # Error indicator
+  info: "ℹ️" # Information indicator
 
 # Default output behavior
 stream: false

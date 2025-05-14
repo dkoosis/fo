@@ -2,408 +2,449 @@ package design
 
 import (
 	"fmt"
-	"path/filepath"
-	"regexp"
 	"strings"
-	"time"
 )
 
 // RenderStartLine returns the formatted start line for the task
 func (t *Task) RenderStartLine() string {
 	var sb strings.Builder
 
-	taskLabelForWidth := t.Label // Use the main task label for width calculations
-	if taskLabelForWidth == "" { // Fallback if label is empty
-		taskLabelForWidth = filepath.Base(t.Command)
-	}
-
-	if t.Config.Style.UseBoxes {
-		width := calculateWidth(taskLabelForWidth)
-		topLabel := strings.ToUpper(taskLabelForWidth)
-		lineWidth := width - len(topLabel) - 3 // for "┌─ " and " ┐"
-		if lineWidth < 0 {
-			lineWidth = 0
-		}
-		sb.WriteString("┌─ ")
-		sb.WriteString(topLabel)
+	// Use the border style from config
+	switch t.Config.Border.Style {
+	case BorderLeftDouble, BorderLeftOnly:
+		// Top line with corner and header
+		sb.WriteString(t.Config.Border.TopCornerChar)
+		sb.WriteString(t.Config.Border.HeaderChar + " ")
+		label := strings.ToUpper(t.Label)
+		sb.WriteString(label)
 		sb.WriteString(" ")
-		sb.WriteString(strings.Repeat("─", lineWidth))
-		sb.WriteString("┐\n")
+		sb.WriteString(strings.Repeat(t.Config.Border.HeaderChar, 30))
+		sb.WriteString("\n")
 
-		sb.WriteString("│")
-		// The empty line padding should span the calculated width + 1 for each border char
-		emptyPadding := width + 1 // Adjusted to be simpler: width of content area + 1 right border
-		if emptyPadding < 0 {
-			emptyPadding = 0
-		}
-		sb.WriteString(strings.Repeat(" ", emptyPadding))
-		sb.WriteString("│\n")
+		// Vertical bar with space (empty line)
+		sb.WriteString(t.Config.Border.VerticalChar + "\n")
+
+		// Process state line with left border
+		sb.WriteString(t.Config.Border.VerticalChar + " ")
+
+	case BorderHeaderBox:
+		// Top line with box around header
+		width := calculateWidth(t.Label)
+		sb.WriteString(t.Config.Border.TopCornerChar)
+		sb.WriteString(strings.Repeat(t.Config.Border.HeaderChar, width))
+		sb.WriteString(t.Config.Border.TopCornerChar + "\n")
+
+		// Header line
+		sb.WriteString(t.Config.Border.VerticalChar + " ")
+		label := strings.ToUpper(t.Label)
+		sb.WriteString(label)
+		paddingWidth := width - len(label) - 2
+		sb.WriteString(strings.Repeat(" ", paddingWidth))
+		sb.WriteString(t.Config.Border.VerticalChar + "\n")
+
+		// Bottom of header box
+		sb.WriteString(t.Config.Border.BottomCornerChar)
+		sb.WriteString(strings.Repeat(t.Config.Border.HeaderChar, width))
+		sb.WriteString(t.Config.Border.BottomCornerChar + "\n")
+
+		// Empty line
+		sb.WriteString(t.Config.Border.VerticalChar + "\n")
+
+		// Process state line
+		sb.WriteString(t.Config.Border.VerticalChar + " ")
+
+	case BorderFull:
+		// Full box (all sides)
+		width := calculateWidth(t.Label)
+		sb.WriteString(t.Config.Border.TopCornerChar)
+		sb.WriteString(strings.Repeat(t.Config.Border.HeaderChar, width))
+		sb.WriteString(t.Config.Border.TopCornerChar + "\n")
+
+		// Empty line
+		sb.WriteString(t.Config.Border.VerticalChar)
+		sb.WriteString(strings.Repeat(" ", width))
+		sb.WriteString(t.Config.Border.VerticalChar + "\n")
+
+		// Process state line
+		sb.WriteString(t.Config.Border.VerticalChar + " ")
+
+	case BorderNone:
+		// Simple label with no border
+		label := strings.ToUpper(t.Label)
+		sb.WriteString(label + ":\n\n")
+
+	case BorderAscii:
+		// ASCII-only version
+		label := strings.ToUpper(t.Label)
+		sb.WriteString("=" + strings.Repeat("=", len(label)+4) + "\n")
+		sb.WriteString("  " + label + "  \n")
+		sb.WriteString("\n")
 	}
 
-	if t.Config.Style.UseBoxes {
-		sb.WriteString("│ ")
-	}
+	// Process label based on intent
+	processLabel := getProcessLabel(t.Intent)
 
-	intentLabel := t.formatIntentLabel() // This is "Running", "Building", etc.
+	// Add the process indicator (same for all styles)
 	sb.WriteString(fmt.Sprintf("%s %s%s...%s",
 		t.Config.Icons.Start,
 		t.Config.Colors.Process,
-		intentLabel,
+		processLabel,
 		t.Config.Colors.Reset))
 
-	if t.Config.Style.UseBoxes {
-		// Calculate padding based on the visible length of the intentLabel line
-		// Visible length: icon + space + intentLabel + "..."
-		contentLen := len(stripANSI(t.Config.Icons.Start)) + 1 + len(stripANSI(intentLabel)) + 3
-		paddingWidth := calculateWidth(taskLabelForWidth) - contentLen
-		if paddingWidth < 0 {
-			paddingWidth = 0
-		}
-		sb.WriteString(strings.Repeat(" ", paddingWidth))
-		sb.WriteString("│")
-	}
 	return sb.String()
 }
 
-func (t *Task) formatIntentLabel() string {
-	if t.Intent == "" {
-		return filepath.Base(t.Command) // Default to command name if no intent
+// Helper to generate better process labels
+func getProcessLabel(intent string) string {
+	// Map intents to better activity labels
+	intentMap := map[string]string{
+		"building":    "Building",
+		"testing":     "Running tests",
+		"linting":     "Linting",
+		"checking":    "Checking",
+		"running":     "Running",
+		"installing":  "Installing",
+		"downloading": "Downloading",
 	}
-	intent := t.Intent
-	if len(intent) > 0 {
-		// Ensure first letter is capitalized
-		intent = strings.ToUpper(string(intent[0])) + intent[1:]
+
+	if label, ok := intentMap[intent]; ok {
+		return label
 	}
-	return intent
+
+	// Default label based on intent
+	if intent != "" {
+		// Capitalize first letter
+		return strings.ToUpper(intent[:1]) + intent[1:]
+	}
+
+	return "Running" // Fallback
 }
 
+// RenderEndLine returns the formatted end line for the task
 func (t *Task) RenderEndLine() string {
 	var sb strings.Builder
-	taskLabelForWidth := t.Label
-	if taskLabelForWidth == "" {
-		taskLabelForWidth = filepath.Base(t.Command)
+
+	// Status line depends on border style
+	switch t.Config.Border.Style {
+	case BorderLeftDouble, BorderLeftOnly, BorderHeaderBox:
+		// Left border for status line
+		sb.WriteString(t.Config.Border.VerticalChar + " ")
+
+	case BorderFull:
+		// Left border for status in full box
+		sb.WriteString(t.Config.Border.VerticalChar + " ")
+
+	case BorderNone, BorderAscii:
+		// No border for status line
+		// Just indentation for alignment
+		sb.WriteString("")
 	}
 
-	if t.Config.Style.UseBoxes {
-		sb.WriteString("│ ")
-	}
-
+	// Select icon and color based on status
 	var icon, color, statusText string
 	switch t.Status {
 	case StatusSuccess:
-		icon, color, statusText = t.Config.Icons.Success, t.Config.Colors.Success, "Complete"
+		icon = t.Config.Icons.Success
+		color = t.Config.Colors.Success
+		statusText = "Complete"
 	case StatusWarning:
-		icon, color, statusText = t.Config.Icons.Warning, t.Config.Colors.Warning, "Completed with warnings"
+		icon = t.Config.Icons.Warning
+		color = t.Config.Colors.Warning
+		statusText = "Completed with warnings"
 	case StatusError:
-		icon, color, statusText = t.Config.Icons.Error, t.Config.Colors.Error, "Failed"
+		icon = t.Config.Icons.Error
+		color = t.Config.Colors.Error
+		statusText = "Failed"
 	default:
-		icon, color, statusText = t.Config.Icons.Info, t.Config.Colors.Process, "Done"
+		icon = t.Config.Icons.Info
+		color = t.Config.Colors.Process
+		statusText = "Done"
 	}
 
+	// Format duration
 	durationStr := ""
 	if !t.Config.Style.NoTimer {
 		durationStr = fmt.Sprintf(" (%s)", formatDuration(t.Duration))
 	}
 
-	// Strip ANSI for length calculation of the status line content
-	statusLineContent := fmt.Sprintf("%s %s%s%s", icon, statusText, durationStr, "") // No reset for length calc
-	visibleStatusLineLength := len(stripANSI(statusLineContent))
+	// Status with duration
+	sb.WriteString(fmt.Sprintf("%s %s%s%s%s",
+		icon, color, statusText, durationStr, t.Config.Colors.Reset))
+	sb.WriteString("\n")
 
-	sb.WriteString(fmt.Sprintf("%s %s%s%s%s", icon, color, statusText, durationStr, t.Config.Colors.Reset))
+	// Bottom border depends on style
+	switch t.Config.Border.Style {
+	case BorderLeftDouble, BorderLeftOnly, BorderHeaderBox:
+		// Bottom left corner with dash
+		sb.WriteString(t.Config.Border.BottomCornerChar + "─")
 
-	if t.Config.Style.UseBoxes {
-		width := calculateWidth(taskLabelForWidth)
-		// contentLen should be the visible length of what's printed before padding
-		paddingWidth := width - visibleStatusLineLength
-		if paddingWidth < 0 {
-			paddingWidth = 0
-		}
-		sb.WriteString(strings.Repeat(" ", paddingWidth))
-		sb.WriteString("│")
+	case BorderFull:
+		// Full bottom border
+		width := calculateWidth(t.Label)
+		sb.WriteString(t.Config.Border.BottomCornerChar)
+		sb.WriteString(strings.Repeat(t.Config.Border.HeaderChar, width))
+		sb.WriteString(t.Config.Border.BottomCornerChar)
+
+	case BorderNone:
+		// No border, just newline
+
+	case BorderAscii:
+		// ASCII bottom border
+		sb.WriteString(strings.Repeat("-", calculateWidth(t.Label)))
 	}
 
-	if t.Config.Style.UseBoxes {
-		width := calculateWidth(taskLabelForWidth)
-		bottomLineWidth := width + 1
-		if bottomLineWidth < 0 {
-			bottomLineWidth = 0
-		}
-		sb.WriteString("\n└")
-		sb.WriteString(strings.Repeat("─", bottomLineWidth))
-		sb.WriteString("┘")
-	}
 	return sb.String()
 }
 
+// RenderOutputLine formats an output line according to the design system
 func (t *Task) RenderOutputLine(line OutputLine) string {
 	var sb strings.Builder
-	taskLabelForWidth := t.Label
-	if taskLabelForWidth == "" {
-		taskLabelForWidth = filepath.Base(t.Command)
+
+	// Add left border depending on style
+	switch t.Config.Border.Style {
+	case BorderLeftDouble, BorderLeftOnly, BorderHeaderBox, BorderFull:
+		sb.WriteString(t.Config.Border.VerticalChar + " ")
+
+	case BorderNone, BorderAscii:
+		// No left border, just indentation
+		sb.WriteString("")
 	}
 
-	if t.Config.Style.UseBoxes {
-		sb.WriteString("│ ")
+	// Add indentation
+	indentLevel := line.Indentation
+	if indentLevel > 0 {
+		sb.WriteString(t.Config.getIndentation(indentLevel))
 	}
 
-	indentLevel := 1
-	if line.Indentation > 0 {
-		indentLevel = line.Indentation
-	}
-	indentStr := t.Config.getIndentation(indentLevel)
-	sb.WriteString(indentStr)
-
-	timestampStr := ""
-	if t.Config.Style.ShowTimestamps {
-		elapsed := line.Timestamp.Sub(t.StartTime)
-		timestampStr = fmt.Sprintf("[%s] ", formatDuration(elapsed))
-		sb.WriteString(timestampStr)
-	}
-
+	// Content styling based on line type
 	content := line.Content
-	formattedContent := ""
 
 	switch line.Type {
 	case TypeError:
-		if line.Context.CognitiveLoad == LoadHigh && !t.Config.Accessibility.ScreenReaderFriendly {
-			formattedContent = fmt.Sprintf("%s%s%s%s%s", t.Config.Colors.Error, "\033[3m", content, "\033[0m", t.Config.Colors.Reset)
+		// Red for errors, with italics for high cognitive load
+		if line.Context.CognitiveLoad == LoadHigh {
+			sb.WriteString(fmt.Sprintf("%s%s%s%s%s",
+				t.Config.Colors.Error,
+				"\033[3m", // Italics
+				content,
+				"\033[0m", // Reset italics
+				t.Config.Colors.Reset))
 		} else {
-			formattedContent = fmt.Sprintf("%s%s%s", t.Config.Colors.Error, content, t.Config.Colors.Reset)
+			sb.WriteString(fmt.Sprintf("%s%s%s",
+				t.Config.Colors.Error,
+				content,
+				t.Config.Colors.Reset))
 		}
 	case TypeWarning:
-		formattedContent = fmt.Sprintf("%s%s %s%s", t.Config.Colors.Warning, t.Config.Icons.Warning, content, t.Config.Colors.Reset)
+		// Warning with icon
+		sb.WriteString(fmt.Sprintf("%s%s %s%s",
+			t.Config.Colors.Warning,
+			t.Config.Icons.Warning,
+			content,
+			t.Config.Colors.Reset))
 	case TypeSuccess:
-		formattedContent = fmt.Sprintf("%s%s%s", t.Config.Colors.Success, content, t.Config.Colors.Reset)
+		// Green for success
+		sb.WriteString(fmt.Sprintf("%s%s%s",
+			t.Config.Colors.Success,
+			content,
+			t.Config.Colors.Reset))
 	case TypeInfo:
-		formattedContent = fmt.Sprintf("%s%s %s%s", t.Config.Colors.Process, t.Config.Icons.Info, content, t.Config.Colors.Reset)
+		// Info with icon
+		sb.WriteString(fmt.Sprintf("%s%s %s%s",
+			t.Config.Colors.Process,
+			t.Config.Icons.Info,
+			content,
+			t.Config.Colors.Reset))
 	case TypeSummary:
-		if !t.Config.Accessibility.ScreenReaderFriendly {
-			formattedContent = fmt.Sprintf("%s%s%s%s", t.Config.Colors.Process, "\033[1m", content, "\033[0m"+t.Config.Colors.Reset)
-		} else {
-			formattedContent = fmt.Sprintf("%s%s%s", t.Config.Colors.Process, content, t.Config.Colors.Reset)
-		}
+		// Bold formatting for summary
+		sb.WriteString(fmt.Sprintf("%s%s%s%s",
+			t.Config.Colors.Process,
+			"\033[1m", // Bold
+			content,
+			"\033[0m"+t.Config.Colors.Reset)) // Reset bold and color
 	case TypeProgress:
-		formattedContent = fmt.Sprintf("%s%s%s", t.Config.Colors.Muted, content, t.Config.Colors.Reset)
+		// Muted for progress
+		sb.WriteString(fmt.Sprintf("%s%s%s",
+			t.Config.Colors.Muted,
+			content,
+			t.Config.Colors.Reset))
 	default: // TypeDetail
-		formattedContent = fmt.Sprintf("%s%s%s", t.Config.Colors.Detail, content, t.Config.Colors.Reset)
+		sb.WriteString(content)
 	}
-	sb.WriteString(formattedContent)
 
-	if t.Config.Style.UseBoxes {
-		// Calculate visible length of the entire printed part of the line so far
-		// This includes indentation, timestamp (if any), and the styled content itself.
-		// stripANSI is used on formattedContent to get its visible length.
-		currentLineVisibleLength := len(indentStr) + len(timestampStr) + len(stripANSI(formattedContent))
+	// No right border needed for any style
 
-		paddingWidth := calculateWidth(taskLabelForWidth) - currentLineVisibleLength
-		if paddingWidth < 0 {
-			paddingWidth = 0
-		}
-		sb.WriteString(strings.Repeat(" ", paddingWidth))
-		sb.WriteString("│")
-	}
 	return sb.String()
 }
 
-// stripANSI removes ANSI escape codes from a string for length calculation.
-func stripANSI(s string) string {
-	re := regexp.MustCompile(`\x1b\[[0-9;]*[mKHF]`)
-	return re.ReplaceAllString(s, "")
-}
-
+// RenderSummary creates a summary section for the output
 func (t *Task) RenderSummary() string {
 	errorCount, warningCount := 0, 0
+
 	for _, line := range t.OutputLines {
-		switch line.Type {
-		case TypeError:
+		if line.Type == TypeError {
 			errorCount++
-		case TypeWarning:
+		} else if line.Type == TypeWarning {
 			warningCount++
 		}
 	}
+
 	if errorCount == 0 && warningCount == 0 {
 		return ""
 	}
 
 	var sb strings.Builder
-	taskLabelForWidth := t.Label
-	if taskLabelForWidth == "" {
-		taskLabelForWidth = filepath.Base(t.Command)
-	}
 
-	boxLinePrefix := ""
-	if t.Config.Style.UseBoxes {
-		sb.WriteString("│ ") // Initial indent for the SUMMARY line itself if in a box
-		boxLinePrefix = "│ "
-	}
+	// Add border based on style
+	switch t.Config.Border.Style {
+	case BorderLeftDouble, BorderLeftOnly, BorderHeaderBox, BorderFull:
+		// Empty line before summary
+		sb.WriteString(t.Config.Border.VerticalChar + "\n")
 
-	summaryHeading := "SUMMARY:"
-	if !t.Config.Accessibility.ScreenReaderFriendly {
-		sb.WriteString(fmt.Sprintf("%s%s%s%s\n", t.Config.Colors.Process, "\033[1m", summaryHeading, "\033[0m"+t.Config.Colors.Reset))
-	} else {
-		sb.WriteString(fmt.Sprintf("%s%s%s\n", t.Config.Colors.Process, summaryHeading, t.Config.Colors.Reset))
-	}
+		// Summary heading
+		sb.WriteString(t.Config.Border.VerticalChar + " ")
 
-	itemIndentStr := t.Config.getIndentation(1)
-	if errorCount > 0 {
-		sb.WriteString(boxLinePrefix) // Prefix for box drawing
-		sb.WriteString(itemIndentStr)
-		sb.WriteString(fmt.Sprintf("%s• %d error%s detected%s\n", t.Config.Colors.Error, errorCount, pluralSuffix(errorCount), t.Config.Colors.Reset))
-	}
-	if warningCount > 0 {
-		sb.WriteString(boxLinePrefix) // Prefix for box drawing
-		sb.WriteString(itemIndentStr)
-		sb.WriteString(fmt.Sprintf("%s• %d warning%s present%s\n", t.Config.Colors.Warning, warningCount, pluralSuffix(warningCount), t.Config.Colors.Reset))
-	}
-
-	if t.Config.Style.UseBoxes {
-		sb.WriteString("│")
-		emptyPadding := calculateWidth(taskLabelForWidth) + 1
-		if emptyPadding < 0 {
-			emptyPadding = 0
-		}
-		sb.WriteString(strings.Repeat(" ", emptyPadding))
-		sb.WriteString("│\n")
-	} else if errorCount > 0 || warningCount > 0 { // Only add extra newline if summary was printed and not in box
+	case BorderNone, BorderAscii:
+		// Just add a newline
 		sb.WriteString("\n")
 	}
+
+	// Summary heading
+	sb.WriteString(fmt.Sprintf("%s%s%s%s\n",
+		t.Config.Colors.Process,
+		"\033[1m", // Bold
+		"SUMMARY:",
+		"\033[0m"+t.Config.Colors.Reset)) // Reset bold and color
+
+	// Error count
+	if errorCount > 0 {
+		switch t.Config.Border.Style {
+		case BorderLeftDouble, BorderLeftOnly, BorderHeaderBox, BorderFull:
+			// Left border
+			sb.WriteString(t.Config.Border.VerticalChar + " ")
+
+		case BorderNone, BorderAscii:
+			// No border
+		}
+
+		// Indentation
+		sb.WriteString(t.Config.getIndentation(1))
+
+		// Format count
+		sb.WriteString(fmt.Sprintf("%s• %d %s%s%s\n",
+			t.Config.Colors.Error,
+			errorCount,
+			"error",
+			pluralSuffix(errorCount),
+			t.Config.Colors.Reset))
+	}
+
+	// Warning count
+	if warningCount > 0 {
+		switch t.Config.Border.Style {
+		case BorderLeftDouble, BorderLeftOnly, BorderHeaderBox, BorderFull:
+			// Left border
+			sb.WriteString(t.Config.Border.VerticalChar + " ")
+
+		case BorderNone, BorderAscii:
+			// No border
+		}
+
+		// Indentation
+		sb.WriteString(t.Config.getIndentation(1))
+
+		// Format count
+		sb.WriteString(fmt.Sprintf("%s• %d %s%s%s\n",
+			t.Config.Colors.Warning,
+			warningCount,
+			"warning",
+			pluralSuffix(warningCount),
+			t.Config.Colors.Reset))
+	}
+
+	// Empty line after summary
+	switch t.Config.Border.Style {
+	case BorderLeftDouble, BorderLeftOnly, BorderHeaderBox, BorderFull:
+		sb.WriteString(t.Config.Border.VerticalChar + "\n")
+
+	case BorderNone, BorderAscii:
+		sb.WriteString("\n")
+	}
+
 	return sb.String()
 }
 
+// RenderCompleteOutput creates the fully formatted task output
 func (t *Task) RenderCompleteOutput(showOutput string) string {
 	var sb strings.Builder
+
+	// Start line (task header)
 	sb.WriteString(t.RenderStartLine())
 	sb.WriteString("\n")
+
+	// Determine if we should show output
 	showDetailedOutput := false
 	switch showOutput {
 	case "always":
 		showDetailedOutput = true
 	case "on-fail":
 		showDetailedOutput = (t.Status == StatusError || t.Status == StatusWarning)
+	case "never":
+		showDetailedOutput = false
 	}
 
+	// Add output lines if we should show them
 	if showDetailedOutput && len(t.OutputLines) > 0 {
-		taskLabelForWidth := t.Label
-		if taskLabelForWidth == "" {
-			taskLabelForWidth = filepath.Base(t.Command)
-		}
-		if t.Config.Style.UseBoxes {
-			sb.WriteString("│")
-			emptyPadding := calculateWidth(taskLabelForWidth) + 1
-			if emptyPadding < 0 {
-				emptyPadding = 0
-			}
-			sb.WriteString(strings.Repeat(" ", emptyPadding))
-			sb.WriteString("│\n")
-		}
+		// Add summary section
 		if summary := t.RenderSummary(); summary != "" {
 			sb.WriteString(summary)
 		}
-		var renderedLines []string
-		if t.Context.CognitiveLoad == LoadHigh && t.Config.Output.SummarizeSimilar {
-			similarGroups := t.SummarizeOutputGroups()
-			for _, groupedLines := range similarGroups {
-				for _, line := range groupedLines {
-					renderedLines = append(renderedLines, t.RenderOutputLine(line))
-				}
-			}
-		} else {
-			for _, line := range t.OutputLines {
-				renderedLines = append(renderedLines, t.RenderOutputLine(line))
+
+		// Output lines
+		for _, line := range t.OutputLines {
+			if line.Type != TypeSummary { // Skip summary lines as they're handled above
+				sb.WriteString(t.RenderOutputLine(line))
+				sb.WriteString("\n")
 			}
 		}
-		if len(renderedLines) > 0 {
-			sb.WriteString(strings.Join(renderedLines, "\n"))
+
+		// Empty line before status, with border if needed
+		switch t.Config.Border.Style {
+		case BorderLeftDouble, BorderLeftOnly, BorderHeaderBox, BorderFull:
+			sb.WriteString(t.Config.Border.VerticalChar + "\n")
+
+		case BorderNone, BorderAscii:
 			sb.WriteString("\n")
 		}
-		if t.Config.Style.UseBoxes {
-			sb.WriteString("│")
-			emptyPadding := calculateWidth(taskLabelForWidth) + 1
-			if emptyPadding < 0 {
-				emptyPadding = 0
-			}
-			sb.WriteString(strings.Repeat(" ", emptyPadding))
-			sb.WriteString("│\n")
-		}
 	}
+
+	// End line (status and bottom border)
 	sb.WriteString(t.RenderEndLine())
+
 	return sb.String()
 }
 
-func (t *Task) SummarizeOutputGroups() [][]OutputLine {
-	pm := NewPatternMatcher(t.Config)
-	groups := pm.FindSimilarLines(t.OutputLines)
-	var result [][]OutputLine
-	processGroupType := func(targetType string, groupNameForSummary string) {
-		for key, lines := range groups {
-			if strings.HasPrefix(key, targetType) {
-				result = append(result, t.sampleAndSummarizeGroup(lines, groupNameForSummary))
-				delete(groups, key)
-			}
-		}
-	}
-	processGroupType(TypeError, "errors")
-	processGroupType(TypeWarning, "warnings")
-	for _, lines := range groups {
-		result = append(result, lines)
-	}
-	return result
-}
-
-func (t *Task) sampleAndSummarizeGroup(lines []OutputLine, groupType string) []OutputLine {
-	if len(lines) > t.Config.Output.MaxErrorSamples && t.Config.Output.SummarizeSimilar {
-		sampleLines := lines[:t.Config.Output.MaxErrorSamples]
-		summaryLine := OutputLine{
-			Content: fmt.Sprintf("... %d similar %s", len(lines)-t.Config.Output.MaxErrorSamples, groupType),
-			Type:    TypeSummary, Timestamp: time.Now(), Indentation: 1,
-			Context: LineContext{CognitiveLoad: t.Context.CognitiveLoad, Importance: 3},
-		}
-		return append(sampleLines, summaryLine)
-	}
-	return lines
-}
-
+// calculateWidth determines the appropriate width for formatting
 func calculateWidth(label string) int {
-	// Ensure label is not excessively long for width calculation
-	// This helps prevent extreme widths if a very long path becomes a label.
-	const maxLabelLengthForWidthCalc = 40
-	effectiveLabel := label
-	if len(effectiveLabel) > maxLabelLengthForWidthCalc {
-		effectiveLabel = effectiveLabel[:maxLabelLengthForWidthCalc] + "..."
-	}
+	// Base width on label length, with minimum and maximum values
+	minWidth := 30
+	maxWidth := 60
 
-	minWidth, maxWidth, basePad := 40, 80, 15 // Adjusted basePad
-	width := len(effectiveLabel) + basePad
+	width := len(label) + 10 // Add some space
+
 	if width < minWidth {
 		return minWidth
-	}
-	if width > maxWidth {
+	} else if width > maxWidth {
 		return maxWidth
 	}
+
 	return width
 }
 
+// pluralSuffix returns "s" for counts not equal to 1
 func pluralSuffix(count int) string {
 	if count == 1 {
 		return ""
 	}
 	return "s"
-}
-
-func formatDuration(d time.Duration) string {
-	if d < time.Millisecond {
-		return fmt.Sprintf("%dµs", d.Microseconds())
-	}
-	if d < time.Second {
-		return fmt.Sprintf("%dms", d.Milliseconds())
-	}
-	if d < time.Minute {
-		return fmt.Sprintf("%.1fs", d.Seconds())
-	}
-	if d < time.Hour {
-		m := int(d.Minutes())
-		s := d.Seconds() - float64(m*60)
-		return fmt.Sprintf("%dm%.1fs", m, s)
-	}
-	return fmt.Sprintf("%dh%dm", int(d.Hours()), int(d.Minutes())%60)
 }
