@@ -1,649 +1,368 @@
-// cmd/internal/design/config.go
-package design
+// cmd/internal/config/config.go
+package config
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
+	// Import the design package to use its Config type
+	"github.com/davidkoosis/fo/cmd/internal/design" // Adjust import path if necessary
 	"gopkg.in/yaml.v3"
 )
 
-// BorderStyle defines the type of border to use for task output
-type BorderStyle string
+// CliFlags holds the values of command-line flags
+type CliFlags struct {
+	Label         string
+	Stream        bool
+	ShowOutput    string
+	NoTimer       bool
+	NoColor       bool
+	CI            bool
+	Debug         bool
+	MaxBufferSize int64 // In bytes, passed from main after parsing
+	MaxLineLength int   // In bytes, passed from main after parsing
+	ThemeName     string
 
+	// Flags to track if they were explicitly set by the user
+	StreamSet     bool
+	ShowOutputSet bool
+	NoTimerSet    bool
+	NoColorSet    bool
+	CISet         bool
+	DebugSet      bool
+	// MaxBufferSizeSet and MaxLineLengthSet might also be useful
+}
+
+// ToolConfig defines specific settings for a command/tool preset
+type ToolConfig struct {
+	Label      string `yaml:"label,omitempty"`
+	Stream     *bool  `yaml:"stream,omitempty"` // Pointer to distinguish not set vs. set to false
+	ShowOutput string `yaml:"show_output,omitempty"`
+	NoTimer    *bool  `yaml:"no_timer,omitempty"`
+	// Add other overridable design.Config fields if needed for presets e.g.
+	// NoColor    *bool            `yaml:"no_color,omitempty"`
+	// Intent     string           `yaml:"intent,omitempty"` // Already in design.ToolConfig
+	OutputPatterns map[string][]string `yaml:"output_patterns,omitempty"` // Already in design.ToolConfig
+	Intent         string              `yaml:"intent,omitempty"`          // Already in design.ToolConfig
+}
+
+// AppConfig represents the application's overall configuration from .fo.yaml
+type AppConfig struct {
+	// Global settings from YAML - these act as defaults if not overridden by theme or flags
+	Label           string                 `yaml:"label,omitempty"`
+	Stream          bool                   `yaml:"stream"`
+	ShowOutput      string                 `yaml:"show_output"`
+	NoTimer         bool                   `yaml:"no_timer"`
+	NoColor         bool                   `yaml:"no_color"`
+	CI              bool                   `yaml:"ci"`
+	Debug           bool                   `yaml:"debug"`
+	MaxBufferSize   int64                  `yaml:"max_buffer_size"` // In bytes
+	MaxLineLength   int                    `yaml:"max_line_length"` // In bytes
+	ActiveThemeName string                 `yaml:"active_theme"`
+	Presets         map[string]*ToolConfig `yaml:"presets"`
+	// Themes are defined in the design package but loaded/referenced here
+	Themes map[string]*design.Config `yaml:"themes"`
+}
+
+// Constants for default values (can be shared or specific to this package)
 const (
-	BorderLeftOnly   BorderStyle = "left_only"
-	BorderLeftDouble BorderStyle = "left_double"
-	BorderHeaderBox  BorderStyle = "header_box"
-	BorderFull       BorderStyle = "full_box"
-	BorderNone       BorderStyle = "none"  // For line-oriented themes or no task framing
-	BorderAscii      BorderStyle = "ascii" // ASCII-only equivalent for boxed tasks
+	DefaultShowOutput      = "on-fail"
+	DefaultMaxBufferSize   = 10 * 1024 * 1024  // 10MB
+	DefaultMaxLineLength   = 1 * 1024 * 1024   // 1MB
+	DefaultActiveThemeName = "unicode_vibrant" // Matches a key in design.Config themes
 )
 
-// ElementStyleDef defines visual styling properties for a specific UI element
-type ElementStyleDef struct {
-	// Text content and formatting
-	Text          string   `yaml:"text,omitempty"`           // Fixed text content
-	Prefix        string   `yaml:"prefix,omitempty"`         // Text before content
-	Suffix        string   `yaml:"suffix,omitempty"`         // Text after content
-	TextContent   string   `yaml:"text_content,omitempty"`   // Default content, e.g. "SUCCESS", "FAILED" 
-	TextCase      string   `yaml:"text_case,omitempty"`      // "upper", "lower", "title", "none"
-	TextStyle     []string `yaml:"text_style,omitempty"`     // ["bold", "italic", "underline", "dim"]
-	
-	// Colors
-	ColorFG       string   `yaml:"color_fg,omitempty"`       // Foreground color name or ANSI code
-	ColorBG       string   `yaml:"color_bg,omitempty"`       // Background color name or ANSI code
-	
-	// Icons and symbols
-	IconKey       string   `yaml:"icon_key,omitempty"`       // Key to lookup in Icons map
-	BulletChar    string   `yaml:"bullet_char,omitempty"`    // Character for bullet points
-	
-	// Line formatting
-	LineChar      string   `yaml:"line_char,omitempty"`      // Character for horizontal lines
-	LineLengthType string  `yaml:"line_length_type,omitempty"` // "full_width", "dynamic_to_label", "fixed"
-	
-	// Border formatting
-	FramingCharStart string `yaml:"framing_char_start,omitempty"` // Start char for framing (e.g. "====[ ")
-	FramingCharEnd   string `yaml:"framing_char_end,omitempty"`   // End char for framing (e.g. " ]====")
-	
-	// Additional layout controls
-	AdditionalChars string `yaml:"additional_chars,omitempty"` // For extra spacing or symbols
-	DateTimeFormat  string `yaml:"date_time_format,omitempty"` // For timestamp formatting
-}
-
-// Config holds all resolved design system settings for rendering
-type Config struct {
-	// Theme metadata 
-	ThemeName    string `yaml:"-"` // Name of the theme this config represents
-	IsMonochrome bool   `yaml:"-"` // True if colors should be stripped/ignored
-	
-	// General style properties
-	Style struct {
-		UseBoxes       bool   `yaml:"use_boxes"`       // Master switch for task container (boxed vs line-oriented)
-		Indentation    string `yaml:"indentation"`     // Base indent unit (e.g., "  ")
-		ShowTimestamps bool   `yaml:"show_timestamps"` // For overall start/end times
-		NoTimer        bool   `yaml:"no_timer"`        // For individual task timers
-		Density        string `yaml:"density"`         // "compact", "balanced", "relaxed" for spacing
-	} `yaml:"style"`
-	
-	// Border characters 
-	Border struct {
-		// Task container border style
-		TaskStyle        BorderStyle `yaml:"task_style"` // One of the BorderStyle constants
-		HeaderChar       string      `yaml:"header_char"`
-		VerticalChar     string      `yaml:"vertical_char"`
-		TopCornerChar    string      `yaml:"top_corner_char"`
-		BottomCornerChar string      `yaml:"bottom_corner_char"`
-		FooterContinuationChar string `yaml:"footer_continuation_char"` // e.g. "─" in "└─"
-		
-		// Table border characters
-		Table_HChar     string `yaml:"table_h_char"`
-		Table_VChar     string `yaml:"table_v_char"`
-		Table_XChar     string `yaml:"table_x_char"` // Cross intersection
-		Table_Corner_TL string `yaml:"table_corner_tl"`
-		Table_Corner_TR string `yaml:"table_corner_tr"`
-		Table_Corner_BL string `yaml:"table_corner_bl"`
-		Table_Corner_BR string `yaml:"table_corner_br"`
-		Table_T_Down    string `yaml:"table_t_down"`
-		Table_T_Up      string `yaml:"table_t_up"`
-		Table_T_Left    string `yaml:"table_t_left"`
-		Table_T_Right   string `yaml:"table_t_right"`
-	} `yaml:"border"`
-	
-	// Color palette
-	Colors struct {
-		Process string `yaml:"process"` // Blue by default
-		Success string `yaml:"success"` // Green by default 
-		Warning string `yaml:"warning"` // Yellow by default
-		Error   string `yaml:"error"`   // Red by default
-		Detail  string `yaml:"detail"`  // Default text
-		Muted   string `yaml:"muted"`   // Dimmed text
-		Reset   string `yaml:"reset"`   // Reset all styling
-	} `yaml:"colors"`
-	
-	// Icon symbols
-	Icons struct {
-		Start   string `yaml:"start"`   // Process indicator
-		Success string `yaml:"success"` // Success indicator
-		Warning string `yaml:"warning"` // Warning indicator
-		Error   string `yaml:"error"`   // Error indicator
-		Info    string `yaml:"info"`    // Information indicator
-		Bullet  string `yaml:"bullet"`  // For lists
-	} `yaml:"icons"`
-	
-	// Element-specific styles
-	Elements map[string]ElementStyleDef `yaml:"elements"`
-	
-	// Pattern recognition rules (existing fields preserved)
-	Patterns struct {
-		Intent map[string][]string `yaml:"intent"`
-		Output map[string][]string `yaml:"output"`
-	} `yaml:"patterns"`
-	
-	// Tool-specific configuration (existing fields preserved)
-	Tools map[string]*ToolConfig `yaml:"tools"`
-	
-	// Cognitive load settings (existing fields preserved)
-	CognitiveLoad struct {
-		AutoDetect bool                 `yaml:"auto_detect"`
-		Default    CognitiveLoadContext `yaml:"default"`
-	} `yaml:"cognitive_load"`
-}
-
-// DefaultConfig returns a Config with standard values (for backward compatibility)
-func DefaultConfig() *Config {
-	return UnicodeVibrantTheme()
-}
-
-// NoColorConfig returns a monochrome Config for --no-color mode
-func NoColorConfig() *Config {
-	cfg := AsciiMinimalTheme()
-	cfg.IsMonochrome = true
-	return cfg
-}
-
-// AsciiMinimalTheme creates a theme using only ASCII characters and no colors
-func AsciiMinimalTheme() *Config {
-	cfg := &Config{
-		ThemeName:    "ascii_minimal",
-		IsMonochrome: true,
-	}
-	
-	// Style settings
-	cfg.Style.UseBoxes = false       // Line-oriented, not boxed
-	cfg.Style.Indentation = "  "
-	cfg.Style.ShowTimestamps = false
-	cfg.Style.Density = "compact"
-	
-	// Icons (ASCII only)
-	cfg.Icons.Start = "[>]"
-	cfg.Icons.Success = "[OK]"
-	cfg.Icons.Warning = "[!!]"
-	cfg.Icons.Error = "[XX]"
-	cfg.Icons.Info = "[i]"
-	cfg.Icons.Bullet = "*"
-	
-	// Colors (empty for monochrome)
-	cfg.Colors.Process = ""
-	cfg.Colors.Success = ""
-	cfg.Colors.Warning = ""
-	cfg.Colors.Error = ""
-	cfg.Colors.Detail = ""
-	cfg.Colors.Muted = ""
-	cfg.Colors.Reset = ""
-	
-	// Border characters (ASCII only)
-	cfg.Border.TaskStyle = BorderNone
-	cfg.Border.HeaderChar = "-"
-	cfg.Border.VerticalChar = "|"
-	cfg.Border.TopCornerChar = "+"
-	cfg.Border.BottomCornerChar = "+"
-	cfg.Border.FooterContinuationChar = "-"
-	
-	// Table borders (ASCII)
-	cfg.Border.Table_HChar = "-"
-	cfg.Border.Table_VChar = "|"
-	cfg.Border.Table_XChar = "+"
-	cfg.Border.Table_Corner_TL = "+"
-	cfg.Border.Table_Corner_TR = "+"
-	cfg.Border.Table_Corner_BL = "+"
-	cfg.Border.Table_Corner_BR = "+"
-	cfg.Border.Table_T_Down = "+"
-	cfg.Border.Table_T_Up = "+"
-	cfg.Border.Table_T_Left = "+"
-	cfg.Border.Table_T_Right = "+"
-	
-	// Initialize Elements map with all known element styles
-	cfg.Elements = make(map[string]ElementStyleDef)
-	initBaseElementStyles(cfg.Elements)
-	
-	// Override specific element styles for this theme
-	
-	// A. Global banner elements
-	cfg.Elements["Fo_Banner_Top"] = ElementStyleDef{
-		LineChar: "=",
-		Prefix: "FO: ",
-		TextStyle: []string{"bold"},
-	}
-	cfg.Elements["Fo_Banner_Bottom"] = ElementStyleDef{
-		LineChar: "=",
-		Prefix: "FO: ",
-		TextStyle: []string{"bold"},
-	}
-	
-	// B. Task block elements (line-oriented style)
-	cfg.Elements["H2_Target_Header_Line"] = ElementStyleDef{
-		LineChar: "-",
-		LineLengthType: "full_width",
-	}
-	cfg.Elements["H2_Target_Title"] = ElementStyleDef{
-		Prefix: "TARGET: ",
-		TextCase: "upper",
-		TextStyle: []string{"bold"},
-	}
-	cfg.Elements["H2_Target_Footer_Line"] = ElementStyleDef{
-		FramingCharStart: "---- ",
-		FramingCharEnd: " ----",
-	}
-	
-	// C. Task content line elements
-	cfg.Elements["Command_Line_Prefix"] = ElementStyleDef{
-		Text: "  -> CMD: ",
-	}
-	cfg.Elements["Stdout_Line_Prefix"] = ElementStyleDef{
-		Text: "    | ",
-	}
-	cfg.Elements["Stderr_Warning_Line_Prefix"] = ElementStyleDef{
-		Text: "    ! WARN: ",
-	}
-	cfg.Elements["Stderr_Error_Line_Prefix"] = ElementStyleDef{
-		Text: "    X ERROR: ",
-	}
-	cfg.Elements["Make_Info_Line_Prefix"] = ElementStyleDef{
-		Text: "INFO: ",
-	}
-	
-	// D. Task status elements
-	cfg.Elements["Status_Label_Prefix"] = ElementStyleDef{
-		Text: "  STAT: ",
-	}
-	cfg.Elements["Task_Status_Success_Block"] = ElementStyleDef{
-		TextContent: "PASSED",
-	}
-	cfg.Elements["Task_Status_Failed_Block"] = ElementStyleDef{
-		TextContent: "FAILED",
-	}
-	cfg.Elements["Task_Status_Warning_Block"] = ElementStyleDef{
-		TextContent: "WARNINGS",
-	}
-	cfg.Elements["Task_Status_Duration"] = ElementStyleDef{
-		Prefix: "(",
-		Suffix: ")",
-	}
-	
-	// E. Summary elements
-	cfg.Elements["Task_Content_Summary_Heading"] = ElementStyleDef{
-		TextContent: "SUMMARY:",
-		TextStyle: []string{"bold"},
-	}
-	cfg.Elements["Task_Content_Summary_Item_Error"] = ElementStyleDef{
-		BulletChar: "*",
-	}
-	cfg.Elements["Task_Content_Summary_Item_Warning"] = ElementStyleDef{
-		BulletChar: "*",
-	}
-	
-	// Pattern recognition (for backward compatibility)
-	cfg.Patterns = defaultPatterns()
-	cfg.Tools = make(map[string]*ToolConfig)
-	cfg.CognitiveLoad.AutoDetect = true
-	cfg.CognitiveLoad.Default = LoadMedium
-	
-	return cfg
-}
-
-// UnicodeVibrantTheme creates a rich theme with Unicode characters and colors
-func UnicodeVibrantTheme() *Config {
-	cfg := &Config{
-		ThemeName:    "unicode_vibrant",
-		IsMonochrome: false,
-	}
-	
-	// Style settings
-	cfg.Style.UseBoxes = true        // Use box-drawing for tasks
-	cfg.Style.Indentation = "  "
-	cfg.Style.ShowTimestamps = false
-	cfg.Style.Density = "balanced"
-	
-	// Icons (Unicode/Emoji)
-	cfg.Icons.Start = "▶️"
-	cfg.Icons.Success = "✅"
-	cfg.Icons.Warning = "⚠️"
-	cfg.Icons.Error = "❌"
-	cfg.Icons.Info = "ℹ️"
-	cfg.Icons.Bullet = "•"
-	
-	// Colors (ANSI codes)
-	cfg.Colors.Process = "\033[0;34m" // Blue
-	cfg.Colors.Success = "\033[0;32m" // Green
-	cfg.Colors.Warning = "\033[0;33m" // Yellow
-	cfg.Colors.Error = "\033[0;31m"   // Red
-	cfg.Colors.Detail = "\033[0m"     // Default
-	cfg.Colors.Muted = "\033[2m"      // Dim
-	cfg.Colors.Reset = "\033[0m"      // Reset
-	
-	// Border characters (Unicode)
-	cfg.Border.TaskStyle = BorderLeftDouble
-	cfg.Border.HeaderChar = "═"
-	cfg.Border.VerticalChar = "│"
-	cfg.Border.TopCornerChar = "╒"
-	cfg.Border.BottomCornerChar = "└"
-	cfg.Border.FooterContinuationChar = "─"
-	
-	// Table borders (Unicode)
-	cfg.Border.Table_HChar = "─"
-	cfg.Border.Table_VChar = "│"
-	cfg.Border.Table_XChar = "┼"
-	cfg.Border.Table_Corner_TL = "┌"
-	cfg.Border.Table_Corner_TR = "┐"
-	cfg.Border.Table_Corner_BL = "└"
-	cfg.Border.Table_Corner_BR = "┘"
-	cfg.Border.Table_T_Down = "┬"
-	cfg.Border.Table_T_Up = "┴"
-	cfg.Border.Table_T_Left = "├"
-	cfg.Border.Table_T_Right = "┤"
-	
-	// Initialize Elements map with base styles
-	cfg.Elements = make(map[string]ElementStyleDef)
-	initBaseElementStyles(cfg.Elements)
-	
-	// Override specific element styles for this theme
-	
-	// A. Global banner elements
-	cfg.Elements["Fo_Banner_Top"] = ElementStyleDef{
-		LineChar: "═",
-		Prefix: "FO: ",
-		TextStyle: []string{"bold"},
-		ColorFG: "Process",
-	}
-	cfg.Elements["Fo_Banner_Bottom"] = ElementStyleDef{
-		LineChar: "═",
-		Prefix: "FO: ",
-		TextStyle: []string{"bold"},
-		ColorFG: "Process",
-	}
-	
-	// B. Task block elements (boxed style)
-	cfg.Elements["Task_Label_Header"] = ElementStyleDef{
-		TextCase: "upper",
-		TextStyle: []string{"bold"},
-		ColorFG: "Process",
-	}
-	cfg.Elements["Task_StartIndicator_Line"] = ElementStyleDef{
-		IconKey: "Start",
-		ColorFG: "Process",
-	}
-	
-	// C. Task content line elements
-	cfg.Elements["Stdout_Line_Prefix"] = ElementStyleDef{
-		AdditionalChars: "  ",
-	}
-	cfg.Elements["Stderr_Warning_Line_Prefix"] = ElementStyleDef{
-		IconKey: "Warning",
-		AdditionalChars: "  ",
-	}
-	cfg.Elements["Stderr_Error_Line_Prefix"] = ElementStyleDef{
-		IconKey: "Error",
-		AdditionalChars: "  ",
-	}
-	cfg.Elements["Make_Info_Line_Prefix"] = ElementStyleDef{
-		IconKey: "Info",
-		Text: " ",
-	}
-	
-	// Styling for line content
-	cfg.Elements["Task_Content_Stderr_Warning_Text"] = ElementStyleDef{
-		ColorFG: "Warning",
-	}
-	cfg.Elements["Task_Content_Stderr_Error_Text"] = ElementStyleDef{
-		ColorFG: "Error",
-	}
-	
-	// D. Task status elements
-	cfg.Elements["Task_Status_Success_Block"] = ElementStyleDef{
-		IconKey: "Success",
-		TextContent: "Complete",
-		ColorFG: "Success",
-	}
-	cfg.Elements["Task_Status_Failed_Block"] = ElementStyleDef{
-		IconKey: "Error",
-		TextContent: "Failed",
-		ColorFG: "Error",
-	}
-	cfg.Elements["Task_Status_Warning_Block"] = ElementStyleDef{
-		IconKey: "Warning",
-		TextContent: "Completed with warnings",
-		ColorFG: "Warning",
-	}
-	cfg.Elements["Task_Status_Duration"] = ElementStyleDef{
-		Prefix: "(",
-		Suffix: ")",
-		ColorFG: "Muted",
-	}
-	
-	// E. Summary elements
-	cfg.Elements["Task_Content_Summary_Heading"] = ElementStyleDef{
-		TextContent: "SUMMARY:",
-		TextStyle: []string{"bold"},
-		ColorFG: "Process",
-	}
-	cfg.Elements["Task_Content_Summary_Item_Error"] = ElementStyleDef{
-		BulletChar: "•",
-		ColorFG: "Error",
-	}
-	cfg.Elements["Task_Content_Summary_Item_Warning"] = ElementStyleDef{
-		BulletChar: "•",
-		ColorFG: "Warning",
-	}
-	
-	// F. Table elements
-	cfg.Elements["Table_Header_Cell_Text"] = ElementStyleDef{
-		TextStyle: []string{"bold"},
-		ColorFG: "Process",
-	}
-	
-	// Pattern recognition (for backward compatibility)
-	cfg.Patterns = defaultPatterns()
-	cfg.Tools = make(map[string]*ToolConfig)
-	cfg.CognitiveLoad.AutoDetect = true
-	cfg.CognitiveLoad.Default = LoadMedium
-	
-	return cfg
-}
-
-// Helper function to initialize the Elements map with base styles
-// This ensures every known element has at least an empty definition
-func initBaseElementStyles(elements map[string]ElementStyleDef) {
-	// A. Global banner elements
-	elements["Fo_Banner_Top"] = ElementStyleDef{}
-	elements["Fo_Banner_Top_Line_FoProcessing"] = ElementStyleDef{}
-	elements["Fo_Timestamp_Start"] = ElementStyleDef{DateTimeFormat: "2006-01-02 15:04:05"}
-	elements["Fo_Banner_Bottom"] = ElementStyleDef{}
-	elements["Fo_OverallStatus_Success"] = ElementStyleDef{}
-	elements["Fo_OverallStatus_Failed"] = ElementStyleDef{}
-	elements["Fo_OverallStatus_Warnings"] = ElementStyleDef{}
-	
-	// B. Task block elements
-	elements["Task_Label_Header"] = ElementStyleDef{}
-	elements["Task_StartIndicator_Line"] = ElementStyleDef{}
-	elements["H2_Target_Header_Line"] = ElementStyleDef{}
-	elements["H2_Target_Title"] = ElementStyleDef{}
-	elements["H2_Target_Footer_Line"] = ElementStyleDef{}
-	
-	// C. Task content line elements
-	elements["Command_Line_Prefix"] = ElementStyleDef{}
-	elements["Stdout_Line_Prefix"] = ElementStyleDef{}
-	elements["Stderr_Warning_Line_Prefix"] = ElementStyleDef{}
-	elements["Stderr_Error_Line_Prefix"] = ElementStyleDef{}
-	elements["Make_Info_Line_Prefix"] = ElementStyleDef{}
-	elements["Task_Content_Stdout_Text"] = ElementStyleDef{}
-	elements["Task_Content_Stderr_Warning_Text"] = ElementStyleDef{}
-	elements["Task_Content_Stderr_Error_Text"] = ElementStyleDef{}
-	
-	// D. Task status elements
-	elements["Status_Label_Prefix"] = ElementStyleDef{}
-	elements["Task_Status_Success_Block"] = ElementStyleDef{}
-	elements["Task_Status_Failed_Block"] = ElementStyleDef{}
-	elements["Task_Status_Warning_Block"] = ElementStyleDef{}
-	elements["Task_Status_Duration"] = ElementStyleDef{}
-	
-	// E. Summary elements
-	elements["Task_Content_Summary_Heading"] = ElementStyleDef{}
-	elements["Task_Content_Summary_Item_Error"] = ElementStyleDef{}
-	elements["Task_Content_Summary_Item_Warning"] = ElementStyleDef{}
-	
-	// F. Table elements
-	elements["Table_Header_Cell_Text"] = ElementStyleDef{}
-	elements["Table_Body_Cell_Text"] = ElementStyleDef{}
-	
-	// G. Progress indicator elements
-	elements["ProgressIndicator_Spinner_Chars"] = ElementStyleDef{}
-	elements["ProgressIndicator_Text"] = ElementStyleDef{}
-}
-
-// defaultPatterns returns the standard pattern recognition rules
-func defaultPatterns() struct {
-	Intent map[string][]string `yaml:"intent"`
-	Output map[string][]string `yaml:"output"`
-} {
-	return struct {
-		Intent map[string][]string `yaml:"intent"`
-		Output map[string][]string `yaml:"output"`
-	}{
-		Intent: map[string][]string{
-			"building": {"go build", "make", "gcc", "g++"},
-			"testing": {"go test", "pytest", "jest", "jasmine"},
-			"linting": {"golangci-lint", "eslint", "pylint", "flake8"},
-			"checking": {"go vet", "check", "verify"},
-			"installing": {"go install", "npm install", "pip install"},
-			"formatting": {"go fmt", "prettier", "black", "gofmt"},
+// LoadConfig loads the .fo.yaml configuration.
+func LoadConfig() *AppConfig {
+	appCfg := &AppConfig{
+		ShowOutput:      DefaultShowOutput,
+		MaxBufferSize:   DefaultMaxBufferSize,
+		MaxLineLength:   DefaultMaxLineLength,
+		ActiveThemeName: DefaultActiveThemeName,
+		Themes: map[string]*design.Config{ // Initialize with known themes from design package
+			"unicode_vibrant": design.UnicodeVibrantTheme(),
+			"ascii_minimal":   design.AsciiMinimalTheme(),
+			// Load other themes defined in design package if necessary
 		},
-		Output: map[string][]string{
-			"error": {
-				"^Error:", "^ERROR:", "^ERRO[R]?\\[", 
-				"^E!",  "^panic:", "^fatal:", "^Failed",
-				"\\[ERROR\\]", "^FAIL\\t"
-			},
-			"warning": {
-				"^Warning:", "^WARNING:", "^WARN\\[", 
-				"^W!", "^deprecated:", "^\\[warn\\]", 
-				"\\[WARNING\\]", "^Warn:"
-			},
-			"success": {
-				"^Success:", "^SUCCESS:", "^PASS\\t", 
-				"^ok\\t", "^Done!", "^Completed", 
-				"^✓", "^All tests passed!"
-			},
-			"info": {
-				"^Info:", "^INFO:", "^INFO\\[", 
-				"^I!", "^\\[info\\]", "^Running"
-			},
-		},
+		Presets: make(map[string]*ToolConfig),
 	}
-}
 
-// Helper methods for accessing theme elements
-
-// GetElementStyle retrieves the style for a specific element
-// Returns an empty ElementStyleDef if not found to avoid nil panics
-func (c *Config) GetElementStyle(elementName string) ElementStyleDef {
-	if style, ok := c.Elements[elementName]; ok {
-		return style
+	configPath := getConfigPath()
+	if configPath == "" {
+		fmt.Fprintf(os.Stderr, "DEBUG: No .fo.yaml config file found, using defaults.\n")
+		return appCfg // Return defaults if no config file found
 	}
-	
-	// Return empty style if not found
-	return ElementStyleDef{}
-}
 
-// GetIndentation returns the appropriate indentation string
-func (c *Config) GetIndentation(level int) string {
-	if level <= 0 {
-		return ""
+	yamlFile, err := os.ReadFile(configPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "Warning: Error reading config file %s: %v. Using defaults.\n", configPath, err)
+		} else {
+			fmt.Fprintf(os.Stderr, "DEBUG: Config file %s not found. Using defaults.\n", configPath)
+		}
+		return appCfg
 	}
-	return strings.Repeat(c.Style.Indentation, level)
-}
 
-// GetIcon returns the icon for the given key, respecting monochrome mode
-func (c *Config) GetIcon(iconKey string) string {
-	if c.IsMonochrome {
-		// ASCII fallbacks in monochrome mode
-		switch iconKey {
-		case "Start":
-			return "[>]"
-		case "Success":
-			return "[OK]"
-		case "Warning":
-			return "[!!]"
-		case "Error":
-			return "[XX]"
-		case "Info":
-			return "[i]"
-		case "Bullet":
-			return "*"
-		default:
-			return ""
+	// Unmarshal into a temporary structure that matches the YAML for themes,
+	// as themes in YAML might be partial and need merging with design package defaults.
+	// For simplicity here, we assume .fo.yaml can fully define themes if it wants to override.
+	err = yaml.Unmarshal(yamlFile, appCfg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: Error unmarshalling config file %s: %v. Using defaults.\n", configPath, err)
+		// Reset to coded defaults if unmarshalling fails to ensure a valid state
+		return &AppConfig{
+			ShowOutput:      DefaultShowOutput,
+			MaxBufferSize:   DefaultMaxBufferSize,
+			MaxLineLength:   DefaultMaxLineLength,
+			ActiveThemeName: DefaultActiveThemeName,
+			Themes: map[string]*design.Config{
+				"unicode_vibrant": design.UnicodeVibrantTheme(),
+				"ascii_minimal":   design.AsciiMinimalTheme(),
+			},
+			Presets: make(map[string]*ToolConfig),
 		}
 	}
-	
-	// Return the configured icon
-	switch iconKey {
-	case "Start":
-		return c.Icons.Start
-	case "Success":
-		return c.Icons.Success
-	case "Warning":
-		return c.Icons.Warning
-	case "Error":
-		return c.Icons.Error
-	case "Info":
-		return c.Icons.Info
-	case "Bullet":
-		return c.Icons.Bullet
-	default:
-		return ""
+	// Ensure default themes are present if not defined in YAML
+	if _, ok := appCfg.Themes["unicode_vibrant"]; !ok {
+		appCfg.Themes["unicode_vibrant"] = design.UnicodeVibrantTheme()
 	}
+	if _, ok := appCfg.Themes["ascii_minimal"]; !ok {
+		appCfg.Themes["ascii_minimal"] = design.AsciiMinimalTheme()
+	}
+
+	if appCfg.MaxBufferSize == 0 {
+		appCfg.MaxBufferSize = DefaultMaxBufferSize
+	}
+	if appCfg.MaxLineLength == 0 {
+		appCfg.MaxLineLength = DefaultMaxLineLength
+	}
+	if appCfg.ShowOutput == "" {
+		appCfg.ShowOutput = DefaultShowOutput
+	}
+	if appCfg.ActiveThemeName == "" {
+		appCfg.ActiveThemeName = DefaultActiveThemeName
+	}
+
+	fmt.Fprintf(os.Stderr, "DEBUG: Loaded config from %s. Active theme: %s\n", configPath, appCfg.ActiveThemeName)
+	return appCfg
 }
 
-// GetColor returns the color for the given key, empty string in monochrome mode
-func (c *Config) GetColor(colorKey string, elementName ...string) string {
-	if c.IsMonochrome {
-		return "" // No colors in monochrome mode
+func getConfigPath() string {
+	localPath := ".fo.yaml"
+	if _, err := os.Stat(localPath); err == nil {
+		return localPath
 	}
-	
-	// First check if we were given a specific element to check
-	if len(elementName) > 0 && elementName[0] != "" {
-		elemStyle := c.GetElementStyle(elementName[0])
-		if elemStyle.ColorFG != "" {
-			// The element has a specific color definition
-			return getColorByName(elemStyle.ColorFG, c)
+	configHome, err := os.UserConfigDir()
+	if err == nil {
+		xdgPath := filepath.Join(configHome, "fo", ".fo.yaml")
+		if _, err := os.Stat(xdgPath); err == nil {
+			return xdgPath
 		}
 	}
-	
-	// Otherwise use the color key directly
-	return getColorByName(colorKey, c)
+	return ""
 }
 
-// getColorByName resolves a color name to its ANSI code
-func getColorByName(name string, c *Config) string {
-	switch name {
-	case "Process":
-		return c.Colors.Process
-	case "Success":
-		return c.Colors.Success
-	case "Warning":
-		return c.Colors.Warning
-	case "Error":
-		return c.Colors.Error
-	case "Detail":
-		return c.Colors.Detail
-	case "Muted":
-		return c.Colors.Muted
-	default:
-		// If the name itself looks like an ANSI code, return it directly
-		if strings.HasPrefix(name, "\033[") {
-			return name
+// MergeWithFlags creates the final design.Config to be used for rendering.
+// It takes the loaded AppConfig, applies CLI flag overrides, and resolves the theme.
+func MergeWithFlags(appCfg *AppConfig, cliFlags CliFlags) *design.Config {
+	effectiveThemeName := appCfg.ActiveThemeName
+	if cliFlags.ThemeName != "" {
+		effectiveThemeName = cliFlags.ThemeName
+	}
+
+	// Get the base theme configuration from the design package (or AppConfig if it stores full themes)
+	finalDesignConfig, themeExists := appCfg.Themes[effectiveThemeName]
+	if !themeExists {
+		fmt.Fprintf(os.Stderr, "Warning: Theme '%s' not found in AppConfig, falling back to default '%s'.\n", effectiveThemeName, DefaultActiveThemeName)
+		finalDesignConfig = appCfg.Themes[DefaultActiveThemeName]
+		if finalDesignConfig == nil { // Absolute fallback
+			fmt.Fprintf(os.Stderr, "Warning: Default theme '%s' also not found, using coded UnicodeVibrant theme.\n", DefaultActiveThemeName)
+			finalDesignConfig = design.UnicodeVibrantTheme()
 		}
-		return ""
+	}
+
+	// Create a deep copy to avoid modifying the original theme map instance
+	copiedConfig := design.DeepCopyConfig(finalDesignConfig) // You'll need to implement DeepCopyConfig in design package
+	finalDesignConfig = copiedConfig
+
+	// Apply overrides: CLI flags > Environment Variables > .fo.yaml global settings > Theme defaults
+
+	// Environment variable overrides (apply before CLI flags so CLI can override env)
+	// FO_NO_COLOR or NO_COLOR
+	envNoColor := os.Getenv("FO_NO_COLOR")
+	if envNoColor == "" {
+		envNoColor = os.Getenv("NO_COLOR")
+	}
+	if envNoColor != "" {
+		if bVal, err := strconv.ParseBool(envNoColor); err == nil && bVal {
+			appCfg.NoColor = true // Update the appCfg field that CLI flags will check
+		}
+	}
+	// FO_CI
+	if envCI := os.Getenv("FO_CI"); envCI != "" {
+		if bVal, err := strconv.ParseBool(envCI); err == nil && bVal {
+			appCfg.CI = true // Update the appCfg field
+		}
+	}
+	// FO_DEBUG
+	if envDebug := os.Getenv("FO_DEBUG"); envDebug != "" {
+		if bVal, err := strconv.ParseBool(envDebug); err == nil && bVal {
+			appCfg.Debug = true
+		}
+	}
+
+	// Apply NoColor from AppConfig (which might have been updated by Env vars)
+	if appCfg.NoColor {
+		finalDesignConfig.IsMonochrome = true
+		design.ApplyMonochromeDefaults(finalDesignConfig) // Helper in design pkg
+	}
+	// Apply CI from AppConfig
+	if appCfg.CI {
+		finalDesignConfig.IsMonochrome = true
+		finalDesignConfig.Style.NoTimer = true
+		design.ApplyMonochromeDefaults(finalDesignConfig) // Ensure CI is fully monochrome + simple
+		finalDesignConfig.Style.UseBoxes = false          // Typically CI mode is simpler
+	}
+
+	// Apply CLI flag overrides (these have highest precedence)
+	if cliFlags.NoColorSet && cliFlags.NoColor {
+		finalDesignConfig.IsMonochrome = true
+		design.ApplyMonochromeDefaults(finalDesignConfig)
+	}
+	if cliFlags.CISet && cliFlags.CI {
+		finalDesignConfig.IsMonochrome = true
+		finalDesignConfig.Style.NoTimer = true
+		design.ApplyMonochromeDefaults(finalDesignConfig)
+		finalDesignConfig.Style.UseBoxes = false
+	}
+	if cliFlags.NoTimerSet && cliFlags.NoTimer {
+		finalDesignConfig.Style.NoTimer = true
+	}
+	// Note: cliFlags.Stream, cliFlags.ShowOutput, cliFlags.Label, cliFlags.MaxBufferSize, cliFlags.MaxLineLength, cliFlags.Debug
+	// are typically used directly in main.go to control execution flow or passed separately,
+	// rather than modifying the finalDesignConfig directly, unless a specific theme property needs to change.
+	// For example, Stream mode might change finalDesignConfig.Style.UseBoxes.
+	if cliFlags.StreamSet && cliFlags.Stream {
+		finalDesignConfig.Style.UseBoxes = false // Example: stream implies simpler output
+	}
+
+	return finalDesignConfig
+}
+
+// ApplyCommandPreset modifies the AppConfig based on a command preset.
+// This should be called *before* MergeWithFlags if presets can affect theme choice or global bools.
+// Or, it can modify the `finalDesignConfig` if presets only change design aspects.
+// For simplicity, let's assume it modifies AppConfig for now.
+func ApplyCommandPreset(appCfg *AppConfig, commandName string) {
+	// Extract just the command name from a path if necessary
+	baseCommand := filepath.Base(commandName)
+
+	keyToCheck := []string{commandName, baseCommand} // Check full path then base name
+
+	for _, cmdKey := range keyToCheck {
+		if preset, ok := appCfg.Presets[cmdKey]; ok {
+			if preset.Label != "" {
+				appCfg.Label = preset.Label // Overrides global label if preset has one
+			}
+			if preset.Stream != nil {
+				appCfg.Stream = *preset.Stream
+			}
+			if preset.ShowOutput != "" {
+				appCfg.ShowOutput = preset.ShowOutput
+			}
+			if preset.NoTimer != nil {
+				appCfg.NoTimer = *preset.NoTimer
+			}
+			// If presets could define tool-specific intents or output patterns for the design.Config
+			// that logic would also go here, potentially by merging into a temporary design.Config
+			// or by having MergeWithFlags be aware of the active command.
+			return // Applied first found preset
+		}
 	}
 }
 
-// ResetColor returns the ANSI reset code, or empty string in monochrome mode
-func (c *Config) ResetColor() string {
-	if c.IsMonochrome {
-		return ""
-	}
-	return c.Colors.Reset
+// You will also need to add DeepCopyConfig and ApplyMonochromeDefaults to your design package:
+// In cmd/internal/design/config.go (package design):
+/*
+func DeepCopyConfig(original *Config) *Config {
+    copied := *original // Shallow copy for top-level fields
+
+    // Deep copy maps and slices
+    copied.Colors = original.Colors // Assuming Colors struct is simple values
+    copied.Icons = original.Icons   // Assuming Icons struct is simple values
+    copied.Border = original.Border // Assuming Border struct is simple values
+    copied.Style = original.Style   // Assuming Style struct is simple values
+    copied.CognitiveLoad = original.CognitiveLoad
+
+    if original.Elements != nil {
+        copied.Elements = make(map[string]ElementStyleDef)
+        for k, v := range original.Elements {
+            copied.Elements[k] = v // ElementStyleDef contains slices, but let's assume they are not modified post-copy for now
+        }
+    }
+    if original.Patterns.Intent != nil {
+        copied.Patterns.Intent = make(map[string][]string)
+        for k, v := range original.Patterns.Intent {
+            // Perform deep copy for slice 'v' if necessary
+            s := make([]string, len(v))
+            copy(s,v)
+            copied.Patterns.Intent[k] = s
+        }
+    }
+    if original.Patterns.Output != nil {
+        copied.Patterns.Output = make(map[string][]string)
+        for k, v := range original.Patterns.Output {
+            s := make([]string, len(v))
+            copy(s,v)
+            copied.Patterns.Output[k] = s
+        }
+    }
+    if original.Tools != nil {
+        copied.Tools = make(map[string]*ToolConfig) // design.ToolConfig might be different from config.ToolConfig
+                                                    // This suggests ToolConfig specific to design might be needed,
+                                                    // or that ToolConfig from package config is passed around.
+                                                    // For now, let's assume this is design.ToolConfig if it exists
+        for k, v := range original.Tools {
+            toolCfgCopy := *v // shallow copy of the ToolConfig itself
+            // deep copy slices/maps within v if any
+            copied.Tools[k] = &toolCfgCopy
+        }
+    }
+    return &copied
 }
+
+func ApplyMonochromeDefaults(cfg *Config) {
+    cfg.IsMonochrome = true
+    asciiMinimal := AsciiMinimalTheme() // Get the full minimal theme
+    cfg.Icons = asciiMinimal.Icons
+    cfg.Colors = asciiMinimal.Colors // All colors become empty strings
+    cfg.Border = asciiMinimal.Border
+    cfg.Style.UseBoxes = asciiMinimal.Style.UseBoxes // Usually simpler for monochrome
+
+    // Ensure all element styles are updated for monochrome
+    if cfg.Elements == nil {
+        cfg.Elements = make(map[string]ElementStyleDef)
+    }
+    for elKey, minimalElDef := range asciiMinimal.Elements {
+        currentElDef, ok := cfg.Elements[elKey]
+        if !ok {
+            currentElDef = ElementStyleDef{} // Start fresh if element didn't exist
+        }
+        currentElDef.ColorFG = "" // Remove color
+        currentElDef.ColorBG = ""
+
+        // If minimal theme defines specific text or icon, prefer it if current is empty or different
+        if minimalElDef.IconKey != "" {
+             currentElDef.IconKey = minimalElDef.IconKey
+        }
+         if minimalElDef.Text != "" && currentElDef.Text == "" { // If minimal theme defines text and current doesn't
+             currentElDef.Text = minimalElDef.Text
+        }
+        // Preserve other non-color aspects from the original theme unless minimal explicitly changes them
+        // (e.g., TextCase, TextStyle if not color dependent)
+        cfg.Elements[elKey] = currentElDef
+    }
+}
+*/
