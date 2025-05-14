@@ -463,8 +463,7 @@ func ApplyMonochromeDefaults(cfg *Config) {
 		return
 	}
 	cfg.IsMonochrome = true
-	cfg.Style.UseBoxes = false            // Force line-oriented for monochrome
-	cfg.Style.NoTimer = cfg.Style.NoTimer // Preserve NoTimer state, as it can be set by --ci separately
+	cfg.Style.UseBoxes = false // Force line-oriented for monochrome
 
 	cfg.Colors = struct {
 		Process string `yaml:"process"`

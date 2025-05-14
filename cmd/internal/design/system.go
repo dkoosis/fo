@@ -2,6 +2,7 @@
 package design
 
 import (
+	"sync" // Import sync package
 	"time"
 )
 
@@ -20,6 +21,7 @@ type Task struct {
 
 	// Output content
 	OutputLines []OutputLine
+	outputLock  sync.Mutex // Mutex to protect concurrent access to OutputLines and related context
 
 	// Configuration and context
 	Config  *Config
@@ -39,57 +41,59 @@ type OutputLine struct {
 }
 
 // TaskContext holds information about the cognitive context of the task
+// (e.g., complexity, user's likely cognitive load).
 type TaskContext struct {
-	// Cognitive load determines styling based on research
+	// CognitiveLoad determines styling based on research (e.g., simplify for high load).
 	CognitiveLoad CognitiveLoadContext
 
-	// Task properties affecting presentation
-	IsDetailView bool // For conditional verbosity
-	Complexity   int  // 1-5 scale of task complexity
+	// IsDetailView indicates if a detailed view is active, affecting verbosity.
+	IsDetailView bool
+	// Complexity is a heuristic (1-5) of the task's output or nature.
+	Complexity int
 }
 
-// LineContext holds information about the context of an output line
+// LineContext holds information about the context of an individual output line
+// used for fine-grained styling decisions.
 type LineContext struct {
-	// Cognitive load at this point in output
+	// CognitiveLoad at the point this line is processed/displayed.
 	CognitiveLoad CognitiveLoadContext
-
-	// Importance rating (1-5) for prioritization
+	// Importance rating (1-5) for prioritization in display or summary.
 	Importance int
-
-	// Special rendering flags
+	// IsHighlighted indicates if the line should receive special emphasis.
 	IsHighlighted bool
-	IsSummary     bool
+	// IsSummary indicates if this line is part of a generated summary.
+	IsSummary bool
 }
 
-// CognitiveLoadContext represents the user's likely cognitive state
+// CognitiveLoadContext represents the user's likely cognitive state when processing information.
 type CognitiveLoadContext string
 
 const (
-	LoadLow    CognitiveLoadContext = "low"
-	LoadMedium CognitiveLoadContext = "medium"
-	LoadHigh   CognitiveLoadContext = "high"
+	LoadLow    CognitiveLoadContext = "low"    // Simple, routine information.
+	LoadMedium CognitiveLoadContext = "medium" // Standard operational information.
+	LoadHigh   CognitiveLoadContext = "high"   // Complex errors, dense information requiring focus.
 )
 
-// LineType constants for consistent output classification
+// LineType constants for consistent classification of output lines.
 const (
-	TypeDetail   = "detail"
-	TypeError    = "error"
-	TypeWarning  = "warning"
-	TypeSuccess  = "success"
-	TypeInfo     = "info"
-	TypeProgress = "progress"
-	TypeSummary  = "summary"
+	TypeDetail   = "detail"   // Default for unclassified lines.
+	TypeError    = "error"    // Error messages.
+	TypeWarning  = "warning"  // Warning messages.
+	TypeSuccess  = "success"  // Success indicators.
+	TypeInfo     = "info"     // Informational messages (e.g., from stderr not being errors).
+	TypeProgress = "progress" // Progress updates.
+	TypeSummary  = "summary"  // Lines that are part of a generated summary.
 )
 
-// TaskStatus constants for consistent status representation
+// TaskStatus constants for consistent representation of a task's overall status.
 const (
-	StatusRunning = "running"
-	StatusSuccess = "success"
-	StatusWarning = "warning"
-	StatusError   = "error"
+	StatusRunning = "running" // Task is currently executing.
+	StatusSuccess = "success" // Task completed successfully.
+	StatusWarning = "warning" // Task completed with warnings.
+	StatusError   = "error"   // Task failed or completed with errors.
 )
 
-// NewTask creates a new task with the given label and intent
+// NewTask creates and initializes a new Task.
 func NewTask(label, intent string, command string, args []string, config *Config) *Task {
 	return &Task{
 		Label:     label,
@@ -98,38 +102,49 @@ func NewTask(label, intent string, command string, args []string, config *Config
 		Args:      args,
 		StartTime: time.Now(),
 		Status:    StatusRunning,
-		Config:    config,
-		Context: TaskContext{
+		Config:    config, // Assign the provided design configuration.
+		Context: TaskContext{ // Initialize context with defaults.
 			CognitiveLoad: LoadMedium,
-			Complexity:    2,
+			Complexity:    2, // Default complexity.
 			IsDetailView:  false,
 		},
+		// outputLock is automatically initialized to its zero value (unlocked mutex).
 	}
 }
 
-// AddOutputLine adds a classified output line to the task
+// AddOutputLine appends a new classified output line to the task's OutputLines.
+// This method is thread-safe due to the use of outputLock.
 func (t *Task) AddOutputLine(content, lineType string, context LineContext) {
+	t.outputLock.Lock()         // Acquire lock before modifying shared OutputLines.
+	defer t.outputLock.Unlock() // Ensure lock is released when function exits.
+
 	t.OutputLines = append(t.OutputLines, OutputLine{
 		Content:   content,
 		Type:      lineType,
-		Timestamp: time.Now(),
+		Timestamp: time.Now(), // Timestamp the line addition.
 		Context:   context,
 	})
 }
 
-// Complete marks the task as complete with the given exit code
+// Complete finalizes the task's status based on its exit code and output analysis.
+// This should be called after all output has been processed.
 func (t *Task) Complete(exitCode int) {
+	// These fields are typically set once after all goroutines are done,
+	// so direct assignment is safe here.
 	t.EndTime = time.Now()
 	t.Duration = t.EndTime.Sub(t.StartTime)
 	t.ExitCode = exitCode
 
+	// Determine final status based on exit code and any errors/warnings in output.
+	// hasOutputIssues safely reads OutputLines using its internal lock.
+	hasErrors, hasWarnings := t.hasOutputIssues()
+
 	if exitCode != 0 {
-		t.Status = StatusError // Non-zero exit code always means error status
+		t.Status = StatusError // Non-zero exit code always means an error status.
 	} else {
-		// If exit code is 0, check output lines for issues
-		hasErrors, hasWarnings := t.hasOutputIssues()
+		// If exit code is 0, check output lines for issues.
 		if hasErrors {
-			t.Status = StatusError // Errors in output override success exit code
+			t.Status = StatusError // Errors in output override a success exit code.
 		} else if hasWarnings {
 			t.Status = StatusWarning
 		} else {
@@ -138,22 +153,30 @@ func (t *Task) Complete(exitCode int) {
 	}
 }
 
-// hasOutputIssues checks if the output contains errors or warnings
+// hasOutputIssues checks the collected OutputLines for any lines classified as errors or warnings.
+// This method is thread-safe for reading OutputLines.
 func (t *Task) hasOutputIssues() (hasErrors, hasWarnings bool) {
+	t.outputLock.Lock()         // Acquire lock for reading shared OutputLines.
+	defer t.outputLock.Unlock() // Release lock.
+
 	for _, line := range t.OutputLines {
 		switch line.Type {
 		case TypeError:
 			hasErrors = true
 		case TypeWarning:
 			hasWarnings = true
-			// Note: TypeInfo is not considered an "issue" for status determination
+			// Note: TypeInfo, TypeDetail, etc., are not considered "issues" for status determination.
 		}
 	}
-	return
+	return // Return the found flags.
 }
 
-// UpdateTaskContext updates the task's cognitive context based on output analysis
+// UpdateTaskContext heuristically adjusts the task's cognitive load and complexity
+// based on the analysis of its output lines. This method is thread-safe.
 func (t *Task) UpdateTaskContext() {
+	t.outputLock.Lock()         // Acquire lock for reading OutputLines and writing to t.Context.
+	defer t.outputLock.Unlock() // Release lock.
+
 	errorCount := 0
 	warningCount := 0
 	for _, line := range t.OutputLines {
@@ -165,7 +188,9 @@ func (t *Task) UpdateTaskContext() {
 		}
 	}
 
-	outputSize := len(t.OutputLines)
+	outputSize := len(t.OutputLines) // Safely read length while holding the lock.
+
+	// Adjust complexity based on output size.
 	if outputSize > 100 {
 		t.Context.Complexity = 5
 	} else if outputSize > 50 {
@@ -173,9 +198,11 @@ func (t *Task) UpdateTaskContext() {
 	} else if outputSize > 20 {
 		t.Context.Complexity = 3
 	} else {
-		t.Context.Complexity = 2
+		t.Context.Complexity = 2 // Default/low complexity.
 	}
 
+	// Adjust cognitive load based on errors, warnings, and complexity.
+	// These heuristics can be refined based on user feedback and research.
 	if errorCount > 5 || t.Context.Complexity >= 4 {
 		t.Context.CognitiveLoad = LoadHigh
 	} else if errorCount > 0 || warningCount > 2 || t.Context.Complexity == 3 {
@@ -183,4 +210,15 @@ func (t *Task) UpdateTaskContext() {
 	} else {
 		t.Context.CognitiveLoad = LoadLow
 	}
+}
+
+// OutputLinesLock provides external access to lock the task's outputLock.
+// This is used by cmd/main.go to synchronize reading of OutputLines when rendering.
+func (t *Task) OutputLinesLock() {
+	t.outputLock.Lock()
+}
+
+// OutputLinesUnlock provides external access to unlock the task's outputLock.
+func (t *Task) OutputLinesUnlock() {
+	t.outputLock.Unlock()
 }
