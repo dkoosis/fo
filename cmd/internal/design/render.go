@@ -283,9 +283,10 @@ func (t *Task) RenderSummary() string {
 	errorCount, warningCount := 0, 0
 
 	for _, line := range t.OutputLines {
-		if line.Type == TypeError {
+		switch line.Type {
+		case TypeError:
 			errorCount++
-		} else if line.Type == TypeWarning {
+		case TypeWarning:
 			warningCount++
 		}
 	}

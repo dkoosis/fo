@@ -18,6 +18,7 @@
 # vendor/
 fo
 fo_test_binary_generated_by_TestMain
+termtest
 
 # Go workspace file
 go.work
