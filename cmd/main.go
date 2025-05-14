@@ -1,22 +1,17 @@
 package main
 
 import (
-	"bufio"
 	"context"
-	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"strings"
-	"sync"
 	"syscall"
 	"time"
 
-	"github.com/davidkoosis/fo/cmd/internal/config"
+	design "github.com/davidkoosis/fo/cmd/internal/config"
 	"github.com/davidkoosis/fo/cmd/internal/design"
 	"github.com/davidkoosis/fo/cmd/internal/version"
 )
@@ -43,10 +38,13 @@ var validShowOutputValues = map[string]bool{
 
 // versionFlag is set if the --version or -v flag is passed.
 var versionFlag bool
+var flagConfig config.CliFlags
 
 func main() {
-	flagConfig := parseFlags()
+	// Parse command line flags
+	cliFlags := parseFlags()
 
+	// Handle version flag
 	if versionFlag {
 		fmt.Printf("fo version %s\n", version.Version)
 		fmt.Printf("Commit: %s\n", version.CommitHash)
@@ -54,9 +52,13 @@ func main() {
 		os.Exit(0)
 	}
 
+	// Load configuration with defaults, file config, and environment variables
 	fileConfig := config.LoadConfig()
-	mergedConfig := config.MergeWithFlags(fileConfig, flagConfig)
 
+	// Apply CLI flag overrides
+	mergedConfig := config.MergeWithFlags(fileConfig, *cliFlags)
+
+	// Find the command to execute
 	cmdArgs := findCommandArgs()
 	if len(cmdArgs) == 0 {
 		fmt.Fprintln(os.Stderr, "Error: No command specified after --")
@@ -64,12 +66,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Apply command-specific preset if available
 	if len(cmdArgs) > 0 {
 		config.ApplyCommandPreset(mergedConfig, cmdArgs[0])
 	}
 
-	localAppConfig := convertToInternalConfig(mergedConfig)
+	// Set label if provided via flag
+	if cliFlags.Label != "" {
+		mergedConfig.Label = cliFlags.Label
+	}
 
+	// Get the resolved design configuration for rendering
+	designConfig := mergedConfig.GetResolvedDesignConfig()
+
+	// Setup signal handling and context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -77,12 +87,14 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(sigChan)
 
-	exitCode := executeCommand(ctx, cancel, sigChan, localAppConfig, cmdArgs)
+	// Execute the command with the resolved configuration
+	exitCode := executeCommand(ctx, cancel, sigChan, mergedConfig, designConfig, cmdArgs)
 
-	if localAppConfig.Debug {
-		fmt.Fprintf(os.Stderr, "[DEBUG main()] about to os.Exit(%d). Final Merged Config: %+v\n", exitCode, mergedConfig)
-		fmt.Fprintf(os.Stderr, "[DEBUG main()] Local App Config: %+v\n", localAppConfig)
+	// Debug output if enabled
+	if mergedConfig.Debug {
+		fmt.Fprintf(os.Stderr, "[DEBUG main()] about to os.Exit(%d). Config: %+v\n", exitCode, mergedConfig)
 	}
+
 	os.Exit(exitCode)
 }
 
@@ -100,49 +112,74 @@ func convertToInternalConfig(cfg *config.Config) Config {
 	}
 }
 
-func parseFlags() *config.Config {
-	cfg := &config.Config{}
-
+func parseFlags() *config.CliFlags {
+	// Version flags
 	flag.BoolVar(&versionFlag, "version", false, "Print fo version and exit.")
 	flag.BoolVar(&versionFlag, "v", false, "Print fo version and exit (shorthand).")
-	flag.BoolVar(&cfg.Debug, "debug", false, "Enable debug output.")
-	flag.BoolVar(&cfg.Debug, "d", false, "Enable debug output (shorthand).")
-	flag.StringVar(&cfg.Label, "l", "", "Label for the task.")
-	flag.StringVar(&cfg.Label, "label", "", "Label for the task (shorthand: -l).")
-	flag.BoolVar(&cfg.Stream, "s", false, "Stream mode - print command's stdout/stderr live.")
-	flag.BoolVar(&cfg.Stream, "stream", false, "Stream mode - print command's stdout/stderr live (shorthand: -s).")
-	flag.StringVar(&cfg.ShowOutput, "show-output", "", "When to show captured output: on-fail, always, never. (Overrides file config)")
-	flag.BoolVar(&cfg.NoTimer, "no-timer", false, "Disable showing the duration.")
-	flag.BoolVar(&cfg.NoColor, "no-color", false, "Disable ANSI color/styling output.")
-	flag.BoolVar(&cfg.CI, "ci", false, "Enable CI-friendly, plain-text output (implies --no-color, --no-timer).")
 
+	// Debug flags
+	flag.BoolVar(&flagConfig.Debug, "debug", false, "Enable debug output.")
+	flag.BoolVar(&flagConfig.Debug, "d", false, "Enable debug output (shorthand).")
+	flagConfig.DebugSet = true // Record that debug flag was explicitly handled
+
+	// Label flag
+	flag.StringVar(&flagConfig.Label, "l", "", "Label for the task.")
+	flag.StringVar(&flagConfig.Label, "label", "", "Label for the task (shorthand: -l).")
+
+	// Stream mode flag
+	flag.BoolVar(&flagConfig.Stream, "s", false, "Stream mode - print command's stdout/stderr live.")
+	flag.BoolVar(&flagConfig.Stream, "stream", false, "Stream mode - print command's stdout/stderr live (shorthand: -s).")
+	flagConfig.StreamSet = true // Record that stream flag was explicitly handled
+
+	// Output mode flag
+	flag.StringVar(&flagConfig.ShowOutput, "show-output", "", "When to show captured output: on-fail, always, never.")
+	flagConfig.ShowOutputSet = (flagConfig.ShowOutput != "") // Record if this flag was set
+
+	// Timer flag
+	flag.BoolVar(&flagConfig.NoTimer, "no-timer", false, "Disable showing the duration.")
+	flagConfig.NoTimerSet = true // Record that this flag was explicitly handled
+
+	// Color flag
+	flag.BoolVar(&flagConfig.NoColor, "no-color", false, "Disable ANSI color/styling output.")
+	flagConfig.NoColorSet = true // Record that this flag was explicitly handled
+
+	// CI mode flag
+	flag.BoolVar(&flagConfig.CI, "ci", false, "Enable CI-friendly, plain-text output.")
+	flagConfig.CISet = true // Record that this flag was explicitly handled
+
+	// Theme selection flag - NEW
+	flag.StringVar(&flagConfig.ThemeName, "theme", "", "Select visual theme (e.g., 'ascii_minimal', 'unicode_vibrant').")
+
+	// Buffer size flags
 	var maxBufferSizeMB int
 	var maxLineLengthKB int
 	flag.IntVar(&maxBufferSizeMB, "max-buffer-size", 0,
-		fmt.Sprintf("Maximum total buffer size in MB (per stream). Default from config: %dMB", config.DefaultMaxBufferSize/(1024*1024)))
+		fmt.Sprintf("Maximum total buffer size in MB (per stream). Default: %dMB", config.DefaultMaxBufferSize/(1024*1024)))
 	flag.IntVar(&maxLineLengthKB, "max-line-length", 0,
-		fmt.Sprintf("Maximum length in KB for a single line. Default from config: %dKB", config.DefaultMaxLineLength/1024))
+		fmt.Sprintf("Maximum length in KB for a single line. Default: %dKB", config.DefaultMaxLineLength/1024))
 
 	flag.Parse()
 
-	if cfg.CI {
-		cfg.NoColor = true
-		cfg.NoTimer = true
-	}
-
-	if val := cfg.ShowOutput; val != "" && !validShowOutputValues[val] {
-		fmt.Fprintf(os.Stderr, "Error: Invalid value for --show-output: %s\n", val)
-		fmt.Fprintln(os.Stderr, "Valid values are: on-fail, always, never")
-		os.Exit(1)
-	}
-
+	// Convert buffer sizes from MB/KB to bytes
 	if maxBufferSizeMB > 0 {
-		cfg.MaxBufferSize = int64(maxBufferSizeMB) * 1024 * 1024
+		flagConfig.MaxBufferSize = int64(maxBufferSizeMB) * 1024 * 1024
 	}
 	if maxLineLengthKB > 0 {
-		cfg.MaxLineLength = maxLineLengthKB * 1024
+		flagConfig.MaxLineLength = maxLineLengthKB * 1024
 	}
-	return cfg
+
+	// Validate show-output flag value
+	if flagConfig.ShowOutput != "" {
+		if flagConfig.ShowOutput != "on-fail" &&
+			flagConfig.ShowOutput != "always" &&
+			flagConfig.ShowOutput != "never" {
+			fmt.Fprintf(os.Stderr, "Error: Invalid value for --show-output: %s\n", flagConfig.ShowOutput)
+			fmt.Fprintln(os.Stderr, "Valid values are: on-fail, always, never")
+			os.Exit(1)
+		}
+	}
+
+	return &flagConfig
 }
 
 func findCommandArgs() []string {
@@ -157,34 +194,33 @@ func findCommandArgs() []string {
 	return []string{}
 }
 
-func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan os.Signal, appConfig Config, cmdArgs []string) int {
-	var designConfig *design.Config
-	if appConfig.NoColor || appConfig.CI {
-		designConfig = design.NoColorConfig() // This sets UseBoxes=false, NoTimer=true, plain icons
-	} else {
-		designConfig = design.DefaultConfig()
-		designConfig.Style.NoTimer = appConfig.NoTimer // Respect appConfig's NoTimer for colored output
+func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan os.Signal,
+	appConfig *config.Config, designConfig *design.Config, cmdArgs []string) int {
+
+	// Determine label (command name if not specified)
+	label := appConfig.Label
+	if label == "" {
+		label = filepath.Base(cmdArgs[0])
 	}
 
+	// Create a pattern matcher for output classification
 	patternMatcher := design.NewPatternMatcher(designConfig)
+
+	// Detect command intent
 	intent := patternMatcher.DetectCommandIntent(cmdArgs[0], cmdArgs[1:])
 
-	label := appConfig.Label // Label from flags or merged config (already has preset applied)
-	if label == "" {         // If still empty after flags and presets
-		if intent != "" && intent != "running" { // Prefer specific detected intent
-			label = intent
-		} else {
-			label = filepath.Base(cmdArgs[0]) // Fallback to command basename
-		}
-	}
-
+	// Create task with the resolved design configuration
 	task := design.NewTask(label, intent, cmdArgs[0], cmdArgs[1:], designConfig)
+
+	// Show start message
 	fmt.Println(task.RenderStartLine())
 
+	// Command setup
 	cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
 	cmd.Env = os.Environ()
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
+	// Signal handling goroutine
 	cmdDone := make(chan struct{})
 	go func() {
 		defer close(cmdDone)
@@ -227,13 +263,15 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 		}
 	}()
 
+	// Execute in stream or capture mode based on config
 	var exitCode int
 	if appConfig.Stream {
-		exitCode = executeStreamMode(cmd, task)
+		exitCode = executeStreamMode(cmd, task, patternMatcher)
 	} else {
 		exitCode = executeCaptureMode(cmd, task, patternMatcher, appConfig)
 	}
 
+	// Complete the task with the exit code
 	task.Complete(exitCode)
 
 	// Printing logic for captured output and summary
@@ -266,165 +304,7 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 		}
 	}
 
+	// Show end message
 	fmt.Println(task.RenderEndLine())
 	return exitCode
-}
-
-func executeStreamMode(cmd *exec.Cmd, task *design.Task) int {
-	// In stream mode, we want to pipe stdout directly.
-	// For stderr, we can tee it: one to os.Stderr for live view, one to a buffer for task.OutputLines.
-	// This allows Task.Complete to correctly assess status based on stderr content if needed.
-
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		// Cannot create stderr pipe, fallback to direct os.Stderr and lose capture for summary
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		runErr := cmd.Run()
-		// Add a generic error to task if pipe creation failed, as we can't capture details
-		task.AddOutputLine(fmt.Sprintf("Error setting up stderr pipe for stream mode: %v", err), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
-		return getExitCode(runErr)
-	}
-	cmd.Stdout = os.Stdout // Stdout goes directly to os.Stdout
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		// Tee stderr: print to os.Stderr and also add to task.OutputLines
-		scanner := bufio.NewScanner(stderrPipe)
-		for scanner.Scan() {
-			line := scanner.Text()
-			fmt.Fprintln(os.Stderr, line) // Print to actual stderr
-			// Use a simple classification for streamed stderr, or enhance if needed
-			// For now, just add as TypeInfo to allow summary generation
-			task.AddOutputLine(line, design.TypeInfo, design.LineContext{CognitiveLoad: design.LoadMedium, Importance: 2})
-		}
-		if err := scanner.Err(); err != nil {
-			// Log scanner error for stderr if necessary, but don't let it change main exit code path
-			// This error is about reading the pipe, not the command's exit status.
-			// Add it to the task for potential summary.
-			task.AddOutputLine(fmt.Sprintf("Error reading stderr in stream mode: %v", err), design.TypeError, design.LineContext{CognitiveLoad: design.LoadMedium, Importance: 3})
-		}
-	}()
-
-	runErr := cmd.Run() // This runs the command and waits for it.
-	wg.Wait()           // Wait for stderr processing to complete.
-
-	return getExitCode(runErr)
-}
-
-func executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design.PatternMatcher, appConfig Config) int {
-	var wg sync.WaitGroup
-	var bufferExceeded sync.Once
-
-	stdoutPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		errMsg := fmt.Sprintf("Error creating stdout pipe: %v", err)
-		errCtx := design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5}
-		task.AddOutputLine(errMsg, design.TypeError, errCtx)
-		if appConfig.ShowOutput == "always" || appConfig.ShowOutput == "on-fail" {
-			fmt.Println(task.RenderOutputLine(task.OutputLines[len(task.OutputLines)-1]))
-		}
-		return 1
-	}
-
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		errMsg := fmt.Sprintf("Error creating stderr pipe: %v", err)
-		errCtx := design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5}
-		task.AddOutputLine(errMsg, design.TypeError, errCtx)
-		if appConfig.ShowOutput == "always" || appConfig.ShowOutput == "on-fail" {
-			fmt.Println(task.RenderOutputLine(task.OutputLines[len(task.OutputLines)-1]))
-		}
-		return 1
-	}
-
-	processOutputPipe := func(pipe io.ReadCloser, source string) {
-		defer wg.Done()
-		scanner := bufio.NewScanner(pipe)
-		scanner.Buffer(make([]byte, 0, 64*1024), appConfig.MaxLineLength)
-
-		var currentTotalBytes int64
-		for scanner.Scan() {
-			line := scanner.Text()
-			lineLength := int64(len(line))
-
-			if currentTotalBytes+lineLength > appConfig.MaxBufferSize {
-				bufferExceeded.Do(func() {
-					exceededMsg := fmt.Sprintf("[fo] BUFFER LIMIT: %s stream exceeded %dMB. Further output truncated.", source, appConfig.MaxBufferSize/(1024*1024))
-					warnCtx := design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4}
-					task.AddOutputLine(exceededMsg, design.TypeWarning, warnCtx)
-					if appConfig.ShowOutput == "always" {
-						fmt.Println(task.RenderOutputLine(task.OutputLines[len(task.OutputLines)-1]))
-					}
-				})
-				break
-			}
-			currentTotalBytes += lineLength
-
-			lineType, lineContext := patternMatcher.ClassifyOutputLine(line, task.Command, task.Args)
-			// If pattern matcher classifies as TypeDetail (default for unrecognised lines) AND source is stderr,
-			// then re-classify as TypeInfo. This prevents generic stderr from becoming TypeError via hasOutputIssues.
-			if source == "stderr" && lineType == design.TypeDetail {
-				lineType = design.TypeInfo // Default unclassified stderr to Info
-				lineContext.Importance = 3 // Adjust importance for info
-			}
-			task.AddOutputLine(line, lineType, lineContext)
-			task.UpdateTaskContext()
-
-			if appConfig.ShowOutput == "always" {
-				fmt.Println(task.RenderOutputLine(task.OutputLines[len(task.OutputLines)-1]))
-			}
-		}
-
-		if errScan := scanner.Err(); errScan != nil {
-			if errors.Is(errScan, bufio.ErrTooLong) {
-				bufferExceeded.Do(func() {
-					exceededMsg := fmt.Sprintf("[fo] LINE LIMIT: Max line length (%d KB) exceeded in %s. Line truncated.", appConfig.MaxLineLength/1024, source)
-					warnCtx := design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4}
-					task.AddOutputLine(exceededMsg, design.TypeWarning, warnCtx)
-					if appConfig.ShowOutput == "always" {
-						fmt.Println(task.RenderOutputLine(task.OutputLines[len(task.OutputLines)-1]))
-					}
-				})
-			} else if !strings.Contains(errScan.Error(), "file already closed") && !strings.Contains(errScan.Error(), "broken pipe") {
-				errMsg := fmt.Sprintf("Error reading %s: %v", source, errScan)
-				errCtx := design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4}
-				task.AddOutputLine(errMsg, design.TypeError, errCtx)
-				if appConfig.ShowOutput == "always" {
-					fmt.Println(task.RenderOutputLine(task.OutputLines[len(task.OutputLines)-1]))
-				}
-			}
-		}
-	}
-
-	wg.Add(2)
-	go processOutputPipe(stdoutPipe, "stdout")
-	go processOutputPipe(stderrPipe, "stderr")
-
-	if err := cmd.Start(); err != nil {
-		errMsg := fmt.Sprintf("Error starting command '%s': %v", strings.Join(cmd.Args, " "), err)
-		errCtx := design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5}
-		task.AddOutputLine(errMsg, design.TypeError, errCtx)
-		fmt.Println(task.RenderOutputLine(task.OutputLines[len(task.OutputLines)-1]))
-		fmt.Fprintln(os.Stderr, errMsg)
-		return getExitCode(err)
-	}
-
-	cmdErr := cmd.Wait()
-	wg.Wait()
-
-	return getExitCode(cmdErr)
-}
-
-func getExitCode(err error) int {
-	if err == nil {
-		return 0
-	}
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
-		return exitErr.ExitCode()
-	}
-	return 1
 }

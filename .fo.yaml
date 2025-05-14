@@ -1,186 +1,231 @@
-# .fo.yaml
+# .fo.yaml - Configuration for fo utility
 
-# Global settings for fo behavior (can be overridden by CLI flags)
+# Global settings
 stream: false
-show_output: "on-fail" # on-fail, always, never
+show_output: "on-fail"
 max_buffer_size: 10485760 # 10MB
 max_line_length: 1048576 # 1MB
 no_timer: false
-no_color: false # If true, would force a monochrome theme or behavior
-ci: false # If true, might force a specific CI-friendly theme
+no_color: false
+ci: false
 debug: false
 
-# Active theme - can be overridden by --theme flag or FO_THEME env var
+# Active theme selection
 active_theme: "unicode_vibrant"
 
-# Presets for specific commands (your existing structure)
+# Command presets
 presets:
   go:
     label: "Go Build"
   golangci-lint:
     label: "Linting"
-  # ... etc.
+  "go test":
+    label: "Testing"
+    stream: true
 
-# --- THEMES DEFINITIONS ---
+# Theme definitions
 themes:
-  # Theme 1: Pure ASCII, monochrome, line-oriented
+  # ASCII minimal theme - monochrome, line-oriented
   ascii_minimal:
-    # General style properties for this theme
-    style_properties: # Corresponds to design.Config.Style
-      UseBoxes: false # CRITICAL for line-oriented
-      Indentation: "  "
-      ShowTimestamps: false # Overall start/end fo timestamps
-      ReduceContrast: false
-      Density: "compact"
-      NoTimer: false # For individual task timers
+    style:
+      use_boxes: false
+      indentation: "  "
+      show_timestamps: false
+      no_timer: false
+      density: "compact"
 
-    # Icons (ASCII fallbacks)
-    icons: # Corresponds to design.Config.Icons
-      Start: "[>]"
-      Success: "[OK]"
-      Warning: "[WW]" # Differentiated for status lines
-      Error: "[!!]"
-      Info: "[ii]"
-      # Specific prefixes for output lines will be part of the element style
-      # For example, Stderr_Error_Line_Prefix below
+    # Icons (ASCII only)
+    icons:
+      start: "[>]"
+      success: "[OK]"
+      warning: "[!!]"
+      error: "[XX]"
+      info: "[i]"
+      bullet: "*"
 
-    # Colors (all empty or reset codes for monochrome)
-    colors: # Corresponds to design.Config.Colors
-      Process: "" # No color
-      Success: ""
-      Warning: ""
-      Error: ""
-      Detail: ""
-      Muted: ""
-      Reset: "" # Should be empty if no colors used
+    # Colors (empty for monochrome)
+    colors:
+      process: ""
+      success: ""
+      warning: ""
+      error: ""
+      detail: ""
+      muted: ""
+      reset: ""
 
-    # Border characters (mostly for tables in this theme)
-    border: # Corresponds to design.Config.Border
-      Style: "none" # This refers to task container style
-      # For tables (which ARE boxed in this theme):
-      Table_HChar: "-"
-      Table_VChar: "|"
-      Table_XChar: "+" # Intersection
+    # Border settings (for ASCII tables)
+    border:
+      task_style: "none"
+      header_char: "-"
+      vertical_char: "|"
+      top_corner_char: "+"
+      bottom_corner_char: "+"
+      table_h_char: "-"
+      table_v_char: "|"
+      table_x_char: "+"
 
-    # --- Styleable Elements (using our agreed list as keys) ---
+    # Element-specific styles
     elements:
-      Fo_Banner_Top: { line_char_top: "=", line_char_bottom: "=", prefix_text: "FO:", text_style: ["bold"] }
-      Fo_Timestamp_Start: { prefix_text: "FO: STARTED AT ", date_time_format: "2006-01-02 15:04:05" }
-      # ... other Fo_Banner_Bottom elements ...
-      Fo_OverallStatus_Success: { text_content: "SUCCESS", text_style: ["bold"] } # Icon comes from theme.icons.Success
-      Fo_OverallStatus_Failed: { text_content: "FAILED", text_style: ["bold"] }
-      Fo_OverallStatus_Warnings: { text_content: "WARNINGS", text_style: ["bold"] }
+      # Banner elements
+      Fo_Banner_Top:
+        line_char: "="
+        prefix: "FO: "
+        text_style: ["bold"]
 
-      H2_Target_Header_Line: { line_char: "-", line_length_type: "full_width" }
-      H2_Target_Title: { prefix_text: "TARGET: ", text_case: "upper", text_style: ["bold"] }
-      H2_Target_Footer_Line:
-        {
-          framing_char_start: "---- ",
-          framing_char_end: " ----",
-          inner_text_format: "{target_name}: {status_marker} {status_text} (Duration: {duration})",
-        }
+      Fo_Banner_Bottom:
+        line_char: "="
+        prefix: "FO: "
+        text_style: ["bold"]
 
-      Command_Line_Prefix: { text: "  -> CMD:", text_style: [] }
-      Stdout_Line_Prefix: { text: "    | " } # Includes indent and symbol
-      Stderr_Warning_Line_Prefix: { text: "    ! WARN: " }
-      Stderr_Error_Line_Prefix: { text: "    X ERROR: " }
-      Make_Info_Line_Prefix: { text: "INFO: " }
+      # Task header elements (line-oriented style)
+      H2_Target_Header_Line:
+        line_char: "-"
+        line_length_type: "full_width"
 
-      Status_Label_Prefix: { text: "  STAT:", text_style: [] }
-      Task_Status_Success_Block: { text_content: "PASSED" } # Icon from theme.icons.Success
-      Task_Status_Failed_Block: { text_content: "FAILED" } # Icon from theme.icons.Error
-      Task_Status_Warning_Block: { text_content: "WARNINGS" } # Icon from theme.icons.Warning
-      Task_Status_Duration: { prefix_char: "(", suffix_char: ")", time_format: "default" }
+      H2_Target_Title:
+        prefix: "TARGET: "
+        text_case: "upper"
+        text_style: ["bold"]
 
-      # Table styles for summary
-      Table_Border_Horizontal: { char: "-" }
-      Table_Border_Vertical: { char: "|" }
-      Table_Border_Intersection_Cross: { char: "+" }
-      Table_Header_Cell_Text: { text_style: ["bold"] }
+      # Task content elements
+      Command_Line_Prefix:
+        text: "  -> CMD: "
 
-  # Theme 2: Richer, Unicode symbols, colors, boxed tasks
+      Stdout_Line_Prefix:
+        text: "    | "
+
+      Stderr_Warning_Line_Prefix:
+        text: "    ! WARN: "
+
+      Stderr_Error_Line_Prefix:
+        text: "    X ERROR: "
+
+      # Status elements
+      Status_Label_Prefix:
+        text: "  STAT: "
+
+      Task_Status_Success_Block:
+        text_content: "PASSED"
+
+      Task_Status_Failed_Block:
+        text_content: "FAILED"
+
+      Task_Status_Duration:
+        prefix: "("
+        suffix: ")"
+
+  # Unicode vibrant theme - rich, colorful, boxed
   unicode_vibrant:
-    # General style properties for this theme
-    style_properties: # Corresponds to design.Config.Style
-      UseBoxes: true # CRITICAL for boxed tasks
-      Indentation: "  "
-      ShowTimestamps: false
-      ReduceContrast: false
-      Density: "balanced"
-      NoTimer: false
+    style:
+      use_boxes: true
+      indentation: "  "
+      show_timestamps: false
+      no_timer: false
+      density: "balanced"
 
     # Icons (Unicode/Emoji)
-    icons: # Corresponds to design.Config.Icons
-      Start: "▶️"
-      Success: "✅"
-      Warning: "⚠️"
-      Error: "❌"
-      Info: "ℹ️"
+    icons:
+      start: "▶️"
+      success: "✅"
+      warning: "⚠️"
+      error: "❌"
+      info: "ℹ️"
+      bullet: "•"
 
     # Colors (ANSI codes)
-    colors: # Corresponds to design.Config.Colors
-      Process: "\033[0;34m" # Blue
-      Success: "\033[0;32m" # Green
-      Warning: "\033[0;33m" # Yellow
-      Error: "\033[0;31m" # Red
-      Detail: "\033[0m" # Default terminal color
-      Muted: "\033[2m" # Dim
-      Reset: "\033[0m"
+    colors:
+      process: "\033[0;34m" # Blue
+      success: "\033[0;32m" # Green
+      warning: "\033[0;33m" # Yellow
+      error: "\033[0;31m" # Red
+      detail: "\033[0m" # Default
+      muted: "\033[2m" # Dim
+      reset: "\033[0m" # Reset
 
-    # Border characters (for Task_Container style "left_double" or similar)
-    border: # Corresponds to design.Config.Border
-      Style: "left_double" # This is one of your existing enums
-      HeaderChar: "═"
-      VerticalChar: "│"
-      TopCornerChar: "╒"
-      BottomCornerChar: "└"
-      # Table chars can be same or different
-      Table_HChar: "─"
-      Table_VChar: "│"
-      Table_XChar: "┼"
+    # Border settings (Unicode)
+    border:
+      task_style: "left_double"
+      header_char: "═"
+      vertical_char: "│"
+      top_corner_char: "╒"
+      bottom_corner_char: "└"
+      footer_continuation_char: "─"
+      table_h_char: "─"
+      table_v_char: "│"
+      table_x_char: "┼"
 
-    # --- Styleable Elements ---
+    # Element-specific styles
+    elements:
+      # Banner elements
+      Fo_Banner_Top:
+        line_char: "═"
+        prefix: "FO: "
+        text_style: ["bold"]
+        color_fg: "process"
+
+      # Task header elements
+      Task_Label_Header:
+        text_case: "upper"
+        text_style: ["bold"]
+        color_fg: "process"
+
+      # Status elements
+      Task_Status_Success_Block:
+        icon_key: "success"
+        text_content: "Complete"
+        color_fg: "success"
+
+      Task_Status_Failed_Block:
+        icon_key: "error"
+        text_content: "Failed"
+        color_fg: "error"
+
+      # More elements can be defined here...
+
+  # Custom theme example - Cyberpunk inspired
+  cyberpunk:
+    style:
+      use_boxes: true
+      indentation: "  "
+      density: "relaxed"
+
+    # Colors
+    colors:
+      process: "\033[0;36m" # Cyan
+      success: "\033[0;92m" # Bright Green
+      warning: "\033[0;93m" # Bright Yellow
+      error: "\033[0;91m" # Bright Red
+      detail: "\033[0;97m" # Bright White
+      muted: "\033[0;90m" # Bright Black
+      reset: "\033[0m" # Reset
+
+    # Icons (Unicode glyphs)
+    icons:
+      start: "⟫"
+      success: "⬢"
+      warning: "△"
+      error: "⬟"
+      info: "◉"
+      bullet: "◆"
+
+    # Border characters
+    border:
+      task_style: "full_box"
+      header_char: "■"
+      vertical_char: "┃"
+      top_corner_char: "┏"
+      bottom_corner_char: "┗"
+
+    # Element styles
     elements:
       Fo_Banner_Top:
-        { line_char_top: "═", line_char_bottom: "═", prefix_text: "FO:", text_style: ["bold"], color_fg: "blue" }
-      Fo_Timestamp_Start: { prefix_text: "FO: STARTED AT ", date_time_format: "2006-01-02 15:04:05", color_fg: "blue" }
-      # ... other Fo_Banner_Bottom elements ...
-      Fo_OverallStatus_Success: { text_content: "SUCCESS", text_style: ["bold"] } # Icon and color from theme.icons/colors
-      Fo_OverallStatus_Failed: { text_content: "FAILED", text_style: ["bold"] }
-      Fo_OverallStatus_Warnings: { text_content: "WARNINGS", text_style: ["bold"] }
+        line_char: "■"
+        prefix: "[FO:// "
+        suffix: " ]"
+        text_style: ["bold"]
+        color_fg: "process"
 
-      # Task_Container uses border settings from theme.border above
-      Task_Label_Header:
-        {
-          text_case: "upper",
-          text_style: ["bold"],
-          color_fg_label: "default",
-          color_fg_border: "default",
-          header_line_fill_char: "═",
-        }
-      Task_StartIndicator_Line: { text_style_label: [], color_fg_label: "blue" } # Icon and color from theme.icons/colors
-
-      # For boxed themes, prefixes for content lines are often just the indentation
-      # after the box's vertical char, which is handled by render.go logic
-      Stdout_Line_Prefix: { additional_chars: "  " }
-      Stderr_Warning_Line_Prefix: { additional_chars: "  " } # Icon and color come from styling the text itself
-      Stderr_Error_Line_Prefix: { additional_chars: "  " }
-      Make_Info_Line_Prefix: { text: "INFO: ", color_fg: "blue" } # If shown outside a task box
-
-      # Actual text styling for these lines
-      Task_Content_Stderr_Warning_Text: { text_style: [] } # Color from theme.colors.Warning, Icon from theme.icons.Warning
-      Task_Content_Stderr_Error_Text: { text_style: [] } # Color from theme.colors.Error, Icon from theme.icons.Error (render.go applies italics for LoadHigh)
-
-      Status_Label_Prefix: { text: "" } # No explicit "STAT:" needed if status is part of box
-      Task_Status_Success_Block: { text_content: "Complete" }
-      Task_Status_Failed_Block: { text_content: "Failed" }
-      Task_Status_Warning_Block: { text_content: "Completed with warnings" }
-      Task_Status_Duration: { prefix_char: "(", suffix_char: ")", time_format: "default", color_fg: "muted" }
-      Task_Footer_Border_Continuation: { char: "─" } # For styles like left_double's "└─"
-
-      # Table styles for summary
-      Table_Border_Horizontal: { char: "─" }
-      Table_Border_Vertical: { char: "│" }
-      Table_Border_Intersection_Cross: { char: "┼" }
-      Table_Header_Cell_Text: { text_style: ["bold"], color_fg: "blue" }
-      Table_Body_Cell_Text: { color_fg: "default" }
+      Task_Status_Success_Block:
+        text_content: "COMPLETE"
+        color_fg: "success"
+        text_style: ["bold"]
