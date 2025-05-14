@@ -7,8 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	// Import the design package to use its Config type
-	"github.com/davidkoosis/fo/cmd/internal/design" // Adjust import path if necessary
+	"github.com/davidkoosis/fo/cmd/internal/design" // Adjusted import path
 	"gopkg.in/yaml.v3"
 )
 
@@ -32,128 +31,151 @@ type CliFlags struct {
 	NoColorSet    bool
 	CISet         bool
 	DebugSet      bool
-	// MaxBufferSizeSet and MaxLineLengthSet might also be useful
-}
-
-// ToolConfig defines specific settings for a command/tool preset
-type ToolConfig struct {
-	Label      string `yaml:"label,omitempty"`
-	Stream     *bool  `yaml:"stream,omitempty"` // Pointer to distinguish not set vs. set to false
-	ShowOutput string `yaml:"show_output,omitempty"`
-	NoTimer    *bool  `yaml:"no_timer,omitempty"`
-	// Add other overridable design.Config fields if needed for presets e.g.
-	// NoColor    *bool            `yaml:"no_color,omitempty"`
-	// Intent     string           `yaml:"intent,omitempty"` // Already in design.ToolConfig
-	OutputPatterns map[string][]string `yaml:"output_patterns,omitempty"` // Already in design.ToolConfig
-	Intent         string              `yaml:"intent,omitempty"`          // Already in design.ToolConfig
+	// MaxBufferSizeSet and MaxLineLengthSet might also be useful if 0 is a valid user input
 }
 
 // AppConfig represents the application's overall configuration from .fo.yaml
 type AppConfig struct {
 	// Global settings from YAML - these act as defaults if not overridden by theme or flags
-	Label           string                 `yaml:"label,omitempty"`
-	Stream          bool                   `yaml:"stream"`
-	ShowOutput      string                 `yaml:"show_output"`
-	NoTimer         bool                   `yaml:"no_timer"`
-	NoColor         bool                   `yaml:"no_color"`
-	CI              bool                   `yaml:"ci"`
-	Debug           bool                   `yaml:"debug"`
-	MaxBufferSize   int64                  `yaml:"max_buffer_size"` // In bytes
-	MaxLineLength   int                    `yaml:"max_line_length"` // In bytes
-	ActiveThemeName string                 `yaml:"active_theme"`
-	Presets         map[string]*ToolConfig `yaml:"presets"`
-	// Themes are defined in the design package but loaded/referenced here
-	Themes map[string]*design.Config `yaml:"themes"`
+	Label           string                        `yaml:"label,omitempty"`
+	Stream          bool                          `yaml:"stream"`
+	ShowOutput      string                        `yaml:"show_output"`
+	NoTimer         bool                          `yaml:"no_timer"`
+	NoColor         bool                          `yaml:"no_color"`
+	CI              bool                          `yaml:"ci"`
+	Debug           bool                          `yaml:"debug"`
+	MaxBufferSize   int64                         `yaml:"max_buffer_size"` // In bytes
+	MaxLineLength   int                           `yaml:"max_line_length"` // In bytes
+	ActiveThemeName string                        `yaml:"active_theme"`
+	Presets         map[string]*design.ToolConfig `yaml:"presets"` // Uses design.ToolConfig
+	// Themes are defined in the design package but can be overridden or extended via YAML
+	Themes map[string]*design.Config `yaml:"themes"` // Holds fully resolved design.Config objects
 }
 
-// Constants for default values (can be shared or specific to this package)
+// Constants for default values
 const (
 	DefaultShowOutput      = "on-fail"
-	DefaultMaxBufferSize   = 10 * 1024 * 1024  // 10MB
-	DefaultMaxLineLength   = 1 * 1024 * 1024   // 1MB
-	DefaultActiveThemeName = "unicode_vibrant" // Matches a key in design.Config themes
+	DefaultMaxBufferSize   = 10 * 1024 * 1024 // 10MB
+	DefaultMaxLineLength   = 1 * 1024 * 1024  // 1MB
+	DefaultActiveThemeName = "unicode_vibrant"
 )
 
 // LoadConfig loads the .fo.yaml configuration.
 func LoadConfig() *AppConfig {
+	// Initialize with hardcoded defaults that themes build upon
 	appCfg := &AppConfig{
+		Stream:          false, // Default behavior is capture mode
 		ShowOutput:      DefaultShowOutput,
+		NoTimer:         false, // Timer is on by default
+		NoColor:         false, // Color is on by default
+		CI:              false,
+		Debug:           false,
 		MaxBufferSize:   DefaultMaxBufferSize,
 		MaxLineLength:   DefaultMaxLineLength,
 		ActiveThemeName: DefaultActiveThemeName,
 		Themes: map[string]*design.Config{ // Initialize with known themes from design package
 			"unicode_vibrant": design.UnicodeVibrantTheme(),
 			"ascii_minimal":   design.AsciiMinimalTheme(),
-			// Load other themes defined in design package if necessary
 		},
-		Presets: make(map[string]*ToolConfig),
+		Presets: make(map[string]*design.ToolConfig),
 	}
 
 	configPath := getConfigPath()
 	if configPath == "" {
-		fmt.Fprintf(os.Stderr, "DEBUG: No .fo.yaml config file found, using defaults.\n")
-		return appCfg // Return defaults if no config file found
+		if appCfg.Debug { // Only print if debug is on (e.g. via env var before this point)
+			fmt.Fprintln(os.Stderr, "DEBUG: No .fo.yaml config file found, using defaults.")
+		}
+		return appCfg
 	}
 
 	yamlFile, err := os.ReadFile(configPath)
 	if err != nil {
-		if !os.IsNotExist(err) {
+		if !os.IsNotExist(err) { // Don't warn if file just doesn't exist, only on actual read errors
 			fmt.Fprintf(os.Stderr, "Warning: Error reading config file %s: %v. Using defaults.\n", configPath, err)
-		} else {
+		} else if appCfg.Debug {
 			fmt.Fprintf(os.Stderr, "DEBUG: Config file %s not found. Using defaults.\n", configPath)
 		}
 		return appCfg
 	}
 
-	// Unmarshal into a temporary structure that matches the YAML for themes,
-	// as themes in YAML might be partial and need merging with design package defaults.
-	// For simplicity here, we assume .fo.yaml can fully define themes if it wants to override.
-	err = yaml.Unmarshal(yamlFile, appCfg)
+	// Unmarshal into a temporary structure.
+	// This is because `appCfg.Themes` might contain partial theme definitions in YAML
+	// that need to be merged onto the base themes from the `design` package.
+	var yamlAppCfg AppConfig
+	err = yaml.Unmarshal(yamlFile, &yamlAppCfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: Error unmarshalling config file %s: %v. Using defaults.\n", configPath, err)
-		// Reset to coded defaults if unmarshalling fails to ensure a valid state
-		return &AppConfig{
-			ShowOutput:      DefaultShowOutput,
-			MaxBufferSize:   DefaultMaxBufferSize,
-			MaxLineLength:   DefaultMaxLineLength,
-			ActiveThemeName: DefaultActiveThemeName,
-			Themes: map[string]*design.Config{
-				"unicode_vibrant": design.UnicodeVibrantTheme(),
-				"ascii_minimal":   design.AsciiMinimalTheme(),
-			},
-			Presets: make(map[string]*ToolConfig),
-		}
-	}
-	// Ensure default themes are present if not defined in YAML
-	if _, ok := appCfg.Themes["unicode_vibrant"]; !ok {
-		appCfg.Themes["unicode_vibrant"] = design.UnicodeVibrantTheme()
-	}
-	if _, ok := appCfg.Themes["ascii_minimal"]; !ok {
-		appCfg.Themes["ascii_minimal"] = design.AsciiMinimalTheme()
+		return appCfg // Return coded defaults if unmarshalling fails
 	}
 
-	if appCfg.MaxBufferSize == 0 {
-		appCfg.MaxBufferSize = DefaultMaxBufferSize
+	// Merge YAML settings onto the base appCfg
+	// Global settings
+	if yamlAppCfg.Label != "" {
+		appCfg.Label = yamlAppCfg.Label
 	}
-	if appCfg.MaxLineLength == 0 {
-		appCfg.MaxLineLength = DefaultMaxLineLength
+	// For booleans, YAML `false` is a valid override.
+	// Check if the key was present in YAML if distinguishing "not set" vs "set to false" is critical.
+	// For simplicity, direct assignment works if YAML always provides the field.
+	appCfg.Stream = yamlAppCfg.Stream
+	if yamlAppCfg.ShowOutput != "" {
+		appCfg.ShowOutput = yamlAppCfg.ShowOutput
 	}
-	if appCfg.ShowOutput == "" {
-		appCfg.ShowOutput = DefaultShowOutput
+	appCfg.NoTimer = yamlAppCfg.NoTimer
+	appCfg.NoColor = yamlAppCfg.NoColor
+	appCfg.CI = yamlAppCfg.CI
+	appCfg.Debug = yamlAppCfg.Debug // Debug can be enabled via YAML
+
+	if yamlAppCfg.MaxBufferSize > 0 { // Allow YAML to set 0 if that's meaningful, otherwise only positive
+		appCfg.MaxBufferSize = yamlAppCfg.MaxBufferSize
 	}
-	if appCfg.ActiveThemeName == "" {
+	if yamlAppCfg.MaxLineLength > 0 {
+		appCfg.MaxLineLength = yamlAppCfg.MaxLineLength
+	}
+	if yamlAppCfg.ActiveThemeName != "" {
+		appCfg.ActiveThemeName = yamlAppCfg.ActiveThemeName
+	}
+	if yamlAppCfg.Presets != nil {
+		appCfg.Presets = yamlAppCfg.Presets
+	}
+
+	// Merge YAML theme definitions.
+	// If a theme from YAML has the same name as a coded theme, YAML takes precedence.
+	if yamlAppCfg.Themes != nil {
+		for name, themeFromFile := range yamlAppCfg.Themes {
+			if baseTheme, ok := appCfg.Themes[name]; ok {
+				// Merge themeFromFile onto baseTheme (This requires a more sophisticated merge)
+				// For now, let's assume YAML theme fully overrides if present
+				appCfg.Themes[name] = design.DeepCopyConfig(themeFromFile) // Store a copy
+			} else {
+				appCfg.Themes[name] = design.DeepCopyConfig(themeFromFile) // Add new theme from file
+			}
+			// Ensure the theme name is set internally if loaded from YAML
+			if appCfg.Themes[name] != nil {
+				appCfg.Themes[name].ThemeName = name
+			}
+		}
+	}
+
+	// Ensure the active theme actually exists, fallback if not
+	if _, ok := appCfg.Themes[appCfg.ActiveThemeName]; !ok {
+		fmt.Fprintf(os.Stderr, "Warning: Active theme '%s' from config file not found in defined themes. Falling back to '%s'.\n", appCfg.ActiveThemeName, DefaultActiveThemeName)
 		appCfg.ActiveThemeName = DefaultActiveThemeName
 	}
 
-	fmt.Fprintf(os.Stderr, "DEBUG: Loaded config from %s. Active theme: %s\n", configPath, appCfg.ActiveThemeName)
+	if appCfg.Debug {
+		fmt.Fprintf(os.Stderr, "DEBUG: Loaded config from %s. Active theme: %s. Presets loaded: %d\n", configPath, appCfg.ActiveThemeName, len(appCfg.Presets))
+	}
 	return appCfg
 }
 
 func getConfigPath() string {
+	// Check local directory first
 	localPath := ".fo.yaml"
 	if _, err := os.Stat(localPath); err == nil {
 		return localPath
 	}
+
+	// Check XDG config directory
 	configHome, err := os.UserConfigDir()
 	if err == nil {
 		xdgPath := filepath.Join(configHome, "fo", ".fo.yaml")
@@ -161,208 +183,146 @@ func getConfigPath() string {
 			return xdgPath
 		}
 	}
+	// Could add other paths here, like ~/.fo.yaml as a fallback
 	return ""
 }
 
 // MergeWithFlags creates the final design.Config to be used for rendering.
 // It takes the loaded AppConfig, applies CLI flag overrides, and resolves the theme.
 func MergeWithFlags(appCfg *AppConfig, cliFlags CliFlags) *design.Config {
+	// Determine the effective theme name (CLI flag > AppConfig active_theme)
 	effectiveThemeName := appCfg.ActiveThemeName
 	if cliFlags.ThemeName != "" {
 		effectiveThemeName = cliFlags.ThemeName
 	}
 
-	// Get the base theme configuration from the design package (or AppConfig if it stores full themes)
+	// Get the base theme configuration. Fallback if not found.
 	finalDesignConfig, themeExists := appCfg.Themes[effectiveThemeName]
 	if !themeExists {
-		fmt.Fprintf(os.Stderr, "Warning: Theme '%s' not found in AppConfig, falling back to default '%s'.\n", effectiveThemeName, DefaultActiveThemeName)
+		fmt.Fprintf(os.Stderr, "Warning: Theme '%s' not found. Falling back to default theme '%s'.\n", effectiveThemeName, DefaultActiveThemeName)
 		finalDesignConfig = appCfg.Themes[DefaultActiveThemeName]
-		if finalDesignConfig == nil { // Absolute fallback
-			fmt.Fprintf(os.Stderr, "Warning: Default theme '%s' also not found, using coded UnicodeVibrant theme.\n", DefaultActiveThemeName)
-			finalDesignConfig = design.UnicodeVibrantTheme()
+		if finalDesignConfig == nil { // Absolute fallback if default also somehow missing
+			fmt.Fprintln(os.Stderr, "Fatal: Default theme definition is missing. Using coded UnicodeVibrant theme.")
+			finalDesignConfig = design.UnicodeVibrantTheme() // Hardcoded fallback
 		}
 	}
 
 	// Create a deep copy to avoid modifying the original theme map instance
-	copiedConfig := design.DeepCopyConfig(finalDesignConfig) // You'll need to implement DeepCopyConfig in design package
-	finalDesignConfig = copiedConfig
+	finalDesignConfig = design.DeepCopyConfig(finalDesignConfig)
+	finalDesignConfig.ThemeName = effectiveThemeName // Ensure the final config knows its name
 
 	// Apply overrides: CLI flags > Environment Variables > .fo.yaml global settings > Theme defaults
 
-	// Environment variable overrides (apply before CLI flags so CLI can override env)
+	// --- Start with AppConfig global settings as a base for behavioral flags ---
+	// These will be potentially overridden by Env and CLI flags.
+	// The `finalDesignConfig` (which is a theme) might have its own defaults for NoTimer, etc.
+	// We need to decide the precedence. Typically: CLI > Env > AppConfig > Theme
+
+	effectiveNoColor := appCfg.NoColor
+	effectiveCI := appCfg.CI
+	effectiveNoTimer := appCfg.NoTimer
+	// effectiveStream := appCfg.Stream // Stream is trickier, often a direct CLI control
+
+	// --- Environment variable overrides ---
 	// FO_NO_COLOR or NO_COLOR
-	envNoColor := os.Getenv("FO_NO_COLOR")
-	if envNoColor == "" {
-		envNoColor = os.Getenv("NO_COLOR")
+	envNoColorStr := os.Getenv("FO_NO_COLOR")
+	if envNoColorStr == "" {
+		envNoColorStr = os.Getenv("NO_COLOR") // Standard NO_COLOR
 	}
-	if envNoColor != "" {
-		if bVal, err := strconv.ParseBool(envNoColor); err == nil && bVal {
-			appCfg.NoColor = true // Update the appCfg field that CLI flags will check
+	if envNoColorStr != "" {
+		if bVal, err := strconv.ParseBool(envNoColorStr); err == nil {
+			effectiveNoColor = bVal
 		}
 	}
 	// FO_CI
-	if envCI := os.Getenv("FO_CI"); envCI != "" {
-		if bVal, err := strconv.ParseBool(envCI); err == nil && bVal {
-			appCfg.CI = true // Update the appCfg field
+	if envCIStr := os.Getenv("FO_CI"); envCIStr != "" {
+		if bVal, err := strconv.ParseBool(envCIStr); err == nil {
+			effectiveCI = bVal
 		}
 	}
-	// FO_DEBUG
-	if envDebug := os.Getenv("FO_DEBUG"); envDebug != "" {
-		if bVal, err := strconv.ParseBool(envDebug); err == nil && bVal {
-			appCfg.Debug = true
-		}
+	// FO_DEBUG (Handled by main.go usually for direct use)
+
+	// --- Apply CLI flag overrides (highest precedence for these behavioral/display flags) ---
+	if cliFlags.NoColorSet { // Check if the flag was actually used
+		effectiveNoColor = cliFlags.NoColor
+	}
+	if cliFlags.CISet {
+		effectiveCI = cliFlags.CI
+	}
+	if cliFlags.NoTimerSet {
+		effectiveNoTimer = cliFlags.NoTimer
 	}
 
-	// Apply NoColor from AppConfig (which might have been updated by Env vars)
-	if appCfg.NoColor {
-		finalDesignConfig.IsMonochrome = true
-		design.ApplyMonochromeDefaults(finalDesignConfig) // Helper in design pkg
-	}
-	// Apply CI from AppConfig
-	if appCfg.CI {
-		finalDesignConfig.IsMonochrome = true
+	// --- Apply the determined effective flags to the design config ---
+	if effectiveCI { // CI implies NoColor and NoTimer
+		design.ApplyMonochromeDefaults(finalDesignConfig)
 		finalDesignConfig.Style.NoTimer = true
-		design.ApplyMonochromeDefaults(finalDesignConfig) // Ensure CI is fully monochrome + simple
-		finalDesignConfig.Style.UseBoxes = false          // Typically CI mode is simpler
+		finalDesignConfig.Style.UseBoxes = false // CI usually means simpler line output
+	} else if effectiveNoColor {
+		design.ApplyMonochromeDefaults(finalDesignConfig)
 	}
 
-	// Apply CLI flag overrides (these have highest precedence)
-	if cliFlags.NoColorSet && cliFlags.NoColor {
-		finalDesignConfig.IsMonochrome = true
-		design.ApplyMonochromeDefaults(finalDesignConfig)
-	}
-	if cliFlags.CISet && cliFlags.CI {
-		finalDesignConfig.IsMonochrome = true
-		finalDesignConfig.Style.NoTimer = true
-		design.ApplyMonochromeDefaults(finalDesignConfig)
-		finalDesignConfig.Style.UseBoxes = false
-	}
-	if cliFlags.NoTimerSet && cliFlags.NoTimer {
+	if effectiveNoTimer {
 		finalDesignConfig.Style.NoTimer = true
 	}
-	// Note: cliFlags.Stream, cliFlags.ShowOutput, cliFlags.Label, cliFlags.MaxBufferSize, cliFlags.MaxLineLength, cliFlags.Debug
-	// are typically used directly in main.go to control execution flow or passed separately,
-	// rather than modifying the finalDesignConfig directly, unless a specific theme property needs to change.
-	// For example, Stream mode might change finalDesignConfig.Style.UseBoxes.
+
+	// Stream flag from CLI usually affects execution mode in main.go directly.
+	// If stream mode should always force a line-oriented theme:
 	if cliFlags.StreamSet && cliFlags.Stream {
-		finalDesignConfig.Style.UseBoxes = false // Example: stream implies simpler output
+		if finalDesignConfig.Style.UseBoxes { // Only simplify if it was a boxed theme
+			// finalDesignConfig.Style.UseBoxes = false // Or switch to ascii_minimal elements
+			// design.ApplyMonochromeDefaults(finalDesignConfig) // Could also imply monochrome
+			// For now, let main.go handle stream mode's display implications primarily.
+		}
 	}
+
+	// Debug setting for main.go to use.
+	// finalDesignConfig does not have a Debug field. Debug is an app-level concern.
+	// If cliFlags.DebugSet { appCfg.Debug = cliFlags.Debug } // main.go will use appCfg.Debug
 
 	return finalDesignConfig
 }
 
 // ApplyCommandPreset modifies the AppConfig based on a command preset.
-// This should be called *before* MergeWithFlags if presets can affect theme choice or global bools.
-// Or, it can modify the `finalDesignConfig` if presets only change design aspects.
-// For simplicity, let's assume it modifies AppConfig for now.
+// This function applies preset values to the *AppConfig* structure.
+// These preset values will then be considered when MergeWithFlags is called.
 func ApplyCommandPreset(appCfg *AppConfig, commandName string) {
-	// Extract just the command name from a path if necessary
 	baseCommand := filepath.Base(commandName)
+	keysToTry := []string{commandName, baseCommand} // Try full command path/name, then base name
 
-	keyToCheck := []string{commandName, baseCommand} // Check full path then base name
-
-	for _, cmdKey := range keyToCheck {
+	for _, cmdKey := range keysToTry {
 		if preset, ok := appCfg.Presets[cmdKey]; ok {
+			if appCfg.Debug {
+				fmt.Fprintf(os.Stderr, "DEBUG: Applying preset for command '%s'\n", cmdKey)
+			}
+			// Note: design.ToolConfig from YAML preset contains Label, Intent, OutputPatterns.
+			// It does NOT contain Stream, ShowOutput, NoTimer flags directly based on current struct.
+			// If presets need to control these, the design.ToolConfig in YAML (and struct) would need them,
+			// or you'd have a separate struct for presets in AppConfig that includes these behavioral fields.
+
+			// For now, assuming design.ToolConfig primarily sets Label and Intent that influence design:
 			if preset.Label != "" {
-				appCfg.Label = preset.Label // Overrides global label if preset has one
+				// This label from preset will be used by main.go if CLI flag -l is not set.
+				// We can set it on appCfg so it's available.
+				appCfg.Label = preset.Label
 			}
-			if preset.Stream != nil {
-				appCfg.Stream = *preset.Stream
-			}
-			if preset.ShowOutput != "" {
-				appCfg.ShowOutput = preset.ShowOutput
-			}
-			if preset.NoTimer != nil {
-				appCfg.NoTimer = *preset.NoTimer
-			}
-			// If presets could define tool-specific intents or output patterns for the design.Config
-			// that logic would also go here, potentially by merging into a temporary design.Config
-			// or by having MergeWithFlags be aware of the active command.
+
+			// If design.ToolConfig *did* have fields like Stream, ShowOutput, NoTimer (as *bool or string):
+			// if preset.Stream != nil { appCfg.Stream = *preset.Stream }
+			// if preset.ShowOutput != "" { appCfg.ShowOutput = preset.ShowOutput }
+			// if preset.NoTimer != nil { appCfg.NoTimer = *preset.NoTimer }
+			// This approach keeps preset application focused on `AppConfig` which `MergeWithFlags` then consumes.
+
+			// The design-specific parts of design.ToolConfig (Intent, OutputPatterns)
+			// are part of the design.Config.Tools map.
+			// `MergeWithFlags` gets a design.Config which includes a `Tools` map.
+			// The pattern matcher in `main.go` then uses this `Tools` map.
+			// So, `appCfg.Presets` effectively feeds into `finalDesignConfig.Tools`.
+			// We need to ensure this link. `design.Config` already has `Tools map[string]*design.ToolConfig`.
+			// The `LoadConfig` should populate this if themes are defined in YAML with tool-specific settings.
+			// `ApplyCommandPreset` here is more about App-level behavior overrides from a preset name.
+
 			return // Applied first found preset
 		}
 	}
 }
-
-// You will also need to add DeepCopyConfig and ApplyMonochromeDefaults to your design package:
-// In cmd/internal/design/config.go (package design):
-/*
-func DeepCopyConfig(original *Config) *Config {
-    copied := *original // Shallow copy for top-level fields
-
-    // Deep copy maps and slices
-    copied.Colors = original.Colors // Assuming Colors struct is simple values
-    copied.Icons = original.Icons   // Assuming Icons struct is simple values
-    copied.Border = original.Border // Assuming Border struct is simple values
-    copied.Style = original.Style   // Assuming Style struct is simple values
-    copied.CognitiveLoad = original.CognitiveLoad
-
-    if original.Elements != nil {
-        copied.Elements = make(map[string]ElementStyleDef)
-        for k, v := range original.Elements {
-            copied.Elements[k] = v // ElementStyleDef contains slices, but let's assume they are not modified post-copy for now
-        }
-    }
-    if original.Patterns.Intent != nil {
-        copied.Patterns.Intent = make(map[string][]string)
-        for k, v := range original.Patterns.Intent {
-            // Perform deep copy for slice 'v' if necessary
-            s := make([]string, len(v))
-            copy(s,v)
-            copied.Patterns.Intent[k] = s
-        }
-    }
-    if original.Patterns.Output != nil {
-        copied.Patterns.Output = make(map[string][]string)
-        for k, v := range original.Patterns.Output {
-            s := make([]string, len(v))
-            copy(s,v)
-            copied.Patterns.Output[k] = s
-        }
-    }
-    if original.Tools != nil {
-        copied.Tools = make(map[string]*ToolConfig) // design.ToolConfig might be different from config.ToolConfig
-                                                    // This suggests ToolConfig specific to design might be needed,
-                                                    // or that ToolConfig from package config is passed around.
-                                                    // For now, let's assume this is design.ToolConfig if it exists
-        for k, v := range original.Tools {
-            toolCfgCopy := *v // shallow copy of the ToolConfig itself
-            // deep copy slices/maps within v if any
-            copied.Tools[k] = &toolCfgCopy
-        }
-    }
-    return &copied
-}
-
-func ApplyMonochromeDefaults(cfg *Config) {
-    cfg.IsMonochrome = true
-    asciiMinimal := AsciiMinimalTheme() // Get the full minimal theme
-    cfg.Icons = asciiMinimal.Icons
-    cfg.Colors = asciiMinimal.Colors // All colors become empty strings
-    cfg.Border = asciiMinimal.Border
-    cfg.Style.UseBoxes = asciiMinimal.Style.UseBoxes // Usually simpler for monochrome
-
-    // Ensure all element styles are updated for monochrome
-    if cfg.Elements == nil {
-        cfg.Elements = make(map[string]ElementStyleDef)
-    }
-    for elKey, minimalElDef := range asciiMinimal.Elements {
-        currentElDef, ok := cfg.Elements[elKey]
-        if !ok {
-            currentElDef = ElementStyleDef{} // Start fresh if element didn't exist
-        }
-        currentElDef.ColorFG = "" // Remove color
-        currentElDef.ColorBG = ""
-
-        // If minimal theme defines specific text or icon, prefer it if current is empty or different
-        if minimalElDef.IconKey != "" {
-             currentElDef.IconKey = minimalElDef.IconKey
-        }
-         if minimalElDef.Text != "" && currentElDef.Text == "" { // If minimal theme defines text and current doesn't
-             currentElDef.Text = minimalElDef.Text
-        }
-        // Preserve other non-color aspects from the original theme unless minimal explicitly changes them
-        // (e.g., TextCase, TextStyle if not color dependent)
-        cfg.Elements[elKey] = currentElDef
-    }
-}
-*/

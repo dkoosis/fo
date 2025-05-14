@@ -12,7 +12,7 @@ func (t *Task) RenderStartLine() string {
 
 	// Get the task header element style
 	headerStyle := t.Config.GetElementStyle("Task_Label_Header")
-	startStyle := t.Config.GetElementStyle("Task_StartIndicator_Line")
+	//	startStyle := t.Config.GetElementStyle("Task_StartIndicator_Line")
 
 	// Determine the border behavior based on the Style.UseBoxes setting
 	if t.Config.Style.UseBoxes {
@@ -566,4 +566,12 @@ func pluralSuffix(count int) string {
 		return ""
 	}
 	return "s"
+}
+
+func getProcessLabel(intent string) string {
+	if intent == "" {
+		return "Processing" // Default label
+	}
+	// Simple title casing for the label, e.g., "building" -> "Building"
+	return strings.Title(strings.ToLower(intent))
 }
