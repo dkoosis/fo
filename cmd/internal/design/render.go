@@ -1,3 +1,4 @@
+// cmd/internal/design/render.go
 package design
 
 import (
@@ -10,292 +11,236 @@ import (
 func (t *Task) RenderStartLine() string {
 	var sb strings.Builder
 
-	// Get the task header element style
-	headerStyle := t.Config.GetElementStyle("Task_Label_Header")
-	// startStyle := t.Config.GetElementStyle("Task_StartIndicator_Line") // Correctly removed as per previous advice
+	if t.Config.IsMonochrome {
+		// Simple monochrome output (for --no-color, --ci)
+		// Tests expect: [START] <label>...
+		icon := t.Config.GetIcon("Start") // Should be "[START]" from updated GetIcon
+		sb.WriteString(fmt.Sprintf("%s %s...", icon, t.Label))
+	} else { // Themed output
+		headerStyle := t.Config.GetElementStyle("Task_Label_Header")
+		startIndicatorStyle := t.Config.GetElementStyle("Task_StartIndicator_Line")
 
-	// Determine the border behavior based on the Style.UseBoxes setting
-	if t.Config.Style.UseBoxes {
-		// Box-oriented themes (left borders, full box, etc.)
-		switch t.Config.Border.TaskStyle {
-		case BorderLeftDouble, BorderLeftOnly:
-			// Top corner with header line
+		if t.Config.Style.UseBoxes {
 			sb.WriteString(t.Config.Border.TopCornerChar)
-			sb.WriteString(t.Config.Border.HeaderChar + " ")
+			sb.WriteString(t.Config.Border.HeaderChar) // Start of top border line part
 
-			// Apply styling to the label based on header style
-			label := applyTextCase(t.Label, headerStyle.TextCase)
 			labelColor := t.Config.GetColor(headerStyle.ColorFG, "Task_Label_Header")
-			sb.WriteString(labelColor)
-			if contains(headerStyle.TextStyle, "bold") {
-				sb.WriteString("\033[1m") // Bold
-			}
-			sb.WriteString(label)
-			sb.WriteString(t.Config.ResetColor()) // Reset
-
-			// Continue the header line
-			sb.WriteString(" ")
-			headerWidth := calculateHeaderWidth(t.Label, 30) // Default 30 if not specified
-			sb.WriteString(strings.Repeat(t.Config.Border.HeaderChar, headerWidth))
-			sb.WriteString("\n")
-
-			// Empty line with vertical border
-			sb.WriteString(t.Config.Border.VerticalChar + "\n")
-
-			// Start the process line with left border
-			sb.WriteString(t.Config.Border.VerticalChar + " ")
-
-		case BorderHeaderBox, BorderFull:
-			// Simplified for brevity - ensure these are implemented if used by a theme
-			label := applyTextCase(t.Label, headerStyle.TextCase)
-			labelColor := t.Config.GetColor(headerStyle.ColorFG, "Task_Label_Header")
-			sb.WriteString(t.Config.Border.TopCornerChar) // Example
-			sb.WriteString(strings.Repeat(t.Config.Border.HeaderChar, calculateHeaderWidth(t.Label, 30)))
-			// ... more border chars ...
-			sb.WriteString("\n")
-			sb.WriteString(t.Config.Border.VerticalChar + " ")
-			sb.WriteString(labelColor)
+			sb.WriteString(labelColor) // Start color for label segment
 			if contains(headerStyle.TextStyle, "bold") {
 				sb.WriteString("\033[1m")
 			}
-			sb.WriteString(label)
-			sb.WriteString(t.Config.ResetColor())
-			// ...
-			sb.WriteString("\n")
-			sb.WriteString(t.Config.Border.VerticalChar + " ")
+			sb.WriteString(" ") // Space before label text
+			sb.WriteString(applyTextCase(t.Label, headerStyle.TextCase))
+			sb.WriteString(" ") // Space after label text
 
-		case BorderNone, BorderAscii: // These are not box styles typically
-			// Simplified header for non-boxed styles
-			label := applyTextCase(t.Label, headerStyle.TextCase)
-			labelColor := t.Config.GetColor(headerStyle.ColorFG, "Task_Label_Header")
-			sb.WriteString(labelColor)
-			if contains(headerStyle.TextStyle, "bold") {
-				sb.WriteString("\033[1m") // Bold
+			// Calculate remaining width for the header line.
+			labelRenderedLength := len(t.Label) + 2 // Label + spaces
+			// Assuming a max visual width for the colored part of the header to avoid overly long lines
+			// This is a heuristic and might need refinement or access to terminal width.
+			desiredHeaderContentVisualWidth := 40
+			repeatCount := desiredHeaderContentVisualWidth - labelRenderedLength
+			if repeatCount < 0 {
+				repeatCount = 0
 			}
-			sb.WriteString(label)
-			sb.WriteString(t.Config.ResetColor()) // Reset
-			sb.WriteString(":\n\n")               // Added colon and newlines for non-boxed title
-		}
-	} else {
-		// Line-oriented themes (no boxes)
-		h2Style := t.Config.GetElementStyle("H2_Target_Title")
-		headerLineStyle := t.Config.GetElementStyle("H2_Target_Header_Line")
 
-		// Header line if specified
-		if headerLineStyle.LineChar != "" {
-			sb.WriteString(strings.Repeat(headerLineStyle.LineChar, calculateHeaderWidth(t.Label, 40)))
+			sb.WriteString(strings.Repeat(t.Config.Border.HeaderChar, repeatCount))
+			sb.WriteString(t.Config.ResetColor()) // Reset color AFTER all potentially colored header parts
 			sb.WriteString("\n")
+
+			sb.WriteString(t.Config.Border.VerticalChar + "\n") // Empty line with border
+			sb.WriteString(t.Config.Border.VerticalChar + " ")  // Start of process line
+			sb.WriteString(t.Config.GetIndentation(1))          // Indent actual start indicator text
+		} else { // Line-oriented (non-boxed) themed output
+			// For line-oriented, the label might be the "header" itself.
+			h2Style := t.Config.GetElementStyle("H2_Target_Title") // Or Task_Label_Header if more appropriate
+			labelColor := t.Config.GetColor(h2Style.ColorFG, "H2_Target_Title")
+			sb.WriteString(labelColor)
+			if contains(h2Style.TextStyle, "bold") {
+				sb.WriteString("\033[1m")
+			}
+			sb.WriteString(h2Style.Prefix) // If any prefix defined for this style
+			sb.WriteString(applyTextCase(t.Label, h2Style.TextCase))
+			sb.WriteString(t.Config.ResetColor())
+			sb.WriteString("\n\n")                     // Spacing after label/title
+			sb.WriteString(t.Config.GetIndentation(1)) // Indent start indicator text
 		}
 
-		// Task title
-		labelColor := t.Config.GetColor(h2Style.ColorFG, "H2_Target_Title")
-		sb.WriteString(labelColor)
-		if contains(h2Style.TextStyle, "bold") {
-			sb.WriteString("\033[1m") // Bold
+		// Process indicator text (common for themed and line-oriented after label)
+		processLabelText := getProcessLabel(t.Intent)
+		processColor := t.Config.GetColor(startIndicatorStyle.ColorFG, "Task_StartIndicator_Line")
+		if processColor == "" { // Fallback if element style doesn't specify color
+			processColor = t.Config.GetColor("Process")
 		}
-		sb.WriteString(h2Style.Prefix)
-		sb.WriteString(applyTextCase(t.Label, h2Style.TextCase))
-		sb.WriteString(t.Config.ResetColor())
-		sb.WriteString("\n\n") // Ensure spacing after title
+		icon := t.Config.GetIcon(startIndicatorStyle.IconKey)
+		if icon == "" { // Fallback if element style doesn't specify icon
+			icon = t.Config.GetIcon("Start")
+		}
+
+		sb.WriteString(fmt.Sprintf("%s %s%s...%s",
+			icon,
+			processColor,
+			processLabelText,
+			t.Config.ResetColor()))
 	}
-
-	// Process indicator
-	processLabelText := getProcessLabel(t.Intent)                            // Ensure getProcessLabel is defined
-	processColor := t.Config.GetColor("Process", "Task_StartIndicator_Line") // Use specific element if color defined
-	icon := t.Config.GetIcon("Start")
-
-	// Add the process indicator text
-	sb.WriteString(fmt.Sprintf("%s %s%s...%s",
-		icon,
-		processColor,
-		processLabelText,
-		t.Config.ResetColor()))
-
 	return sb.String()
 }
 
 // RenderEndLine returns the formatted end line for the task
 func (t *Task) RenderEndLine() string {
 	var sb strings.Builder
-
-	var statusStyle ElementStyleDef
-	switch t.Status {
-	case StatusSuccess:
-		statusStyle = t.Config.GetElementStyle("Task_Status_Success_Block")
-	case StatusWarning:
-		statusStyle = t.Config.GetElementStyle("Task_Status_Warning_Block")
-	case StatusError:
-		statusStyle = t.Config.GetElementStyle("Task_Status_Failed_Block")
-	default:
-		statusStyle = t.Config.GetElementStyle("Task_Status_Success_Block") // Default
-	}
-
-	durationStyle := t.Config.GetElementStyle("Task_Status_Duration")
-
-	if t.Config.Style.UseBoxes {
-		switch t.Config.Border.TaskStyle {
-		case BorderLeftDouble, BorderLeftOnly, BorderHeaderBox, BorderFull:
-			sb.WriteString(t.Config.Border.VerticalChar + " ")
-		}
-	} else {
-		if statusStyle.Prefix != "" { // For line-oriented themes, prefix might be indent or symbol
-			sb.WriteString(statusStyle.Prefix)
-		}
-	}
-
-	var icon, statusText string
-	var colorKey string // To fetch from t.Config.Colors directly
-
-	switch t.Status {
-	case StatusSuccess:
-		icon = t.Config.GetIcon("Success")
-		statusText = statusStyle.TextContent // Use text from element style if defined
-		if statusText == "" {
-			statusText = "Complete"
-		}
-		colorKey = statusStyle.ColorFG // Prefer color from element style
-		if colorKey == "" {
-			colorKey = "Success" // Fallback to direct color key
-		}
-	case StatusWarning:
-		icon = t.Config.GetIcon("Warning")
-		statusText = statusStyle.TextContent
-		if statusText == "" {
-			statusText = "Completed with warnings"
-		}
-		colorKey = statusStyle.ColorFG
-		if colorKey == "" {
-			colorKey = "Warning"
-		}
-	case StatusError:
-		icon = t.Config.GetIcon("Error")
-		statusText = statusStyle.TextContent
-		if statusText == "" {
-			statusText = "Failed"
-		}
-		colorKey = statusStyle.ColorFG
-		if colorKey == "" {
-			colorKey = "Error"
-		}
-	default:
-		icon = t.Config.GetIcon("Info") // Should not happen if status is set
-		statusText = "Done"
-		colorKey = statusStyle.ColorFG
-		if colorKey == "" {
-			colorKey = "Process"
-		}
-	}
-
-	colorCode := t.Config.GetColor(colorKey) // Get resolved color
-
 	durationStr := ""
+
+	// Effective NoTimer state comes from resolved t.Config.Style.NoTimer
 	if !t.Config.Style.NoTimer {
+		durationStyle := t.Config.GetElementStyle("Task_Status_Duration")
 		prefix := durationStyle.Prefix
-		if prefix == "" && !t.Config.IsMonochrome { // Add default parens only if not monochrome (monochrome has its own format)
-			prefix = "("
-		}
 		suffix := durationStyle.Suffix
-		if suffix == "" && !t.Config.IsMonochrome {
-			suffix = ")"
+
+		if t.Config.IsMonochrome { // Ensure simple parentheses for monochrome if not styled
+			if prefix == "" {
+				prefix = "("
+			}
+			if suffix == "" {
+				suffix = ")"
+			}
+		} else { // For themed, allow theme to specify empty prefix/suffix
+			if prefix == "" && suffix == "" { // Add default parens if both are empty for themed
+				prefix = "("
+				suffix = ")"
+			}
 		}
 
 		durationColorName := durationStyle.ColorFG
 		if durationColorName == "" {
-			durationColorName = "Muted" // Default duration color
-		}
-		durationAnsiColor := t.Config.GetColor(durationColorName)
+			durationColorName = "Muted"
+		} // Default color for duration
+		durationAnsiColor := t.Config.GetColor(durationColorName) // Will be "" if monochrome
 
-		// Ensure space before duration only if prefix is not already providing it or is empty
 		space := " "
-		if prefix != "" && strings.HasSuffix(prefix, " ") {
-			space = ""
+		if prefix != "" && (strings.HasSuffix(prefix, " ") || strings.HasPrefix(suffix, " ")) {
+			space = "" // Avoid double space if prefix/suffix already includes it
 		}
 
 		durationStr = fmt.Sprintf("%s%s%s%s%s%s",
-			space, // Ensure space before duration if needed
-			durationAnsiColor,
-			prefix,
-			formatDuration(t.Duration),
-			suffix,
-			t.Config.ResetColor())
+			space, durationAnsiColor, prefix, formatDuration(t.Duration), suffix, t.Config.ResetColor())
 	}
 
-	statusTextWithStyle := statusText
-	if contains(statusStyle.TextStyle, "bold") {
-		statusTextWithStyle = "\033[1m" + statusText + "\033[22m" // Using 22m for bold off to be specific
-	}
+	if t.Config.IsMonochrome {
+		// Simple monochrome output: [ICON] Label (duration) or [ICON] Label
+		var icon string
+		switch t.Status {
+		case StatusSuccess:
+			icon = t.Config.GetIcon("Success") // e.g., "[SUCCESS]"
+		case StatusWarning:
+			icon = t.Config.GetIcon("Warning") // e.g., "[WARNING]"
+		case StatusError:
+			icon = t.Config.GetIcon("Error") // e.g., "[FAILED]"
+		default:
+			icon = t.Config.GetIcon("Info") // e.g., "[INFO]"
+		}
+		// durationStr will be empty if t.Config.Style.NoTimer is true (e.g. CI mode)
+		sb.WriteString(fmt.Sprintf("%s %s%s", icon, t.Label, durationStr))
 
-	sb.WriteString(fmt.Sprintf("%s %s%s%s%s",
-		icon, colorCode, statusTextWithStyle, t.Config.ResetColor(), durationStr))
+	} else { // Themed output
+		var statusStyle ElementStyleDef
+		var icon, statusText, colorKey string
 
-	sb.WriteString("\n") // Newline after status
+		switch t.Status {
+		case StatusSuccess:
+			statusStyle = t.Config.GetElementStyle("Task_Status_Success_Block")
+			icon = t.Config.GetIcon(statusStyle.IconKey)
+			if icon == "" {
+				icon = t.Config.GetIcon("Success")
+			}
+			statusText = statusStyle.TextContent
+			if statusText == "" {
+				statusText = "Complete"
+			}
+			colorKey = statusStyle.ColorFG
+			if colorKey == "" {
+				colorKey = "Success"
+			}
+		case StatusWarning:
+			statusStyle = t.Config.GetElementStyle("Task_Status_Warning_Block")
+			icon = t.Config.GetIcon(statusStyle.IconKey)
+			if icon == "" {
+				icon = t.Config.GetIcon("Warning")
+			}
+			statusText = statusStyle.TextContent
+			if statusText == "" {
+				statusText = "Completed with warnings"
+			}
+			colorKey = statusStyle.ColorFG
+			if colorKey == "" {
+				colorKey = "Warning"
+			}
+		case StatusError:
+			statusStyle = t.Config.GetElementStyle("Task_Status_Failed_Block")
+			icon = t.Config.GetIcon(statusStyle.IconKey)
+			if icon == "" {
+				icon = t.Config.GetIcon("Error")
+			}
+			statusText = statusStyle.TextContent
+			if statusText == "" {
+				statusText = "Failed"
+			}
+			colorKey = statusStyle.ColorFG
+			if colorKey == "" {
+				colorKey = "Error"
+			}
+		default: // Should ideally not happen if Status is always set
+			statusStyle = t.Config.GetElementStyle("Task_Status_Info_Block") // Assuming an Info_Block
+			icon = t.Config.GetIcon(statusStyle.IconKey)
+			if icon == "" {
+				icon = t.Config.GetIcon("Info")
+			}
+			statusText = statusStyle.TextContent
+			if statusText == "" {
+				statusText = "Done"
+			}
+			colorKey = statusStyle.ColorFG
+			if colorKey == "" {
+				colorKey = "Process"
+			} // Default color
+		}
 
-	if t.Config.Style.UseBoxes {
-		switch t.Config.Border.TaskStyle {
-		case BorderLeftDouble, BorderLeftOnly:
+		colorCode := t.Config.GetColor(colorKey)
+		statusTextWithStyle := statusText
+		if contains(statusStyle.TextStyle, "bold") {
+			statusTextWithStyle = "\033[1m" + statusText + "\033[22m" // Specific off-bold
+		}
+
+		if t.Config.Style.UseBoxes {
+			sb.WriteString(t.Config.Border.VerticalChar + " ")
+			sb.WriteString(t.Config.GetIndentation(1)) // Indent status line for boxed themes
+		} else if statusStyle.Prefix != "" { // For line-oriented themes that might have a status prefix
+			sb.WriteString(statusStyle.Prefix)
+		}
+
+		sb.WriteString(fmt.Sprintf("%s %s%s%s%s",
+			icon, colorCode, statusTextWithStyle, t.Config.ResetColor(), durationStr))
+		sb.WriteString("\n") // Newline after status text
+
+		if t.Config.Style.UseBoxes {
 			footerChar := t.Config.Border.FooterContinuationChar
 			if footerChar == "" {
-				footerChar = "─" // Default
-			}
+				footerChar = t.Config.Border.HeaderChar
+			} // Fallback to header char
+			if footerChar == "" {
+				footerChar = "─"
+			} // Absolute fallback
 			sb.WriteString(t.Config.Border.BottomCornerChar)
 			sb.WriteString(footerChar) // This creates "└─" or similar
-			// Optional: extend footer line further
-			// sb.WriteString(strings.Repeat(footerChar, calculateWidth(t.Label)-1))
+			// Could extend the line: strings.Repeat(footerChar, width)
 			sb.WriteString("\n")
-
-		case BorderHeaderBox: // Needs full bottom border
-			width := calculateWidth(t.Label) // Or a relevant width
-			sb.WriteString(t.Config.Border.BottomCornerChar)
-			sb.WriteString(strings.Repeat(t.Config.Border.HeaderChar, width)) // Match header char
-			// This needs adjustment based on how BorderHeaderBox is defined visually
-			// For a box, it might be BottomLeftCorner + HorizontalRepeat + BottomRightCorner
-			sb.WriteString(t.Config.Border.BottomCornerChar) // Example placeholder
-			sb.WriteString("\n")
-
-		case BorderFull:
-			width := calculateHeaderWidth(t.Label, 30)                        // Use consistent width calculation
-			sb.WriteString(t.Config.Border.BottomCornerChar)                  // Typically bottom-left
-			sb.WriteString(strings.Repeat(t.Config.Border.HeaderChar, width)) // Horizontal line
-			// This depends on the full box definition, might need a right corner char if defined
-			// For simplicity, assuming BottomCornerChar is the bottom-left, and line extends.
-			// If a specific right corner is part of BorderFull theme:
-			// sb.WriteString(t.Config.Border.BottomRightCornerChar)
-			sb.WriteString("\n")
-
-		case BorderAscii: // ASCII equivalent of a bottom border
-			sb.WriteString(strings.Repeat("-", calculateHeaderWidth(t.Label, 30)))
-			sb.WriteString("\n")
-		case BorderNone:
-			// No border for BorderNone
-			break
-		}
-	} else { // Line-oriented themes
-		footerStyle := t.Config.GetElementStyle("H2_Target_Footer_Line")
-		if footerStyle.FramingCharStart != "" || footerStyle.LineChar != "" {
-			char := footerStyle.LineChar
-			if char == "" {
-				char = "-" // Default line char
+		} else { // Line-oriented themes might have a final horizontal rule
+			footerStyle := t.Config.GetElementStyle("H2_Target_Footer_Line")
+			if footerStyle.LineChar != "" {
+				sb.WriteString(strings.Repeat(footerStyle.LineChar, calculateHeaderWidth(t.Label, 40))) // Use consistent width
+				sb.WriteString("\n")
 			}
-
-			if footerStyle.FramingCharStart != "" { // e.g. "---- FAILED ----"
-				finalStatusText := t.Status // Use raw status like "success", "error"
-				if t.Status == StatusSuccess {
-					finalStatusText = "PASSED"
-				}
-				if t.Status == StatusError {
-					finalStatusText = "FAILED"
-				}
-
-				sb.WriteString(footerStyle.FramingCharStart)
-				sb.WriteString(strings.ToUpper(finalStatusText)) // Example: make it upper case
-				sb.WriteString(footerStyle.FramingCharEnd)
-			} else { // Just a line
-				sb.WriteString(strings.Repeat(char, calculateHeaderWidth(t.Label, 40)))
-			}
-			sb.WriteString("\n")
 		}
 	}
-
 	return sb.String()
 }
 
@@ -303,117 +248,143 @@ func (t *Task) RenderEndLine() string {
 func (t *Task) RenderOutputLine(line OutputLine) string {
 	var sb strings.Builder
 
-	if t.Config.Style.UseBoxes {
-		switch t.Config.Border.TaskStyle {
-		case BorderLeftDouble, BorderLeftOnly, BorderHeaderBox, BorderFull:
+	// Check for fo's own internal messages that should be rendered plainly
+	isFoInternalMessage := strings.HasPrefix(line.Content, "[fo] ") ||
+		(line.Type == TypeError && (strings.HasPrefix(line.Content, "Error starting command") ||
+			strings.HasPrefix(line.Content, "Error creating stdout pipe") ||
+			strings.HasPrefix(line.Content, "Error creating stderr pipe")))
+
+	if t.Config.IsMonochrome {
+		sb.WriteString(t.Config.GetIndentation(1)) // Base indent for all content
+		if line.Indentation > 0 {                  // Additional script-level indent
+			sb.WriteString(strings.Repeat(t.Config.GetIndentation(1), line.Indentation))
+		}
+
+		if isFoInternalMessage { // Print fo's own errors/messages plainly after initial indent
+			sb.WriteString(line.Content)
+		} else { // Regular script output
+			var prefixText string
+			switch line.Type {
+			case TypeError:
+				prefixStyle := t.Config.GetElementStyle("Stderr_Error_Line_Prefix")
+				prefixText = prefixStyle.Text // e.g., "  > " from AsciiMinimalTheme
+			case TypeWarning:
+				prefixStyle := t.Config.GetElementStyle("Stderr_Warning_Line_Prefix")
+				prefixText = prefixStyle.Text // e.g., "  > "
+			default: // TypeDetail, TypeInfo, TypeSuccess etc.
+				prefixStyle := t.Config.GetElementStyle("Stdout_Line_Prefix")
+				prefixText = prefixStyle.Text // e.g., "  "
+			}
+			sb.WriteString(prefixText)
+			sb.WriteString(line.Content)
+		}
+	} else { // Themed rendering
+		if t.Config.Style.UseBoxes {
 			sb.WriteString(t.Config.Border.VerticalChar + " ")
 		}
-	}
-
-	indentLevel := line.Indentation
-	if indentLevel > 0 {
-		sb.WriteString(t.Config.GetIndentation(indentLevel))
-	}
-
-	var prefixStyle ElementStyleDef
-	// var contentStyle ElementStyleDef // REMOVED as it was not used effectively
-
-	switch line.Type {
-	case TypeError:
-		prefixStyle = t.Config.GetElementStyle("Stderr_Error_Line_Prefix")
-		// contentStyle = t.Config.GetElementStyle("Task_Content_Stderr_Error_Text") // REMOVED
-	case TypeWarning:
-		prefixStyle = t.Config.GetElementStyle("Stderr_Warning_Line_Prefix")
-		// contentStyle = t.Config.GetElementStyle("Task_Content_Stderr_Warning_Text") // REMOVED
-	case TypeInfo:
-		prefixStyle = t.Config.GetElementStyle("Make_Info_Line_Prefix")
-	case TypeDetail:
-		if t.Config.Style.UseBoxes { // Boxed themes might have a stdout prefix
-			prefixStyle = t.Config.GetElementStyle("Stdout_Line_Prefix")
-		} else { // Line themes might use a command line prefix
-			prefixStyle = t.Config.GetElementStyle("Command_Line_Prefix")
+		sb.WriteString(t.Config.GetIndentation(1))
+		if line.Indentation > 0 {
+			sb.WriteString(strings.Repeat(t.Config.GetIndentation(1), line.Indentation))
 		}
-	default: // Includes TypeSuccess, TypeProgress, TypeSummary, etc. or unknown
-		// Default prefix usually for regular stdout or unclassified lines
-		if t.Config.Style.UseBoxes {
-			prefixStyle = t.Config.GetElementStyle("Stdout_Line_Prefix")
-		} else {
-			// For line-oriented themes, TypeDetail might not have a prefix by default from here
-			// but specific line types like TypeSuccess could define one.
-			// Let's assume a generic or no prefix if not explicitly handled.
+
+		var prefixStyle ElementStyleDef
+		var contentColorKey string
+		var contentElementStyleKey string // Key to get style for content text (bold, italic)
+
+		switch line.Type {
+		case TypeError:
+			if isFoInternalMessage {
+				prefixStyle = ElementStyleDef{}                           // No icon/prefix from element style for fo's internal error line
+				contentColorKey = "Error"                                 // Just color the text red
+				contentElementStyleKey = "Task_Content_Stderr_Error_Text" // For potential bold/italic
+			} else {
+				prefixStyle = t.Config.GetElementStyle("Stderr_Error_Line_Prefix")
+				contentColorKey = prefixStyle.ColorFG
+				if contentColorKey == "" {
+					contentColorKey = "Error"
+				}
+				contentElementStyleKey = "Task_Content_Stderr_Error_Text"
+			}
+		case TypeWarning:
+			prefixStyle = t.Config.GetElementStyle("Stderr_Warning_Line_Prefix")
+			contentColorKey = prefixStyle.ColorFG
+			if contentColorKey == "" {
+				contentColorKey = "Warning"
+			}
+			contentElementStyleKey = "Task_Content_Stderr_Warning_Text"
+		case TypeInfo:
+			prefixStyle = t.Config.GetElementStyle("Make_Info_Line_Prefix") // Or a generic "Info_Line_Prefix"
+			contentColorKey = prefixStyle.ColorFG
+			if contentColorKey == "" {
+				contentColorKey = "Process"
+			} // Default info color
+			contentElementStyleKey = "Task_Content_Info_Text"
+		default: // TypeDetail, TypeSuccess, etc.
+			prefixStyle = t.Config.GetElementStyle("Stdout_Line_Prefix") // Default prefix for stdout-like content
+			contentColorKey = prefixStyle.ColorFG
+			if contentColorKey == "" {
+				contentColorKey = "Detail"
+			}
+			contentElementStyleKey = "Task_Content_Stdout_Text"
 		}
-	}
 
-	if prefixStyle.Text != "" { // Text from prefix definition
-		sb.WriteString(prefixStyle.Text)
-	}
-	if prefixStyle.IconKey != "" {
-		sb.WriteString(t.Config.GetIcon(prefixStyle.IconKey) + " ")
-	}
-	if prefixStyle.AdditionalChars != "" {
-		sb.WriteString(prefixStyle.AdditionalChars)
-	}
-
-	content := line.Content
-	var finalColor, finalStyleStart, finalStyleEnd string
-
-	// Determine color and style based on line type and element definitions
-	// This section now directly uses colors and styles based on line.Type
-	// rather than attempting to use the 'contentStyle' variable.
-
-	currentElementStyle := ElementStyleDef{} // To store text style for the content itself
-	switch line.Type {
-	case TypeError:
-		finalColor = t.Config.GetColor("Error")
-		currentElementStyle = t.Config.GetElementStyle("Task_Content_Stderr_Error_Text")
-		if line.Context.CognitiveLoad == LoadHigh { // Specific research-backed rule
-			finalStyleStart += "\033[3m" // Italics
+		// Render prefix part (icon, prefix text from style)
+		prefixRenderedColor := t.Config.GetColor(prefixStyle.ColorFG) // Color for the prefix itself
+		sb.WriteString(prefixRenderedColor)
+		if prefixStyle.IconKey != "" {
+			sb.WriteString(t.Config.GetIcon(prefixStyle.IconKey) + " ")
 		}
-	case TypeWarning:
-		finalColor = t.Config.GetColor("Warning")
-		currentElementStyle = t.Config.GetElementStyle("Task_Content_Stderr_Warning_Text")
-	case TypeSuccess:
-		finalColor = t.Config.GetColor("Success")
-		currentElementStyle = t.Config.GetElementStyle("Task_Content_Stdout_Success_Text") // Example new element
-	case TypeInfo:
-		finalColor = t.Config.GetColor("Process")                                // Or a specific "Info" color if defined
-		currentElementStyle = t.Config.GetElementStyle("Task_Content_Info_Text") // Example new element
-	case TypeSummary:
-		finalColor = t.Config.GetColor("Process")                                   // Or a specific "Summary" color
-		finalStyleStart += "\033[1m"                                                // Bold for summary lines
-		currentElementStyle = t.Config.GetElementStyle("Task_Content_Summary_Text") // Example new element
-	case TypeProgress:
-		finalColor = t.Config.GetColor("Muted")
-		currentElementStyle = t.Config.GetElementStyle("Task_Content_Progress_Text") // Example new element
-	case TypeDetail:
-		finalColor = t.Config.GetColor("Detail") // Default text color
-		currentElementStyle = t.Config.GetElementStyle("Task_Content_Stdout_Text")
-	default:
-		finalColor = t.Config.GetColor("Detail") // Fallback
-	}
+		if prefixStyle.Text != "" {
+			sb.WriteString(prefixStyle.Text)
+		}
+		if prefixStyle.AdditionalChars != "" {
+			sb.WriteString(prefixStyle.AdditionalChars)
+		}
+		if prefixRenderedColor != "" {
+			sb.WriteString(t.Config.ResetColor())
+		} // Reset color if prefix had one
 
-	// Apply text styles from the fetched element definition for the content
-	if contains(currentElementStyle.TextStyle, "bold") && !strings.Contains(finalStyleStart, "\033[1m") {
-		finalStyleStart += "\033[1m"
-	}
-	if contains(currentElementStyle.TextStyle, "italic") && !strings.Contains(finalStyleStart, "\033[3m") {
-		finalStyleStart += "\033[3m"
-	}
-	// Add other styles like underline, dim if needed
+		// Content styling
+		finalContentColor := t.Config.GetColor(contentColorKey) // Color for the content text
+		contentStyleDef := t.Config.GetElementStyle(contentElementStyleKey)
+		styleStart, styleEnd := "", ""
 
-	if finalStyleStart != "" {
-		finalStyleEnd = t.Config.ResetColor() // Ensure reset if any style was applied
-	}
+		// Apply cognitive load italics for critical application errors (not fo's own)
+		if line.Context.CognitiveLoad == LoadHigh && line.Type == TypeError && !isFoInternalMessage {
+			styleStart += "\033[3m" // Italics
+		}
+		// Apply text styles from definition
+		if contains(contentStyleDef.TextStyle, "bold") {
+			styleStart += "\033[1m"
+		}
+		if contains(contentStyleDef.TextStyle, "italic") && !strings.Contains(styleStart, "\033[3m") {
+			styleStart += "\033[3m"
+		}
+		// ... (add other styles like underline, dim if defined in ElementStyleDef.TextStyle)
 
-	sb.WriteString(fmt.Sprintf("%s%s%s%s", finalColor, finalStyleStart, content, finalStyleEnd))
+		if styleStart != "" {
+			styleEnd = t.Config.ResetColor()
+		} // Reset if any style was applied
+
+		sb.WriteString(fmt.Sprintf("%s%s%s%s", finalContentColor, styleStart, line.Content, styleEnd))
+	}
 	return sb.String()
 }
 
 // RenderSummary creates a summary section for the output
 func (t *Task) RenderSummary() string {
 	errorCount, warningCount := 0, 0
-
 	for _, line := range t.OutputLines {
+		// Exclude fo's internal/startup errors from the user-facing summary of command output issues.
+		isFoInternalError := (line.Type == TypeError &&
+			(strings.HasPrefix(line.Content, "Error starting command") ||
+				strings.HasPrefix(line.Content, "Error creating stdout pipe") ||
+				strings.HasPrefix(line.Content, "Error creating stderr pipe") ||
+				strings.HasPrefix(line.Content, "[fo] "))) // Tag for other fo internal messages
+		if isFoInternalError {
+			continue
+		}
+
 		switch line.Type {
 		case TypeError:
 			errorCount++
@@ -423,7 +394,7 @@ func (t *Task) RenderSummary() string {
 	}
 
 	if errorCount == 0 && warningCount == 0 {
-		return "" // No summary needed
+		return "" // No summary needed if no relevant errors/warnings from the command
 	}
 
 	var sb strings.Builder
@@ -431,111 +402,74 @@ func (t *Task) RenderSummary() string {
 	errorItemStyle := t.Config.GetElementStyle("Task_Content_Summary_Item_Error")
 	warningItemStyle := t.Config.GetElementStyle("Task_Content_Summary_Item_Warning")
 
-	// Border and spacing
+	// Determine base indentation for summary lines (respecting boxing)
+	baseIndentForSummaryItems := ""
 	if t.Config.Style.UseBoxes {
-		switch t.Config.Border.TaskStyle {
-		case BorderLeftDouble, BorderLeftOnly, BorderHeaderBox, BorderFull:
-			sb.WriteString(t.Config.Border.VerticalChar + "\n") // Empty line before summary
-			sb.WriteString(t.Config.Border.VerticalChar + " ")  // Start summary heading line
-		}
+		sb.WriteString(t.Config.Border.VerticalChar + "\n") // Empty line before summary for boxed
+		baseIndentForSummaryItems = t.Config.Border.VerticalChar + " " + t.Config.GetIndentation(1)
 	} else {
-		sb.WriteString("\n") // Spacing for line themes
+		sb.WriteString("\n") // Spacing for line themes before summary
+		baseIndentForSummaryItems = t.Config.GetIndentation(1)
 	}
+	sb.WriteString(baseIndentForSummaryItems) // Indent summary heading
 
 	// Heading text and color
 	headingText := summaryHeadingStyle.TextContent
 	if headingText == "" {
 		headingText = "SUMMARY:"
 	}
-	headingColorName := summaryHeadingStyle.ColorFG
-	if headingColorName == "" {
-		headingColorName = "Process" // Default color for summary heading
-	}
-	headingColor := t.Config.GetColor(headingColorName)
-	headingStyleStart, headingStyleEnd := "", ""
+	headingColor := t.Config.GetColor(summaryHeadingStyle.ColorFG, "Task_Content_Summary_Heading")
+	if headingColor == "" && !t.Config.IsMonochrome {
+		headingColor = t.Config.GetColor("Process")
+	} // Default for themed
+
+	hStyleStart, hStyleEnd := "", ""
 	if contains(summaryHeadingStyle.TextStyle, "bold") {
-		headingStyleStart = "\033[1m"
-		headingStyleEnd = t.Config.ResetColor() // Reset after bold
+		hStyleStart = "\033[1m"
+		hStyleEnd = t.Config.GetColor("Reset") // Ensure reset after bold specifically
 	}
+	sb.WriteString(fmt.Sprintf("%s%s%s%s%s\n", headingColor, hStyleStart, headingText, hStyleEnd, t.Config.ResetColor()))
 
-	sb.WriteString(fmt.Sprintf("%s%s%s%s%s\n",
-		headingColor,
-		headingStyleStart,
-		headingText,
-		headingStyleEnd,
-		t.Config.ResetColor())) // Overall reset for the line
+	// Item indentation is one level deeper than the summary heading's base indent
+	itemFurtherIndent := baseIndentForSummaryItems + t.Config.GetIndentation(1)
 
-	// Error items
 	if errorCount > 0 {
-		if t.Config.Style.UseBoxes {
-			switch t.Config.Border.TaskStyle {
-			case BorderLeftDouble, BorderLeftOnly, BorderHeaderBox, BorderFull:
-				sb.WriteString(t.Config.Border.VerticalChar + " ")
-			}
-		}
-		sb.WriteString(t.Config.GetIndentation(1)) // Indent summary items
-
+		sb.WriteString(itemFurtherIndent)
 		bulletChar := errorItemStyle.BulletChar
 		if bulletChar == "" {
-			bulletChar = t.Config.GetIcon("Bullet") // Fallback to theme icon
-			if bulletChar == "" {
-				bulletChar = "•" // Hardcoded fallback
-			}
+			bulletChar = t.Config.GetIcon("Bullet")
 		}
-		itemColorName := errorItemStyle.ColorFG
-		if itemColorName == "" {
-			itemColorName = "Error"
+		itemColor := t.Config.GetColor(errorItemStyle.ColorFG, "Task_Content_Summary_Item_Error")
+		if itemColor == "" && !t.Config.IsMonochrome {
+			itemColor = t.Config.GetColor("Error")
 		}
-		itemColor := t.Config.GetColor(itemColorName)
-
-		sb.WriteString(fmt.Sprintf("%s%s %d %s%s%s\n",
-			itemColor, bulletChar, errorCount, "error", pluralSuffix(errorCount), t.Config.ResetColor()))
+		sb.WriteString(fmt.Sprintf("%s%s %d error%s%s\n", itemColor, bulletChar, errorCount, pluralSuffix(errorCount), t.Config.ResetColor()))
 	}
 
-	// Warning items
 	if warningCount > 0 {
-		if t.Config.Style.UseBoxes {
-			switch t.Config.Border.TaskStyle {
-			case BorderLeftDouble, BorderLeftOnly, BorderHeaderBox, BorderFull:
-				sb.WriteString(t.Config.Border.VerticalChar + " ")
-			}
-		}
-		sb.WriteString(t.Config.GetIndentation(1))
-
+		sb.WriteString(itemFurtherIndent)
 		bulletChar := warningItemStyle.BulletChar
 		if bulletChar == "" {
 			bulletChar = t.Config.GetIcon("Bullet")
-			if bulletChar == "" {
-				bulletChar = "•"
-			}
 		}
-		itemColorName := warningItemStyle.ColorFG
-		if itemColorName == "" {
-			itemColorName = "Warning"
+		itemColor := t.Config.GetColor(warningItemStyle.ColorFG, "Task_Content_Summary_Item_Warning")
+		if itemColor == "" && !t.Config.IsMonochrome {
+			itemColor = t.Config.GetColor("Warning")
 		}
-		itemColor := t.Config.GetColor(itemColorName)
-
-		sb.WriteString(fmt.Sprintf("%s%s %d %s%s%s\n",
-			itemColor, bulletChar, warningCount, "warning", pluralSuffix(warningCount), t.Config.ResetColor()))
+		sb.WriteString(fmt.Sprintf("%s%s %d warning%s%s\n", itemColor, bulletChar, warningCount, pluralSuffix(warningCount), t.Config.ResetColor()))
 	}
 
-	// Spacing after summary
+	// Spacing after summary items
 	if t.Config.Style.UseBoxes {
-		switch t.Config.Border.TaskStyle {
-		case BorderLeftDouble, BorderLeftOnly, BorderHeaderBox, BorderFull:
-			sb.WriteString(t.Config.Border.VerticalChar + "\n")
-		default: // BorderNone, BorderAscii (which are not really UseBoxes true by default)
-			sb.WriteString("\n")
-		}
+		sb.WriteString(t.Config.Border.VerticalChar + "\n")
 	} else {
-		sb.WriteString("\n")
+		sb.WriteString("\n") // Ensure a blank line after summary for line themes
 	}
 
 	return sb.String()
 }
 
-// Helper functions
-
+// Helper functions (assumed to be mostly correct from previous versions)
 func applyTextCase(text, caseType string) string {
 	switch strings.ToLower(caseType) {
 	case "upper":
@@ -543,7 +477,6 @@ func applyTextCase(text, caseType string) string {
 	case "lower":
 		return strings.ToLower(text)
 	case "title":
-		// strings.Title is deprecated. A common alternative:
 		words := strings.Fields(text)
 		for i, word := range words {
 			if len(word) > 0 {
@@ -566,43 +499,33 @@ func contains(slice []string, item string) bool {
 }
 
 func calculateHeaderWidth(label string, defaultWidth int) int {
-	// Ensure label does not cause excessively wide headers if it's very long
-	const maxLabelContribution = 40
+	const maxLabelContribution = 30 // Max length of label to consider for width calculation
 	effectiveLabelLength := len(label)
 	if effectiveLabelLength > maxLabelContribution {
 		effectiveLabelLength = maxLabelContribution
 	}
-
-	// Base width on label length plus some padding, or use default.
-	// This is a bit arbitrary and might need tweaking based on desired visual output.
-	width := effectiveLabelLength + 10
+	width := effectiveLabelLength + 10 // Base width on label length plus some padding
 	if width < defaultWidth {
 		width = defaultWidth
 	}
-
-	// Max width constraint
-	maxWidth := 80
+	maxWidth := 60 // Absolute max width for header line to prevent very wide outputs
 	if width > maxWidth {
 		return maxWidth
 	}
 	return width
 }
 
-func calculateWidth(label string) int {
-	return calculateHeaderWidth(label, 30) // Default to 30 for generic width
-}
-
 func formatDuration(d time.Duration) string {
-	if d < time.Millisecond { // Add microsecond precision for very short durations
+	if d < time.Millisecond {
 		return fmt.Sprintf("%dµs", d.Microseconds())
 	}
 	if d < time.Second {
-		return fmt.Sprintf("%dms", d.Milliseconds()) // Use integer ms
+		return fmt.Sprintf("%dms", d.Milliseconds())
 	}
 	if d < time.Minute {
-		return fmt.Sprintf("%.1fs", d.Seconds()) // Seconds with one decimal place
+		return fmt.Sprintf("%.1fs", d.Seconds())
 	}
-	// For longer durations, use a more detailed format like M:SS.ms
+	// For M:SS.ms format
 	minutes := int(d.Minutes())
 	seconds := int(d.Seconds()) % 60
 	milliseconds := int(d.Milliseconds()) % 1000
@@ -616,10 +539,13 @@ func pluralSuffix(count int) string {
 	return "s"
 }
 
-// getProcessLabel is expected to be defined, ensure it is.
 func getProcessLabel(intent string) string {
 	if intent == "" {
-		return "Processing"
+		return "Running"
+	} // Default if intent is empty
+	// Capitalize the first letter of the intent
+	if len(intent) > 0 {
+		return strings.ToUpper(string(intent[0])) + strings.ToLower(intent[1:])
 	}
-	return strings.Title(strings.ToLower(intent))
+	return "Running" // Fallback
 }
