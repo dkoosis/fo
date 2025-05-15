@@ -533,7 +533,9 @@ func executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design
 			fmt.Fprintln(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Copying stdoutPipe")
 		}
 		_, errStdoutCopy = io.Copy(&stdoutBuffer, stdoutPipe)
-		if errStdoutCopy != nil && !errors.Is(errStdoutCopy, io.EOF) { // EOF is expected
+		if errStdoutCopy != nil && !errors.Is(errStdoutCopy, io.EOF) &&
+			!strings.Contains(errStdoutCopy.Error(), "file already closed") &&
+			!strings.Contains(errStdoutCopy.Error(), "broken pipe") {
 			if appSettings.Debug {
 				fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Error copying stdout: %v\n", errStdoutCopy)
 			}
@@ -548,7 +550,9 @@ func executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design
 			fmt.Fprintln(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Copying stderrPipe")
 		}
 		_, errStderrCopy = io.Copy(&stderrBuffer, stderrPipe)
-		if errStderrCopy != nil && !errors.Is(errStderrCopy, io.EOF) { // EOF is expected
+		if errStderrCopy != nil && !errors.Is(errStderrCopy, io.EOF) &&
+			!strings.Contains(errStderrCopy.Error(), "file already closed") &&
+			!strings.Contains(errStderrCopy.Error(), "broken pipe") {
 			if appSettings.Debug {
 				fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Error copying stderr: %v\n", errStderrCopy)
 			}
@@ -670,11 +674,18 @@ func executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design
 	}
 
 	// Check errors from io.Copy if cmdWaitErr was nil
-	if errStdoutCopy != nil && !errors.Is(errStdoutCopy, io.EOF) {
+	// Only treat serious, unexpected errors as failures - ignore common pipe closure errors
+	if errStdoutCopy != nil &&
+		!errors.Is(errStdoutCopy, io.EOF) &&
+		!strings.Contains(errStdoutCopy.Error(), "file already closed") &&
+		!strings.Contains(errStdoutCopy.Error(), "broken pipe") {
 		task.AddOutputLine(fmt.Sprintf("[fo] Final stdout copy error: %v", errStdoutCopy), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
 		return 1, errStdoutCopy
 	}
-	if errStderrCopy != nil && !errors.Is(errStderrCopy, io.EOF) {
+	if errStderrCopy != nil &&
+		!errors.Is(errStderrCopy, io.EOF) &&
+		!strings.Contains(errStderrCopy.Error(), "file already closed") &&
+		!strings.Contains(errStderrCopy.Error(), "broken pipe") {
 		task.AddOutputLine(fmt.Sprintf("[fo] Final stderr copy error: %v", errStderrCopy), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
 		return 1, errStderrCopy
 	}
