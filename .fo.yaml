@@ -1,18 +1,16 @@
+---
 # .fo.yaml - Configuration for fo utility
-
 # Global settings
 stream: false
 show_output: "on-fail"
-max_buffer_size: 10485760 # 10MB
-max_line_length: 1048576 # 1MB
+max_buffer_size: 10485760  #  10MB
+max_line_length: 1048576  #  1MB
 no_timer: false
 no_color: false
 ci: false
 debug: false
-
 # Active theme selection
 active_theme: "unicode_vibrant"
-
 # Command presets
 presets:
   go:
@@ -22,7 +20,6 @@ presets:
   "go test":
     label: "Testing"
     stream: true
-
 # Theme definitions
 themes:
   # ASCII minimal theme - monochrome, line-oriented
@@ -33,7 +30,6 @@ themes:
       show_timestamps: false
       no_timer: false
       density: "compact"
-
     # Icons (ASCII only)
     icons:
       start: "[>]"
@@ -42,7 +38,6 @@ themes:
       error: "[XX]"
       info: "[i]"
       bullet: "*"
-
     # Colors (empty for monochrome)
     colors:
       process: ""
@@ -52,7 +47,6 @@ themes:
       detail: ""
       muted: ""
       reset: ""
-
     # Border settings (for ASCII tables)
     border:
       task_style: "none"
@@ -63,7 +57,6 @@ themes:
       table_h_char: "-"
       table_v_char: "|"
       table_x_char: "+"
-
     # Element-specific styles
     elements:
       # Banner elements
@@ -71,49 +64,37 @@ themes:
         line_char: "="
         prefix: "FO: "
         text_style: ["bold"]
-
       Fo_Banner_Bottom:
         line_char: "="
         prefix: "FO: "
         text_style: ["bold"]
-
       # Task header elements (line-oriented style)
       H2_Target_Header_Line:
         line_char: "-"
         line_length_type: "full_width"
-
       H2_Target_Title:
         prefix: "TARGET: "
         text_case: "upper"
         text_style: ["bold"]
-
       # Task content elements
       Command_Line_Prefix:
         text: "  -> CMD: "
-
       Stdout_Line_Prefix:
         text: "    | "
-
       Stderr_Warning_Line_Prefix:
         text: "    ! WARN: "
-
       Stderr_Error_Line_Prefix:
         text: "    X ERROR: "
-
       # Status elements
       Status_Label_Prefix:
         text: "  STAT: "
-
       Task_Status_Success_Block:
         text_content: "PASSED"
-
       Task_Status_Failed_Block:
         text_content: "FAILED"
-
       Task_Status_Duration:
         prefix: "("
         suffix: ")"
-
   # Unicode vibrant theme - rich, colorful, boxed
   unicode_vibrant:
     style:
@@ -122,7 +103,6 @@ themes:
       show_timestamps: false
       no_timer: false
       density: "balanced"
-
     # Icons (Unicode/Emoji)
     icons:
       start: "▶️"
@@ -131,17 +111,15 @@ themes:
       error: "❌"
       info: "ℹ️"
       bullet: "•"
-
     # Colors (ANSI codes)
     colors:
-      process: "blue" # Instead of "\033[0;34m"
-      success: "green" # Instead of "\033[0;32m"
-      warning: "yellow" # Instead of "\033[0;33m"
-      error: "red" # Instead of "\033[0;31m"
-      detail: "default" # Instead of "\033[0m"
-      muted: "dim" # Instead of "\033[2m"
-      reset: "reset" # Instead of "\033[0m"
-
+      process: "blue"  #  Instead of "\033[0;34m"
+      success: "green"  #  Instead of "\033[0;32m"
+      warning: "yellow"  #  Instead of "\033[0;33m"
+      error: "red"  #  Instead of "\033[0;31m"
+      detail: "default"  #  Instead of "\033[0m"
+      muted: "dim"  #  Instead of "\033[2m"
+      reset: "reset"  #  Instead of "\033[0m"
     # Border settings (Unicode)
     border:
       task_style: "left_double"
@@ -153,7 +131,6 @@ themes:
       table_h_char: "─"
       table_v_char: "│"
       table_x_char: "┼"
-
     # Element-specific styles
     elements:
       # Banner elements
@@ -162,43 +139,36 @@ themes:
         prefix: "FO: "
         text_style: ["bold"]
         color_fg: "process"
-
       # Task header elements
       Task_Label_Header:
         text_case: "upper"
         text_style: ["bold"]
         color_fg: "process"
-
       # Status elements
       Task_Status_Success_Block:
         icon_key: "success"
         text_content: "Complete"
         color_fg: "success"
-
       Task_Status_Failed_Block:
         icon_key: "error"
         text_content: "Failed"
         color_fg: "error"
-
       # More elements can be defined here...
-
   # Custom theme example - Cyberpunk inspired
   cyberpunk:
     style:
       use_boxes: true
       indentation: "  "
       density: "relaxed"
-
     # Colors
     colors:
-      process: "\033[0;36m" # Cyan
-      success: "\033[0;92m" # Bright Green
-      warning: "\033[0;93m" # Bright Yellow
-      error: "\033[0;91m" # Bright Red
-      detail: "\033[0;97m" # Bright White
-      muted: "\033[0;90m" # Bright Black
-      reset: "\033[0m" # Reset
-
+      process: "\033[0;36m"  #  Cyan
+      success: "\033[0;92m"  #  Bright Green
+      warning: "\033[0;93m"  #  Bright Yellow
+      error: "\033[0;91m"  #  Bright Red
+      detail: "\033[0;97m"  #  Bright White
+      muted: "\033[0;90m"  #  Bright Black
+      reset: "\033[0m"  #  Reset
     # Icons (Unicode glyphs)
     icons:
       start: "⟫"
@@ -207,7 +177,6 @@ themes:
       error: "⬟"
       info: "◉"
       bullet: "◆"
-
     # Border characters
     border:
       task_style: "full_box"
@@ -215,7 +184,6 @@ themes:
       vertical_char: "┃"
       top_corner_char: "┏"
       bottom_corner_char: "┗"
-
     # Element styles
     elements:
       Fo_Banner_Top:
@@ -224,8 +192,16 @@ themes:
         suffix: " ]"
         text_style: ["bold"]
         color_fg: "process"
-
       Task_Status_Success_Block:
         text_content: "COMPLETE"
         color_fg: "success"
         text_style: ["bold"]
+style:
+  use_inline_progress: true  #  Enable/disable in-place updating
+  spinner_interval: 80  #  Milliseconds between spinner updates (optional)
+elements:
+  Task_Progress_Line:
+    template_in_progress: "{icon} {verb}ing {subject}..."
+    template_complete: "{icon} {verb}ing {subject} complete ({duration})"
+    template_error: "{icon} {verb}ing {subject} failed ({duration})"
+    spinner_chars: "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"  #  Braille spinner sequence (optional)

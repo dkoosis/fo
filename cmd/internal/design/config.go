@@ -52,11 +52,14 @@ type Config struct {
 	IsMonochrome bool   `yaml:"-"`
 
 	Style struct {
-		UseBoxes       bool   `yaml:"use_boxes"`
-		Indentation    string `yaml:"indentation"`
-		ShowTimestamps bool   `yaml:"show_timestamps"`
-		NoTimer        bool   `yaml:"no_timer"`
-		Density        string `yaml:"density"`
+		UseBoxes          bool   `yaml:"use_boxes"`
+		Indentation       string `yaml:"indentation"`
+		ShowTimestamps    bool   `yaml:"show_timestamps"`
+		NoTimer           bool   `yaml:"no_timer"`
+		Density           string `yaml:"density"`
+		UseInlineProgress bool   `yaml:"use_inline_progress"`
+		NoSpinner         bool   `yaml:"no_spinner"`
+		SpinnerInterval   int    `yaml:"spinner_interval"`
 	} `yaml:"style"`
 
 	Border struct {
@@ -172,6 +175,10 @@ func AsciiMinimalTheme() *Config {
 	cfg.Icons.Info = "[INFO]"
 	cfg.Icons.Bullet = "*"
 
+	cfg.Style.UseInlineProgress = true
+	cfg.Style.NoSpinner = false
+	cfg.Style.SpinnerInterval = 80 // Default to 80ms
+
 	cfg.Colors = struct {
 		Process string `yaml:"process"`
 		Success string `yaml:"success"`
@@ -286,6 +293,12 @@ func initBaseElementStyles(elements map[string]ElementStyleDef) {
 		"Task_Content_Summary_Heading", "Task_Content_Summary_Item_Error", "Task_Content_Summary_Item_Warning",
 		"Table_Header_Cell_Text", "Table_Body_Cell_Text",
 		"ProgressIndicator_Spinner_Chars", "ProgressIndicator_Text",
+		"Task_Progress_Line",
+	}
+	elements["Task_Progress_Line"] = ElementStyleDef{
+		AdditionalChars: "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏",                   // Spinner chars
+		Text:            "{verb}ing {subject}...",       // In-progress template
+		TextContent:     "{verb}ing {subject} complete", // Complete template
 	}
 	for _, elKey := range knownElements {
 		elements[elKey] = ElementStyleDef{}

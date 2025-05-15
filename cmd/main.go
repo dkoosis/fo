@@ -215,7 +215,21 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 	intent := patternMatcher.DetectCommandIntent(cmdArgs[0], cmdArgs[1:])
 	task := design.NewTask(labelToUse, intent, cmdArgs[0], cmdArgs[1:], designCfg)
 
-	fmt.Println(task.RenderStartLine())
+	// Use inline progress for non-stream mode if enabled in config
+	useInlineProgress := designCfg.Style.UseInlineProgress && !appSettings.Stream
+
+	// Create progress tracker for task
+	progress := design.NewInlineProgress(task)
+
+	// Handle task start display
+	if useInlineProgress {
+		// Use inline progress with spinner
+		enableSpinner := !designCfg.Style.NoSpinner
+		progress.Start(ctx, enableSpinner)
+	} else {
+		// Traditional start line
+		fmt.Println(task.RenderStartLine())
+	}
 
 	cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
 	cmd.Env = os.Environ()
@@ -313,6 +327,20 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 
 	task.Complete(exitCode)
 
+	// Handle task completion display
+	if useInlineProgress {
+		// Use inline progress for completion
+		status := design.StatusSuccess
+		if exitCode != 0 {
+			status = design.StatusError
+		} else if task.Status == design.StatusWarning {
+			status = design.StatusWarning
+		}
+
+		progress.Complete(string(status))
+	}
+
+	// Output display logic
 	if !appSettings.Stream {
 		showCaptured := false
 		switch appSettings.ShowOutput {
@@ -372,7 +400,15 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 		}
 	}
 
-	fmt.Println(task.RenderEndLine())
+	// Only render end line for non-inline progress mode or stream mode
+	if !useInlineProgress {
+		fmt.Println(task.RenderEndLine())
+	}
+
+	if appSettings.Debug {
+		fmt.Fprintf(os.Stderr, "[DEBUG main()] about to os.Exit(%d).\nBehavioral Config: %+v\n", exitCode, appSettings)
+	}
+
 	return exitCode
 }
 
