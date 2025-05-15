@@ -328,7 +328,7 @@ func (t *Task) RenderOutputLine(line OutputLine) string {
 		if prefixStyle.AdditionalChars != "" {
 			sb.WriteString(prefixStyle.AdditionalChars)
 		}
-		if prefixRenderedColor != "" { // Only reset if a color was applied for the prefix
+		if prefixRenderedColor != "" {
 			sb.WriteString(t.Config.ResetColor())
 		}
 
@@ -336,19 +336,17 @@ func (t *Task) RenderOutputLine(line OutputLine) string {
 		contentStyleDef := t.Config.GetElementStyle(contentElementStyleKey)
 		styleStart, styleEnd := "", ""
 
-		if !t.Config.IsMonochrome { // Guard all explicit ANSI styling
+		if !t.Config.IsMonochrome {
 			if line.Context.CognitiveLoad == LoadHigh && line.Type == TypeError && !isFoInternalMessage {
-				styleStart += "\033[3m" // Italics
+				styleStart += "\033[3m"
 			}
 			if contains(contentStyleDef.TextStyle, "bold") {
-				styleStart += "\033[1m" // ANSI bold
+				styleStart += "\033[1m"
 			}
 			if contains(contentStyleDef.TextStyle, "italic") && !strings.Contains(styleStart, "\033[3m") {
-				styleStart += "\033[3m" // ANSI italics
+				styleStart += "\033[3m"
 			}
-			// ... (add other styles like underline, dim if defined in ElementStyleDef.TextStyle)
-
-			if styleStart != "" { // If any style was applied, ensure it's reset
+			if styleStart != "" {
 				styleEnd = t.Config.ResetColor()
 			}
 		}
@@ -360,7 +358,7 @@ func (t *Task) RenderOutputLine(line OutputLine) string {
 // RenderSummary creates a summary section for the output
 func (t *Task) RenderSummary() string {
 	errorCount, warningCount := 0, 0
-	t.OutputLinesLock() // Lock for reading OutputLines
+	t.OutputLinesLock()
 	for _, line := range t.OutputLines {
 		isFoInternalError := (line.Type == TypeError &&
 			(strings.HasPrefix(line.Content, "Error starting command") ||
@@ -378,7 +376,7 @@ func (t *Task) RenderSummary() string {
 			warningCount++
 		}
 	}
-	t.OutputLinesUnlock() // Unlock
+	t.OutputLinesUnlock()
 
 	if errorCount == 0 && warningCount == 0 {
 		return ""
@@ -444,7 +442,7 @@ func (t *Task) RenderSummary() string {
 		sb.WriteString(fmt.Sprintf("%s%s %d warning%s%s\n", itemColor, bulletChar, warningCount, pluralSuffix(warningCount), t.Config.ResetColor()))
 	}
 
-	if t.Config.Style.UseBoxes && !t.Config.IsMonochrome { // Only box if not monochrome
+	if t.Config.Style.UseBoxes && !t.Config.IsMonochrome {
 		sb.WriteString(t.Config.Border.VerticalChar + "\n")
 	} else {
 		sb.WriteString("\n")

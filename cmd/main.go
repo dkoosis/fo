@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes" // Import bytes for buffer
 	"context"
 	"errors"
 	"flag"
@@ -96,39 +97,30 @@ func main() {
 	finalDesignConfig := config.MergeWithFlags(fileAppConfig, cliFlagsGlobal)
 
 	// Update behavioralSettings with final decisions on NoTimer, NoColor, CI from finalDesignConfig.
-	// This ensures consistency if executeCommand logic depends on these.
 	behavioralSettings.NoTimer = finalDesignConfig.Style.NoTimer
 	behavioralSettings.NoColor = finalDesignConfig.IsMonochrome
-	// CI mode implies no color and no timer for simplicity.
 	behavioralSettings.CI = finalDesignConfig.IsMonochrome && finalDesignConfig.Style.NoTimer
-	// Ensure behavioralSettings.Debug reflects the final decision (CLI > file config)
-	// This is important because executeCommand uses behavioralSettings.Debug
-	if fileAppConfig.Debug { // If debug was true in file config
+	if fileAppConfig.Debug {
 		behavioralSettings.Debug = true
 	}
-	if cliFlagsGlobal.DebugSet { // And CLI overrides it
+	if cliFlagsGlobal.DebugSet {
 		behavioralSettings.Debug = cliFlagsGlobal.Debug
 	}
 
-	// Set up context for cancellation and signal handling for graceful shutdown.
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel() // Ensure context is cancelled on exit.
+	defer cancel()
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	defer signal.Stop(sigChan) // Stop listening for signals on exit.
+	defer signal.Stop(sigChan)
 
-	// Execute the command and get its exit code.
 	exitCode := executeCommand(ctx, cancel, sigChan, behavioralSettings, finalDesignConfig, cmdArgs)
 
-	// Optional debug output before exiting.
 	if behavioralSettings.Debug {
 		fmt.Fprintf(os.Stderr, "[DEBUG main()] about to os.Exit(%d).\nBehavioral Config: %+v\n", exitCode, behavioralSettings)
 	}
-	os.Exit(exitCode) // Exit with the command's exit code.
+	os.Exit(exitCode)
 }
 
-// convertAppConfigToLocal translates settings from the YAML-loaded AppConfig
-// to the LocalAppConfig struct used for direct operational control.
 func convertAppConfigToLocal(appCfg *config.AppConfig) LocalAppConfig {
 	return LocalAppConfig{
 		Label:         appCfg.Label,
@@ -143,10 +135,7 @@ func convertAppConfigToLocal(appCfg *config.AppConfig) LocalAppConfig {
 	}
 }
 
-// parseFlagsIntoGlobal parses all command-line flags and stores them
-// in the global cliFlagsGlobal variable. It also handles validation for --show-output.
 func parseFlagsIntoGlobal() {
-	// Define all CLI flags.
 	flag.BoolVar(&versionFlag, "version", false, "Print fo version and exit.")
 	flag.BoolVar(&versionFlag, "v", false, "Print fo version and exit (shorthand).")
 	flag.BoolVar(&cliFlagsGlobal.Debug, "debug", false, "Enable debug output.")
@@ -161,14 +150,13 @@ func parseFlagsIntoGlobal() {
 	flag.BoolVar(&cliFlagsGlobal.CI, "ci", false, "Enable CI-friendly, plain-text output.")
 	flag.StringVar(&cliFlagsGlobal.ThemeName, "theme", "", "Select visual theme (e.g., 'ascii_minimal', 'unicode_vibrant').")
 
-	var maxBufferSizeMB int // For user-friendly MB input
-	var maxLineLengthKB int // For user-friendly KB input
+	var maxBufferSizeMB int
+	var maxLineLengthKB int
 	flag.IntVar(&maxBufferSizeMB, "max-buffer-size", 0, fmt.Sprintf("Maximum total buffer size in MB (per stream). Default: %dMB", config.DefaultMaxBufferSize/(1024*1024)))
 	flag.IntVar(&maxLineLengthKB, "max-line-length", 0, fmt.Sprintf("Maximum length in KB for a single line. Default: %dKB", config.DefaultMaxLineLength/1024))
 
-	flag.Parse() // Parse the flags.
+	flag.Parse()
 
-	// Track which flags were explicitly set by the user.
 	flag.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "s", "stream":
@@ -186,7 +174,6 @@ func parseFlagsIntoGlobal() {
 		}
 	})
 
-	// Convert MB/KB inputs to bytes.
 	if maxBufferSizeMB > 0 {
 		cliFlagsGlobal.MaxBufferSize = int64(maxBufferSizeMB) * 1024 * 1024
 	}
@@ -194,69 +181,58 @@ func parseFlagsIntoGlobal() {
 		cliFlagsGlobal.MaxLineLength = maxLineLengthKB * 1024
 	}
 
-	// Validate the --show-output flag value if it was set.
 	if cliFlagsGlobal.ShowOutput != "" {
 		validValues := map[string]bool{"on-fail": true, "always": true, "never": true}
 		if !validValues[cliFlagsGlobal.ShowOutput] {
 			fmt.Fprintf(os.Stderr, "Error: Invalid value for --show-output: %s\nValid values are: on-fail, always, never\n", cliFlagsGlobal.ShowOutput)
-			flag.Usage() // Print usage information.
-			os.Exit(1)   // Exit due to invalid flag.
+			flag.Usage()
+			os.Exit(1)
 		}
 	}
 }
 
-// findCommandArgs isolates the command and its arguments from os.Args.
-// The command is expected to appear after a "--" separator.
 func findCommandArgs() []string {
 	for i, arg := range os.Args {
 		if arg == "--" {
-			// If "--" is found, the subsequent arguments are the command and its args.
 			if i < len(os.Args)-1 {
 				return os.Args[i+1:]
 			}
-			return []string{} // "--" was the last argument, no command provided.
+			return []string{}
 		}
 	}
-	// If "--" is not found, no command is considered specified by this convention.
 	return []string{}
 }
 
-// executeCommand manages the execution of the wrapped command, including output handling and signal propagation.
 func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan os.Signal,
 	appSettings LocalAppConfig, designCfg *design.Config, cmdArgs []string) int {
 
-	// Determine the label for the task. Use CLI flag, then config, then infer from command.
-	labelToUse := appSettings.Label // Already incorporates config and CLI override
+	labelToUse := appSettings.Label
 	if labelToUse == "" {
-		labelToUse = filepath.Base(cmdArgs[0]) // Default to the base name of the command.
+		labelToUse = filepath.Base(cmdArgs[0])
 	}
 
-	// Initialize pattern matcher and task for design system.
 	patternMatcher := design.NewPatternMatcher(designCfg)
 	intent := patternMatcher.DetectCommandIntent(cmdArgs[0], cmdArgs[1:])
 	task := design.NewTask(labelToUse, intent, cmdArgs[0], cmdArgs[1:], designCfg)
 
-	fmt.Println(task.RenderStartLine()) // Print the task start line.
+	fmt.Println(task.RenderStartLine())
 
-	// Prepare the command for execution with context for cancellation.
 	cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
-	cmd.Env = os.Environ()                                // Inherit environment variables.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // Create new process group for signal handling.
+	cmd.Env = os.Environ()
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-	cmdDone := make(chan struct{}) // Channel to signal command completion.
-	// Goroutine to handle signals (SIGINT, SIGTERM) and context cancellation.
+	cmdDone := make(chan struct{})
 	go func() {
-		defer close(cmdDone) // Ensure cmdDone is closed when this goroutine exits.
+		defer close(cmdDone)
 		select {
-		case sig := <-sigChan: // Received an OS signal.
-			if cmd.Process == nil { // Command hasn't started or already finished.
+		case sig := <-sigChan:
+			if cmd.Process == nil {
 				if appSettings.Debug {
 					fmt.Fprintln(os.Stderr, "[DEBUG sigChan] Process is nil, canceling context.")
 				}
-				cancel() // Cancel the context.
+				cancel()
 				return
 			}
-			// Forward the signal to the entire process group of the command.
 			if appSettings.Debug {
 				fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Received signal %v for PID %d. Forwarding...\n", sig, cmd.Process.Pid)
 			}
@@ -265,24 +241,22 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 				if appSettings.Debug {
 					fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Sending signal %v to PGID %d\n", sig, pgid)
 				}
-				_ = syscall.Kill(-pgid, sig.(syscall.Signal)) // Negative PGID signals the group.
-			} else { // Fallback if getting PGID fails.
+				_ = syscall.Kill(-pgid, sig.(syscall.Signal))
+			} else {
 				if appSettings.Debug {
 					fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Failed to get PGID for PID %d (%v), sending to PID directly.\n", cmd.Process.Pid, err)
 				}
 				_ = cmd.Process.Signal(sig)
 			}
-			// Wait for the command to react to the signal or timeout.
 			select {
-			case <-cmdDone: // Command completed after signal.
+			case <-cmdDone:
 				if appSettings.Debug {
 					fmt.Fprintln(os.Stderr, "[DEBUG sigChan] cmdDone received after signal forwarding.")
 				}
-			case <-time.After(2 * time.Second): // Grace period for command to exit.
+			case <-time.After(2 * time.Second):
 				if appSettings.Debug {
 					fmt.Fprintln(os.Stderr, "[DEBUG sigChan] Timeout after signal, ensuring process is killed.")
 				}
-				// Force kill if still running.
 				if cmd.Process != nil && cmd.ProcessState == nil {
 					pgidKill, errKill := syscall.Getpgid(cmd.Process.Pid)
 					if errKill == nil {
@@ -291,14 +265,13 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 						_ = cmd.Process.Kill()
 					}
 				}
-				cancel() // Cancel context as a final measure.
+				cancel()
 			}
 			return
-		case <-ctx.Done(): // Context was cancelled (e.g., by another part of fo or timeout).
+		case <-ctx.Done():
 			if appSettings.Debug {
 				fmt.Fprintln(os.Stderr, "[DEBUG sigChan] Context done, ensuring process is killed if running.")
 			}
-			// Ensure process is killed if context is cancelled.
 			if cmd.Process != nil && cmd.ProcessState == nil {
 				pgid, err := syscall.Getpgid(cmd.Process.Pid)
 				if err == nil {
@@ -308,7 +281,7 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 				}
 			}
 			return
-		case <-cmdDone: // Command finished naturally before any signal or context cancellation.
+		case <-cmdDone:
 			if appSettings.Debug {
 				fmt.Fprintln(os.Stderr, "[DEBUG sigChan] cmdDone received, command finished naturally.")
 			}
@@ -317,60 +290,50 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 	}()
 
 	var exitCode int
-	var cmdRunError error             // Stores error from cmd.Start(), cmd.Wait(), or cmd.Run().
-	var isActualFoStartupFailure bool // True if fo itself failed to start/pipe the command.
+	var cmdRunError error
+	var isActualFoStartupFailure bool
 
-	// Execute in stream or capture mode based on settings.
 	if appSettings.Stream {
 		exitCode, cmdRunError = executeStreamMode(cmd, task, appSettings)
 		if cmdRunError != nil {
 			var exitErr *exec.ExitError
-			// If the error is not an *exec.ExitError, it's likely a startup/pipe issue for fo.
 			if !errors.As(cmdRunError, &exitErr) {
 				isActualFoStartupFailure = true
 			}
 		}
-	} else { // Capture Mode
+	} else {
 		exitCode, cmdRunError = executeCaptureMode(cmd, task, patternMatcher, appSettings)
 		if cmdRunError != nil {
 			var exitErr *exec.ExitError
-			// If the error is not an *exec.ExitError, it's likely a startup/pipe issue for fo.
 			if !errors.As(cmdRunError, &exitErr) {
 				isActualFoStartupFailure = true
 			}
 		}
 	}
-	// cmdDone is closed by the signal handling goroutine's defer statement.
 
-	task.Complete(exitCode) // Mark the task as complete and set its final status.
+	task.Complete(exitCode)
 
-	// Handle display of captured output for non-stream mode.
 	if !appSettings.Stream {
 		showCaptured := false
 		switch appSettings.ShowOutput {
 		case "always":
 			showCaptured = true
 		case "on-fail":
-			if exitCode != 0 { // Show if the command failed.
+			if exitCode != 0 {
 				showCaptured = true
 			}
-			// "never" remains false.
 		}
 
-		// Display captured output if conditions are met and it wasn't an fo startup failure.
 		if showCaptured && !isActualFoStartupFailure {
-			summary := task.RenderSummary() // Get summary of errors/warnings from command output.
+			summary := task.RenderSummary()
 			if summary != "" {
 				fmt.Print(summary)
 			}
 
 			hasActualRenderableOutput := false
-			task.OutputLinesLock() // Lock before iterating over task.OutputLines.
+			task.OutputLinesLock()
 			for _, l := range task.OutputLines {
-				// Check if the line is actual command output, not an internal fo error message.
-				// This uses the De Morgan's law corrected logic.
-				if l.Type != design.TypeError || // It's not an error, OR
-					// It IS a TypeError, but NOT one of fo's internal startup/pipe error messages.
+				if l.Type != design.TypeError ||
 					(!strings.HasPrefix(l.Content, "Error starting command") &&
 						!strings.HasPrefix(l.Content, "Error creating stdout pipe") &&
 						!strings.HasPrefix(l.Content, "Error creating stderr pipe") &&
@@ -379,32 +342,28 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 					break
 				}
 			}
-			task.OutputLinesUnlock() // Unlock after iteration.
+			task.OutputLinesUnlock()
 
 			if hasActualRenderableOutput {
 				fmt.Println(designCfg.GetColor("Muted"), "--- Captured output: ---", designCfg.ResetColor())
-				task.OutputLinesLock() // Lock again for rendering.
+				task.OutputLinesLock()
 				for _, line := range task.OutputLines {
-					// RenderOutputLine will handle plain rendering for fo's own startup errors if they made it here.
 					fmt.Println(task.RenderOutputLine(line))
 				}
-				task.OutputLinesUnlock() // Unlock.
+				task.OutputLinesUnlock()
 			} else if (task.Status == design.StatusError || task.Status == design.StatusWarning) && summary == "" {
-				// If no specific command output but status indicates issues, re-render summary.
 				summary = task.RenderSummary()
 				if summary != "" {
 					fmt.Print(summary)
 				}
 			}
 		} else if !showCaptured && (task.Status == design.StatusError || task.Status == design.StatusWarning) && !isActualFoStartupFailure {
-			// If not showing captured output, but there were errors/warnings from the command (not fo startup), show summary.
 			summary := task.RenderSummary()
 			if summary != "" {
 				fmt.Print(summary)
 			}
 		}
-	} else { // Stream mode
-		// In stream mode, output was live. Only show summary for issues (excluding fo startup issues).
+	} else {
 		if (task.Status == design.StatusError || task.Status == design.StatusWarning) && !isActualFoStartupFailure {
 			summary := task.RenderSummary()
 			if summary != "" {
@@ -413,48 +372,40 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 		}
 	}
 
-	fmt.Println(task.RenderEndLine()) // Print the task end line.
+	fmt.Println(task.RenderEndLine())
 	return exitCode
 }
 
-// executeStreamMode handles command execution when output is streamed live.
-// It pipes command's stdout directly and captures/prints its stderr.
 func executeStreamMode(cmd *exec.Cmd, task *design.Task, appSettings LocalAppConfig) (int, error) {
-	// Attempt to get a pipe for stderr to process it.
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil {
-		// Fallback if stderr pipe creation fails: send both stdout/stderr directly.
 		if appSettings.Debug {
 			fmt.Fprintln(os.Stderr, "[DEBUG executeStreamMode] Error creating stderr pipe, fallback to direct os.Stderr:", err)
 		}
 		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr // Both go to fo's stdout/stderr.
-		runErr := cmd.Run()    // cmd.Run() calls Start then Wait.
-		// Add a generic error to task if pipe creation failed.
+		cmd.Stderr = os.Stderr
+		runErr := cmd.Run()
 		task.AddOutputLine(fmt.Sprintf("[fo] Error setting up stderr pipe for stream mode: %v", err), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
-		return getExitCode(runErr), runErr // Return error from cmd.Run().
+		return getExitCode(runErr), runErr
 	}
-	cmd.Stdout = os.Stdout // Command's stdout goes directly to fo's stdout.
+	cmd.Stdout = os.Stdout
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-	// Goroutine to read from the command's stderr pipe.
 	go func() {
 		defer wg.Done()
 		scanner := bufio.NewScanner(stderrPipe)
-		// Use a buffer for the scanner, respecting MaxLineLength.
-		buffer := make([]byte, 0, bufio.MaxScanTokenSize) // Default initial capacity.
-		scanner.Buffer(buffer, appSettings.MaxLineLength) // Set max capacity.
+		buffer := make([]byte, 0, bufio.MaxScanTokenSize)
+		scanner.Buffer(buffer, appSettings.MaxLineLength)
 
 		for scanner.Scan() {
 			line := scanner.Text()
 			if appSettings.Debug {
 				fmt.Fprintf(os.Stderr, "[DEBUG executeStreamMode STDERR] Scanned line: %s\n", line)
 			}
-			fmt.Fprintln(os.Stderr, line) // Print stderr line to fo's actual stderr.
+			fmt.Fprintln(os.Stderr, line)
 			task.AddOutputLine(line, design.TypeDetail, design.LineContext{CognitiveLoad: design.LoadMedium, Importance: 2})
 		}
-		// Handle scanner errors (e.g., line too long).
 		if scanErr := scanner.Err(); scanErr != nil {
 			if appSettings.Debug {
 				fmt.Fprintf(os.Stderr, "[DEBUG executeStreamMode STDERR] Scanner error: %v\n", scanErr)
@@ -467,128 +418,192 @@ func executeStreamMode(cmd *exec.Cmd, task *design.Task, appSettings LocalAppCon
 		}
 	}()
 
-	runErr := cmd.Run() // Start and wait for the command.
-	wg.Wait()           // Wait for the stderr processing goroutine to finish.
+	runErr := cmd.Run() // This calls Start then Wait.
+	wg.Wait()
 	return getExitCode(runErr), runErr
 }
 
-// executeCaptureMode handles command execution when output is captured and processed.
-// It uses pipes for stdout/stderr and processes lines with a PatternMatcher.
+// executeCaptureMode uses io.Copy to bytes.Buffer to capture full output before processing.
 func executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design.PatternMatcher, appSettings LocalAppConfig) (int, error) {
-	var wg sync.WaitGroup
-	var bufferExceeded sync.Once // To ensure buffer limit message is logged only once per stream.
-
-	// Create pipe for command's stdout.
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
 		errMsg := fmt.Sprintf("[fo] Error creating stdout pipe: %v", err)
 		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
-		fmt.Fprintln(os.Stderr, errMsg) // Print fo's own error to its stderr.
-		return 1, err                   // Return error related to pipe creation.
+		fmt.Fprintln(os.Stderr, errMsg)
+		return 1, err
 	}
 
-	// Create pipe for command's stderr.
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil {
 		errMsg := fmt.Sprintf("[fo] Error creating stderr pipe: %v", err)
 		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
-		fmt.Fprintln(os.Stderr, errMsg) // Print fo's own error to its stderr.
-		return 1, err                   // Return error related to pipe creation.
+		fmt.Fprintln(os.Stderr, errMsg)
+		_ = stdoutPipe.Close() // Close the already opened stdout pipe
+		return 1, err
 	}
 
-	// Goroutine function to process output from a pipe (stdout or stderr).
-	// It captures appSettings for debug logging.
-	processOutputPipe := func(pipe io.ReadCloser, source string) {
-		defer wg.Done()
-		scanner := bufio.NewScanner(pipe)
-		// Use a buffer for the scanner, respecting MaxLineLength.
-		buffer := make([]byte, 0, bufio.MaxScanTokenSize) // Default initial capacity.
-		scanner.Buffer(buffer, appSettings.MaxLineLength) // Set max capacity.
+	var stdoutBuffer, stderrBuffer bytes.Buffer
+	var wgRead sync.WaitGroup
+	wgRead.Add(2) // For two goroutines copying stdout and stderr
 
-		var currentTotalBytes int64
-		for scanner.Scan() {
-			line := scanner.Text()
-			if appSettings.Debug {
-				fmt.Fprintf(os.Stderr, "[DEBUG processOutputPipe %s] Scanned line: %s\n", source, line)
-			}
+	var errStdoutCopy, errStderrCopy error
 
-			lineLength := int64(len(line)) // Get length before potentially truncating or adding.
-
-			// Check if total buffer size for this stream would be exceeded.
-			if currentTotalBytes+lineLength > appSettings.MaxBufferSize && appSettings.MaxBufferSize > 0 {
-				bufferExceeded.Do(func() { // Log only once.
-					msg := fmt.Sprintf("[fo] BUFFER LIMIT: %s stream exceeded %dMB. Further output truncated.", source, appSettings.MaxBufferSize/(1024*1024))
-					task.AddOutputLine(msg, design.TypeWarning, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
-				})
-				break // Stop processing this pipe.
-			}
-			currentTotalBytes += lineLength
-
-			// Classify the line using the pattern matcher.
-			lineType, lineContext := patternMatcher.ClassifyOutputLine(line, task.Command, task.Args)
-			// Reclassify unclassified stderr lines as "info" rather than "detail".
-			if source == "stderr" && lineType == design.TypeDetail {
-				lineType = design.TypeInfo
-				lineContext.Importance = 3 // Give stderr info slightly higher importance.
-			}
-			task.AddOutputLine(line, lineType, lineContext) // This is now mutex-protected.
-			task.UpdateTaskContext()                        // This is also mutex-protected.
+	go func() {
+		defer wgRead.Done()
+		if appSettings.Debug {
+			fmt.Fprintln(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Copying stdoutPipe")
 		}
-		// Handle scanner errors (e.g., line too long, read errors).
-		if scanErr := scanner.Err(); scanErr != nil {
+		_, errStdoutCopy = io.Copy(&stdoutBuffer, stdoutPipe)
+		if errStdoutCopy != nil && !errors.Is(errStdoutCopy, io.EOF) { // EOF is expected
 			if appSettings.Debug {
-				fmt.Fprintf(os.Stderr, "[DEBUG processOutputPipe %s] Scanner error: %v\n", source, scanErr)
-			}
-			if errors.Is(scanErr, bufio.ErrTooLong) {
-				// Log line limit exceeded message (also once via bufferExceeded).
-				bufferExceeded.Do(func() {
-					msg := fmt.Sprintf("[fo] LINE LIMIT: Max line length (%d KB) exceeded in %s. Line truncated.", appSettings.MaxLineLength/1024, source)
-					task.AddOutputLine(msg, design.TypeWarning, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
-				})
-			} else if !errors.Is(scanErr, io.EOF) && !strings.Contains(scanErr.Error(), "file already closed") && !strings.Contains(scanErr.Error(), "broken pipe") {
-				// Log other significant scanner errors.
-				errMsg := fmt.Sprintf("[fo] Error reading %s: %v", source, scanErr)
-				task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
+				fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Error copying stdout: %v\n", errStdoutCopy)
 			}
 		} else if appSettings.Debug {
-			fmt.Fprintf(os.Stderr, "[DEBUG processOutputPipe %s] Scanner finished without error.\n", source)
+			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Finished copying stdoutPipe (len: %d)\n", stdoutBuffer.Len())
 		}
-	}
+	}()
 
-	wg.Add(2) // Two goroutines for stdout and stderr.
-	go processOutputPipe(stdoutPipe, "stdout")
-	go processOutputPipe(stderrPipe, "stderr")
+	go func() {
+		defer wgRead.Done()
+		if appSettings.Debug {
+			fmt.Fprintln(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Copying stderrPipe")
+		}
+		_, errStderrCopy = io.Copy(&stderrBuffer, stderrPipe)
+		if errStderrCopy != nil && !errors.Is(errStderrCopy, io.EOF) { // EOF is expected
+			if appSettings.Debug {
+				fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Error copying stderr: %v\n", errStderrCopy)
+			}
+		} else if appSettings.Debug {
+			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Finished copying stderrPipe (len: %d)\n", stderrBuffer.Len())
+		}
+	}()
 
-	// Start the command. This is where "command not found" errors typically occur.
+	// Start the command
 	if err := cmd.Start(); err != nil {
 		errMsg := fmt.Sprintf("Error starting command '%s': %v", strings.Join(cmd.Args, " "), err)
 		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
-		fmt.Fprintln(os.Stderr, errMsg) // Print fo's own startup error to its actual stderr.
-		wg.Wait()                       // Wait for pipe processors to finish.
-		return getExitCode(err), err    // Return the error from cmd.Start().
+		fmt.Fprintln(os.Stderr, errMsg)
+		// Pipes are associated with cmd; cmd.Wait() will handle their closure if Start was successful.
+		// If Start fails, the pipes might not be fully "live" from the child's perspective.
+		// Explicitly closing them here might be redundant or cause issues if cmd.Wait() is not called.
+		// Let cmd.Wait() (or its absence on Start error) manage pipe state.
+		// However, we must ensure our reading goroutines (wgRead) don't hang.
+		// Closing our ends of the pipes can help unblock io.Copy.
+		_ = stdoutPipe.Close()
+		_ = stderrPipe.Close()
+		wgRead.Wait() // Ensure goroutines finish if Start fails.
+		return getExitCode(err), err
 	}
 
-	cmdWaitErr := cmd.Wait() // Wait for the command to complete.
-	wg.Wait()                // Wait for all output processing goroutines to finish.
-	return getExitCode(cmdWaitErr), cmdWaitErr
+	cmdWaitErr := cmd.Wait() // Wait for command to exit; this closes its side of pipes.
+	wgRead.Wait()            // Wait for io.Copy goroutines to complete (they will see EOF).
+
+	if appSettings.Debug {
+		fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] stdout captured (len %d): %s\n", stdoutBuffer.Len(), stdoutBuffer.String())
+		fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] stderr captured (len %d): %s\n", stderrBuffer.Len(), stderrBuffer.String())
+	}
+
+	var bufferLimitLogged sync.Once
+
+	// Process stdoutData
+	scanner := bufio.NewScanner(&stdoutBuffer) // Use &stdoutBuffer (bytes.Buffer implements io.Reader)
+	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), appSettings.MaxLineLength)
+	var currentTotalStdoutBytes int64
+	for scanner.Scan() {
+		line := scanner.Text()
+		if appSettings.Debug {
+			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode STDOUT_SCAN] Scanned line: %s\n", line)
+		}
+		lineLength := int64(len(line))
+		if appSettings.MaxBufferSize > 0 && currentTotalStdoutBytes+lineLength > appSettings.MaxBufferSize {
+			bufferLimitLogged.Do(func() {
+				task.AddOutputLine(fmt.Sprintf("[fo] BUFFER LIMIT: stdout stream exceeded %dMB. Further output truncated.", appSettings.MaxBufferSize/(1024*1024)), design.TypeWarning, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
+			})
+			break
+		}
+		currentTotalStdoutBytes += lineLength
+		lineType, lineContext := patternMatcher.ClassifyOutputLine(line, task.Command, task.Args)
+		task.AddOutputLine(line, lineType, lineContext)
+	}
+	if errScan := scanner.Err(); errScan != nil {
+		if appSettings.Debug {
+			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode STDOUT_SCAN] Scanner error: %v\n", errScan)
+		}
+		if errors.Is(errScan, bufio.ErrTooLong) {
+			bufferLimitLogged.Do(func() {
+				task.AddOutputLine(fmt.Sprintf("[fo] LINE LIMIT: Max line length (%d KB) exceeded in stdout. Line truncated.", appSettings.MaxLineLength/1024), design.TypeWarning, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
+			})
+		} else if !errors.Is(errScan, io.EOF) { // Don't log EOF as an error from scanner
+			task.AddOutputLine(fmt.Sprintf("[fo] Error scanning stdout buffer: %v", errScan), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
+		}
+	}
+
+	// Process stderrData
+	scanner = bufio.NewScanner(&stderrBuffer) // Use &stderrBuffer
+	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), appSettings.MaxLineLength)
+	var currentTotalStderrBytes int64
+	for scanner.Scan() {
+		line := scanner.Text()
+		if appSettings.Debug {
+			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode STDERR_SCAN] Scanned line: %s\n", line)
+		}
+		lineLength := int64(len(line))
+		if appSettings.MaxBufferSize > 0 && currentTotalStderrBytes+lineLength > appSettings.MaxBufferSize {
+			bufferLimitLogged.Do(func() {
+				task.AddOutputLine(fmt.Sprintf("[fo] BUFFER LIMIT: stderr stream exceeded %dMB. Further output truncated.", appSettings.MaxBufferSize/(1024*1024)), design.TypeWarning, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
+			})
+			break
+		}
+		currentTotalStderrBytes += lineLength
+		lineType, lineContext := patternMatcher.ClassifyOutputLine(line, task.Command, task.Args)
+		if lineType == design.TypeDetail {
+			lineType = design.TypeInfo
+			lineContext.Importance = 3
+		}
+		task.AddOutputLine(line, lineType, lineContext)
+	}
+	if errScan := scanner.Err(); errScan != nil {
+		if appSettings.Debug {
+			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode STDERR_SCAN] Scanner error: %v\n", errScan)
+		}
+		if errors.Is(errScan, bufio.ErrTooLong) {
+			bufferLimitLogged.Do(func() {
+				task.AddOutputLine(fmt.Sprintf("[fo] LINE LIMIT: Max line length (%d KB) exceeded in stderr. Line truncated.", appSettings.MaxLineLength/1024), design.TypeWarning, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
+			})
+		} else if !errors.Is(errScan, io.EOF) { // Don't log EOF as an error from scanner
+			task.AddOutputLine(fmt.Sprintf("[fo] Error scanning stderr buffer: %v", errScan), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
+		}
+	}
+
+	task.UpdateTaskContext()
+
+	if cmdWaitErr != nil {
+		return getExitCode(cmdWaitErr), cmdWaitErr
+	}
+	// Check errors from io.Copy if cmdWaitErr was nil
+	if errStdoutCopy != nil && !errors.Is(errStdoutCopy, io.EOF) {
+		task.AddOutputLine(fmt.Sprintf("[fo] Final stdout copy error: %v", errStdoutCopy), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
+		return 1, errStdoutCopy
+	}
+	if errStderrCopy != nil && !errors.Is(errStderrCopy, io.EOF) {
+		task.AddOutputLine(fmt.Sprintf("[fo] Final stderr copy error: %v", errStderrCopy), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
+		return 1, errStderrCopy
+	}
+
+	return 0, nil // Success
 }
 
-// getExitCode extracts a numerical exit code from an error.
-// It handles *exec.ExitError and common "command not found" scenarios.
 func getExitCode(err error) int {
 	if err == nil {
-		return 0 // Success.
+		return 0
 	}
-	// If it's an *exec.ExitError, the command ran and exited with a status.
 	if exitErr, ok := err.(*exec.ExitError); ok {
 		return exitErr.ExitCode()
 	}
-	// Check for "command not found" type errors.
-	// exec.ErrNotFound is the most portable check.
 	if errors.Is(err, exec.ErrNotFound) ||
 		strings.Contains(err.Error(), "executable file not found") ||
-		(runtime.GOOS != "windows" && strings.Contains(err.Error(), "no such file or directory")) { // "no such file" can be ambiguous but often means not found on Unix.
-		return 127 // Standard exit code for command not found.
+		(runtime.GOOS != "windows" && strings.Contains(err.Error(), "no such file or directory")) {
+		return 127
 	}
-	return 1 // Generic error code for other types of errors (e.g., I/O errors).
+	return 1
 }

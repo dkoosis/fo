@@ -1,0 +1,1236 @@
+?   	github.com/davidkoosis/fo	[no test files]
+=== RUN   TestFoCoreExecution
+=== RUN   TestFoCoreExecution/ExitCodePassthroughSuccess
+=== PAUSE TestFoCoreExecution/ExitCodePassthroughSuccess
+=== RUN   TestFoCoreExecution/ExitCodePassthroughFailure
+=== PAUSE TestFoCoreExecution/ExitCodePassthroughFailure
+=== RUN   TestFoCoreExecution/ExitCodePassthroughSpecific
+=== PAUSE TestFoCoreExecution/ExitCodePassthroughSpecific
+=== RUN   TestFoCoreExecution/CommandNotFound
+=== PAUSE TestFoCoreExecution/CommandNotFound
+=== RUN   TestFoCoreExecution/ArgumentsToWrappedCommand
+=== PAUSE TestFoCoreExecution/ArgumentsToWrappedCommand
+=== CONT  TestFoCoreExecution/ExitCodePassthroughSuccess
+=== CONT  TestFoCoreExecution/CommandNotFound
+=== CONT  TestFoCoreExecution/ArgumentsToWrappedCommand
+=== CONT  TestFoCoreExecution/ExitCodePassthroughFailure
+=== CONT  TestFoCoreExecution/ExitCodePassthroughSpecific
+=== NAME  TestFoCoreExecution/CommandNotFound
+    main_test.go:227: Executed: ./fo_test_binary_generated_by_TestMain --no-color -- a_very_unique_non_existent_command_askjdfh (took 154.828708ms)
+        --- FO STDOUT ---
+        [START] a_very_unique_non_existent_command_askjdfh...
+        [FAILED] a_very_unique_non_existent_command_askjdfh (220µs)
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=true, NoTimer=false, UseBoxes=false
+          Final Colors - Process: '' (Hex: ), Reset: '' (Hex: )
+        Error starting command 'a_very_unique_non_existent_command_askjdfh': exec: "a_very_unique_non_existent_command_askjdfh": executable file not found in $PATH
+        
+        --- FO EXITCODE (from fo process): 127 ---
+    main_test.go:256: Expected 'fo' stderr to start with 'Error starting command 'a_very_unique_non_existent_command_askjdfh': exec: "a_very_unique_non_existent_command_askjdfh":', got:
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=true, NoTimer=false, UseBoxes=false
+          Final Colors - Process: '' (Hex: ), Reset: '' (Hex: )
+        Error starting command 'a_very_unique_non_existent_command_askjdfh': exec: "a_very_unique_non_existent_command_askjdfh": executable file not found in $PATH
+=== NAME  TestFoCoreExecution/ExitCodePassthroughSpecific
+    main_test.go:208: Executed: ./fo_test_binary_generated_by_TestMain --no-color --show-output on-fail -- testdata/exit_code.sh 42 (took 162.875208ms)
+        --- FO STDOUT ---
+        [START] exit_code.sh...
+         --- Captured output: --- 
+            STDOUT: Script about to exit with 42
+            STDERR: Script stderr message before exiting 42
+        [FAILED] exit_code.sh (8ms)
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=true, NoTimer=false, UseBoxes=false
+          Final Colors - Process: '' (Hex: ), Reset: '' (Hex: )
+        
+        --- FO EXITCODE (from fo process): 42 ---
+=== NAME  TestFoCoreExecution/ExitCodePassthroughSuccess
+    main_test.go:190: Executed: ./fo_test_binary_generated_by_TestMain -- testdata/success.sh (took 163.508375ms)
+        --- FO STDOUT ---
+        ╒═[0;34m[1m SUCCESS.SH ════════════════════════════[0m
+        │
+        │   ▶️ [0;34mRunning...[0m
+        │   ✅ [0;32mComplete[0m [2m(8ms)[0m
+        └─
+        
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=false, NoTimer=false, UseBoxes=true
+          Final Colors - Process: '[0;34m' (Hex: 1b5b303b33346d), Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Process' (Hex: 50726f63657373)
+        [DEBUG resolveColorName] Code from switch: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG ensureEscapePrefix] Input: '[0;34m' (Hex: 1b5b303b33346d), Output: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Process' (Hex: 50726f63657373)
+        [DEBUG resolveColorName] Code from switch: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG ensureEscapePrefix] Input: '[0;34m' (Hex: 1b5b303b33346d), Output: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Muted' (Hex: 4d75746564)
+        [DEBUG resolveColorName] Code from switch: '[2m' (Hex: 1b5b326d)
+        [DEBUG ensureEscapePrefix] Input: '[2m' (Hex: 1b5b326d), Output: '[2m' (Hex: 1b5b326d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[2m' (Hex: 1b5b326d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Success' (Hex: 53756363657373)
+        [DEBUG resolveColorName] Code from switch: '[0;32m' (Hex: 1b5b303b33326d)
+        [DEBUG ensureEscapePrefix] Input: '[0;32m' (Hex: 1b5b303b33326d), Output: '[0;32m' (Hex: 1b5b303b33326d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;32m' (Hex: 1b5b303b33326d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        
+        --- FO EXITCODE (from fo process): 0 ---
+=== NAME  TestFoCoreExecution/ExitCodePassthroughFailure
+    main_test.go:198: Executed: ./fo_test_binary_generated_by_TestMain -- testdata/failure.sh (took 163.461875ms)
+        --- FO STDOUT ---
+        ╒═[0;34m[1m FAILURE.SH ════════════════════════════[0m
+        │
+        │   ▶️ [0;34mRunning...[0m
+        │
+        │   [0;34m[1mSUMMARY:[0m[0m
+        │     [0;31m• 2 errors[0m
+        │
+        [2m --- Captured output: --- [0m
+        │   [0;31m❌   [0m[0;31m[3mSTDOUT: Output from failure.sh before failing[0m
+        │   [0;31m❌   [0m[0;31m[3mSTDERR: Error message from failure.sh[0m
+        │   ❌ [0;31mFailed[0m [2m(8ms)[0m
+        └─
+        
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=false, NoTimer=false, UseBoxes=true
+          Final Colors - Process: '[0;34m' (Hex: 1b5b303b33346d), Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Process' (Hex: 50726f63657373)
+        [DEBUG resolveColorName] Code from switch: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG ensureEscapePrefix] Input: '[0;34m' (Hex: 1b5b303b33346d), Output: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Process' (Hex: 50726f63657373)
+        [DEBUG resolveColorName] Code from switch: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG ensureEscapePrefix] Input: '[0;34m' (Hex: 1b5b303b33346d), Output: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Process' (Hex: 50726f63657373)
+        [DEBUG resolveColorName] Code from switch: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG ensureEscapePrefix] Input: '[0;34m' (Hex: 1b5b303b33346d), Output: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Error' (Hex: 4572726f72)
+        [DEBUG resolveColorName] Code from switch: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ensureEscapePrefix] Input: '[0;31m' (Hex: 1b5b303b33316d), Output: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Muted' (Hex: 4d75746564)
+        [DEBUG resolveColorName] Code from switch: '[2m' (Hex: 1b5b326d)
+        [DEBUG ensureEscapePrefix] Input: '[2m' (Hex: 1b5b326d), Output: '[2m' (Hex: 1b5b326d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[2m' (Hex: 1b5b326d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Error' (Hex: 4572726f72)
+        [DEBUG resolveColorName] Code from switch: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ensureEscapePrefix] Input: '[0;31m' (Hex: 1b5b303b33316d), Output: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Error' (Hex: 4572726f72)
+        [DEBUG resolveColorName] Code from switch: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ensureEscapePrefix] Input: '[0;31m' (Hex: 1b5b303b33316d), Output: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Error' (Hex: 4572726f72)
+        [DEBUG resolveColorName] Code from switch: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ensureEscapePrefix] Input: '[0;31m' (Hex: 1b5b303b33316d), Output: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Error' (Hex: 4572726f72)
+        [DEBUG resolveColorName] Code from switch: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ensureEscapePrefix] Input: '[0;31m' (Hex: 1b5b303b33316d), Output: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Muted' (Hex: 4d75746564)
+        [DEBUG resolveColorName] Code from switch: '[2m' (Hex: 1b5b326d)
+        [DEBUG ensureEscapePrefix] Input: '[2m' (Hex: 1b5b326d), Output: '[2m' (Hex: 1b5b326d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[2m' (Hex: 1b5b326d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Error' (Hex: 4572726f72)
+        [DEBUG resolveColorName] Code from switch: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ensureEscapePrefix] Input: '[0;31m' (Hex: 1b5b303b33316d), Output: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        
+        --- FO EXITCODE (from fo process): 1 ---
+=== NAME  TestFoCoreExecution/ArgumentsToWrappedCommand
+    main_test.go:273: Executed: ./fo_test_binary_generated_by_TestMain --show-output always --no-color -- /var/folders/_5/z29k0cv53bjgn2nkk_sv0cqr0000gq/T/TestFoCoreExecutionArgumentsToWrappedCommand339979306/001/args_test.sh hello world (took 241.374041ms)
+        --- FO STDOUT ---
+        [START] args_test.sh...
+         --- Captured output: --- 
+            Args: hello world
+        [SUCCESS] args_test.sh (87ms)
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=true, NoTimer=false, UseBoxes=false
+          Final Colors - Process: '' (Hex: ), Reset: '' (Hex: )
+        
+        --- FO EXITCODE (from fo process): 0 ---
+--- FAIL: TestFoCoreExecution (0.00s)
+    --- FAIL: TestFoCoreExecution/CommandNotFound (0.16s)
+    --- PASS: TestFoCoreExecution/ExitCodePassthroughSpecific (0.16s)
+    --- PASS: TestFoCoreExecution/ExitCodePassthroughSuccess (0.16s)
+    --- PASS: TestFoCoreExecution/ExitCodePassthroughFailure (0.16s)
+    --- PASS: TestFoCoreExecution/ArgumentsToWrappedCommand (0.24s)
+=== RUN   TestFoLabels
+=== RUN   TestFoLabels/DefaultLabelInferenceNoColor
+=== PAUSE TestFoLabels/DefaultLabelInferenceNoColor
+=== RUN   TestFoLabels/CustomLabelShortFlagNoColor
+=== PAUSE TestFoLabels/CustomLabelShortFlagNoColor
+=== RUN   TestFoLabels/CustomLabelLongFlagNoColor
+=== PAUSE TestFoLabels/CustomLabelLongFlagNoColor
+=== CONT  TestFoLabels/DefaultLabelInferenceNoColor
+=== CONT  TestFoLabels/CustomLabelShortFlagNoColor
+=== CONT  TestFoLabels/CustomLabelLongFlagNoColor
+=== NAME  TestFoLabels/CustomLabelShortFlagNoColor
+    main_test.go:294: Executed: ./fo_test_binary_generated_by_TestMain --no-color -l My Custom Task -- testdata/success.sh (took 10.924667ms)
+        --- FO STDOUT ---
+        [START] My Custom Task...
+        [SUCCESS] My Custom Task (5ms)
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=true, NoTimer=false, UseBoxes=false
+          Final Colors - Process: '' (Hex: ), Reset: '' (Hex: )
+        
+        --- FO EXITCODE (from fo process): 0 ---
+=== NAME  TestFoLabels/CustomLabelLongFlagNoColor
+    main_test.go:294: Executed: ./fo_test_binary_generated_by_TestMain --no-color --label Another Task -- testdata/success.sh (took 12.348041ms)
+        --- FO STDOUT ---
+        [START] Another Task...
+        [SUCCESS] Another Task (7ms)
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=true, NoTimer=false, UseBoxes=false
+          Final Colors - Process: '' (Hex: ), Reset: '' (Hex: )
+        
+        --- FO EXITCODE (from fo process): 0 ---
+=== NAME  TestFoLabels/DefaultLabelInferenceNoColor
+    main_test.go:294: Executed: ./fo_test_binary_generated_by_TestMain --no-color -- testdata/success.sh (took 13.131708ms)
+        --- FO STDOUT ---
+        [START] success.sh...
+        [SUCCESS] success.sh (8ms)
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=true, NoTimer=false, UseBoxes=false
+          Final Colors - Process: '' (Hex: ), Reset: '' (Hex: )
+        
+        --- FO EXITCODE (from fo process): 0 ---
+--- PASS: TestFoLabels (0.00s)
+    --- PASS: TestFoLabels/CustomLabelShortFlagNoColor (0.01s)
+    --- PASS: TestFoLabels/CustomLabelLongFlagNoColor (0.01s)
+    --- PASS: TestFoLabels/DefaultLabelInferenceNoColor (0.01s)
+=== RUN   TestFoCaptureMode
+=== RUN   TestFoCaptureMode/DefaultSuccess
+=== PAUSE TestFoCaptureMode/DefaultSuccess
+=== RUN   TestFoCaptureMode/on-fail_Failure
+=== PAUSE TestFoCaptureMode/on-fail_Failure
+=== RUN   TestFoCaptureMode/always_Success
+=== PAUSE TestFoCaptureMode/always_Success
+=== RUN   TestFoCaptureMode/never_Failure
+=== PAUSE TestFoCaptureMode/never_Failure
+=== CONT  TestFoCaptureMode/DefaultSuccess
+=== CONT  TestFoCaptureMode/never_Failure
+=== CONT  TestFoCaptureMode/always_Success
+=== CONT  TestFoCaptureMode/on-fail_Failure
+=== NAME  TestFoCaptureMode/DefaultSuccess
+    main_test.go:362: Executed: ./fo_test_binary_generated_by_TestMain --no-color -- testdata/success.sh (took 10.1205ms)
+        --- FO STDOUT ---
+        [START] success.sh...
+        [SUCCESS] success.sh (5ms)
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=true, NoTimer=false, UseBoxes=false
+          Final Colors - Process: '' (Hex: ), Reset: '' (Hex: )
+        
+        --- FO EXITCODE (from fo process): 0 ---
+=== NAME  TestFoCaptureMode/on-fail_Failure
+    main_test.go:362: Executed: ./fo_test_binary_generated_by_TestMain --no-color --show-output on-fail -- testdata/failure.sh (took 12.613875ms)
+        --- FO STDOUT ---
+        [START] failure.sh...
+        
+          SUMMARY:
+            • 2 errors
+        
+         --- Captured output: --- 
+            > STDOUT: Output from failure.sh before failing
+            > STDERR: Error message from failure.sh
+        [FAILED] failure.sh (8ms)
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=true, NoTimer=false, UseBoxes=false
+          Final Colors - Process: '' (Hex: ), Reset: '' (Hex: )
+        
+        --- FO EXITCODE (from fo process): 1 ---
+=== NAME  TestFoCaptureMode/never_Failure
+    main_test.go:362: Executed: ./fo_test_binary_generated_by_TestMain --no-color --show-output never -- testdata/failure.sh (took 14.930208ms)
+        --- FO STDOUT ---
+        [START] failure.sh...
+        
+          SUMMARY:
+            • 2 errors
+        
+        [FAILED] failure.sh (10ms)
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=true, NoTimer=false, UseBoxes=false
+          Final Colors - Process: '' (Hex: ), Reset: '' (Hex: )
+        
+        --- FO EXITCODE (from fo process): 1 ---
+=== NAME  TestFoCaptureMode/always_Success
+    main_test.go:362: Executed: ./fo_test_binary_generated_by_TestMain --no-color --show-output always -- testdata/success.sh (took 15.95125ms)
+        --- FO STDOUT ---
+        [START] success.sh...
+         --- Captured output: --- 
+            STDOUT: Normal output from success.sh
+            STDERR: Info output from success.sh
+        [SUCCESS] success.sh (11ms)
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=true, NoTimer=false, UseBoxes=false
+          Final Colors - Process: '' (Hex: ), Reset: '' (Hex: )
+        
+        --- FO EXITCODE (from fo process): 0 ---
+--- PASS: TestFoCaptureMode (0.00s)
+    --- PASS: TestFoCaptureMode/DefaultSuccess (0.01s)
+    --- PASS: TestFoCaptureMode/on-fail_Failure (0.01s)
+    --- PASS: TestFoCaptureMode/never_Failure (0.02s)
+    --- PASS: TestFoCaptureMode/always_Success (0.02s)
+=== RUN   TestFoStreamMode
+=== RUN   TestFoStreamMode/StreamSuccess
+=== PAUSE TestFoStreamMode/StreamSuccess
+=== RUN   TestFoStreamMode/StreamOverridesShowOutput
+=== PAUSE TestFoStreamMode/StreamOverridesShowOutput
+=== CONT  TestFoStreamMode/StreamSuccess
+=== CONT  TestFoStreamMode/StreamOverridesShowOutput
+=== NAME  TestFoStreamMode/StreamSuccess
+    main_test.go:419: Executed: ./fo_test_binary_generated_by_TestMain -s --no-color -- testdata/success.sh (took 10.891875ms)
+        --- FO STDOUT ---
+        [START] success.sh...
+        STDOUT: Normal output from success.sh
+        [SUCCESS] success.sh (6ms)
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=true, NoTimer=false, UseBoxes=false
+          Final Colors - Process: '' (Hex: ), Reset: '' (Hex: )
+        STDERR: Info output from success.sh
+        
+        --- FO EXITCODE (from fo process): 0 ---
+=== NAME  TestFoStreamMode/StreamOverridesShowOutput
+    main_test.go:435: Executed: ./fo_test_binary_generated_by_TestMain -s --show-output never --no-color -- testdata/success.sh (took 11.815208ms)
+        --- FO STDOUT ---
+        [START] success.sh...
+        STDOUT: Normal output from success.sh
+        [SUCCESS] success.sh (7ms)
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=true, NoTimer=false, UseBoxes=false
+          Final Colors - Process: '' (Hex: ), Reset: '' (Hex: )
+        STDERR: Info output from success.sh
+        
+        --- FO EXITCODE (from fo process): 0 ---
+--- PASS: TestFoStreamMode (0.00s)
+    --- PASS: TestFoStreamMode/StreamSuccess (0.01s)
+    --- PASS: TestFoStreamMode/StreamOverridesShowOutput (0.01s)
+=== RUN   TestFoTimer
+=== RUN   TestFoTimer/TimerShownByDefaultNoColor
+=== PAUSE TestFoTimer/TimerShownByDefaultNoColor
+=== RUN   TestFoTimer/TimerHiddenWithNoTimerFlag
+=== PAUSE TestFoTimer/TimerHiddenWithNoTimerFlag
+=== CONT  TestFoTimer/TimerShownByDefaultNoColor
+=== CONT  TestFoTimer/TimerHiddenWithNoTimerFlag
+    main_test.go:479: Executed: ./fo_test_binary_generated_by_TestMain --no-timer --no-color -- testdata/success.sh (took 10.331959ms)
+        --- FO STDOUT ---
+        [START] success.sh...
+        [SUCCESS] success.sh
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=true, NoTimer=true, UseBoxes=false
+          Final Colors - Process: '' (Hex: ), Reset: '' (Hex: )
+        
+        --- FO EXITCODE (from fo process): 0 ---
+=== NAME  TestFoTimer/TimerShownByDefaultNoColor
+    main_test.go:460: Executed: ./fo_test_binary_generated_by_TestMain --no-color -- testdata/long_running.sh (took 118.877125ms)
+        --- FO STDOUT ---
+        [START] long_running.sh...
+        [SUCCESS] long_running.sh (115ms)
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=true, NoTimer=false, UseBoxes=false
+          Final Colors - Process: '' (Hex: ), Reset: '' (Hex: )
+        
+        --- FO EXITCODE (from fo process): 0 ---
+--- PASS: TestFoTimer (0.00s)
+    --- PASS: TestFoTimer/TimerHiddenWithNoTimerFlag (0.01s)
+    --- PASS: TestFoTimer/TimerShownByDefaultNoColor (0.12s)
+=== RUN   TestFoColorAndIcons
+=== RUN   TestFoColorAndIcons/ColorAndIconsShownByDefaultSuccess
+=== PAUSE TestFoColorAndIcons/ColorAndIconsShownByDefaultSuccess
+=== RUN   TestFoColorAndIcons/ColorAndIconsShownByDefaultFailure
+=== PAUSE TestFoColorAndIcons/ColorAndIconsShownByDefaultFailure
+=== RUN   TestFoColorAndIcons/ColorAndIconsHiddenWithNoColorFlag
+=== PAUSE TestFoColorAndIcons/ColorAndIconsHiddenWithNoColorFlag
+=== CONT  TestFoColorAndIcons/ColorAndIconsShownByDefaultSuccess
+=== CONT  TestFoColorAndIcons/ColorAndIconsShownByDefaultFailure
+=== CONT  TestFoColorAndIcons/ColorAndIconsHiddenWithNoColorFlag
+=== NAME  TestFoColorAndIcons/ColorAndIconsShownByDefaultSuccess
+    main_test.go:510: Executed: ./fo_test_binary_generated_by_TestMain -- testdata/success.sh (took 11.057833ms)
+        --- FO STDOUT ---
+        ╒═[0;34m[1m SUCCESS.SH ════════════════════════════[0m
+        │
+        │   ▶️ [0;34mRunning...[0m
+        │   ✅ [0;32mComplete[0m [2m(6ms)[0m
+        └─
+        
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=false, NoTimer=false, UseBoxes=true
+          Final Colors - Process: '[0;34m' (Hex: 1b5b303b33346d), Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Process' (Hex: 50726f63657373)
+        [DEBUG resolveColorName] Code from switch: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG ensureEscapePrefix] Input: '[0;34m' (Hex: 1b5b303b33346d), Output: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Process' (Hex: 50726f63657373)
+        [DEBUG resolveColorName] Code from switch: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG ensureEscapePrefix] Input: '[0;34m' (Hex: 1b5b303b33346d), Output: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Muted' (Hex: 4d75746564)
+        [DEBUG resolveColorName] Code from switch: '[2m' (Hex: 1b5b326d)
+        [DEBUG ensureEscapePrefix] Input: '[2m' (Hex: 1b5b326d), Output: '[2m' (Hex: 1b5b326d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[2m' (Hex: 1b5b326d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Success' (Hex: 53756363657373)
+        [DEBUG resolveColorName] Code from switch: '[0;32m' (Hex: 1b5b303b33326d)
+        [DEBUG ensureEscapePrefix] Input: '[0;32m' (Hex: 1b5b303b33326d), Output: '[0;32m' (Hex: 1b5b303b33326d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;32m' (Hex: 1b5b303b33326d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        
+        --- FO EXITCODE (from fo process): 0 ---
+=== NAME  TestFoColorAndIcons/ColorAndIconsShownByDefaultFailure
+    main_test.go:524: Executed: ./fo_test_binary_generated_by_TestMain -- testdata/failure.sh (took 12.3515ms)
+        --- FO STDOUT ---
+        ╒═[0;34m[1m FAILURE.SH ════════════════════════════[0m
+        │
+        │   ▶️ [0;34mRunning...[0m
+        │
+        │   [0;34m[1mSUMMARY:[0m[0m
+        │     [0;31m• 2 errors[0m
+        │
+        [2m --- Captured output: --- [0m
+        │   [0;31m❌   [0m[0;31m[3mSTDOUT: Output from failure.sh before failing[0m
+        │   [0;31m❌   [0m[0;31m[3mSTDERR: Error message from failure.sh[0m
+        │   ❌ [0;31mFailed[0m [2m(7ms)[0m
+        └─
+        
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=false, NoTimer=false, UseBoxes=true
+          Final Colors - Process: '[0;34m' (Hex: 1b5b303b33346d), Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Process' (Hex: 50726f63657373)
+        [DEBUG resolveColorName] Code from switch: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG ensureEscapePrefix] Input: '[0;34m' (Hex: 1b5b303b33346d), Output: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Process' (Hex: 50726f63657373)
+        [DEBUG resolveColorName] Code from switch: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG ensureEscapePrefix] Input: '[0;34m' (Hex: 1b5b303b33346d), Output: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Process' (Hex: 50726f63657373)
+        [DEBUG resolveColorName] Code from switch: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG ensureEscapePrefix] Input: '[0;34m' (Hex: 1b5b303b33346d), Output: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;34m' (Hex: 1b5b303b33346d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Error' (Hex: 4572726f72)
+        [DEBUG resolveColorName] Code from switch: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ensureEscapePrefix] Input: '[0;31m' (Hex: 1b5b303b33316d), Output: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Muted' (Hex: 4d75746564)
+        [DEBUG resolveColorName] Code from switch: '[2m' (Hex: 1b5b326d)
+        [DEBUG ensureEscapePrefix] Input: '[2m' (Hex: 1b5b326d), Output: '[2m' (Hex: 1b5b326d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[2m' (Hex: 1b5b326d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Error' (Hex: 4572726f72)
+        [DEBUG resolveColorName] Code from switch: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ensureEscapePrefix] Input: '[0;31m' (Hex: 1b5b303b33316d), Output: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Error' (Hex: 4572726f72)
+        [DEBUG resolveColorName] Code from switch: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ensureEscapePrefix] Input: '[0;31m' (Hex: 1b5b303b33316d), Output: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Error' (Hex: 4572726f72)
+        [DEBUG resolveColorName] Code from switch: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ensureEscapePrefix] Input: '[0;31m' (Hex: 1b5b303b33316d), Output: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Error' (Hex: 4572726f72)
+        [DEBUG resolveColorName] Code from switch: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ensureEscapePrefix] Input: '[0;31m' (Hex: 1b5b303b33316d), Output: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Muted' (Hex: 4d75746564)
+        [DEBUG resolveColorName] Code from switch: '[2m' (Hex: 1b5b326d)
+        [DEBUG ensureEscapePrefix] Input: '[2m' (Hex: 1b5b326d), Output: '[2m' (Hex: 1b5b326d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[2m' (Hex: 1b5b326d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        [DEBUG resolveColorName] Input name: 'Error' (Hex: 4572726f72)
+        [DEBUG resolveColorName] Code from switch: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ensureEscapePrefix] Input: '[0;31m' (Hex: 1b5b303b33316d), Output: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG resolveColorName] Final code after ensureEscapePrefix: '[0;31m' (Hex: 1b5b303b33316d)
+        [DEBUG ResetColor] Input c.Colors.Reset: '[0m' (Hex: 1b5b306d)
+        [DEBUG ensureEscapePrefix] Input: '[0m' (Hex: 1b5b306d), Output: '[0m' (Hex: 1b5b306d)
+        [DEBUG ResetColor] Output finalReset: '[0m' (Hex: 1b5b306d)
+        
+        --- FO EXITCODE (from fo process): 1 ---
+=== NAME  TestFoColorAndIcons/ColorAndIconsHiddenWithNoColorFlag
+    main_test.go:538: Executed: ./fo_test_binary_generated_by_TestMain --no-color -- testdata/success.sh (took 13.599ms)
+        --- FO STDOUT ---
+        [START] success.sh...
+        [SUCCESS] success.sh (9ms)
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=true, NoTimer=false, UseBoxes=false
+          Final Colors - Process: '' (Hex: ), Reset: '' (Hex: )
+        
+        --- FO EXITCODE (from fo process): 0 ---
+--- PASS: TestFoColorAndIcons (0.00s)
+    --- PASS: TestFoColorAndIcons/ColorAndIconsShownByDefaultSuccess (0.01s)
+    --- PASS: TestFoColorAndIcons/ColorAndIconsShownByDefaultFailure (0.01s)
+    --- PASS: TestFoColorAndIcons/ColorAndIconsHiddenWithNoColorFlag (0.01s)
+=== RUN   TestFoCIMode
+=== RUN   TestFoCIMode/CIModeSuccess
+=== PAUSE TestFoCIMode/CIModeSuccess
+=== RUN   TestFoCIMode/CIModeFailure
+=== PAUSE TestFoCIMode/CIModeFailure
+=== CONT  TestFoCIMode/CIModeSuccess
+=== CONT  TestFoCIMode/CIModeFailure
+    main_test.go:576: Executed: ./fo_test_binary_generated_by_TestMain --ci -- testdata/failure.sh (took 10.748ms)
+        --- FO STDOUT ---
+        [START] failure.sh...
+        
+          SUMMARY:
+            • 2 errors
+        
+         --- Captured output: --- 
+            > STDOUT: Output from failure.sh before failing
+            > STDERR: Error message from failure.sh
+        [FAILED] failure.sh
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=true, NoTimer=true, UseBoxes=false
+          Final Colors - Process: '' (Hex: ), Reset: '' (Hex: )
+        
+        --- FO EXITCODE (from fo process): 1 ---
+=== NAME  TestFoCIMode/CIModeSuccess
+    main_test.go:576: Executed: ./fo_test_binary_generated_by_TestMain --ci -- testdata/success.sh (took 11.930042ms)
+        --- FO STDOUT ---
+        [START] success.sh...
+        [SUCCESS] success.sh
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=true, NoTimer=true, UseBoxes=false
+          Final Colors - Process: '' (Hex: ), Reset: '' (Hex: )
+        
+        --- FO EXITCODE (from fo process): 0 ---
+--- PASS: TestFoCIMode (0.00s)
+    --- PASS: TestFoCIMode/CIModeFailure (0.01s)
+    --- PASS: TestFoCIMode/CIModeSuccess (0.01s)
+=== RUN   TestFoErrorHandling
+=== RUN   TestFoErrorHandling/NoCommandAfterDashDash
+=== PAUSE TestFoErrorHandling/NoCommandAfterDashDash
+=== RUN   TestFoErrorHandling/NoCommandAtAll
+=== PAUSE TestFoErrorHandling/NoCommandAtAll
+=== RUN   TestFoErrorHandling/InvalidShowOutputValue
+=== PAUSE TestFoErrorHandling/InvalidShowOutputValue
+=== CONT  TestFoErrorHandling/NoCommandAfterDashDash
+=== CONT  TestFoErrorHandling/InvalidShowOutputValue
+=== CONT  TestFoErrorHandling/NoCommandAtAll
+    main_test.go:633: Executed: ./fo_test_binary_generated_by_TestMain -l some-label (took 3.525542ms)
+        --- FO STDOUT ---
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        Error: No command specified after --
+        Usage: fo [flags] -- <COMMAND> [ARGS...]
+        
+        --- FO EXITCODE (from fo process): 1 ---
+=== NAME  TestFoErrorHandling/InvalidShowOutputValue
+    main_test.go:645: Executed: ./fo_test_binary_generated_by_TestMain --show-output bad-value -- true (took 3.757042ms)
+        --- FO STDOUT ---
+        
+        --- FO STDERR ---
+        Error: Invalid value for --show-output: bad-value
+        Valid values are: on-fail, always, never
+        Usage of ./fo_test_binary_generated_by_TestMain:
+          -ci
+            	Enable CI-friendly, plain-text output.
+          -d	Enable debug output (shorthand).
+          -debug
+            	Enable debug output.
+          -l string
+            	Label for the task.
+          -label string
+            	Label for the task.
+          -max-buffer-size int
+            	Maximum total buffer size in MB (per stream). Default: 10MB
+          -max-line-length int
+            	Maximum length in KB for a single line. Default: 1024KB
+          -no-color
+            	Disable ANSI color/styling output.
+          -no-timer
+            	Disable showing the duration.
+          -s	Stream mode - print command's stdout/stderr live.
+          -show-output string
+            	When to show captured output: on-fail, always, never.
+          -stream
+            	Stream mode.
+          -theme string
+            	Select visual theme (e.g., 'ascii_minimal', 'unicode_vibrant').
+          -v	Print fo version and exit (shorthand).
+          -version
+            	Print fo version and exit.
+        
+        --- FO EXITCODE (from fo process): 1 ---
+=== NAME  TestFoErrorHandling/NoCommandAfterDashDash
+    main_test.go:621: Executed: ./fo_test_binary_generated_by_TestMain -- (took 3.775167ms)
+        --- FO STDOUT ---
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        Error: No command specified after --
+        Usage: fo [flags] -- <COMMAND> [ARGS...]
+        
+        --- FO EXITCODE (from fo process): 1 ---
+--- PASS: TestFoErrorHandling (0.00s)
+    --- PASS: TestFoErrorHandling/NoCommandAtAll (0.00s)
+    --- PASS: TestFoErrorHandling/NoCommandAfterDashDash (0.00s)
+    --- PASS: TestFoErrorHandling/InvalidShowOutputValue (0.00s)
+=== RUN   TestEnvironmentInheritance
+=== PAUSE TestEnvironmentInheritance
+=== RUN   TestFoTimestampedOutput
+=== RUN   TestFoTimestampedOutput/PreservesOutputOrderInCaptureNoColor
+=== PAUSE TestFoTimestampedOutput/PreservesOutputOrderInCaptureNoColor
+=== CONT  TestFoTimestampedOutput/PreservesOutputOrderInCaptureNoColor
+    main_test.go:704: Executed: ./fo_test_binary_generated_by_TestMain --debug --no-color --show-output always -- testdata/interleaved.sh (took 9.979167ms)
+        --- FO STDOUT ---
+        [START] interleaved.sh...
+         --- Captured output: --- 
+            STDOUT: Message 1
+            STDOUT: Message 2
+            STDERR: Message 1
+            STDERR: Message 2
+        [SUCCESS] interleaved.sh (6ms)
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=true, NoTimer=false, UseBoxes=false
+          Final Colors - Process: '' (Hex: ), Reset: '' (Hex: )
+        [DEBUG executeCaptureMode] Goroutine: Copying stdoutPipe
+        [DEBUG executeCaptureMode] Goroutine: Copying stderrPipe
+        [DEBUG executeCaptureMode] Goroutine: Finished copying stdoutPipe (len: 36)
+        [DEBUG executeCaptureMode] Goroutine: Finished copying stderrPipe (len: 36)
+        [DEBUG executeCaptureMode] stdout captured (len 36): STDOUT: Message 1
+        STDOUT: Message 2
+        
+        [DEBUG executeCaptureMode] stderr captured (len 36): STDERR: Message 1
+        STDERR: Message 2
+        
+        [DEBUG executeCaptureMode STDOUT_SCAN] Scanned line: STDOUT: Message 1
+        [DEBUG executeCaptureMode STDOUT_SCAN] Scanned line: STDOUT: Message 2
+        [DEBUG executeCaptureMode STDERR_SCAN] Scanned line: STDERR: Message 1
+        [DEBUG executeCaptureMode STDERR_SCAN] Scanned line: STDERR: Message 2
+        [DEBUG main()] about to os.Exit(0).
+        Behavioral Config: {Label: Stream:false ShowOutput:always NoTimer:false NoColor:true CI:false Debug:true MaxBufferSize:10485760 MaxLineLength:1048576}
+        
+        --- FO EXITCODE (from fo process): 0 ---
+--- PASS: TestFoTimestampedOutput (0.00s)
+    --- PASS: TestFoTimestampedOutput/PreservesOutputOrderInCaptureNoColor (0.01s)
+=== RUN   TestFoSignalHandling
+    main_test.go:741: Skipping signal handling test; OS-dependent and hard to automate reliably.
+--- SKIP: TestFoSignalHandling (0.00s)
+=== RUN   TestFoBasicExecution
+    main_test.go:746: Basic execution covered in TestFoCoreExecution and others.
+--- SKIP: TestFoBasicExecution (0.00s)
+=== CONT  TestEnvironmentInheritance
+    main_test.go:687: Executed: ./fo_test_binary_generated_by_TestMain --show-output always --no-color -- /var/folders/_5/z29k0cv53bjgn2nkk_sv0cqr0000gq/T/TestEnvironmentInheritance2121468673/001/env.sh (took 123.404459ms)
+        --- FO STDOUT ---
+        [START] env.sh...
+         --- Captured output: --- 
+            VAR is: fo_env_test_val_unique
+        [SUCCESS] env.sh (120ms)
+        
+        --- FO STDERR ---
+        --- [DEBUG LoadConfig] Initial Hardcoded Themes ---
+        Theme: unicode_vibrant (IsMonochrome: false)
+          Process: '[0;34m' (Hex: 1b5b303b33346d)
+          Success: '[0;32m' (Hex: 1b5b303b33326d)
+          Warning: '[0;33m' (Hex: 1b5b303b33336d)
+          Error:   '[0;31m' (Hex: 1b5b303b33316d)
+          Detail:  '[0m' (Hex: 1b5b306d)
+          Muted:   '[2m' (Hex: 1b5b326d)
+          Reset:   '[0m' (Hex: 1b5b306d)
+        Theme: ascii_minimal (IsMonochrome: true)
+          Process: '' (Hex: )
+          Success: '' (Hex: )
+          Warning: '' (Hex: )
+          Error:   '' (Hex: )
+          Detail:  '' (Hex: )
+          Muted:   '' (Hex: )
+          Reset:   '' (Hex: )
+        -------------------------------------------------
+        [DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.
+        [DEBUG MergeWithFlags] Final Design Config for theme 'unicode_vibrant': IsMonochrome=true, NoTimer=false, UseBoxes=false
+          Final Colors - Process: '' (Hex: ), Reset: '' (Hex: )
+        
+        --- FO EXITCODE (from fo process): 0 ---
+--- PASS: TestEnvironmentInheritance (0.12s)
+FAIL
+FAIL	github.com/davidkoosis/fo/cmd	1.130s
+?   	github.com/davidkoosis/fo/cmd/internal/config	[no test files]
+?   	github.com/davidkoosis/fo/cmd/internal/design	[no test files]
+?   	github.com/davidkoosis/fo/cmd/internal/version	[no test files]
+FAIL
