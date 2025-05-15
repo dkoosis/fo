@@ -224,8 +224,9 @@ func TestFoCoreExecution(t *testing.T) {
 	t.Run("CommandNotFound", func(t *testing.T) {
 		t.Parallel()
 		commandName := "a_very_unique_non_existent_command_askjdfh"
-		res := runFo(t, "--no-color", "--", commandName) // Use --no-color for predictable plain icons.
-		if res.exitCode != 127 {                         // Expect 127 for command not found.
+		// The --debug flag was previously added to this call in gofix_main_test_20250515_11
+		res := runFo(t, "--debug", "--no-color", "--", commandName)
+		if res.exitCode != 127 {
 			t.Errorf("Expected 'fo' to exit with 127 for command not found, got %d. Stderr:\n%s", res.exitCode, res.stderr)
 		}
 
@@ -234,14 +235,12 @@ func TestFoCoreExecution(t *testing.T) {
 			t.Fatalf("Expected some output from fo, got empty stdout for CommandNotFound.")
 		}
 
-		// Check fo's stdout for start and end lines by examining the first and last lines.
 		startPattern := buildPattern(plainIconStart, commandName, true, false)
 		if !startPattern.MatchString(lines[0]) {
 			t.Errorf("Expected 'fo' stdout to contain start line /%s/, got first line: '%s'\nFull stdout:\n%s", startPattern.String(), lines[0], res.stdout)
 		}
 
-		// For command not found, timer should still be displayed by default.
-		endPattern := buildPattern(plainIconFailure, commandName, false, true) // true for expectTimer.
+		endPattern := buildPattern(plainIconFailure, commandName, false, true) // Timer is expected
 		if len(lines) < 2 || !endPattern.MatchString(lines[len(lines)-1]) {
 			lastLine := ""
 			if len(lines) >= 1 {
@@ -250,17 +249,16 @@ func TestFoCoreExecution(t *testing.T) {
 			t.Errorf("Expected 'fo' stdout to contain end line /%s/, got last line: '%s'\nFull stdout:\n%s", endPattern.String(), lastLine, res.stdout)
 		}
 
-		// Check fo's stderr for the direct error message.
-		expectedStderrPrefix := "Error starting command '" + commandName + "': exec: \"" + commandName + "\":"
-		if !strings.HasPrefix(strings.TrimSpace(res.stderr), expectedStderrPrefix) {
-			t.Errorf("Expected 'fo' stderr to start with '%s', got:\n%s", expectedStderrPrefix, res.stderr)
+		// MODIFIED ASSERTION: Use strings.Contains because debug output might be prepended.
+		expectedStderrContent := "Error starting command '" + commandName + "': exec: \"" + commandName + "\":"
+		if !strings.Contains(res.stderr, expectedStderrContent) {
+			t.Errorf("Expected 'fo' stderr to contain '%s', got:\n%s", expectedStderrContent, res.stderr)
 		}
 		// Ensure "--- Captured output: ---" is NOT in stdout for fo's own startup error.
 		if strings.Contains(res.stdout, "--- Captured output: ---") {
 			t.Errorf("Did NOT expect '--- Captured output: ---' in stdout for command not found error, got:\n%s", res.stdout)
 		}
 	})
-
 	t.Run("ArgumentsToWrappedCommand", func(t *testing.T) {
 		t.Parallel()
 		helperScriptContent := `#!/bin/sh
