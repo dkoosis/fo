@@ -327,6 +327,12 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 
 	task.Complete(exitCode)
 
+	// Debug output for CI mode test troubleshooting
+	if appSettings.Debug || appSettings.CI {
+		fmt.Fprintf(os.Stderr, "[DEBUG executeCommand] CI=%t, exitCode=%d, task.Status=%s, isActualFoStartupFailure=%t\n",
+			appSettings.CI, exitCode, task.Status, isActualFoStartupFailure)
+	}
+
 	// Handle task completion display
 	if useInlineProgress {
 		// Use inline progress for completion
@@ -335,6 +341,11 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 			status = design.StatusError
 		} else if task.Status == design.StatusWarning {
 			status = design.StatusWarning
+		}
+
+		// For test debugging
+		if appSettings.Debug || appSettings.CI {
+			fmt.Fprintf(os.Stderr, "[DEBUG executeCommand] About to call progress.Complete with status: %s\n", status)
 		}
 
 		progress.Complete(string(status))
@@ -411,7 +422,6 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 
 	return exitCode
 }
-
 func executeStreamMode(cmd *exec.Cmd, task *design.Task, appSettings LocalAppConfig) (int, error) {
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil {
@@ -422,7 +432,15 @@ func executeStreamMode(cmd *exec.Cmd, task *design.Task, appSettings LocalAppCon
 		cmd.Stderr = os.Stderr
 		runErr := cmd.Run()
 		task.AddOutputLine(fmt.Sprintf("[fo] Error setting up stderr pipe for stream mode: %v", err), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
-		return getExitCode(runErr), runErr
+
+		// Return exit code, but don't mark as startup failure for normal ExitError
+		exitCode := getExitCode(runErr)
+		var exitErr *exec.ExitError
+		if errors.As(runErr, &exitErr) {
+			// Normal exit with non-zero code, not a startup failure
+			return exitCode, runErr
+		}
+		return exitCode, runErr
 	}
 	cmd.Stdout = os.Stdout
 
@@ -454,9 +472,34 @@ func executeStreamMode(cmd *exec.Cmd, task *design.Task, appSettings LocalAppCon
 		}
 	}()
 
-	runErr := cmd.Run() // This calls Start then Wait.
-	wg.Wait()
-	return getExitCode(runErr), runErr
+	startErr := cmd.Start()
+	if startErr != nil {
+		// Handle error starting command
+		errMsg := fmt.Sprintf("Error starting command '%s': %v", strings.Join(cmd.Args, " "), startErr)
+		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
+		fmt.Fprintln(os.Stderr, errMsg)
+
+		// Close stderr pipe to unblock the goroutine
+		_ = stderrPipe.Close()
+		wg.Wait() // Wait for stderr goroutine to finish
+
+		return getExitCode(startErr), startErr
+	}
+
+	runErr := cmd.Wait() // Wait for command to complete
+	wg.Wait()            // Wait for stderr goroutine to finish
+
+	// Get exit code but don't mark as startup failure for normal ExitError
+	exitCode := getExitCode(runErr)
+	if runErr != nil {
+		var exitErr *exec.ExitError
+		if errors.As(runErr, &exitErr) {
+			// Normal exit with non-zero code, not a startup failure
+			return exitCode, runErr
+		}
+	}
+
+	return exitCode, runErr
 }
 
 // executeCaptureMode uses io.Copy to bytes.Buffer to capture full output before processing.
@@ -515,34 +558,32 @@ func executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design
 	}()
 
 	// Start the command
-	if err := cmd.Start(); err != nil {
-		errMsg := fmt.Sprintf("Error starting command '%s': %v", strings.Join(cmd.Args, " "), err)
+	startErr := cmd.Start()
+	if startErr != nil {
+		errMsg := fmt.Sprintf("Error starting command '%s': %v", strings.Join(cmd.Args, " "), startErr)
 		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
 		fmt.Fprintln(os.Stderr, errMsg)
-		// Pipes are associated with cmd; cmd.Wait() will handle their closure if Start was successful.
-		// If Start fails, the pipes might not be fully "live" from the child's perspective.
-		// Explicitly closing them here might be redundant or cause issues if cmd.Wait() is not called.
-		// Let cmd.Wait() (or its absence on Start error) manage pipe state.
-		// However, we must ensure our reading goroutines (wgRead) don't hang.
-		// Closing our ends of the pipes can help unblock io.Copy.
+		// Explicitly close pipes to avoid hanging goroutines
 		_ = stdoutPipe.Close()
 		_ = stderrPipe.Close()
-		wgRead.Wait() // Ensure goroutines finish if Start fails.
-		return getExitCode(err), err
+		wgRead.Wait() // Ensure goroutines finish
+		return getExitCode(startErr), startErr
 	}
 
-	cmdWaitErr := cmd.Wait() // Wait for command to exit; this closes its side of pipes.
-	wgRead.Wait()            // Wait for io.Copy goroutines to complete (they will see EOF).
+	// Wait for command to complete
+	cmdWaitErr := cmd.Wait()
+	wgRead.Wait() // Wait for io.Copy goroutines to complete
 
 	if appSettings.Debug {
 		fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] stdout captured (len %d): %s\n", stdoutBuffer.Len(), stdoutBuffer.String())
 		fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] stderr captured (len %d): %s\n", stderrBuffer.Len(), stderrBuffer.String())
+		fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] cmdWaitErr: %v\n", cmdWaitErr)
 	}
 
 	var bufferLimitLogged sync.Once
 
 	// Process stdoutData
-	scanner := bufio.NewScanner(&stdoutBuffer) // Use &stdoutBuffer (bytes.Buffer implements io.Reader)
+	scanner := bufio.NewScanner(&stdoutBuffer)
 	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), appSettings.MaxLineLength)
 	var currentTotalStdoutBytes int64
 	for scanner.Scan() {
@@ -575,7 +616,7 @@ func executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design
 	}
 
 	// Process stderrData
-	scanner = bufio.NewScanner(&stderrBuffer) // Use &stderrBuffer
+	scanner = bufio.NewScanner(&stderrBuffer)
 	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), appSettings.MaxLineLength)
 	var currentTotalStderrBytes int64
 	for scanner.Scan() {
@@ -613,9 +654,21 @@ func executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design
 
 	task.UpdateTaskContext()
 
+	// Get the exit code from cmd.Wait() error
+	exitCode := 0
 	if cmdWaitErr != nil {
-		return getExitCode(cmdWaitErr), cmdWaitErr
+		var exitErr *exec.ExitError
+		if errors.As(cmdWaitErr, &exitErr) {
+			// Normal exit with non-zero code, not a startup failure
+			exitCode = exitErr.ExitCode()
+			// Critical fix: This is NOT a startup failure, it's a normal command execution that failed
+			return exitCode, cmdWaitErr
+		}
+		// Only treat as startup failure if it's not an ExitError (unusual case)
+		exitCode = getExitCode(cmdWaitErr)
+		return exitCode, cmdWaitErr
 	}
+
 	// Check errors from io.Copy if cmdWaitErr was nil
 	if errStdoutCopy != nil && !errors.Is(errStdoutCopy, io.EOF) {
 		task.AddOutputLine(fmt.Sprintf("[fo] Final stdout copy error: %v", errStdoutCopy), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})

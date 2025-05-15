@@ -24,7 +24,16 @@ type InlineProgress struct {
 
 // NewInlineProgress creates a progress tracker for a task
 func NewInlineProgress(task *Task) *InlineProgress {
+	// Detect if we're in CI mode from the task config
+	isCIMode := task.Config.IsMonochrome && task.Config.Style.NoTimer
+
+	// Determine if we're in a terminal
 	isTerminal := IsInteractiveTerminal()
+
+	// Force non-interactive mode for CI regardless of terminal status
+	if isCIMode {
+		isTerminal = false
+	}
 
 	return &InlineProgress{
 		Task:         task,
@@ -52,8 +61,8 @@ func (p *InlineProgress) Start(ctx context.Context, enableSpinner bool) {
 	// Render initial state
 	p.RenderProgress("running")
 
-	// Start spinner if enabled and in a terminal
-	if enableSpinner && p.isTerminal {
+	// Start spinner if enabled and in a terminal (never in CI mode)
+	if enableSpinner && p.isTerminal && !p.Task.Config.IsMonochrome {
 		go p.runSpinner(ctx)
 	}
 }
@@ -73,8 +82,8 @@ func (p *InlineProgress) RenderProgress(status string) {
 	// Generate formatted message based on task and status
 	message := p.formatProgressMessage(status)
 
-	// In terminal mode, update in-place
-	if p.isTerminal {
+	// In terminal mode with color support, update in-place
+	if p.isTerminal && !p.Task.Config.IsMonochrome {
 		fmt.Print("\r\033[K") // Carriage return + erase line
 		fmt.Print(message)
 
@@ -83,13 +92,34 @@ func (p *InlineProgress) RenderProgress(status string) {
 			fmt.Println()
 		}
 	} else {
-		// Non-terminal mode, just print new lines
+		// Non-terminal mode or CI mode, just print new lines
 		fmt.Println(message)
 	}
 }
 
 // formatProgressMessage creates the formatted status line
 func (p *InlineProgress) formatProgressMessage(status string) string {
+	// Special handling for CI mode (text-only output)
+	if p.Task.Config.IsMonochrome {
+		subject := p.Task.Label
+		if subject == "" {
+			subject = p.Task.Command
+		}
+
+		// Use simple bracketed format for CI mode
+		switch status {
+		case "running":
+			return fmt.Sprintf("[START] %s...", subject)
+		case "success":
+			return fmt.Sprintf("[SUCCESS] %s", subject)
+		case "error", "warning":
+			return fmt.Sprintf("[FAILED] %s", subject)
+		default:
+			return fmt.Sprintf("[INFO] %s", subject)
+		}
+	}
+
+	// Regular formatting for normal terminal mode
 	indent := ""
 	if p.Task.Config.Style.UseBoxes {
 		indent = p.Task.Config.Border.VerticalChar + " "
@@ -139,7 +169,7 @@ func (p *InlineProgress) formatProgressMessage(status string) string {
 			p.Task.Config.ResetColor(),
 			duration)
 
-	case "error":
+	case "error", "warning":
 		icon = p.Task.Config.GetIcon("Error")
 		colorCode = p.Task.Config.GetColor("Error")
 		return fmt.Sprintf("%s%s %s%sing %s failed%s (%s)",

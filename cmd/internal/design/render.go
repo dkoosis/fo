@@ -8,6 +8,7 @@ import (
 )
 
 // RenderStartLine returns the formatted start line for the task
+// RenderStartLine returns the formatted start line for the task
 func (t *Task) RenderStartLine() string {
 	var sb strings.Builder
 
@@ -23,15 +24,18 @@ func (t *Task) RenderStartLine() string {
 			sb.WriteString(t.Config.Border.TopCornerChar)
 			sb.WriteString(t.Config.Border.HeaderChar)
 
+			// Apply color only to the label text, not the border
 			labelColor := t.Config.GetColor(headerStyle.ColorFG, "Task_Label_Header")
+			sb.WriteString(" ")
 			sb.WriteString(labelColor)
 			if contains(headerStyle.TextStyle, "bold") {
 				sb.WriteString("\033[1m") // ANSI bold
 			}
-			sb.WriteString(" ")
 			sb.WriteString(applyTextCase(t.Label, headerStyle.TextCase))
+			sb.WriteString(t.Config.ResetColor())
 			sb.WriteString(" ")
 
+			// Calculate border length - rendered after color reset
 			labelRenderedLength := len(t.Label) + 2
 			desiredHeaderContentVisualWidth := 40
 			repeatCount := desiredHeaderContentVisualWidth - labelRenderedLength
@@ -39,8 +43,8 @@ func (t *Task) RenderStartLine() string {
 				repeatCount = 0
 			}
 
+			// Border characters without color
 			sb.WriteString(strings.Repeat(t.Config.Border.HeaderChar, repeatCount))
-			sb.WriteString(t.Config.ResetColor())
 			sb.WriteString("\n")
 
 			sb.WriteString(t.Config.Border.VerticalChar + "\n")
