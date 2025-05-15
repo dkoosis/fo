@@ -357,40 +357,29 @@ func (c *Config) GetIndentation(level int) string {
 	return strings.Repeat(baseIndent, level)
 }
 
+// In cmd/internal/design/config.go
+// Find and modify the GetIcon function:
+
 func (c *Config) GetIcon(iconKey string) string {
-	if c.IsMonochrome {
-		switch strings.ToLower(iconKey) {
-		case "start":
-			return "[START]"
-		case "success":
-			return "[SUCCESS]"
-		case "warning":
-			return "[WARNING]"
-		case "error":
-			return "[FAILED]"
-		case "info":
-			return "[INFO]"
-		case "bullet":
-			return "*"
-		default:
-			return ""
-		}
-	}
+	// FORCE ASCII ICONS FOR DEBUGGING
+	fmt.Fprintf(os.Stderr, "[DEBUG GetIcon] FORCING ASCII ICONS\n")
+
+	// Always return ASCII versions regardless of monochrome setting
 	switch strings.ToLower(iconKey) {
 	case "start":
-		return c.Icons.Start
+		return "*" // Simple ASCII char
 	case "success":
-		return c.Icons.Success
+		return "+" // Simple ASCII char
 	case "warning":
-		return c.Icons.Warning
+		return "!" // Simple ASCII char
 	case "error":
-		return c.Icons.Error
+		return "x" // Simple ASCII char
 	case "info":
-		return c.Icons.Info
+		return "i" // Simple ASCII char
 	case "bullet":
-		return c.Icons.Bullet
+		return "-" // Simple ASCII char
 	default:
-		return ""
+		return "?" // Simple ASCII char
 	}
 }
 
