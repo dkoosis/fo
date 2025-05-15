@@ -97,25 +97,28 @@ func (p *InlineProgress) RenderProgress(status string) {
 	}
 }
 
-// formatProgressMessage creates the formatted status line
+// formatProgressMessage creates the formatted status line following the new design:
+// [ICON] <ToolLabel>: <ActionPhrase> [<OutcomeWord> <Duration>]
 func (p *InlineProgress) formatProgressMessage(status string) string {
 	// Special handling for CI mode (text-only output)
 	if p.Task.Config.IsMonochrome {
-		subject := p.Task.Label
-		if subject == "" {
-			subject = p.Task.Command
+		toolLabel := p.Task.Label
+		if toolLabel == "" {
+			toolLabel = p.Task.Command
 		}
 
 		// Use simple bracketed format for CI mode
 		switch status {
 		case "running":
-			return fmt.Sprintf("[START] %s...", subject)
+			return fmt.Sprintf("[START] %s: working...", toolLabel)
 		case "success":
-			return fmt.Sprintf("[SUCCESS] %s", subject)
-		case "error", "warning":
-			return fmt.Sprintf("[FAILED] %s", subject)
+			return fmt.Sprintf("[SUCCESS] %s: done (%s)", toolLabel, formatDuration(p.Task.Duration))
+		case "error":
+			return fmt.Sprintf("[FAILED] %s: error (%s)", toolLabel, formatDuration(p.Task.Duration))
+		case "warning":
+			return fmt.Sprintf("[WARNING] %s: warning (%s)", toolLabel, formatDuration(p.Task.Duration))
 		default:
-			return fmt.Sprintf("[INFO] %s", subject)
+			return fmt.Sprintf("[INFO] %s: done (%s)", toolLabel, formatDuration(p.Task.Duration))
 		}
 	}
 
@@ -125,100 +128,143 @@ func (p *InlineProgress) formatProgressMessage(status string) string {
 		indent = p.Task.Config.Border.VerticalChar + " "
 	}
 
-	var icon, colorCode, verb, subject, duration string
-
-	// Get subject (task name or command)
-	subject = p.Task.Label
-	if subject == "" {
-		subject = p.Task.Command
+	// Get tool label (use command basename if label is empty)
+	toolLabel := p.Task.Label
+	if toolLabel == "" {
+		toolLabel = p.Task.Command
 	}
 
-	// Get verb from intent or default
-	verb = p.Task.Intent
-	if verb == "" {
-		verb = "Process"
-	}
+	// Get verb from intent (base form, not -ing form)
+	baseVerb := getBaseVerb(p.Task.Intent)
+
+	// Get target description (usually first non-flag argument or command-specific target)
+	target := getTargetDescription(p.Task.Command, p.Task.Args)
+
+	// Format action phrase
+	actionPhrase := fmt.Sprintf("%s %s", baseVerb, target)
+
+	// Variables for icon, color, and outcome text
+	var icon, colorCode, outcomeWord, duration string
 
 	// Format duration for completed states
 	if status != "running" {
 		duration = formatDuration(p.Task.Duration)
+	} else {
+		duration = formatDuration(time.Since(p.StartTime))
 	}
 
-	// Choose icon, color, and template based on status
+	// Choose icon, color, and outcome word based on status
 	switch status {
 	case "running":
 		icon = p.Task.Config.GetIcon("Start")
 		colorCode = p.Task.Config.GetColor("Process")
-		return fmt.Sprintf("%s%s %s%sing %s...%s",
+		outcomeWord = "Working"
+
+		return fmt.Sprintf("%s%s %s: %s%s%s [%s %s]",
 			indent,
 			icon,
+			toolLabel,
 			colorCode,
-			capitalizeFirst(verb),
-			subject,
-			p.Task.Config.ResetColor())
+			actionPhrase,
+			p.Task.Config.ResetColor(),
+			outcomeWord,
+			duration)
 
 	case "success":
 		icon = p.Task.Config.GetIcon("Success")
 		colorCode = p.Task.Config.GetColor("Success")
-		return fmt.Sprintf("%s%s %s%sing %s complete%s (%s)",
+		outcomeWord = "OK"
+
+		return fmt.Sprintf("%s%s %s: %s%s%s [%s%s%s %s]",
 			indent,
 			icon,
+			toolLabel,
 			colorCode,
-			capitalizeFirst(verb),
-			subject,
+			actionPhrase,
+			p.Task.Config.ResetColor(),
+			colorCode,
+			outcomeWord,
 			p.Task.Config.ResetColor(),
 			duration)
 
-	case "error", "warning":
+	case "error":
 		icon = p.Task.Config.GetIcon("Error")
 		colorCode = p.Task.Config.GetColor("Error")
-		return fmt.Sprintf("%s%s %s%sing %s failed%s (%s)",
+		outcomeWord = "Error"
+
+		return fmt.Sprintf("%s%s %s: %s%s%s [%s%s%s %s]",
 			indent,
 			icon,
+			toolLabel,
 			colorCode,
-			capitalizeFirst(verb),
-			subject,
+			actionPhrase,
+			p.Task.Config.ResetColor(),
+			colorCode,
+			outcomeWord,
+			p.Task.Config.ResetColor(),
+			duration)
+
+	case "warning":
+		icon = p.Task.Config.GetIcon("Warning")
+		colorCode = p.Task.Config.GetColor("Warning")
+		outcomeWord = "Warning"
+
+		return fmt.Sprintf("%s%s %s: %s%s%s [%s%s%s %s]",
+			indent,
+			icon,
+			toolLabel,
+			colorCode,
+			actionPhrase,
+			p.Task.Config.ResetColor(),
+			colorCode,
+			outcomeWord,
 			p.Task.Config.ResetColor(),
 			duration)
 
 	default:
 		icon = p.Task.Config.GetIcon("Info")
 		colorCode = p.Task.Config.GetColor("Process")
-		return fmt.Sprintf("%s%s %s%s%s (%s)",
+		outcomeWord = "Done"
+
+		return fmt.Sprintf("%s%s %s: %s%s%s [%s %s]",
 			indent,
 			icon,
+			toolLabel,
 			colorCode,
-			subject,
+			actionPhrase,
 			p.Task.Config.ResetColor(),
+			outcomeWord,
 			duration)
 	}
 }
 
 // runSpinner animates the spinner while the task is running
 func (p *InlineProgress) runSpinner(ctx context.Context) {
-	// Use simple ASCII spinner by default for maximum compatibility
-	spinnerChars := "-\\|/"
+	// Pulsing heartbeat spinner as preferred
+	spinnerChars := "•⦿⦿⦿•⦿⦿⦿"
 
-	// Only use Unicode spinner if configured and in a suitable terminal
+	// Only use custom spinner if configured in config file and not in monochrome mode
 	if !p.Task.Config.IsMonochrome && p.isTerminal {
 		// Check if custom spinner is defined in config
 		if elemStyle := p.Task.Config.GetElementStyle("Task_Progress_Line"); elemStyle.AdditionalChars != "" {
-			// If AdditionalChars contains ASCII characters, use them
-			if strings.ContainsAny(elemStyle.AdditionalChars, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") {
-				spinnerChars = "-\\|/" // Fall back to ASCII if invalid Unicode
-			} else {
+			// Use the configured spinner if it's not empty
+			if len(elemStyle.AdditionalChars) > 0 {
 				spinnerChars = elemStyle.AdditionalChars
 			}
 		}
+	} else if p.Task.Config.IsMonochrome {
+		// Use ASCII spinner for monochrome/CI mode
+		spinnerChars = "-\\|/"
 	}
 
 	// Ensure we have at least one character
 	if len(spinnerChars) == 0 {
-		spinnerChars = "-\\|/"
+		spinnerChars = "•⦿⦿⦿•⦿⦿⦿"
 	}
 
-	// Default interval of 80ms unless configured otherwise
-	interval := 80 * time.Millisecond
+	// Use a moderate interval that allows the spinner to be visible
+	// but still feels responsive
+	interval := 180 * time.Millisecond
 	if p.Task.Config.Style.SpinnerInterval > 0 {
 		interval = time.Duration(p.Task.Config.Style.SpinnerInterval) * time.Millisecond
 	}
@@ -245,31 +291,38 @@ func (p *InlineProgress) runSpinner(ctx context.Context) {
 			currSpinChar := string(spinnerChars[p.SpinnerIndex])
 			p.mutex.Unlock()
 
-			// Generate message with current spinner frame
+			// Generate message with current spinner frame and updated time
 			indent := ""
 			if p.Task.Config.Style.UseBoxes {
 				indent = p.Task.Config.Border.VerticalChar + " "
 			}
 
-			verb := p.Task.Intent
-			if verb == "" {
-				verb = "Process"
+			// Get tool label
+			toolLabel := p.Task.Label
+			if toolLabel == "" {
+				toolLabel = p.Task.Command
 			}
 
-			subject := p.Task.Label
-			if subject == "" {
-				subject = p.Task.Command
-			}
+			// Get verb from intent (base form, not -ing form)
+			baseVerb := getBaseVerb(p.Task.Intent)
+
+			// Get target description
+			target := getTargetDescription(p.Task.Command, p.Task.Args)
+
+			// Format action phrase
+			actionPhrase := fmt.Sprintf("%s %s", baseVerb, target)
 
 			colorCode := p.Task.Config.GetColor("Process")
+			duration := formatDuration(time.Since(p.StartTime))
 
-			message := fmt.Sprintf("%s%s %s%sing %s...%s",
+			message := fmt.Sprintf("%s%s %s: %s%s%s [Working %s]",
 				indent,
 				currSpinChar,
+				toolLabel,
 				colorCode,
-				capitalizeFirst(verb),
-				subject,
-				p.Task.Config.ResetColor())
+				actionPhrase,
+				p.Task.Config.ResetColor(),
+				duration)
 
 			// Update display
 			fmt.Print("\r\033[K") // Carriage return + erase line
@@ -278,7 +331,190 @@ func (p *InlineProgress) runSpinner(ctx context.Context) {
 	}
 }
 
+// Helper functions for the new format
+
+// getBaseVerb converts an intent (potentially with -ing suffix) to base form
+func getBaseVerb(intent string) string {
+	if intent == "" {
+		return "run"
+	}
+
+	// Convert to lowercase for better matching
+	intentLower := strings.ToLower(intent)
+
+	// Common verb mapping for exact matches
+	verbMap := map[string]string{
+		"building":     "build",
+		"running":      "run",
+		"testing":      "test",
+		"checking":     "check",
+		"linting":      "lint",
+		"formatting":   "format",
+		"tidying":      "tidy",
+		"downloading":  "download",
+		"verifying":    "verify",
+		"vetting":      "vet",
+		"installing":   "install",
+		"analyzing":    "analyze",
+		"generating":   "generate",
+		"compiling":    "compile",
+		"benchmarking": "benchmark",
+		"validating":   "validate",
+		"migrating":    "migrate",
+		"deploying":    "deploy",
+		"publishing":   "publish",
+		"cleaning":     "clean",
+		"executing":    "execute",
+		"searching":    "search",
+		"filtering":    "filter",
+		"changing":     "change",
+		"transforming": "transform",
+		"processing":   "process",
+		"compressing":  "compress",
+		"archiving":    "archive",
+		"starting":     "start",
+	}
+
+	// Check direct map first
+	if baseForm, ok := verbMap[intentLower]; ok {
+		return baseForm
+	}
+
+	// Handle -ing suffix removal for verbs not in the map
+	if strings.HasSuffix(intentLower, "ing") {
+		// Special cases where simple removal of -ing doesn't work
+		if strings.HasSuffix(intentLower, "ying") {
+			return intentLower[:len(intentLower)-4] + "y"
+		}
+		if strings.HasSuffix(intentLower, "ting") && len(intentLower) > 4 &&
+			!strings.HasSuffix(intentLower, "ating") &&
+			!strings.HasSuffix(intentLower, "cting") &&
+			!strings.HasSuffix(intentLower, "sting") {
+			return intentLower[:len(intentLower)-4] + "t"
+		}
+		if strings.HasSuffix(intentLower, "ping") {
+			return intentLower[:len(intentLower)-4] + "p"
+		}
+		if strings.HasSuffix(intentLower, "ding") {
+			return intentLower[:len(intentLower)-4] + "d"
+		}
+		if strings.HasSuffix(intentLower, "ming") {
+			return intentLower[:len(intentLower)-4] + "m"
+		}
+		if strings.HasSuffix(intentLower, "ning") {
+			return intentLower[:len(intentLower)-4] + "n"
+		}
+		if strings.HasSuffix(intentLower, "king") {
+			return intentLower[:len(intentLower)-4] + "k"
+		}
+
+		// General case - just remove -ing
+		return intentLower[:len(intentLower)-3]
+	}
+
+	// If not ending with -ing, return as is
+	return intentLower
+}
+
+// getTargetDescription returns a suitable target description based on command and args
+func getTargetDescription(cmd string, args []string) string {
+	// Extract basename of command
+	cmdBase := cmd
+	if lastSlash := strings.LastIndex(cmd, "/"); lastSlash >= 0 {
+		cmdBase = cmd[lastSlash+1:]
+	}
+
+	// Known command-target mappings
+	switch cmdBase {
+	case "go":
+		if len(args) > 0 {
+			switch args[0] {
+			case "build":
+				if len(args) > 1 && !strings.HasPrefix(args[1], "-") {
+					return args[1]
+				}
+				return "binary"
+			case "test":
+				return "tests"
+			case "mod":
+				if len(args) > 1 {
+					return "go.mod"
+				}
+				return "modules"
+			case "vet":
+				return "code"
+			case "generate":
+				return "code"
+			case "run":
+				if len(args) > 1 && !strings.HasPrefix(args[1], "-") {
+					return args[1]
+				}
+				return "program"
+			case "install":
+				if len(args) > 1 && !strings.HasPrefix(args[1], "-") {
+					return args[1]
+				}
+				return "package"
+			}
+			return args[0]
+		}
+		return "code"
+
+	case "golangci-lint":
+		if len(args) > 0 {
+			if args[0] == "run" {
+				return "code"
+			}
+			if args[0] == "fmt" {
+				return "code"
+			}
+			return args[0]
+		}
+		return "code"
+
+	case "yamllint":
+		return "YAML files"
+
+	case "make":
+		if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+			return args[0]
+		}
+		return "target"
+
+	case "docker":
+		if len(args) > 0 {
+			if args[0] == "build" {
+				return "image"
+			}
+			if args[0] == "run" {
+				return "container"
+			}
+			return args[0]
+		}
+		return "container"
+	}
+
+	// Generic approach for other commands
+	// Try to find the first non-flag argument
+	for _, arg := range args {
+		if !strings.HasPrefix(arg, "-") {
+			// Check if it looks like a filename or path
+			if strings.Contains(arg, ".") || strings.Contains(arg, "/") {
+				return arg
+			}
+			// Otherwise, use it as is if it's not empty
+			if arg != "" {
+				return arg
+			}
+		}
+	}
+
+	// If we can't find a suitable argument, use a generic target
+	return "target"
+}
+
 // Helper function to capitalize first letter
+// nolint: unused
 func capitalizeFirst(s string) string {
 	if s == "" {
 		return s

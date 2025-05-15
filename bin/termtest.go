@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 func main() {
 	// --- General Info ---
@@ -75,6 +78,68 @@ func main() {
 	fmt.Println("Block Elements: █ ▓ ▒ ░")
 	fmt.Println("Symbols: ✔ ✅ ✘ ❌ ℹ️ ⚠️ ▶ ➤ ● ★ ☆ … ≠ ≤ ≥")
 	fmt.Println("Test for wide characters (e.g., Japanese): こんにちは世界 (Hello World)")
+	fmt.Println()
+
+	// --- Spinner Character Test ---
+	fmt.Println("--- Spinner Character Tests ---")
+	fmt.Println("Static display of character sequences:")
+
+	// Simple ASCII spinner
+	fmt.Println("1. ASCII Spinner: - \\ | /")
+
+	// Various Unicode spinner options (heartbeat style)
+	fmt.Println("2. Heart/Circle Pulsing: • ◦ ○ ● ◎ ◉ ◌ ◍ ◎ ◉")
+	fmt.Println("3. Simple Dot Pulsing: · • ⦿ • ·")
+	fmt.Println("4. Circle Variations: ◌ ○ ◎ ◉ ● ◉ ◎ ○")
+	fmt.Println("5. Heart Pulse: ♡ ♥ ❤ ♥ ♡")
+	fmt.Println("6. Geometric: □ ■ □ ▣ ■ ▣")
+	fmt.Println("7. Circled Dots: ◎ ⦿ ◉ ⦾")
+	fmt.Println("8. Moon Phases: 🌑 🌒 🌓 🌔 🌕 🌖 🌗 🌘")
+	fmt.Println("9. Star Pulse: ☆ ⋆ ★ ✧ ✦")
+	fmt.Println("10. Braille Patterns: ⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏")
+
+	// Live spinner simulation
+	fmt.Println("\nLive spinner simulation (Ctrl+C to stop):")
+
+	// Define spinner patterns to test
+	spinners := []struct {
+		name     string
+		pattern  string
+		interval time.Duration
+	}{
+		{"ASCII", `-\|/`, 100 * time.Millisecond},
+		{"Heart Pulsing", `•◦○●◎◉◌◍◎◉`, 150 * time.Millisecond},
+		{"Simple Dots", `·•⦿•·`, 200 * time.Millisecond},
+		{"Circles", `◌○◎◉●◉◎○`, 150 * time.Millisecond},
+		{"Heart", `♡♥❤♥♡`, 200 * time.Millisecond},
+		{"Geometric", `□■□▣■▣`, 150 * time.Millisecond},
+		{"Circled Dots", `◎⦿◉⦾`, 200 * time.Millisecond},
+		{"Braille", `⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏`, 80 * time.Millisecond},
+	}
+
+	// Test each spinner for a few seconds
+	for _, spinner := range spinners {
+		fmt.Printf("\nTesting spinner: %s\n", spinner.name)
+		fmt.Printf("Characters: %s\n", spinner.pattern)
+		fmt.Printf("Press Ctrl+C to skip to next spinner\n")
+
+		// Run the spinner for a brief period (adjust time as needed)
+		testDuration := 3 * time.Second
+		endTime := time.Now().Add(testDuration)
+
+		for time.Now().Before(endTime) {
+			for _, char := range spinner.pattern {
+				fmt.Printf("\r\033[K%c Testing %s spinner...", char, spinner.name)
+				time.Sleep(spinner.interval)
+			}
+		}
+		fmt.Println("\r\033[KCompleted testing", spinner.name, "spinner")
+	}
+
+	fmt.Println("\nAdditional Spinner Patterns to Test in Real Use:")
+	fmt.Println("1. Pulsing Heartbeat: •⦿⦿⦿•⦿⦿⦿")
+	fmt.Println("2. Simple Pulse: ⦾⦿⥀⥁")
+	fmt.Println("3. Minimal Dots: ⠂⠄⠆⠇⠧⠷⠿⠷⠧⠇⠆⠄")
 	fmt.Println()
 
 	// --- Cursor Movement (Basic - might not be easily verifiable without more complex logic) ---
