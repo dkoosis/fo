@@ -689,6 +689,9 @@ func getExitCode(err error) int {
 	if exitErr, ok := err.(*exec.ExitError); ok {
 		return exitErr.ExitCode()
 	}
+	// Debug print to help diagnose issues
+	fmt.Fprintf(os.Stderr, "[DEBUG getExitCode] Non-ExitError type: %T, error: %v\n", err, err)
+
 	if errors.Is(err, exec.ErrNotFound) ||
 		strings.Contains(err.Error(), "executable file not found") ||
 		(runtime.GOOS != "windows" && strings.Contains(err.Error(), "no such file or directory")) {

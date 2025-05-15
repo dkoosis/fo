@@ -196,16 +196,25 @@ func (p *InlineProgress) formatProgressMessage(status string) string {
 
 // runSpinner animates the spinner while the task is running
 func (p *InlineProgress) runSpinner(ctx context.Context) {
-	spinnerChars := "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏" // Default Braille spinner
+	// Use simple ASCII spinner by default for maximum compatibility
+	spinnerChars := "-\\|/"
 
-	// Check if custom spinner is defined in config
-	if elemStyle := p.Task.Config.GetElementStyle("Task_Progress_Line"); elemStyle.AdditionalChars != "" {
-		spinnerChars = elemStyle.AdditionalChars
+	// Only use Unicode spinner if configured and in a suitable terminal
+	if !p.Task.Config.IsMonochrome && p.isTerminal {
+		// Check if custom spinner is defined in config
+		if elemStyle := p.Task.Config.GetElementStyle("Task_Progress_Line"); elemStyle.AdditionalChars != "" {
+			// If AdditionalChars contains ASCII characters, use them
+			if strings.ContainsAny(elemStyle.AdditionalChars, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") {
+				spinnerChars = "-\\|/" // Fall back to ASCII if invalid Unicode
+			} else {
+				spinnerChars = elemStyle.AdditionalChars
+			}
+		}
 	}
 
 	// Ensure we have at least one character
 	if len(spinnerChars) == 0 {
-		spinnerChars = "-"
+		spinnerChars = "-\\|/"
 	}
 
 	// Default interval of 80ms unless configured otherwise
