@@ -112,7 +112,7 @@ type PatternsRepo struct {
 	Output map[string][]string `yaml:"output"`
 }
 
-// ensureEscapePrefix checks if a string starts with "33[" and prepends "\033" if so.
+// ensureEscapePrefix checks if a string starts with "33[" and converts it to a proper ANSI escape sequence.
 func ensureEscapePrefix(s string) string {
 	// Debug print to see what this function receives and returns.
 	// This should only be active if FO_DEBUG is set.
@@ -128,12 +128,17 @@ func ensureEscapePrefix(s string) string {
 	if s == "" {
 		return ""
 	}
-	if strings.HasPrefix(s, "\033") { // Already has correct ESCAPE char
+
+	escChar := string([]byte{27}) // ASCII escape character
+
+	if strings.HasPrefix(s, escChar) { // Already has correct ESCAPE char
 		return s
 	}
-	if strings.HasPrefix(s, "33[") { // Missing initial \0 part of \033
-		s = "\033" + s // Prepend the ESCAPE character
-		return s
+	if strings.HasPrefix(s, "\033") { // String literal representation
+		return escChar + s[1:] // Replace "\033" with real escape char
+	}
+	if strings.HasPrefix(s, "33[") { // Missing escape character
+		return escChar + "[" + s[3:] // Replace "33[" with escape char + "["
 	}
 	return s // Return as is if no known malformation
 }
@@ -389,7 +394,8 @@ func (c *Config) GetColor(colorKey string, elementName ...string) string {
 }
 
 // resolveColorName translates a color name or a direct ANSI code string.
-// It applies ensureEscapePrefix to the final code.
+// resolveColorName translates a color name or a direct ANSI code string.
+// It applies ensureEscapePrefix to the final code for backward compatibility.
 func (c *Config) resolveColorName(name string) string {
 	if c.IsMonochrome { // Should be handled by GetColor, but defensive check.
 		return ""
@@ -400,29 +406,72 @@ func (c *Config) resolveColorName(name string) string {
 		fmt.Fprintf(os.Stderr, "[DEBUG resolveColorName] Input name: '%s' (Hex: %x)\n", name, name)
 	}
 
+	// Create the escape character directly
+	escChar := string([]byte{27}) // ASCII escape (decimal 27, hex 0x1B)
+
+	// Map symbolic names to ANSI codes
 	var colorCode string
 	switch strings.ToLower(name) {
-	case "process":
-		colorCode = c.Colors.Process
-	case "success":
-		colorCode = c.Colors.Success
-	case "warning":
-		colorCode = c.Colors.Warning
-	case "error":
-		colorCode = c.Colors.Error
-	case "detail":
-		colorCode = c.Colors.Detail
-	case "muted":
-		colorCode = c.Colors.Muted
+	// Primary theme colors
+	case "process", "blue":
+		colorCode = escChar + "[0;34m"
+	case "success", "green":
+		colorCode = escChar + "[0;32m"
+	case "warning", "yellow":
+		colorCode = escChar + "[0;33m"
+	case "error", "red":
+		colorCode = escChar + "[0;31m"
+	case "detail", "default":
+		colorCode = escChar + "[0m"
+	case "muted", "dim":
+		colorCode = escChar + "[2m"
+	case "reset":
+		colorCode = escChar + "[0m"
+
+	// Text styles
+	case "bold":
+		colorCode = escChar + "[1m"
+	case "italic":
+		colorCode = escChar + "[3m"
+	case "underline":
+		colorCode = escChar + "[4m"
+
+	// More colors for completeness
+	case "black":
+		colorCode = escChar + "[0;30m"
+	case "white":
+		colorCode = escChar + "[0;37m"
+	case "cyan":
+		colorCode = escChar + "[0;36m"
+	case "magenta":
+		colorCode = escChar + "[0;35m"
+
+	// Bright variants
+	case "brightblack", "gray":
+		colorCode = escChar + "[0;90m"
+	case "brightred":
+		colorCode = escChar + "[0;91m"
+	case "brightgreen":
+		colorCode = escChar + "[0;92m"
+	case "brightyellow":
+		colorCode = escChar + "[0;93m"
+	case "brightblue":
+		colorCode = escChar + "[0;94m"
+	case "brightmagenta":
+		colorCode = escChar + "[0;95m"
+	case "brightcyan":
+		colorCode = escChar + "[0;96m"
+	case "brightwhite":
+		colorCode = escChar + "[0;97m"
+
 	default:
-		// If 'name' itself is an ANSI code (e.g., "\033[1;31m") or potentially malformed ("33[1;31m"),
-		// ensureEscapePrefix will handle it. Otherwise, it's an unknown symbolic name.
+		// Handle legacy direct ANSI codes for backward compatibility
 		if strings.HasPrefix(name, "\033[") || strings.HasPrefix(name, "33[") {
-			colorCode = name // Pass potentially malformed or correct codes to ensureEscapePrefix
+			colorCode = ensureEscapePrefix(name)
 		} else {
-			colorCode = c.Colors.Detail // Fallback for unknown symbolic names
+			colorCode = escChar + "[0m" // Fallback to default
 			if os.Getenv("FO_DEBUG") != "" {
-				fmt.Fprintf(os.Stderr, "[DEBUG resolveColorName] Unknown color name '%s', falling back to Detail: '%s'\n", name, colorCode)
+				fmt.Fprintf(os.Stderr, "[DEBUG resolveColorName] Unknown color name '%s', falling back to default\n", name)
 			}
 		}
 	}
@@ -432,15 +481,18 @@ func (c *Config) resolveColorName(name string) string {
 		fmt.Fprintf(os.Stderr, "[DEBUG resolveColorName] Code from switch: '%s' (Hex: %x)\n", colorCode, colorCode)
 	}
 
-	finalCode := ensureEscapePrefix(colorCode)
+	// We're directly using the escape character, so we don't need ensureEscapePrefix anymore
+	// but keeping it for potential edge cases in legacy configurations
+	finalCode := colorCode
 
-	// Debug print for the final code after ensureEscapePrefix.
+	// Debug print for the final code.
 	if os.Getenv("FO_DEBUG") != "" {
-		fmt.Fprintf(os.Stderr, "[DEBUG resolveColorName] Final code after ensureEscapePrefix: '%s' (Hex: %x)\n", finalCode, finalCode)
+		fmt.Fprintf(os.Stderr, "[DEBUG resolveColorName] Final code: '%s' (Hex: %x)\n", finalCode, finalCode)
 	}
 	return finalCode
 }
 
+// ResetColor returns the ANSI reset code if not in monochrome mode.
 func (c *Config) ResetColor() string {
 	if c.IsMonochrome {
 		return ""
@@ -449,7 +501,10 @@ func (c *Config) ResetColor() string {
 	if os.Getenv("FO_DEBUG") != "" {
 		fmt.Fprintf(os.Stderr, "[DEBUG ResetColor] Input c.Colors.Reset: '%s' (Hex: %x)\n", c.Colors.Reset, c.Colors.Reset)
 	}
-	finalReset := ensureEscapePrefix(c.Colors.Reset)
+
+	// Get the reset color code
+	finalReset := c.resolveColorName("reset")
+
 	if os.Getenv("FO_DEBUG") != "" {
 		fmt.Fprintf(os.Stderr, "[DEBUG ResetColor] Output finalReset: '%s' (Hex: %x)\n", finalReset, finalReset)
 	}
