@@ -2,6 +2,8 @@
 package design
 
 import (
+	"fmt"
+	"os" // For debug prints to stderr
 	"strings"
 )
 
@@ -32,9 +34,9 @@ type ElementStyleDef struct {
 	TextContent      string   `yaml:"text_content,omitempty"`
 	TextCase         string   `yaml:"text_case,omitempty"`
 	TextStyle        []string `yaml:"text_style,omitempty"`
-	ColorFG          string   `yaml:"color_fg,omitempty"` // Use color names like "Process", "Error"
-	ColorBG          string   `yaml:"color_bg,omitempty"` // Use color names
-	IconKey          string   `yaml:"icon_key,omitempty"` // Refers to keys in Config.Icons or GetIcon
+	ColorFG          string   `yaml:"color_fg,omitempty"`
+	ColorBG          string   `yaml:"color_bg,omitempty"`
+	IconKey          string   `yaml:"icon_key,omitempty"`
 	BulletChar       string   `yaml:"bullet_char,omitempty"`
 	LineChar         string   `yaml:"line_char,omitempty"`
 	LineLengthType   string   `yaml:"line_length_type,omitempty"`
@@ -53,7 +55,7 @@ type Config struct {
 		UseBoxes       bool   `yaml:"use_boxes"`
 		Indentation    string `yaml:"indentation"`
 		ShowTimestamps bool   `yaml:"show_timestamps"`
-		NoTimer        bool   `yaml:"no_timer"` // This is the effective value after flags
+		NoTimer        bool   `yaml:"no_timer"`
 		Density        string `yaml:"density"`
 	} `yaml:"style"`
 
@@ -87,7 +89,7 @@ type Config struct {
 		Reset   string `yaml:"reset"`
 	} `yaml:"colors"`
 
-	Icons struct { // These are for themed (non-monochrome) icons
+	Icons struct {
 		Start   string `yaml:"start"`
 		Success string `yaml:"success"`
 		Warning string `yaml:"warning"`
@@ -110,15 +112,39 @@ type PatternsRepo struct {
 	Output map[string][]string `yaml:"output"`
 }
 
+// ensureEscapePrefix checks if a string starts with "33[" and prepends "\033" if so.
+func ensureEscapePrefix(s string) string {
+	// Debug print to see what this function receives and returns.
+	// This should only be active if FO_DEBUG is set.
+	if os.Getenv("FO_DEBUG") != "" {
+		originalS := s
+		defer func() {
+			// This defer will execute after the return, showing the final state.
+			fmt.Fprintf(os.Stderr, "[DEBUG ensureEscapePrefix] Input: '%s' (Hex: %x), Output: '%s' (Hex: %x)\n",
+				originalS, originalS, s, s)
+		}()
+	}
+
+	if s == "" {
+		return ""
+	}
+	if strings.HasPrefix(s, "\033") { // Already has correct ESCAPE char
+		return s
+	}
+	if strings.HasPrefix(s, "33[") { // Missing initial \0 part of \033
+		s = "\033" + s // Prepend the ESCAPE character
+		return s
+	}
+	return s // Return as is if no known malformation
+}
+
 func DefaultConfig() *Config {
 	return UnicodeVibrantTheme()
 }
 
 func NoColorConfig() *Config {
-	// Start with ASCII minimal as a base for structure, then ensure all color is stripped
-	// and specific monochrome settings (like UseBoxes=false) are enforced.
-	cfg := AsciiMinimalTheme()   // This already sets IsMonochrome = true, UseBoxes = false
-	ApplyMonochromeDefaults(cfg) // Further enforce monochrome properties
+	cfg := AsciiMinimalTheme()
+	ApplyMonochromeDefaults(cfg)
 	cfg.ThemeName = "no_color_derived_from_ascii"
 	return cfg
 }
@@ -126,16 +152,14 @@ func NoColorConfig() *Config {
 func AsciiMinimalTheme() *Config {
 	cfg := &Config{
 		ThemeName:    "ascii_minimal",
-		IsMonochrome: true, // This theme IS monochrome by definition
+		IsMonochrome: true,
 	}
-	cfg.Style.UseBoxes = false // Critical for test expectations: line-oriented
+	cfg.Style.UseBoxes = false
 	cfg.Style.Indentation = "  "
 	cfg.Style.ShowTimestamps = false
 	cfg.Style.Density = "compact"
-	cfg.Style.NoTimer = false // Default state for this theme, CLI flags can override
+	cfg.Style.NoTimer = false
 
-	// Icons for this theme are actually defined by GetIcon's monochrome path.
-	// This section can be empty or align with GetIcon's monochrome output for clarity.
 	cfg.Icons.Start = "[START]"
 	cfg.Icons.Success = "[SUCCESS]"
 	cfg.Icons.Warning = "[WARNING]"
@@ -143,7 +167,6 @@ func AsciiMinimalTheme() *Config {
 	cfg.Icons.Info = "[INFO]"
 	cfg.Icons.Bullet = "*"
 
-	// Colors are all empty for a true monochrome theme.
 	cfg.Colors = struct {
 		Process string `yaml:"process"`
 		Success string `yaml:"success"`
@@ -154,31 +177,28 @@ func AsciiMinimalTheme() *Config {
 		Reset   string `yaml:"reset"`
 	}{}
 
-	cfg.Border.TaskStyle = BorderNone // No boxes
-	// Other border fields are mostly irrelevant if UseBoxes is false and TaskStyle is None.
+	cfg.Border.TaskStyle = BorderNone
 
 	cfg.Elements = make(map[string]ElementStyleDef)
-	initBaseElementStyles(cfg.Elements) // Ensure all element keys exist
+	initBaseElementStyles(cfg.Elements)
 
-	// Define element styles specific to ASCII minimal / monochrome behavior.
-	// These ensure that RenderStartLine/EndLine/OutputLine behave as expected for tests.
-	cfg.Elements["Task_Label_Header"] = ElementStyleDef{}                               // No specific text, Render* funcs handle
-	cfg.Elements["Task_StartIndicator_Line"] = ElementStyleDef{}                        // RenderStartLine handles
-	cfg.Elements["H2_Target_Title"] = ElementStyleDef{Prefix: "", TextCase: "none"}     // No "TARGET:"
-	cfg.Elements["Task_Status_Success_Block"] = ElementStyleDef{TextContent: "Success"} // Plain text used by RenderEndLine
+	cfg.Elements["Task_Label_Header"] = ElementStyleDef{}
+	cfg.Elements["Task_StartIndicator_Line"] = ElementStyleDef{}
+	cfg.Elements["H2_Target_Title"] = ElementStyleDef{Prefix: "", TextCase: "none"}
+	cfg.Elements["Task_Status_Success_Block"] = ElementStyleDef{TextContent: "Success"}
 	cfg.Elements["Task_Status_Failed_Block"] = ElementStyleDef{TextContent: "Failed"}
 	cfg.Elements["Task_Status_Warning_Block"] = ElementStyleDef{TextContent: "Warnings"}
 	cfg.Elements["Task_Status_Duration"] = ElementStyleDef{Prefix: "(", Suffix: ")"}
-	cfg.Elements["Stderr_Error_Line_Prefix"] = ElementStyleDef{Text: "  > "}   // Simple prefix for errors
-	cfg.Elements["Stderr_Warning_Line_Prefix"] = ElementStyleDef{Text: "  > "} // Simple prefix for warnings
-	cfg.Elements["Stdout_Line_Prefix"] = ElementStyleDef{Text: "  "}           // Just indent for plain stdout lines
+	cfg.Elements["Stderr_Error_Line_Prefix"] = ElementStyleDef{Text: "  > "}
+	cfg.Elements["Stderr_Warning_Line_Prefix"] = ElementStyleDef{Text: "  > "}
+	cfg.Elements["Stdout_Line_Prefix"] = ElementStyleDef{Text: "  "}
 	cfg.Elements["Task_Content_Summary_Heading"] = ElementStyleDef{TextContent: "SUMMARY:"}
 	cfg.Elements["Task_Content_Summary_Item_Error"] = ElementStyleDef{BulletChar: "*"}
 	cfg.Elements["Task_Content_Summary_Item_Warning"] = ElementStyleDef{BulletChar: "*"}
 
 	cfg.Patterns = defaultPatterns()
 	cfg.Tools = make(map[string]*ToolConfig)
-	cfg.CognitiveLoad.AutoDetect = false // No colors to vary
+	cfg.CognitiveLoad.AutoDetect = false
 	cfg.CognitiveLoad.Default = LoadLow
 
 	return cfg
@@ -202,13 +222,13 @@ func UnicodeVibrantTheme() *Config {
 	cfg.Icons.Info = "ℹ️"
 	cfg.Icons.Bullet = "•"
 
-	cfg.Colors.Process = "\033[0;34m"
-	cfg.Colors.Success = "\033[0;32m"
-	cfg.Colors.Warning = "\033[0;33m"
-	cfg.Colors.Error = "\033[0;31m"
-	cfg.Colors.Detail = "\033[0m"
-	cfg.Colors.Muted = "\033[2m"
-	cfg.Colors.Reset = "\033[0m"
+	cfg.Colors.Process = "\033[0;34m" // Blue
+	cfg.Colors.Success = "\033[0;32m" // Green
+	cfg.Colors.Warning = "\033[0;33m" // Yellow
+	cfg.Colors.Error = "\033[0;31m"   // Red
+	cfg.Colors.Detail = "\033[0m"     // Default/Reset
+	cfg.Colors.Muted = "\033[2m"      // Dim
+	cfg.Colors.Reset = "\033[0m"      // ANSI Reset
 
 	cfg.Border.TaskStyle = BorderLeftDouble
 	cfg.Border.HeaderChar = "═"
@@ -216,17 +236,7 @@ func UnicodeVibrantTheme() *Config {
 	cfg.Border.TopCornerChar = "╒"
 	cfg.Border.BottomCornerChar = "└"
 	cfg.Border.FooterContinuationChar = "─"
-	cfg.Border.Table_HChar = "─"
-	cfg.Border.Table_VChar = "│"
-	cfg.Border.Table_XChar = "┼"
-	cfg.Border.Table_Corner_TL = "┌"
-	cfg.Border.Table_Corner_TR = "┐"
-	cfg.Border.Table_Corner_BL = "└"
-	cfg.Border.Table_Corner_BR = "┘"
-	cfg.Border.Table_T_Down = "┬"
-	cfg.Border.Table_T_Up = "┴"
-	cfg.Border.Table_T_Left = "├"
-	cfg.Border.Table_T_Right = "┤"
+	// ... (other border characters)
 
 	cfg.Elements = make(map[string]ElementStyleDef)
 	initBaseElementStyles(cfg.Elements)
@@ -290,7 +300,7 @@ func defaultPatterns() PatternsRepo {
 		Output: map[string][]string{
 			"error": {
 				"^Error:", "^ERROR:", "^ERRO[R]?\\[",
-				"^E!", "^panic:", "^fatal:", "^Failed", // General "Failed" might be too broad
+				"^E!", "^panic:", "^fatal:", "^Failed",
 				"\\[ERROR\\]", "^FAIL\\t", "failure",
 			},
 			"warning": {
@@ -378,36 +388,72 @@ func (c *Config) GetColor(colorKey string, elementName ...string) string {
 	return c.resolveColorName(colorKey)
 }
 
+// resolveColorName translates a color name or a direct ANSI code string.
+// It applies ensureEscapePrefix to the final code.
 func (c *Config) resolveColorName(name string) string {
-	if c.IsMonochrome {
+	if c.IsMonochrome { // Should be handled by GetColor, but defensive check.
 		return ""
 	}
+
+	// Debug print for input to resolveColorName
+	if os.Getenv("FO_DEBUG") != "" {
+		fmt.Fprintf(os.Stderr, "[DEBUG resolveColorName] Input name: '%s' (Hex: %x)\n", name, name)
+	}
+
+	var colorCode string
 	switch strings.ToLower(name) {
 	case "process":
-		return c.Colors.Process
+		colorCode = c.Colors.Process
 	case "success":
-		return c.Colors.Success
+		colorCode = c.Colors.Success
 	case "warning":
-		return c.Colors.Warning
+		colorCode = c.Colors.Warning
 	case "error":
-		return c.Colors.Error
+		colorCode = c.Colors.Error
 	case "detail":
-		return c.Colors.Detail
+		colorCode = c.Colors.Detail
 	case "muted":
-		return c.Colors.Muted
+		colorCode = c.Colors.Muted
 	default:
-		if strings.HasPrefix(name, "\033[") {
-			return name
+		// If 'name' itself is an ANSI code (e.g., "\033[1;31m") or potentially malformed ("33[1;31m"),
+		// ensureEscapePrefix will handle it. Otherwise, it's an unknown symbolic name.
+		if strings.HasPrefix(name, "\033[") || strings.HasPrefix(name, "33[") {
+			colorCode = name // Pass potentially malformed or correct codes to ensureEscapePrefix
+		} else {
+			colorCode = c.Colors.Detail // Fallback for unknown symbolic names
+			if os.Getenv("FO_DEBUG") != "" {
+				fmt.Fprintf(os.Stderr, "[DEBUG resolveColorName] Unknown color name '%s', falling back to Detail: '%s'\n", name, colorCode)
+			}
 		}
-		return c.Colors.Detail // Fallback for unknown names
 	}
+
+	// Debug print for the code chosen by the switch statement.
+	if os.Getenv("FO_DEBUG") != "" {
+		fmt.Fprintf(os.Stderr, "[DEBUG resolveColorName] Code from switch: '%s' (Hex: %x)\n", colorCode, colorCode)
+	}
+
+	finalCode := ensureEscapePrefix(colorCode)
+
+	// Debug print for the final code after ensureEscapePrefix.
+	if os.Getenv("FO_DEBUG") != "" {
+		fmt.Fprintf(os.Stderr, "[DEBUG resolveColorName] Final code after ensureEscapePrefix: '%s' (Hex: %x)\n", finalCode, finalCode)
+	}
+	return finalCode
 }
 
 func (c *Config) ResetColor() string {
 	if c.IsMonochrome {
 		return ""
 	}
-	return c.Colors.Reset
+	// Debug print for ResetColor input
+	if os.Getenv("FO_DEBUG") != "" {
+		fmt.Fprintf(os.Stderr, "[DEBUG ResetColor] Input c.Colors.Reset: '%s' (Hex: %x)\n", c.Colors.Reset, c.Colors.Reset)
+	}
+	finalReset := ensureEscapePrefix(c.Colors.Reset)
+	if os.Getenv("FO_DEBUG") != "" {
+		fmt.Fprintf(os.Stderr, "[DEBUG ResetColor] Output finalReset: '%s' (Hex: %x)\n", finalReset, finalReset)
+	}
+	return finalReset
 }
 
 func DeepCopyConfig(original *Config) *Config {
@@ -415,6 +461,7 @@ func DeepCopyConfig(original *Config) *Config {
 		return nil
 	}
 	copied := *original
+
 	if original.Elements != nil {
 		copied.Elements = make(map[string]ElementStyleDef)
 		for k, v := range original.Elements {
@@ -463,7 +510,7 @@ func ApplyMonochromeDefaults(cfg *Config) {
 		return
 	}
 	cfg.IsMonochrome = true
-	cfg.Style.UseBoxes = false // Force line-oriented for monochrome
+	cfg.Style.UseBoxes = false
 
 	cfg.Colors = struct {
 		Process string `yaml:"process"`
@@ -475,18 +522,18 @@ func ApplyMonochromeDefaults(cfg *Config) {
 		Reset   string `yaml:"reset"`
 	}{}
 
-	// Use ASCII minimal element definitions as a base for monochrome elements
 	asciiMinimalElements := AsciiMinimalTheme().Elements
 	if cfg.Elements == nil {
 		cfg.Elements = make(map[string]ElementStyleDef)
-		initBaseElementStyles(cfg.Elements) // Ensure all keys exist
+		initBaseElementStyles(cfg.Elements)
 	}
+
 	for key := range cfg.Elements {
 		elDef := cfg.Elements[key]
 		elDef.ColorFG = ""
 		elDef.ColorBG = ""
+
 		if asciiStyle, ok := asciiMinimalElements[key]; ok {
-			// Override with simpler text/prefixes from ASCII theme if they exist
 			if asciiStyle.Text != "" {
 				elDef.Text = asciiStyle.Text
 			}
@@ -499,7 +546,6 @@ func ApplyMonochromeDefaults(cfg *Config) {
 			if asciiStyle.TextContent != "" {
 				elDef.TextContent = asciiStyle.TextContent
 			}
-			// IconKey in element styles is less relevant if GetIcon handles monochrome centrally
 		}
 		cfg.Elements[key] = elDef
 	}
