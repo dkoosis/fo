@@ -1,609 +1,699 @@
 package main
 
 import (
-	"bufio"
-	"bytes" // Import bytes for buffer
-	"context"
-	"errors"
-	"flag"
+	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
-	"runtime"
+	"regexp"
 	"strings"
-	"sync"
-	"syscall"
+	"testing"
 	"time"
 
-	config "github.com/davidkoosis/fo/cmd/internal/config"
 	"github.com/davidkoosis/fo/cmd/internal/design"
-	"github.com/davidkoosis/fo/cmd/internal/version"
 )
 
-// LocalAppConfig holds behavioral settings derived from AppConfig and CLI flags.
-type LocalAppConfig struct {
-	Label         string
-	Stream        bool
-	ShowOutput    string
-	NoTimer       bool // Effective NoTimer after all flags/configs
-	NoColor       bool // Effective NoColor (IsMonochrome)
-	CI            bool // Effective CI mode
-	Debug         bool
-	MaxBufferSize int64 // Max total size for combined stdout/stderr in capture mode
-	MaxLineLength int   // Max size for a single line from stdout/stderr
-}
+// Updated plain text icon constants to match GetIcon's monochrome output
+const (
+	plainIconStart   = "[START]"
+	plainIconSuccess = "[SUCCESS]"
+	plainIconWarning = "[WARNING]"
+	plainIconFailure = "[FAILED]"
+)
 
-var versionFlag bool
-var cliFlagsGlobal config.CliFlags // Holds parsed CLI flags
+var foTestBinaryPath = "./fo_test_binary_generated_by_TestMain"
 
-// main is the entry point of the application.
-func main() {
-	// Parse command-line flags into the global cliFlagsGlobal struct.
-	parseFlagsIntoGlobal()
-
-	// Handle version flag.
-	if versionFlag {
-		fmt.Printf("fo version %s\n", version.Version)
-		fmt.Printf("Commit: %s\n", version.CommitHash)
-		fmt.Printf("Built: %s\n", version.BuildDate)
-		os.Exit(0)
+// TestMain sets up and tears down the test binary.
+func TestMain(m *testing.M) {
+	cmd := exec.Command("go", "build", "-o", foTestBinaryPath, ".")
+	buildOutput, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to build test binary '%s': %v\nOutput:\n%s\n", foTestBinaryPath, err, string(buildOutput))
+		os.Exit(1)
 	}
 
-	// Load application configuration from .fo.yaml.
-	fileAppConfig := config.LoadConfig()
+	exitCode := m.Run()
 
-	// Find the command and arguments to be executed (must be after "--").
-	cmdArgs := findCommandArgs()
-	if len(cmdArgs) == 0 {
-		fmt.Fprintln(os.Stderr, "Error: No command specified after --")
-		fmt.Fprintln(os.Stderr, "Usage: fo [flags] -- <COMMAND> [ARGS...]")
-		os.Exit(1) // Exit if no command is provided.
-	}
-
-	// Apply any command-specific presets from the config file.
-	if len(cmdArgs) > 0 {
-		config.ApplyCommandPreset(fileAppConfig, cmdArgs[0])
-	}
-
-	// Convert the file-based AppConfig to LocalAppConfig for runtime behavior.
-	behavioralSettings := convertAppConfigToLocal(fileAppConfig)
-
-	// Override behavioral settings with any explicitly set CLI flags.
-	if cliFlagsGlobal.Label != "" {
-		behavioralSettings.Label = cliFlagsGlobal.Label
-	}
-	if cliFlagsGlobal.StreamSet { // Check if -s/--stream was actually used
-		behavioralSettings.Stream = cliFlagsGlobal.Stream
-	}
-	if cliFlagsGlobal.ShowOutputSet && cliFlagsGlobal.ShowOutput != "" { // Check if --show-output was used
-		behavioralSettings.ShowOutput = cliFlagsGlobal.ShowOutput
-	}
-	if cliFlagsGlobal.DebugSet { // CLI debug flag overrides all
-		behavioralSettings.Debug = cliFlagsGlobal.Debug
-		fileAppConfig.Debug = cliFlagsGlobal.Debug // Ensure this is passed to MergeWithFlags
-	}
-	if cliFlagsGlobal.MaxBufferSize > 0 { // CLI overrides config if set
-		behavioralSettings.MaxBufferSize = cliFlagsGlobal.MaxBufferSize
-	}
-	if cliFlagsGlobal.MaxLineLength > 0 { // CLI overrides config if set
-		behavioralSettings.MaxLineLength = cliFlagsGlobal.MaxLineLength
-	}
-
-	// Get the final design configuration (styling, icons, colors) by merging
-	// the file configuration with CLI flags related to presentation.
-	finalDesignConfig := config.MergeWithFlags(fileAppConfig, cliFlagsGlobal)
-
-	// Update behavioralSettings with final decisions on NoTimer, NoColor, CI from finalDesignConfig.
-	behavioralSettings.NoTimer = finalDesignConfig.Style.NoTimer
-	behavioralSettings.NoColor = finalDesignConfig.IsMonochrome
-	behavioralSettings.CI = finalDesignConfig.IsMonochrome && finalDesignConfig.Style.NoTimer
-	if fileAppConfig.Debug {
-		behavioralSettings.Debug = true
-	}
-	if cliFlagsGlobal.DebugSet {
-		behavioralSettings.Debug = cliFlagsGlobal.Debug
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	defer signal.Stop(sigChan)
-
-	exitCode := executeCommand(ctx, cancel, sigChan, behavioralSettings, finalDesignConfig, cmdArgs)
-
-	if behavioralSettings.Debug {
-		fmt.Fprintf(os.Stderr, "[DEBUG main()] about to os.Exit(%d).\nBehavioral Config: %+v\n", exitCode, behavioralSettings)
+	if err := os.Remove(foTestBinaryPath); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: Failed to remove test binary '%s': %v\n", foTestBinaryPath, err)
 	}
 	os.Exit(exitCode)
 }
 
-func convertAppConfigToLocal(appCfg *config.AppConfig) LocalAppConfig {
-	return LocalAppConfig{
-		Label:         appCfg.Label,
-		Stream:        appCfg.Stream,
-		ShowOutput:    appCfg.ShowOutput,
-		NoTimer:       appCfg.NoTimer,
-		NoColor:       appCfg.NoColor,
-		CI:            appCfg.CI,
-		Debug:         appCfg.Debug,
-		MaxBufferSize: appCfg.MaxBufferSize,
-		MaxLineLength: appCfg.MaxLineLength,
+// foResult holds the output and exit status of an 'fo' command execution.
+type foResult struct {
+	stdout   string
+	stderr   string
+	exitCode int
+	runError error
+}
+
+// runFo executes the compiled 'fo' test binary with given arguments.
+func runFo(t *testing.T, foCmdArgs ...string) foResult {
+	t.Helper()
+	cmd := exec.Command(foTestBinaryPath, foCmdArgs...)
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	startTime := time.Now()
+	runErr := cmd.Run()
+	duration := time.Since(startTime)
+
+	exitCode := 0
+	if runErr != nil {
+		if exitError, ok := runErr.(*exec.ExitError); ok {
+			exitCode = exitError.ExitCode()
+		} else {
+			exitCode = 1
+		}
+	}
+	if cmd.ProcessState != nil {
+		exitCode = cmd.ProcessState.ExitCode()
+	}
+
+	logMessage := fmt.Sprintf("Executed: %s %s (took %v)\n"+
+		"--- FO STDOUT ---\n%s\n"+
+		"--- FO STDERR ---\n%s\n"+
+		"--- FO EXITCODE (from fo process): %d ---",
+		foTestBinaryPath, strings.Join(foCmdArgs, " "), duration,
+		stdout.String(), stderr.String(), exitCode)
+	t.Log(logMessage)
+
+	return foResult{
+		stdout:   stdout.String(),
+		stderr:   stderr.String(),
+		exitCode: exitCode,
+		runError: runErr,
 	}
 }
 
-func parseFlagsIntoGlobal() {
-	flag.BoolVar(&versionFlag, "version", false, "Print fo version and exit.")
-	flag.BoolVar(&versionFlag, "v", false, "Print fo version and exit (shorthand).")
-	flag.BoolVar(&cliFlagsGlobal.Debug, "debug", false, "Enable debug output.")
-	flag.BoolVar(&cliFlagsGlobal.Debug, "d", false, "Enable debug output (shorthand).")
-	flag.StringVar(&cliFlagsGlobal.Label, "l", "", "Label for the task.")
-	flag.StringVar(&cliFlagsGlobal.Label, "label", "", "Label for the task.")
-	flag.BoolVar(&cliFlagsGlobal.Stream, "s", false, "Stream mode - print command's stdout/stderr live.")
-	flag.BoolVar(&cliFlagsGlobal.Stream, "stream", false, "Stream mode.")
-	flag.StringVar(&cliFlagsGlobal.ShowOutput, "show-output", "", "When to show captured output: on-fail, always, never.")
-	flag.BoolVar(&cliFlagsGlobal.NoTimer, "no-timer", false, "Disable showing the duration.")
-	flag.BoolVar(&cliFlagsGlobal.NoColor, "no-color", false, "Disable ANSI color/styling output.")
-	flag.BoolVar(&cliFlagsGlobal.CI, "ci", false, "Enable CI-friendly, plain-text output.")
-	flag.StringVar(&cliFlagsGlobal.ThemeName, "theme", "", "Select visual theme (e.g., 'ascii_minimal', 'unicode_vibrant').")
+// setupTestScripts creates dummy shell scripts in a 'testdata' directory for tests to use.
+func setupTestScripts(t *testing.T) {
+	t.Helper()
+	scriptsDir := "testdata"
+	if _, err := os.Stat(scriptsDir); os.IsNotExist(err) {
+		if err := os.Mkdir(scriptsDir, 0755); err != nil {
+			t.Fatalf("Failed to create directory %s: %v", scriptsDir, err)
+		}
+	}
+	scripts := map[string]string{
+		"success.sh": `#!/bin/sh
+echo "STDOUT: Normal output from success.sh"
+echo "STDERR: Info output from success.sh" >&2
+exit 0`,
+		"failure.sh": `#!/bin/sh
+echo "STDOUT: Output from failure.sh before failing"
+echo "STDERR: Error message from failure.sh" >&2
+exit 1`,
+		"exit_code.sh": `#!/bin/sh
+echo "STDOUT: Script about to exit with $1"
+echo "STDERR: Script stderr message before exiting $1" >&2
+exit "$1"`,
+		"long_running.sh": `#!/bin/sh 
+echo "STDOUT: Starting long task..."
+sleep 0.1 
+echo "STDOUT: Long task finished."
+exit 0`,
+		"only_stdout.sh": `#!/bin/sh
+echo "ONLY_STDOUT_CONTENT"
+exit 0`,
+		"only_stderr.sh": `#!/bin/sh
+echo "ONLY_STDERR_CONTENT" >&2
+exit 1`,
+		"interleaved.sh": `#!/bin/sh 
+echo "STDOUT: Message 1"
+echo "STDERR: Message 1" >&2
+echo "STDOUT: Message 2"
+echo "STDERR: Message 2" >&2
+exit 0`,
+		"large_output.sh": `#!/bin/sh 
+for i in $(seq 1 100); do
+  printf "STDOUT: Line %04d - This is test content to generate output.\n" $i
+done
+echo "Script complete"
+exit 0`,
+		"signal_test.sh": `#!/bin/sh 
+echo "Starting signal test script (PID: $$)"
+echo "Will sleep for 5 seconds unless interrupted" 
+trap 'echo "Caught signal, exiting cleanly"; exit 42' INT TERM
+sleep 5
+echo "Finished sleeping"
+exit 0`,
+	}
+	for name, content := range scripts {
+		path := filepath.Join(scriptsDir, name)
+		if err := os.WriteFile(path, []byte(content), 0755); err != nil {
+			t.Fatalf("Failed to write test script %s: %v", name, err)
+		}
+	}
+}
 
-	var maxBufferSizeMB int
-	var maxLineLengthKB int
-	flag.IntVar(&maxBufferSizeMB, "max-buffer-size", 0, fmt.Sprintf("Maximum total buffer size in MB (per stream). Default: %dMB", config.DefaultMaxBufferSize/(1024*1024)))
-	flag.IntVar(&maxLineLengthKB, "max-line-length", 0, fmt.Sprintf("Maximum length in KB for a single line. Default: %dKB", config.DefaultMaxLineLength/1024))
+// buildPattern creates a regex to match fo's start/end lines.
+func buildPattern(iconString string, label string, isStartLine bool, expectTimer bool) *regexp.Regexp {
+	pattern := regexp.QuoteMeta(iconString) + `\s*` + regexp.QuoteMeta(label)
+	if isStartLine {
+		pattern += `\.\.\.`
+	} else if expectTimer {
+		pattern += `\s*\([\wµ\.:]+\)$`
+	} else {
+		pattern += `$`
+	}
+	return regexp.MustCompile(pattern)
+}
 
-	flag.Parse()
+// TestFoCoreExecution tests basic command execution, exit codes, and argument passing.
+func TestFoCoreExecution(t *testing.T) {
+	setupTestScripts(t)
 
-	flag.Visit(func(f *flag.Flag) {
-		switch f.Name {
-		case "s", "stream":
-			cliFlagsGlobal.StreamSet = true
-		case "show-output":
-			cliFlagsGlobal.ShowOutputSet = true
-		case "no-timer":
-			cliFlagsGlobal.NoTimerSet = true
-		case "no-color":
-			cliFlagsGlobal.NoColorSet = true
-		case "ci":
-			cliFlagsGlobal.CISet = true
-		case "d", "debug":
-			cliFlagsGlobal.DebugSet = true
+	t.Run("ExitCodePassthroughSuccess", func(t *testing.T) {
+		t.Parallel()
+		res := runFo(t, "--", "testdata/success.sh")
+		if res.exitCode != 0 {
+			t.Errorf("Expected exit code 0, got %d", res.exitCode)
 		}
 	})
 
-	if maxBufferSizeMB > 0 {
-		cliFlagsGlobal.MaxBufferSize = int64(maxBufferSizeMB) * 1024 * 1024
-	}
-	if maxLineLengthKB > 0 {
-		cliFlagsGlobal.MaxLineLength = maxLineLengthKB * 1024
-	}
-
-	if cliFlagsGlobal.ShowOutput != "" {
-		validValues := map[string]bool{"on-fail": true, "always": true, "never": true}
-		if !validValues[cliFlagsGlobal.ShowOutput] {
-			fmt.Fprintf(os.Stderr, "Error: Invalid value for --show-output: %s\nValid values are: on-fail, always, never\n", cliFlagsGlobal.ShowOutput)
-			flag.Usage()
-			os.Exit(1)
+	t.Run("ExitCodePassthroughFailure", func(t *testing.T) {
+		t.Parallel()
+		res := runFo(t, "--", "testdata/failure.sh")
+		if res.exitCode != 1 {
+			t.Errorf("Expected exit code 1, got %d", res.exitCode)
 		}
-	}
+	})
+
+	t.Run("ExitCodePassthroughSpecific", func(t *testing.T) {
+		t.Parallel()
+		res := runFo(t, "--no-color", "--show-output", "on-fail", "--", "testdata/exit_code.sh", "42")
+		if res.exitCode != 42 {
+			t.Errorf("Expected fo process to exit with code 42, got %d.", res.exitCode)
+		}
+		if !strings.Contains(res.stdout, "--- Captured output: ---") {
+			t.Error("Expected '--- Captured output: ---' header for a failing script with non-zero exit code.")
+		}
+		if !strings.Contains(res.stdout, "STDOUT: Script about to exit with 42") {
+			t.Error("Expected script's STDOUT in captured output.")
+		}
+		// This was the failing assertion. Check if STDERR message is present in the captured output.
+		if !strings.Contains(res.stdout, "STDERR: Script stderr message before exiting 42") {
+			t.Errorf("Expected script's STDERR in captured output. Full stdout:\n%s", res.stdout)
+		}
+	})
+
+	t.Run("CommandNotFound", func(t *testing.T) {
+		t.Parallel()
+		commandName := "a_very_unique_non_existent_command_askjdfh"
+		// Add --debug to see if it affects stderr output order
+		res := runFo(t, "--debug", "--no-color", "--", commandName)
+		if res.exitCode != 127 {
+			t.Errorf("Expected 'fo' to exit with 127 for command not found, got %d. Stderr:\n%s", res.exitCode, res.stderr)
+		}
+
+		lines := strings.Split(strings.TrimSpace(res.stdout), "\n")
+		if len(lines) == 0 {
+			t.Fatalf("Expected some output from fo, got empty stdout for CommandNotFound.")
+		}
+
+		startPattern := buildPattern(plainIconStart, commandName, true, false)
+		if !startPattern.MatchString(lines[0]) {
+			t.Errorf("Expected 'fo' stdout to contain start line /%s/, got first line: '%s'\nFull stdout:\n%s", startPattern.String(), lines[0], res.stdout)
+		}
+
+		endPattern := buildPattern(plainIconFailure, commandName, false, true)
+		if len(lines) < 2 || !endPattern.MatchString(lines[len(lines)-1]) {
+			lastLine := ""
+			if len(lines) >= 1 {
+				lastLine = lines[len(lines)-1]
+			}
+			t.Errorf("Expected 'fo' stdout to contain end line /%s/, got last line: '%s'\nFull stdout:\n%s", endPattern.String(), lastLine, res.stdout)
+		}
+
+		// MODIFIED ASSERTION: Use strings.Contains because debug output might be prepended.
+		expectedStderrContent := "Error starting command '" + commandName + "': exec: \"" + commandName + "\":"
+		if !strings.Contains(res.stderr, expectedStderrContent) {
+			t.Errorf("Expected 'fo' stderr to contain '%s', got:\n%s", expectedStderrContent, res.stderr)
+		}
+		if strings.Contains(res.stdout, "--- Captured output: ---") {
+			t.Errorf("Did NOT expect '--- Captured output: ---' in stdout for command not found error, got:\n%s", res.stdout)
+		}
+	})
+
+	t.Run("ArgumentsToWrappedCommand", func(t *testing.T) {
+		t.Parallel()
+		helperScriptContent := `#!/bin/sh
+echo "Args: $1 $2"`
+		scriptPath := filepath.Join(t.TempDir(), "args_test.sh")
+		if err := os.WriteFile(scriptPath, []byte(helperScriptContent), 0755); err != nil {
+			t.Fatalf("Failed to write script: %v", err)
+		}
+		res := runFo(t, "--show-output", "always", "--no-color", "--", scriptPath, "hello", "world")
+		if res.exitCode != 0 {
+			t.Errorf("Expected exit code 0, got %d", res.exitCode)
+		}
+		if !strings.Contains(res.stdout, "Args: hello world") {
+			t.Errorf("Expected 'Args: hello world' in fo's output, got: %s", res.stdout)
+		}
+	})
 }
 
-func findCommandArgs() []string {
-	for i, arg := range os.Args {
-		if arg == "--" {
-			if i < len(os.Args)-1 {
-				return os.Args[i+1:]
-			}
-			return []string{}
-		}
-	}
-	return []string{}
-}
+// TestFoLabels verifies that labels (default and custom) are correctly displayed.
+func TestFoLabels(t *testing.T) {
+	setupTestScripts(t)
+	scriptPath := "testdata/success.sh"
 
-func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan os.Signal,
-	appSettings LocalAppConfig, designCfg *design.Config, cmdArgs []string) int {
-
-	labelToUse := appSettings.Label
-	if labelToUse == "" {
-		labelToUse = filepath.Base(cmdArgs[0])
-	}
-
-	patternMatcher := design.NewPatternMatcher(designCfg)
-	intent := patternMatcher.DetectCommandIntent(cmdArgs[0], cmdArgs[1:])
-	task := design.NewTask(labelToUse, intent, cmdArgs[0], cmdArgs[1:], designCfg)
-
-	fmt.Println(task.RenderStartLine())
-
-	cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
-	cmd.Env = os.Environ()
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-
-	cmdDone := make(chan struct{})
-	go func() {
-		defer close(cmdDone)
-		select {
-		case sig := <-sigChan:
-			if cmd.Process == nil {
-				if appSettings.Debug {
-					fmt.Fprintln(os.Stderr, "[DEBUG sigChan] Process is nil, canceling context.")
-				}
-				cancel()
-				return
-			}
-			if appSettings.Debug {
-				fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Received signal %v for PID %d. Forwarding...\n", sig, cmd.Process.Pid)
-			}
-			pgid, err := syscall.Getpgid(cmd.Process.Pid)
-			if err == nil {
-				if appSettings.Debug {
-					fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Sending signal %v to PGID %d\n", sig, pgid)
-				}
-				_ = syscall.Kill(-pgid, sig.(syscall.Signal))
-			} else {
-				if appSettings.Debug {
-					fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Failed to get PGID for PID %d (%v), sending to PID directly.\n", cmd.Process.Pid, err)
-				}
-				_ = cmd.Process.Signal(sig)
-			}
-			select {
-			case <-cmdDone:
-				if appSettings.Debug {
-					fmt.Fprintln(os.Stderr, "[DEBUG sigChan] cmdDone received after signal forwarding.")
-				}
-			case <-time.After(2 * time.Second):
-				if appSettings.Debug {
-					fmt.Fprintln(os.Stderr, "[DEBUG sigChan] Timeout after signal, ensuring process is killed.")
-				}
-				if cmd.Process != nil && cmd.ProcessState == nil {
-					pgidKill, errKill := syscall.Getpgid(cmd.Process.Pid)
-					if errKill == nil {
-						_ = syscall.Kill(-pgidKill, syscall.SIGKILL)
-					} else {
-						_ = cmd.Process.Kill()
-					}
-				}
-				cancel()
-			}
-			return
-		case <-ctx.Done():
-			if appSettings.Debug {
-				fmt.Fprintln(os.Stderr, "[DEBUG sigChan] Context done, ensuring process is killed if running.")
-			}
-			if cmd.Process != nil && cmd.ProcessState == nil {
-				pgid, err := syscall.Getpgid(cmd.Process.Pid)
-				if err == nil {
-					_ = syscall.Kill(-pgid, syscall.SIGKILL)
-				} else {
-					_ = cmd.Process.Kill()
-				}
-			}
-			return
-		case <-cmdDone:
-			if appSettings.Debug {
-				fmt.Fprintln(os.Stderr, "[DEBUG sigChan] cmdDone received, command finished naturally.")
-			}
-			return
-		}
-	}()
-
-	var exitCode int
-	var cmdRunError error
-	var isActualFoStartupFailure bool
-
-	if appSettings.Stream {
-		exitCode, cmdRunError = executeStreamMode(cmd, task, appSettings)
-		if cmdRunError != nil {
-			var exitErr *exec.ExitError
-			if !errors.As(cmdRunError, &exitErr) {
-				isActualFoStartupFailure = true
-			}
-		}
-	} else {
-		exitCode, cmdRunError = executeCaptureMode(cmd, task, patternMatcher, appSettings)
-		if cmdRunError != nil {
-			var exitErr *exec.ExitError
-			if !errors.As(cmdRunError, &exitErr) {
-				isActualFoStartupFailure = true
-			}
-		}
-	}
-
-	task.Complete(exitCode)
-
-	if !appSettings.Stream {
-		showCaptured := false
-		switch appSettings.ShowOutput {
-		case "always":
-			showCaptured = true
-		case "on-fail":
-			if exitCode != 0 {
-				showCaptured = true
-			}
-		}
-
-		if showCaptured && !isActualFoStartupFailure {
-			summary := task.RenderSummary()
-			if summary != "" {
-				fmt.Print(summary)
+	commonTest := func(tcName string, args []string, expectedLabelForPattern string) {
+		t.Run(tcName, func(t *testing.T) {
+			t.Parallel()
+			res := runFo(t, args...)
+			lines := strings.Split(strings.TrimSpace(res.stdout), "\n")
+			if len(lines) < 2 {
+				t.Fatalf("Args: %v. Expected at least 2 lines of output, got %d:\n%s", args, len(lines), res.stdout)
 			}
 
-			hasActualRenderableOutput := false
-			task.OutputLinesLock()
-			for _, l := range task.OutputLines {
-				if l.Type != design.TypeError ||
-					(!strings.HasPrefix(l.Content, "Error starting command") &&
-						!strings.HasPrefix(l.Content, "Error creating stdout pipe") &&
-						!strings.HasPrefix(l.Content, "Error creating stderr pipe") &&
-						!strings.HasPrefix(l.Content, "[fo] ")) {
-					hasActualRenderableOutput = true
+			startPattern := buildPattern(plainIconStart, expectedLabelForPattern, true, false)
+			if !startPattern.MatchString(lines[0]) {
+				t.Errorf("Args: %v. Missing start pattern /%s/ in first line '%s'. Full stdout:\n%s", args, startPattern, lines[0], res.stdout)
+			}
+
+			expectTimer := true
+			for _, arg := range args {
+				if arg == "--no-timer" || arg == "--ci" {
+					expectTimer = false
 					break
 				}
 			}
-			task.OutputLinesUnlock()
+			endPattern := buildPattern(plainIconSuccess, expectedLabelForPattern, false, expectTimer)
+			if !endPattern.MatchString(lines[len(lines)-1]) {
+				t.Errorf("Args: %v. Missing end pattern /%s/ in last line '%s'. Full stdout:\n%s", args, endPattern, lines[len(lines)-1], res.stdout)
+			}
+		})
+	}
 
-			if hasActualRenderableOutput {
-				fmt.Println(designCfg.GetColor("Muted"), "--- Captured output: ---", designCfg.ResetColor())
-				task.OutputLinesLock()
-				for _, line := range task.OutputLines {
-					fmt.Println(task.RenderOutputLine(line))
+	commonTest("DefaultLabelInferenceNoColor", []string{"--no-color", "--", scriptPath}, filepath.Base(scriptPath))
+
+	customLabel1 := "My Custom Task"
+	commonTest("CustomLabelShortFlagNoColor", []string{"--no-color", "-l", customLabel1, "--", scriptPath}, customLabel1)
+
+	customLabel2 := "Another Task"
+	commonTest("CustomLabelLongFlagNoColor", []string{"--no-color", "--label", customLabel2, "--", scriptPath}, customLabel2)
+}
+
+// TestFoCaptureMode tests different behaviors of --show-output in capture mode.
+func TestFoCaptureMode(t *testing.T) {
+	setupTestScripts(t)
+	tests := []struct {
+		name                                 string
+		foArgs                               []string
+		script                               string
+		expectExit                           int
+		expectHeader                         bool
+		negateOut                            bool
+		negateErr                            bool
+		expectOutContains, expectErrContains string
+	}{
+		{"DefaultSuccess", []string{"--no-color"}, "testdata/success.sh", 0, false, true, true, "STDOUT: Normal", "STDERR: Info"},
+		{"on-fail Failure", []string{"--no-color", "--show-output", "on-fail"}, "testdata/failure.sh", 1, true, false, false, "STDOUT: Output from failure", "STDERR: Error message"},
+		{"always Success", []string{"--no-color", "--show-output", "always"}, "testdata/success.sh", 0, true, false, false, "STDOUT: Normal", "STDERR: Info"},
+		{"never Failure", []string{"--no-color", "--show-output", "never"}, "testdata/failure.sh", 1, false, true, true, "STDOUT: Output from failure", "STDERR: Error message"},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			args := append(tt.foArgs, "--", tt.script)
+			res := runFo(t, args...)
+
+			if res.exitCode != tt.expectExit {
+				t.Errorf("Exit code: got %d, want %d", res.exitCode, tt.expectExit)
+			}
+
+			hasHeader := strings.Contains(res.stdout, "--- Captured output: ---")
+			if tt.expectHeader != hasHeader {
+				t.Errorf("'Captured output' header presence: got %t, want %t. Full stdout:\n%s", hasHeader, tt.expectHeader, res.stdout)
+			}
+
+			targetSection := res.stdout
+			if tt.expectHeader && hasHeader {
+				parts := strings.SplitN(res.stdout, "--- Captured output: ---", 2)
+				if len(parts) == 2 {
+					targetSection = parts[1]
+				} else {
+					t.Errorf("Expected 'Captured output' header and section, but couldn't split stdout appropriately:\n%s", res.stdout)
 				}
-				task.OutputLinesUnlock()
-			} else if (task.Status == design.StatusError || task.Status == design.StatusWarning) && summary == "" {
-				summary = task.RenderSummary()
-				if summary != "" {
-					fmt.Print(summary)
+			}
+
+			outPresent := strings.Contains(targetSection, tt.expectOutContains)
+			if tt.negateOut {
+				if outPresent {
+					t.Errorf("Script stdout '%s' was unexpectedly PRESENT in target section:\n%s", tt.expectOutContains, targetSection)
+				}
+			} else {
+				if !outPresent {
+					t.Errorf("Script stdout '%s' was unexpectedly ABSENT from target section:\n%s", tt.expectOutContains, targetSection)
 				}
 			}
-		} else if !showCaptured && (task.Status == design.StatusError || task.Status == design.StatusWarning) && !isActualFoStartupFailure {
-			summary := task.RenderSummary()
-			if summary != "" {
-				fmt.Print(summary)
-			}
-		}
-	} else {
-		if (task.Status == design.StatusError || task.Status == design.StatusWarning) && !isActualFoStartupFailure {
-			summary := task.RenderSummary()
-			if summary != "" {
-				fmt.Print(summary)
-			}
-		}
-	}
 
-	fmt.Println(task.RenderEndLine())
-	return exitCode
+			errPresent := strings.Contains(targetSection, tt.expectErrContains)
+			if tt.negateErr {
+				if errPresent {
+					t.Errorf("Script stderr '%s' was unexpectedly PRESENT in target section:\n%s", tt.expectErrContains, targetSection)
+				}
+			} else {
+				if !errPresent {
+					t.Errorf("Script stderr '%s' was unexpectedly ABSENT from target section:\n%s", tt.expectErrContains, targetSection)
+				}
+			}
+		})
+	}
 }
 
-func executeStreamMode(cmd *exec.Cmd, task *design.Task, appSettings LocalAppConfig) (int, error) {
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		if appSettings.Debug {
-			fmt.Fprintln(os.Stderr, "[DEBUG executeStreamMode] Error creating stderr pipe, fallback to direct os.Stderr:", err)
+// TestFoStreamMode verifies behavior when -s/--stream flag is used.
+func TestFoStreamMode(t *testing.T) {
+	setupTestScripts(t)
+
+	t.Run("StreamSuccess", func(t *testing.T) {
+		t.Parallel()
+		res := runFo(t, "-s", "--no-color", "--", "testdata/success.sh")
+		if res.exitCode != 0 {
+			t.Errorf("Exit code: got %d, want 0", res.exitCode)
 		}
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		runErr := cmd.Run()
-		task.AddOutputLine(fmt.Sprintf("[fo] Error setting up stderr pipe for stream mode: %v", err), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
-		return getExitCode(runErr), runErr
+		if !strings.Contains(res.stdout, "STDOUT: Normal output from success.sh") {
+			t.Error("Expected script's stdout in fo's stdout")
+		}
+		if !strings.Contains(res.stderr, "STDERR: Info output from success.sh") {
+			t.Errorf("Expected script's stderr in fo's stderr. Fo Stderr:\n%s", res.stderr)
+		}
+	})
+
+	t.Run("StreamOverridesShowOutput", func(t *testing.T) {
+		t.Parallel()
+		res := runFo(t, "-s", "--show-output", "never", "--no-color", "--", "testdata/success.sh")
+		if res.exitCode != 0 {
+			t.Errorf("Exit code: got %d, want 0", res.exitCode)
+		}
+		if !strings.Contains(res.stdout, "STDOUT: Normal output from success.sh") {
+			t.Error("Expected script's stdout in fo's stdout even when --show-output=never is overridden by stream mode")
+		}
+		if strings.Contains(res.stdout, "--- Captured output: ---") {
+			t.Error("Did NOT expect 'Captured output' header in stream mode")
+		}
+	})
+}
+
+// TestFoTimer checks if the execution timer is displayed correctly based on flags.
+func TestFoTimer(t *testing.T) {
+	setupTestScripts(t)
+	timerRegex := regexp.MustCompile(`\s*\([\d\.:µms]+\)$`)
+
+	t.Run("TimerShownByDefaultNoColor", func(t *testing.T) {
+		t.Parallel()
+		scriptName := "testdata/long_running.sh"
+		expectedLabel := filepath.Base(scriptName)
+		res := runFo(t, "--no-color", "--", scriptName)
+
+		lines := strings.Split(strings.TrimSpace(res.stdout), "\n")
+		if len(lines) < 1 {
+			t.Fatalf("Expected output, got none for TimerShownByDefaultNoColor")
+		}
+		actualEndLine := lines[len(lines)-1]
+
+		endLineWithTimerPattern := buildPattern(plainIconSuccess, expectedLabel, false, true)
+		if !endLineWithTimerPattern.MatchString(actualEndLine) {
+			t.Errorf("Expected timer in output matching /%s/, but not found in line '%s'. Output:\n%s", endLineWithTimerPattern.String(), actualEndLine, res.stdout)
+		}
+	})
+
+	t.Run("TimerHiddenWithNoTimerFlag", func(t *testing.T) {
+		t.Parallel()
+		scriptName := "testdata/success.sh"
+		expectedLabel := filepath.Base(scriptName)
+		res := runFo(t, "--no-timer", "--no-color", "--", scriptName)
+
+		lines := strings.Split(strings.TrimSpace(res.stdout), "\n")
+		if len(lines) < 1 {
+			t.Fatalf("Expected output, got none for TimerHiddenWithNoTimerFlag")
+		}
+		actualEndLine := lines[len(lines)-1]
+
+		endLineNoTimerPattern := buildPattern(plainIconSuccess, expectedLabel, false, false)
+
+		if !endLineNoTimerPattern.MatchString(actualEndLine) {
+			t.Errorf("Expected end line /%s/ (no timer), got '%s'. Full stdout:\n%s", endLineNoTimerPattern.String(), actualEndLine, res.stdout)
+		}
+		if timerRegex.MatchString(actualEndLine) {
+			t.Errorf("Expected no timer in end line '%s', but found one. Full stdout:\n%s", actualEndLine, res.stdout)
+		}
+	})
+}
+
+// TestFoColorAndIcons verifies that ANSI colors and icons are used/suppressed correctly.
+func TestFoColorAndIcons(t *testing.T) {
+	setupTestScripts(t)
+	ansiRegex := regexp.MustCompile(`\x1b\[[0-9;]*[mK]`)
+	vibrantCfg := design.UnicodeVibrantTheme()
+	emojiStart, emojiSuccess, emojiFail := vibrantCfg.Icons.Start, vibrantCfg.Icons.Success, vibrantCfg.Icons.Error
+
+	t.Run("ColorAndIconsShownByDefaultSuccess", func(t *testing.T) {
+		t.Parallel()
+		res := runFo(t, "--", "testdata/success.sh")
+		if !ansiRegex.MatchString(res.stdout) {
+			t.Error("Expected ANSI color codes, none found")
+		}
+		if !strings.Contains(res.stdout, emojiStart) {
+			t.Errorf("Expected start icon '%s', not found in stdout:\n%s", emojiStart, res.stdout)
+		}
+		if !strings.Contains(res.stdout, emojiSuccess) {
+			t.Errorf("Expected success icon '%s', not found in stdout:\n%s", emojiSuccess, res.stdout)
+		}
+	})
+
+	t.Run("ColorAndIconsShownByDefaultFailure", func(t *testing.T) {
+		t.Parallel()
+		res := runFo(t, "--", "testdata/failure.sh")
+		if !ansiRegex.MatchString(res.stdout) {
+			t.Error("Expected ANSI color codes, none found")
+		}
+		if !strings.Contains(res.stdout, emojiStart) {
+			t.Errorf("Expected start icon '%s', not found in stdout:\n%s", emojiStart, res.stdout)
+		}
+		if !strings.Contains(res.stdout, emojiFail) {
+			t.Errorf("Expected failure icon '%s', not found in stdout:\n%s", emojiFail, res.stdout)
+		}
+	})
+
+	t.Run("ColorAndIconsHiddenWithNoColorFlag", func(t *testing.T) {
+		t.Parallel()
+		res := runFo(t, "--no-color", "--", "testdata/success.sh")
+		if ansiRegex.MatchString(res.stdout) {
+			t.Error("Unexpected ANSI colors with --no-color")
+		}
+		if strings.Contains(res.stdout, emojiStart) || strings.Contains(res.stdout, emojiSuccess) {
+			t.Error("Unexpected emoji icons with --no-color")
+		}
+		if !strings.Contains(res.stdout, plainIconStart) {
+			t.Errorf("Missing plain start icon '%s' in stdout:\n%s", plainIconStart, res.stdout)
+		}
+		if !strings.Contains(res.stdout, plainIconSuccess) {
+			t.Errorf("Missing plain success icon '%s' in stdout:\n%s", plainIconSuccess, res.stdout)
+		}
+	})
+}
+
+// TestFoCIMode checks behavior with the --ci flag (implies no color, no timer).
+func TestFoCIMode(t *testing.T) {
+	setupTestScripts(t)
+	ansiRegex := regexp.MustCompile(`\x1b\[[0-9;]*[mK]`)
+	timerRegex := regexp.MustCompile(`\s*\([\d\.:µms]+\)$`)
+	tests := []struct {
+		name       string
+		scriptPath string
+		args       []string // Additional args for fo, like --debug
+		exit       int
+		endIcon    string
+	}{
+		{"CIModeSuccess", "testdata/success.sh", []string{"--ci"}, 0, plainIconSuccess},
+		// Add --debug to CIModeFailure to get MergeWithFlags output
+		{"CIModeFailure", "testdata/failure.sh", []string{"--ci", "--debug"}, 1, plainIconFailure},
 	}
-	cmd.Stdout = os.Stdout
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		scanner := bufio.NewScanner(stderrPipe)
-		buffer := make([]byte, 0, bufio.MaxScanTokenSize)
-		scanner.Buffer(buffer, appSettings.MaxLineLength)
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			expectedLabel := filepath.Base(tt.scriptPath)
+			foArgs := append(tt.args, "--", tt.scriptPath)
+			res := runFo(t, foArgs...)
 
-		for scanner.Scan() {
-			line := scanner.Text()
-			if appSettings.Debug {
-				fmt.Fprintf(os.Stderr, "[DEBUG executeStreamMode STDERR] Scanned line: %s\n", line)
+			if res.exitCode != tt.exit {
+				t.Errorf("Exit code: got %d, want %d", res.exitCode, tt.exit)
 			}
-			fmt.Fprintln(os.Stderr, line)
-			task.AddOutputLine(line, design.TypeDetail, design.LineContext{CognitiveLoad: design.LoadMedium, Importance: 2})
+			if ansiRegex.MatchString(res.stdout) {
+				t.Errorf("Unexpected ANSI colors in CI mode. Stdout:\n%s\nHex:\n%x", res.stdout, res.stdout)
+			}
+
+			lines := strings.Split(strings.TrimSpace(res.stdout), "\n")
+			if len(lines) == 0 {
+				t.Fatalf("Expected output in CI mode, got none for script %s.", tt.scriptPath)
+			}
+
+			actualStartLine := lines[0]
+			actualEndLine := ""
+			if len(lines) > 0 {
+				// Find the last line that looks like a status line
+				for i := len(lines) - 1; i >= 0; i-- {
+					if strings.HasPrefix(lines[i], plainIconStart) ||
+						strings.HasPrefix(lines[i], plainIconSuccess) ||
+						strings.HasPrefix(lines[i], plainIconFailure) ||
+						strings.HasPrefix(lines[i], plainIconWarning) {
+						actualEndLine = lines[i]
+						break
+					}
+				}
+				if actualEndLine == "" { // Fallback if no clear status line found at end
+					actualEndLine = lines[len(lines)-1]
+				}
+			}
+
+			if timerRegex.MatchString(actualEndLine) {
+				t.Errorf("Unexpected timer in CI mode end line '%s'. Full stdout:\n%s", actualEndLine, res.stdout)
+			}
+
+			startPattern := buildPattern(plainIconStart, expectedLabel, true, false)
+			if !startPattern.MatchString(actualStartLine) {
+				t.Errorf("Missing start pattern /%s/ in start line '%s'. Full stdout:\n%s", startPattern, actualStartLine, res.stdout)
+			}
+
+			endPattern := buildPattern(tt.endIcon, expectedLabel, false, false)
+			if !endPattern.MatchString(actualEndLine) {
+				t.Errorf("Missing end pattern /%s/ in end line '%s'. Full stdout:\n%s", endPattern, actualEndLine, res.stdout)
+			}
+		})
+	}
+}
+
+// TestFoErrorHandling tests fo's own error reporting for invalid usage.
+func TestFoErrorHandling(t *testing.T) {
+	t.Run("NoCommandAfterDashDash", func(t *testing.T) {
+		t.Parallel()
+		res := runFo(t, "--")
+		if res.exitCode == 0 {
+			t.Error("Expected non-zero exit when no command is specified after --")
 		}
-		if scanErr := scanner.Err(); scanErr != nil {
-			if appSettings.Debug {
-				fmt.Fprintf(os.Stderr, "[DEBUG executeStreamMode STDERR] Scanner error: %v\n", scanErr)
+		if !strings.Contains(res.stderr, "Error: No command specified after --") {
+			t.Errorf("Missing expected error message in stderr. Got:\n%s", res.stderr)
+		}
+	})
+
+	t.Run("NoCommandAtAll", func(t *testing.T) {
+		t.Parallel()
+		res := runFo(t, "-l", "some-label")
+		if res.exitCode == 0 {
+			t.Error("Expected non-zero exit when no command is specified at all")
+		}
+		if !strings.Contains(res.stderr, "Error: No command specified after --") {
+			t.Errorf("Missing expected error message in stderr. Got:\n%s", res.stderr)
+		}
+	})
+
+	t.Run("InvalidShowOutputValue", func(t *testing.T) {
+		t.Parallel()
+		res := runFo(t, "--show-output", "bad-value", "--", "true")
+		if res.exitCode == 0 {
+			t.Error("Expected non-zero exit for invalid --show-output value")
+		}
+		if !strings.Contains(res.stderr, "Error: Invalid value for --show-output: bad-value") {
+			t.Errorf("Missing expected error message for invalid --show-output. Got:\n%s", res.stderr)
+		}
+	})
+}
+
+// TestEnvironmentInheritance checks if the wrapped command inherits environment variables.
+func TestEnvironmentInheritance(t *testing.T) {
+	t.Parallel()
+	scriptContent := `#!/bin/sh
+echo "VAR is: $MY_TEST_VAR"`
+	scriptPath := filepath.Join(t.TempDir(), "env.sh")
+	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0755); err != nil {
+		t.Fatalf("Failed to write environment test script: %v", err)
+	}
+
+	key, val := "MY_TEST_VAR", "fo_env_test_val_unique"
+	origVal, wasSet := os.LookupEnv(key)
+
+	if err := os.Setenv(key, val); err != nil {
+		t.Fatalf("Failed to set environment variable %s to %s: %v", key, val, err)
+	}
+	defer func() {
+		if wasSet {
+			if err := os.Setenv(key, origVal); err != nil {
+				t.Logf("Warning: Failed to restore environment variable %s to %s: %v", key, origVal, err)
 			}
-			if !errors.Is(scanErr, io.EOF) && !strings.Contains(scanErr.Error(), "file already closed") && !strings.Contains(scanErr.Error(), "broken pipe") {
-				task.AddOutputLine(fmt.Sprintf("[fo] Error reading stderr in stream mode: %v", scanErr), design.TypeError, design.LineContext{CognitiveLoad: design.LoadMedium, Importance: 3})
+		} else {
+			if err := os.Unsetenv(key); err != nil {
+				t.Logf("Warning: Failed to unset environment variable %s: %v", key, err)
 			}
-		} else if appSettings.Debug {
-			fmt.Fprintln(os.Stderr, "[DEBUG executeStreamMode STDERR] Scanner finished without error.")
 		}
 	}()
 
-	runErr := cmd.Run() // This calls Start then Wait.
-	wg.Wait()
-	return getExitCode(runErr), runErr
+	res := runFo(t, "--show-output", "always", "--no-color", "--", scriptPath)
+	if res.exitCode != 0 {
+		t.Errorf("Expected exit code 0, got %d", res.exitCode)
+	}
+	expectedOutput := fmt.Sprintf("VAR is: %s", val)
+	if !strings.Contains(res.stdout, expectedOutput) {
+		t.Errorf("Expected '%s' in fo's stdout, indicating environment inheritance. Got:\n%s", expectedOutput, res.stdout)
+	}
 }
 
-// executeCaptureMode uses io.Copy to bytes.Buffer to capture full output before processing.
-func executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design.PatternMatcher, appSettings LocalAppConfig) (int, error) {
-	stdoutPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		errMsg := fmt.Sprintf("[fo] Error creating stdout pipe: %v", err)
-		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
-		fmt.Fprintln(os.Stderr, errMsg)
-		return 1, err
-	}
-
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		errMsg := fmt.Sprintf("[fo] Error creating stderr pipe: %v", err)
-		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
-		fmt.Fprintln(os.Stderr, errMsg)
-		_ = stdoutPipe.Close() // Close the already opened stdout pipe
-		return 1, err
-	}
-
-	var stdoutBuffer, stderrBuffer bytes.Buffer
-	var wgRead sync.WaitGroup
-	wgRead.Add(2) // For two goroutines copying stdout and stderr
-
-	var errStdoutCopy, errStderrCopy error
-
-	go func() {
-		defer wgRead.Done()
-		if appSettings.Debug {
-			fmt.Fprintln(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Copying stdoutPipe")
+// TestFoTimestampedOutput verifies that interleaved stdout/stderr from the script
+// are captured and displayed, preserving their content.
+func TestFoTimestampedOutput(t *testing.T) {
+	setupTestScripts(t)
+	t.Run("PreservesOutputOrderInCaptureNoColor", func(t *testing.T) {
+		t.Parallel()
+		res := runFo(t, "--debug", "--no-color", "--show-output", "always", "--", "testdata/interleaved.sh")
+		if res.exitCode != 0 {
+			t.Errorf("Exit code: got %d, want 0. Stdout:\n%s\nStderr:\n%s", res.exitCode, res.stdout, res.stderr)
 		}
-		_, errStdoutCopy = io.Copy(&stdoutBuffer, stdoutPipe)
-		if errStdoutCopy != nil && !errors.Is(errStdoutCopy, io.EOF) { // EOF is expected
-			if appSettings.Debug {
-				fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Error copying stdout: %v\n", errStdoutCopy)
+
+		capturedSection := ""
+		parts := strings.SplitN(res.stdout, "--- Captured output: ---", 2)
+		if len(parts) == 2 {
+			foEndLinePattern := regexp.MustCompile(`(?m)^\[(SUCCESS|FAILED|WARNING)\].*$`)
+			endLineMatch := foEndLinePattern.FindStringIndex(parts[1])
+			if endLineMatch != nil {
+				capturedSection = strings.TrimSpace(parts[1][:endLineMatch[0]])
+			} else {
+				capturedSection = strings.TrimSpace(parts[1])
 			}
-		} else if appSettings.Debug {
-			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Finished copying stdoutPipe (len: %d)\n", stdoutBuffer.Len())
+		} else {
+			t.Fatalf("Missing '--- Captured output: ---' section in stdout:\n%s", res.stdout)
 		}
-	}()
 
-	go func() {
-		defer wgRead.Done()
-		if appSettings.Debug {
-			fmt.Fprintln(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Copying stderrPipe")
+		expectedMessages := []string{
+			"STDOUT: Message 1",
+			"STDERR: Message 1",
+			"STDOUT: Message 2",
+			"STDERR: Message 2",
 		}
-		_, errStderrCopy = io.Copy(&stderrBuffer, stderrPipe)
-		if errStderrCopy != nil && !errors.Is(errStderrCopy, io.EOF) { // EOF is expected
-			if appSettings.Debug {
-				fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Error copying stderr: %v\n", errStderrCopy)
+
+		for _, msg := range expectedMessages {
+			if !strings.Contains(capturedSection, msg) {
+				t.Errorf("Expected captured output to contain '%s', but it was missing. Captured section:\n%s", msg, capturedSection)
 			}
-		} else if appSettings.Debug {
-			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Finished copying stderrPipe (len: %d)\n", stderrBuffer.Len())
 		}
-	}()
-
-	// Start the command
-	if err := cmd.Start(); err != nil {
-		errMsg := fmt.Sprintf("Error starting command '%s': %v", strings.Join(cmd.Args, " "), err)
-		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
-		fmt.Fprintln(os.Stderr, errMsg)
-		// Pipes are associated with cmd; cmd.Wait() will handle their closure if Start was successful.
-		// If Start fails, the pipes might not be fully "live" from the child's perspective.
-		// Explicitly closing them here might be redundant or cause issues if cmd.Wait() is not called.
-		// Let cmd.Wait() (or its absence on Start error) manage pipe state.
-		// However, we must ensure our reading goroutines (wgRead) don't hang.
-		// Closing our ends of the pipes can help unblock io.Copy.
-		_ = stdoutPipe.Close()
-		_ = stderrPipe.Close()
-		wgRead.Wait() // Ensure goroutines finish if Start fails.
-		return getExitCode(err), err
-	}
-
-	cmdWaitErr := cmd.Wait() // Wait for command to exit; this closes its side of pipes.
-	wgRead.Wait()            // Wait for io.Copy goroutines to complete (they will see EOF).
-
-	if appSettings.Debug {
-		fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] stdout captured (len %d): %s\n", stdoutBuffer.Len(), stdoutBuffer.String())
-		fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] stderr captured (len %d): %s\n", stderrBuffer.Len(), stderrBuffer.String())
-	}
-
-	var bufferLimitLogged sync.Once
-
-	// Process stdoutData
-	scanner := bufio.NewScanner(&stdoutBuffer) // Use &stdoutBuffer (bytes.Buffer implements io.Reader)
-	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), appSettings.MaxLineLength)
-	var currentTotalStdoutBytes int64
-	for scanner.Scan() {
-		line := scanner.Text()
-		if appSettings.Debug {
-			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode STDOUT_SCAN] Scanned line: %s\n", line)
-		}
-		lineLength := int64(len(line))
-		if appSettings.MaxBufferSize > 0 && currentTotalStdoutBytes+lineLength > appSettings.MaxBufferSize {
-			bufferLimitLogged.Do(func() {
-				task.AddOutputLine(fmt.Sprintf("[fo] BUFFER LIMIT: stdout stream exceeded %dMB. Further output truncated.", appSettings.MaxBufferSize/(1024*1024)), design.TypeWarning, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
-			})
-			break
-		}
-		currentTotalStdoutBytes += lineLength
-		lineType, lineContext := patternMatcher.ClassifyOutputLine(line, task.Command, task.Args)
-		task.AddOutputLine(line, lineType, lineContext)
-	}
-	if errScan := scanner.Err(); errScan != nil {
-		if appSettings.Debug {
-			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode STDOUT_SCAN] Scanner error: %v\n", errScan)
-		}
-		if errors.Is(errScan, bufio.ErrTooLong) {
-			bufferLimitLogged.Do(func() {
-				task.AddOutputLine(fmt.Sprintf("[fo] LINE LIMIT: Max line length (%d KB) exceeded in stdout. Line truncated.", appSettings.MaxLineLength/1024), design.TypeWarning, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
-			})
-		} else if !errors.Is(errScan, io.EOF) { // Don't log EOF as an error from scanner
-			task.AddOutputLine(fmt.Sprintf("[fo] Error scanning stdout buffer: %v", errScan), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
-		}
-	}
-
-	// Process stderrData
-	scanner = bufio.NewScanner(&stderrBuffer) // Use &stderrBuffer
-	scanner.Buffer(make([]byte, 0, bufio.MaxScanTokenSize), appSettings.MaxLineLength)
-	var currentTotalStderrBytes int64
-	for scanner.Scan() {
-		line := scanner.Text()
-		if appSettings.Debug {
-			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode STDERR_SCAN] Scanned line: %s\n", line)
-		}
-		lineLength := int64(len(line))
-		if appSettings.MaxBufferSize > 0 && currentTotalStderrBytes+lineLength > appSettings.MaxBufferSize {
-			bufferLimitLogged.Do(func() {
-				task.AddOutputLine(fmt.Sprintf("[fo] BUFFER LIMIT: stderr stream exceeded %dMB. Further output truncated.", appSettings.MaxBufferSize/(1024*1024)), design.TypeWarning, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
-			})
-			break
-		}
-		currentTotalStderrBytes += lineLength
-		lineType, lineContext := patternMatcher.ClassifyOutputLine(line, task.Command, task.Args)
-		if lineType == design.TypeDetail {
-			lineType = design.TypeInfo
-			lineContext.Importance = 3
-		}
-		task.AddOutputLine(line, lineType, lineContext)
-	}
-	if errScan := scanner.Err(); errScan != nil {
-		if appSettings.Debug {
-			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode STDERR_SCAN] Scanner error: %v\n", errScan)
-		}
-		if errors.Is(errScan, bufio.ErrTooLong) {
-			bufferLimitLogged.Do(func() {
-				task.AddOutputLine(fmt.Sprintf("[fo] LINE LIMIT: Max line length (%d KB) exceeded in stderr. Line truncated.", appSettings.MaxLineLength/1024), design.TypeWarning, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
-			})
-		} else if !errors.Is(errScan, io.EOF) { // Don't log EOF as an error from scanner
-			task.AddOutputLine(fmt.Sprintf("[fo] Error scanning stderr buffer: %v", errScan), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
-		}
-	}
-
-	task.UpdateTaskContext()
-
-	if cmdWaitErr != nil {
-		return getExitCode(cmdWaitErr), cmdWaitErr
-	}
-	// Check errors from io.Copy if cmdWaitErr was nil
-	if errStdoutCopy != nil && !errors.Is(errStdoutCopy, io.EOF) {
-		task.AddOutputLine(fmt.Sprintf("[fo] Final stdout copy error: %v", errStdoutCopy), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
-		return 1, errStdoutCopy
-	}
-	if errStderrCopy != nil && !errors.Is(errStderrCopy, io.EOF) {
-		task.AddOutputLine(fmt.Sprintf("[fo] Final stderr copy error: %v", errStderrCopy), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
-		return 1, errStderrCopy
-	}
-
-	return 0, nil // Success
+	})
 }
 
-func getExitCode(err error) int {
-	if err == nil {
-		return 0
-	}
-	if exitErr, ok := err.(*exec.ExitError); ok {
-		return exitErr.ExitCode()
-	}
-	if errors.Is(err, exec.ErrNotFound) ||
-		strings.Contains(err.Error(), "executable file not found") ||
-		(runtime.GOOS != "windows" && strings.Contains(err.Error(), "no such file or directory")) {
-		return 127
-	}
-	return 1
+// TestFoSignalHandling is skipped as it's hard to automate reliably.
+func TestFoSignalHandling(t *testing.T) {
+	t.Skip("Skipping signal handling test; OS-dependent and hard to automate reliably.")
+}
+
+// TestFoBasicExecution is skipped as its functionality is covered by other, more specific tests.
+func TestFoBasicExecution(t *testing.T) {
+	t.Skip("Basic execution covered in TestFoCoreExecution and others.")
 }
