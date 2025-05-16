@@ -41,11 +41,22 @@ var cliFlagsGlobal config.CliFlags // Holds parsed CLI flags
 
 // main is the entry point of the application.
 func main() {
+	// Check for subcommand first
+	if len(os.Args) > 1 {
+		command := os.Args[1]
+		if !strings.HasPrefix(command, "-") { // It's a potential subcommand
+			if command == "print" {
+				handlePrintCommand(os.Args[2:]) // Pass remaining args to print handler
+				return
+			}
+			// Add other subcommands here if needed
+		}
+	}
 
-	// Parse command-line flags into the global cliFlagsGlobal struct.
-	parseFlagsIntoGlobal()
+	// If not a recognized subcommand, proceed as command wrapper
+	parseGlobalFlags()
 
-	// Handle version flag.
+	// Handle version flag
 	if versionFlag {
 		fmt.Printf("fo version %s\n", version.Version)
 		fmt.Printf("Commit: %s\n", version.CommitHash)
@@ -53,26 +64,26 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Load application configuration from .fo.yaml.
+	// Load application configuration from .fo.yaml
 	fileAppConfig := config.LoadConfig()
 
-	// Find the command and arguments to be executed (must be after "--").
+	// Find the command and arguments to be executed (must be after "--")
 	cmdArgs := findCommandArgs()
 	if len(cmdArgs) == 0 {
 		fmt.Fprintln(os.Stderr, "Error: No command specified after --")
 		fmt.Fprintln(os.Stderr, "Usage: fo [flags] -- <COMMAND> [ARGS...]")
-		os.Exit(1) // Exit if no command is provided.
+		os.Exit(1) // Exit if no command is provided
 	}
 
-	// Apply any command-specific presets from the config file.
+	// Apply any command-specific presets from the config file
 	if len(cmdArgs) > 0 {
 		config.ApplyCommandPreset(fileAppConfig, cmdArgs[0])
 	}
 
-	// Convert the file-based AppConfig to LocalAppConfig for runtime behavior.
+	// Convert the file-based AppConfig to LocalAppConfig for runtime behavior
 	behavioralSettings := convertAppConfigToLocal(fileAppConfig)
 
-	// Override behavioral settings with any explicitly set CLI flags.
+	// Override behavioral settings with any explicitly set CLI flags
 	if cliFlagsGlobal.Label != "" {
 		behavioralSettings.Label = cliFlagsGlobal.Label
 	}
@@ -94,10 +105,10 @@ func main() {
 	}
 
 	// Get the final design configuration (styling, icons, colors) by merging
-	// the file configuration with CLI flags related to presentation.
+	// the file configuration with CLI flags related to presentation
 	finalDesignConfig := config.MergeWithFlags(fileAppConfig, cliFlagsGlobal)
 
-	// Update behavioralSettings with final decisions on NoTimer, NoColor, CI from finalDesignConfig.
+	// Update behavioralSettings with final decisions on NoTimer, NoColor, CI from finalDesignConfig
 	behavioralSettings.NoTimer = finalDesignConfig.Style.NoTimer
 	behavioralSettings.NoColor = finalDesignConfig.IsMonochrome
 	behavioralSettings.CI = finalDesignConfig.IsMonochrome && finalDesignConfig.Style.NoTimer
@@ -121,7 +132,6 @@ func main() {
 	}
 	os.Exit(exitCode)
 }
-
 func convertAppConfigToLocal(appCfg *config.AppConfig) LocalAppConfig {
 	return LocalAppConfig{
 		Label:         appCfg.Label,
@@ -133,62 +143,6 @@ func convertAppConfigToLocal(appCfg *config.AppConfig) LocalAppConfig {
 		Debug:         appCfg.Debug,
 		MaxBufferSize: appCfg.MaxBufferSize,
 		MaxLineLength: appCfg.MaxLineLength,
-	}
-}
-
-func parseFlagsIntoGlobal() {
-	flag.BoolVar(&versionFlag, "version", false, "Print fo version and exit.")
-	flag.BoolVar(&versionFlag, "v", false, "Print fo version and exit (shorthand).")
-	flag.BoolVar(&cliFlagsGlobal.Debug, "debug", false, "Enable debug output.")
-	flag.BoolVar(&cliFlagsGlobal.Debug, "d", false, "Enable debug output (shorthand).")
-	flag.StringVar(&cliFlagsGlobal.Label, "l", "", "Label for the task.")
-	flag.StringVar(&cliFlagsGlobal.Label, "label", "", "Label for the task.")
-	flag.BoolVar(&cliFlagsGlobal.Stream, "s", false, "Stream mode - print command's stdout/stderr live.")
-	flag.BoolVar(&cliFlagsGlobal.Stream, "stream", false, "Stream mode.")
-	flag.StringVar(&cliFlagsGlobal.ShowOutput, "show-output", "", "When to show captured output: on-fail, always, never.")
-	flag.BoolVar(&cliFlagsGlobal.NoTimer, "no-timer", false, "Disable showing the duration.")
-	flag.BoolVar(&cliFlagsGlobal.NoColor, "no-color", false, "Disable ANSI color/styling output.")
-	flag.BoolVar(&cliFlagsGlobal.CI, "ci", false, "Enable CI-friendly, plain-text output.")
-	flag.StringVar(&cliFlagsGlobal.ThemeName, "theme", "", "Select visual theme (e.g., 'ascii_minimal', 'unicode_vibrant').")
-
-	var maxBufferSizeMB int
-	var maxLineLengthKB int
-	flag.IntVar(&maxBufferSizeMB, "max-buffer-size", 0, fmt.Sprintf("Maximum total buffer size in MB (per stream). Default: %dMB", config.DefaultMaxBufferSize/(1024*1024)))
-	flag.IntVar(&maxLineLengthKB, "max-line-length", 0, fmt.Sprintf("Maximum length in KB for a single line. Default: %dKB", config.DefaultMaxLineLength/1024))
-
-	flag.Parse()
-
-	flag.Visit(func(f *flag.Flag) {
-		switch f.Name {
-		case "s", "stream":
-			cliFlagsGlobal.StreamSet = true
-		case "show-output":
-			cliFlagsGlobal.ShowOutputSet = true
-		case "no-timer":
-			cliFlagsGlobal.NoTimerSet = true
-		case "no-color":
-			cliFlagsGlobal.NoColorSet = true
-		case "ci":
-			cliFlagsGlobal.CISet = true
-		case "d", "debug":
-			cliFlagsGlobal.DebugSet = true
-		}
-	})
-
-	if maxBufferSizeMB > 0 {
-		cliFlagsGlobal.MaxBufferSize = int64(maxBufferSizeMB) * 1024 * 1024
-	}
-	if maxLineLengthKB > 0 {
-		cliFlagsGlobal.MaxLineLength = maxLineLengthKB * 1024
-	}
-
-	if cliFlagsGlobal.ShowOutput != "" {
-		validValues := map[string]bool{"on-fail": true, "always": true, "never": true}
-		if !validValues[cliFlagsGlobal.ShowOutput] {
-			fmt.Fprintf(os.Stderr, "Error: Invalid value for --show-output: %s\nValid values are: on-fail, always, never\n", cliFlagsGlobal.ShowOutput)
-			flag.Usage()
-			os.Exit(1)
-		}
 	}
 }
 
@@ -710,4 +664,130 @@ func getExitCode(err error) int {
 		return 127
 	}
 	return 1
+}
+
+// handlePrintCommand handles the 'fo print' subcommand.
+// handlePrintCommand handles the 'fo print' subcommand.
+func handlePrintCommand(args []string) {
+	printFlagSet := flag.NewFlagSet("print", flag.ExitOnError)
+	typeFlag := printFlagSet.String("type", "info", "Type of message (info, success, warning, error, header, raw)")
+	iconFlag := printFlagSet.String("icon", "", "Custom icon to use (overrides type default)")
+	indentFlag := printFlagSet.Int("indent", 0, "Number of indentation levels")
+	// Global flags that should also apply to 'print'
+	themeFlag := printFlagSet.String("theme", "", "Select visual theme")
+	noColorFlag := printFlagSet.Bool("no-color", false, "Disable ANSI color/styling output for print")
+	ciFlag := printFlagSet.Bool("ci", false, "Enable CI-friendly, plain-text output for print")
+	debugFlag := printFlagSet.Bool("debug", false, "Enable debug output for print processing")
+
+	// Parse print-specific flags
+	err := printFlagSet.Parse(args)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing 'print' flags: %v\n", err)
+		os.Exit(1)
+	}
+	messageParts := printFlagSet.Args()
+	message := strings.Join(messageParts, " ")
+
+	if message == "" && *typeFlag != "raw" { // Allow empty raw for just printing newline or control chars
+		fmt.Fprintln(os.Stderr, "Error: No message provided for 'fo print'.")
+		printFlagSet.Usage()
+		os.Exit(1)
+	}
+
+	// Create a config.CliFlags with just the print-relevant flags
+	var globalCliFlagsForPrint config.CliFlags
+	if *themeFlag != "" {
+		globalCliFlagsForPrint.ThemeName = *themeFlag
+	}
+	if *noColorFlag {
+		globalCliFlagsForPrint.NoColor = true
+		globalCliFlagsForPrint.NoColorSet = true
+	}
+	if *ciFlag {
+		globalCliFlagsForPrint.CI = true
+		globalCliFlagsForPrint.CISet = true
+	}
+	if *debugFlag {
+		globalCliFlagsForPrint.Debug = true
+		globalCliFlagsForPrint.DebugSet = true
+	}
+
+	// Get the debug mode flag for local use
+	debug := globalCliFlagsForPrint.Debug
+
+	fileAppConfig := config.LoadConfig() // Load base config
+	finalDesignConfig := config.MergeWithFlags(fileAppConfig, globalCliFlagsForPrint)
+
+	if debug {
+		fmt.Fprintf(os.Stderr, "[DEBUG handlePrintCommand] Type: %s, Icon: %s, Indent: %d, Message: '%s'\n",
+			*typeFlag, *iconFlag, *indentFlag, message)
+		fmt.Fprintf(os.Stderr, "[DEBUG handlePrintCommand] finalDesignConfig.ThemeName: %s, IsMonochrome: %t\n",
+			finalDesignConfig.ThemeName, finalDesignConfig.IsMonochrome)
+	}
+
+	// Use the new render function for direct messages
+	output := design.RenderDirectMessage(finalDesignConfig, *typeFlag, *iconFlag, message, *indentFlag)
+	fmt.Print(output) // Print directly to stdout
+	os.Exit(0)
+}
+
+func parseGlobalFlags() {
+	// Define flags for version and help
+	flag.BoolVar(&versionFlag, "version", false, "Print fo version and exit.")
+	flag.BoolVar(&versionFlag, "v", false, "Print fo version and exit (shorthand).")
+
+	// These are global flags, also potentially usable by 'print' if implemented
+	flag.BoolVar(&cliFlagsGlobal.Debug, "debug", false, "Enable debug output.")
+	flag.BoolVar(&cliFlagsGlobal.Debug, "d", false, "Enable debug output (shorthand).")
+	flag.StringVar(&cliFlagsGlobal.ThemeName, "theme", "", "Select visual theme (e.g., 'ascii_minimal', 'unicode_vibrant').")
+	flag.BoolVar(&cliFlagsGlobal.NoColor, "no-color", false, "Disable ANSI color/styling output.")
+	flag.BoolVar(&cliFlagsGlobal.CI, "ci", false, "Enable CI-friendly, plain-text output.")
+
+	// Flags specific to command wrapping mode
+	flag.StringVar(&cliFlagsGlobal.Label, "l", "", "Label for the task.")
+	flag.StringVar(&cliFlagsGlobal.Label, "label", "", "Label for the task.")
+	flag.BoolVar(&cliFlagsGlobal.Stream, "s", false, "Stream mode - print command's stdout/stderr live.")
+	flag.BoolVar(&cliFlagsGlobal.Stream, "stream", false, "Stream mode.")
+	flag.StringVar(&cliFlagsGlobal.ShowOutput, "show-output", "", "When to show captured output: on-fail, always, never.")
+	flag.BoolVar(&cliFlagsGlobal.NoTimer, "no-timer", false, "Disable showing the duration.")
+
+	var maxBufferSizeMB int
+	var maxLineLengthKB int
+	flag.IntVar(&maxBufferSizeMB, "max-buffer-size", 0, fmt.Sprintf("Maximum total buffer size in MB (per stream). Default: %dMB", config.DefaultMaxBufferSize/(1024*1024)))
+	flag.IntVar(&maxLineLengthKB, "max-line-length", 0, fmt.Sprintf("Maximum length in KB for a single line. Default: %dKB", config.DefaultMaxLineLength/1024))
+
+	flag.Parse()
+
+	flag.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "s", "stream":
+			cliFlagsGlobal.StreamSet = true
+		case "show-output":
+			cliFlagsGlobal.ShowOutputSet = true
+		case "no-timer":
+			cliFlagsGlobal.NoTimerSet = true
+		case "no-color":
+			cliFlagsGlobal.NoColorSet = true
+		case "ci":
+			cliFlagsGlobal.CISet = true
+		case "d", "debug":
+			cliFlagsGlobal.DebugSet = true
+		}
+	})
+
+	if maxBufferSizeMB > 0 {
+		cliFlagsGlobal.MaxBufferSize = int64(maxBufferSizeMB) * 1024 * 1024
+	}
+	if maxLineLengthKB > 0 {
+		cliFlagsGlobal.MaxLineLength = maxLineLengthKB * 1024
+	}
+
+	if cliFlagsGlobal.ShowOutput != "" {
+		validValues := map[string]bool{"on-fail": true, "always": true, "never": true}
+		if !validValues[cliFlagsGlobal.ShowOutput] {
+			fmt.Fprintf(os.Stderr, "Error: Invalid value for --show-output: %s\nValid values are: on-fail, always, never\n", cliFlagsGlobal.ShowOutput)
+			flag.Usage()
+			os.Exit(1)
+		}
+	}
 }

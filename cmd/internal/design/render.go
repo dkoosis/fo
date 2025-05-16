@@ -532,3 +532,80 @@ func getProcessLabel(intent string) string {
 	}
 	return "Running"
 }
+
+// RenderDirectMessage formats and returns a string for the 'fo print' subcommand.
+func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, indentLevel int) string {
+	var sb strings.Builder
+	var iconToUse string
+	var colorToUse string // ANSI color code
+
+	// Determine icon
+	if customIcon != "" {
+		iconToUse = customIcon // User-defined icon takes precedence
+	} else {
+		// Get icon based on message type from theme
+		switch strings.ToLower(messageType) {
+		case "success":
+			iconToUse = cfg.GetIcon("Success")
+		case "warning":
+			iconToUse = cfg.GetIcon("Warning")
+		case "error":
+			iconToUse = cfg.GetIcon("Error")
+		case "info":
+			iconToUse = cfg.GetIcon("Info")
+		case "header": // For headers, icon might be different or none
+			iconToUse = cfg.GetIcon("Start") // Or a specific "Header" icon if defined
+		case "raw":
+			iconToUse = "" // No icon for raw
+		default:
+			iconToUse = cfg.GetIcon("Info") // Default to info icon
+		}
+	}
+
+	// Determine color
+	// For 'raw', no color is applied by default unless message contains its own ANSI codes
+	if strings.ToLower(messageType) != "raw" {
+		switch strings.ToLower(messageType) {
+		case "success":
+			colorToUse = cfg.GetColor("Success")
+		case "warning":
+			colorToUse = cfg.GetColor("Warning")
+		case "error":
+			colorToUse = cfg.GetColor("Error")
+		case "info":
+			colorToUse = cfg.GetColor("Process") // Often blue for info
+		case "header":
+			colorToUse = cfg.GetColor("Process") // Example: Blue for headers
+		default:
+			colorToUse = cfg.GetColor("Detail") // Default color
+		}
+	}
+
+	// Apply indentation
+	if indentLevel > 0 {
+		sb.WriteString(strings.Repeat(cfg.GetIndentation(1), indentLevel))
+	}
+
+	// Apply color and icon if not raw type
+	if strings.ToLower(messageType) != "raw" {
+		if colorToUse != "" {
+			sb.WriteString(colorToUse)
+		}
+		if iconToUse != "" {
+			sb.WriteString(iconToUse)
+			sb.WriteString(" ") // Space after icon
+		}
+	}
+
+	// Append the message
+	sb.WriteString(message)
+
+	// Reset color if a color was applied (and not raw)
+	if strings.ToLower(messageType) != "raw" && colorToUse != "" {
+		sb.WriteString(cfg.ResetColor())
+	}
+
+	sb.WriteString("\n") // Always add a newline for 'print' messages
+
+	return sb.String()
+}
