@@ -357,29 +357,45 @@ func (c *Config) GetIndentation(level int) string {
 	return strings.Repeat(baseIndent, level)
 }
 
-// In cmd/internal/design/config.go
-// Find and modify the GetIcon function:
-
 func (c *Config) GetIcon(iconKey string) string {
-	// FORCE ASCII ICONS FOR DEBUGGING
-	fmt.Fprintf(os.Stderr, "[DEBUG GetIcon] FORCING ASCII ICONS\n")
+	if c.IsMonochrome {
+		// Return ASCII versions if in monochrome mode
+		// These values are similar to what AsciiMinimalTheme would provide
+		switch strings.ToLower(iconKey) {
+		case "start":
+			return "[START]"
+		case "success":
+			return "[SUCCESS]"
+		case "warning":
+			return "[WARNING]"
+		case "error":
+			return "[FAILED]"
+		case "info":
+			return "[INFO]"
+		case "bullet":
+			return "*"
+		default:
+			return "?" // Default for unknown keys in monochrome
+		}
+	}
 
-	// Always return ASCII versions regardless of monochrome setting
+	// Return Unicode icons from the current theme's configuration
 	switch strings.ToLower(iconKey) {
 	case "start":
-		return "*" // Simple ASCII char
+		return c.Icons.Start
 	case "success":
-		return "+" // Simple ASCII char
+		return c.Icons.Success
 	case "warning":
-		return "!" // Simple ASCII char
+		return c.Icons.Warning
 	case "error":
-		return "x" // Simple ASCII char
+		return c.Icons.Error
 	case "info":
-		return "i" // Simple ASCII char
+		return c.Icons.Info
 	case "bullet":
-		return "-" // Simple ASCII char
+		return c.Icons.Bullet
 	default:
-		return "?" // Simple ASCII char
+		// Fallback for unknown icon keys, could be an empty string or a default Unicode char
+		return "" // Unicode replacement character, or handle as you see fit
 	}
 }
 

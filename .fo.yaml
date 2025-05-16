@@ -91,7 +91,9 @@ themes:
         color_fg: "muted"
 
       Task_Progress_Line:
-        additional_chars: "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏" # Braille spinner sequence
+        #  additional_chars: "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏" # Braille spinner sequence
+        #  additional_chars: ".oOo"
+        additional_chars: "-\\|/"
 
       # Output line styling
       Stdout_Line_Prefix:

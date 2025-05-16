@@ -42,10 +42,6 @@ var cliFlagsGlobal config.CliFlags // Holds parsed CLI flags
 // main is the entry point of the application.
 func main() {
 
-	// Add this right at the top of main.go
-	fmt.Fprintf(os.Stderr, "\n\n!!!! RUNNING WITH DEBUG CHANGES - FORCE ASCII ICONS !!!!\n\n")
-
-	// rest of main function...
 	// Parse command-line flags into the global cliFlagsGlobal struct.
 	parseFlagsIntoGlobal()
 
@@ -224,7 +220,7 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 	useInlineProgress := designCfg.Style.UseInlineProgress && !appSettings.Stream
 
 	// Create progress tracker for task
-	progress := design.NewInlineProgress(task)
+	progress := design.NewInlineProgress(task, appSettings.Debug)
 
 	// Handle task start display
 	if useInlineProgress {

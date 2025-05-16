@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -20,10 +21,11 @@ type InlineProgress struct {
 	StartTime    time.Time
 	isTerminal   bool
 	mutex        sync.Mutex
+	Debug        bool
 }
 
 // NewInlineProgress creates a progress tracker for a task
-func NewInlineProgress(task *Task) *InlineProgress {
+func NewInlineProgress(task *Task, debugMode bool) *InlineProgress {
 	// Detect if we're in CI mode from the task config
 	isCIMode := task.Config.IsMonochrome && task.Config.Style.NoTimer
 
@@ -41,6 +43,7 @@ func NewInlineProgress(task *Task) *InlineProgress {
 		SpinnerIndex: 0,
 		StartTime:    time.Now(),
 		isTerminal:   isTerminal,
+		Debug:        debugMode,
 	}
 }
 
@@ -97,150 +100,173 @@ func (p *InlineProgress) RenderProgress(status string) {
 	}
 }
 
-// formatProgressMessage creates the formatted status line following the new design:
-// [ICON] <ToolLabel>: <ActionPhrase> [<OutcomeWord> <Duration>]
 // formatProgressMessage creates the formatted status line
 func (p *InlineProgress) formatProgressMessage(status string) string {
-	// Determine if we should use plain ASCII characters
-	// Use ASCII if:
-	// 1. Config.IsMonochrome is true (explicitly set by --no-color, --ci, or theme)
-	// OR
-	// 2. We are not in an interactive terminal (p.isTerminal is false)
 	usePlainAscii := p.Task.Config.IsMonochrome || !p.isTerminal
 
-	// Handle plain ASCII mode (monochrome or non-interactive terminal)
-	if usePlainAscii {
-		toolLabel := p.Task.Label
-		if toolLabel == "" {
-			toolLabel = p.Task.Command
+	toolLabel := p.Task.Label
+	if toolLabel == "" {
+		toolLabel = filepath.Base(p.Task.Command) // Fallback if label is empty
+	}
+	commandBaseName := filepath.Base(p.Task.Command)
+	formattedDuration := formatDuration(p.Task.Duration) // For completed states
+
+	// Running state for spinner
+	if status == "running" {
+		if usePlainAscii {
+			baseVerb := getBaseVerb(p.Task.Intent)
+			target := getTargetDescription(p.Task.Command, p.Task.Args)
+			actionPhrase := fmt.Sprintf("%s %s", baseVerb, target)
+			return fmt.Sprintf("[BUSY] %s: %s [Working...]", toolLabel, actionPhrase)
 		}
 
-		// Get verb and target
+		// Themed running state (spinner animation)
+		indent := ""
+		if p.Task.Config.Style.UseBoxes && !p.Task.Config.IsMonochrome {
+			indent = p.Task.Config.Border.VerticalChar + " "
+		}
+
 		baseVerb := getBaseVerb(p.Task.Intent)
 		target := getTargetDescription(p.Task.Command, p.Task.Args)
 		actionPhrase := fmt.Sprintf("%s %s", baseVerb, target)
 
-		// Format based on status
-		switch status {
-		case "running":
-			// For static line when spinner isn't running
-			return fmt.Sprintf("[BUSY] %s: %s [Working...]", toolLabel, actionPhrase)
-		case "success":
-			return fmt.Sprintf("[OK] %s: %s [OK %s]", toolLabel, actionPhrase, formatDuration(p.Task.Duration))
-		case "error":
-			return fmt.Sprintf("[ERROR] %s: %s [Failed %s]", toolLabel, actionPhrase, formatDuration(p.Task.Duration))
-		case "warning":
-			return fmt.Sprintf("[WARN] %s: %s [Warning %s]", toolLabel, actionPhrase, formatDuration(p.Task.Duration))
-		default:
-			return fmt.Sprintf("[INFO] %s: %s [Done %s]", toolLabel, actionPhrase, formatDuration(p.Task.Duration))
-		}
-	}
-
-	// Regular formatting for normal terminal mode with color/Unicode
-	indent := ""
-	if p.Task.Config.Style.UseBoxes {
-		indent = p.Task.Config.Border.VerticalChar + " "
-	}
-
-	// Get tool label
-	toolLabel := p.Task.Label
-	if toolLabel == "" {
-		toolLabel = p.Task.Command
-	}
-
-	// Get verb and target
-	baseVerb := getBaseVerb(p.Task.Intent)
-	target := getTargetDescription(p.Task.Command, p.Task.Args)
-	actionPhrase := fmt.Sprintf("%s %s", baseVerb, target)
-
-	// Variables for icon, color, and outcome text
-	var icon, colorCode, outcomeWord, duration string
-
-	// Format duration for completed states
-	if status != "running" {
-		duration = formatDuration(p.Task.Duration)
-	} else {
-		duration = formatDuration(time.Since(p.StartTime))
-	}
-
-	// For spinner in running state, get the current spinner character
-	if status == "running" {
-		// Use current spinner position
 		p.mutex.Lock()
-		spinnerChars := "-\\|/" // Default fallback
+		spinnerChars := "-\\|/"
 		if elemStyle := p.Task.Config.GetElementStyle("Task_Progress_Line"); elemStyle.AdditionalChars != "" {
 			spinnerChars = elemStyle.AdditionalChars
 		}
-		if len(spinnerChars) > 0 && p.SpinnerIndex < len(spinnerChars) {
-			icon = string(spinnerChars[p.SpinnerIndex])
-		} else {
-			icon = "-" // Fallback
+		if len(spinnerChars) == 0 {
+			spinnerChars = "-\\|/"
 		}
+		spinnerIcon := string(spinnerChars[p.SpinnerIndex])
 		p.mutex.Unlock()
 
-		colorCode = p.Task.Config.GetColor("Process")
-		outcomeWord = "Working"
-	} else {
-		// Choose icon, color, and outcome word based on static status
-		switch status {
-		case "success":
-			icon = p.Task.Config.GetIcon("Success")
-			colorCode = p.Task.Config.GetColor("Success")
-			outcomeWord = "OK"
-		case "error":
-			icon = p.Task.Config.GetIcon("Error")
-			colorCode = p.Task.Config.GetColor("Error")
-			outcomeWord = "Error"
-		case "warning":
-			icon = p.Task.Config.GetIcon("Warning")
-			colorCode = p.Task.Config.GetColor("Warning")
-			outcomeWord = "Warning"
-		default:
-			icon = p.Task.Config.GetIcon("Info")
-			colorCode = p.Task.Config.GetColor("Process")
-			outcomeWord = "Done"
-		}
+		runningColor := p.Task.Config.GetColor("Process")
+		runningDuration := formatDuration(time.Since(p.StartTime))
+
+		return fmt.Sprintf("%s%s %s: %s%s%s [%sWorking%s %s]",
+			indent,
+			spinnerIcon,
+			toolLabel,
+			runningColor,
+			actionPhrase,
+			p.Task.Config.ResetColor(),
+			runningColor,
+			p.Task.Config.ResetColor(),
+			runningDuration)
 	}
 
-	// Format the output line
-	return fmt.Sprintf("%s%s %s: %s%s%s [%s%s%s %s]",
+	// Completed states (success, error, warning) - UPDATED FORMATTING
+	var icon string
+	// var statusColorKey string // Not directly used for the bracketed part's color anymore
+
+	switch status {
+	case "success":
+		icon = p.Task.Config.GetIcon("Success")
+		// statusColorKey = "Success" // Retained if other parts of the line need it
+	case "error":
+		icon = p.Task.Config.GetIcon("Error")
+		// statusColorKey = "Error"
+	case "warning":
+		icon = p.Task.Config.GetIcon("Warning")
+		// statusColorKey = "Warning"
+	default:
+		icon = p.Task.Config.GetIcon("Info")
+		// statusColorKey = "Process"
+	}
+
+	if usePlainAscii {
+		var plainStatusPrefix string
+		switch status {
+		case "success":
+			plainStatusPrefix = "[OK]"
+		case "error":
+			plainStatusPrefix = "[ERROR]"
+		case "warning":
+			plainStatusPrefix = "[WARN]"
+		default:
+			plainStatusPrefix = "[INFO]"
+		}
+		return fmt.Sprintf("%s %s [%s, %s]",
+			plainStatusPrefix,
+			toolLabel,
+			commandBaseName,
+			formattedDuration)
+	}
+
+	// Themed completed state - UPDATED for muted bracketed part
+	indent := ""
+	if p.Task.Config.Style.UseBoxes && !p.Task.Config.IsMonochrome {
+		indent = p.Task.Config.Border.VerticalChar + " "
+	}
+
+	mutedColor := p.Task.Config.GetColor("Muted") // Get the "Muted" color
+	resetColor := p.Task.Config.ResetColor()
+
+	// Themed: INDENT ICON TASK_LABEL MUTED_COLOR[COMMAND_BASENAME, DURATION]RESET_COLOR
+	return fmt.Sprintf("%s%s %s %s[%s, %s]%s", // Added space before mutedColor
 		indent,
 		icon,
-		toolLabel,
-		colorCode,
-		actionPhrase,
-		p.Task.Config.ResetColor(),
-		colorCode,
-		outcomeWord,
-		p.Task.Config.ResetColor(),
-		duration)
+		toolLabel,         // e.g., "Lint YAML files"
+		mutedColor,        // Apply muted color to the whole bracketed section
+		commandBaseName,   // e.g., "yamllint"
+		formattedDuration, // e.g., "55ms"
+		resetColor)        // Reset color after the bracketed section
 }
 
 // runSpinner animates the spinner while the task is running
 func (p *InlineProgress) runSpinner(ctx context.Context) {
-	// This function should ONLY run if p.isTerminal is true
-	// The Start method already gates this with:
-	// if enableSpinner && p.isTerminal && !p.Task.Config.IsMonochrome
+	// This function should ONLY run if p.isTerminal is true and not monochrome,
+	// as typically gated by the Start method.
+	// However, the debug prints for state are still useful.
 
 	// Default to ASCII spinner for maximum compatibility
-	spinnerChars := "-\\|/"
+	spinnerChars := "-\\|/" // DEFAULT_ASCII_SPINNER
 
-	// Only use Unicode spinner if explicitly configured, in a terminal, and not in monochrome mode
+	// --- Debug: Initial state ---
+	if p.Debug { // Check the global debug flag
+		fmt.Fprintf(os.Stderr, "[FO_DEBUG_SPINNER] runSpinner Init: isTerminal: %t, Config.IsMonochrome: %t, Config.ThemeName: %s\n",
+			p.isTerminal, p.Task.Config.IsMonochrome, p.Task.Config.ThemeName)
+	}
+
+	// Determine spinner characters
 	if !p.Task.Config.IsMonochrome && p.isTerminal {
-		if elemStyle := p.Task.Config.GetElementStyle("Task_Progress_Line"); elemStyle.AdditionalChars != "" {
+		elemStyle := p.Task.Config.GetElementStyle("Task_Progress_Line")
+		if elemStyle.AdditionalChars != "" {
 			spinnerChars = elemStyle.AdditionalChars
+			if p.Debug { // Check the global debug flag
+				fmt.Fprintf(os.Stderr, "[FO_DEBUG_SPINNER] Source: Theme ('%s') Task_Progress_Line.additional_chars: \"%s\"\n", p.Task.Config.ThemeName, spinnerChars)
+			}
+		} else {
+			if p.Debug { // Check the global debug flag
+				fmt.Fprintf(os.Stderr, "[FO_DEBUG_SPINNER] Source: Default ASCII (Theme '%s' Task_Progress_Line.AdditionalChars was empty).\n", p.Task.Config.ThemeName)
+			}
+		}
+	} else {
+		if p.Debug { // Check the global debug flag
+			fmt.Fprintf(os.Stderr, "[FO_DEBUG_SPINNER] Source: Default ASCII (Conditions for Unicode not met. IsMonochrome: %t, isTerminal: %t).\n", p.Task.Config.IsMonochrome, p.isTerminal)
 		}
 	}
 
-	// Ensure we have at least one character
+	// Ensure we have at least one character for the spinner animation
 	if len(spinnerChars) == 0 {
-		spinnerChars = "-\\|/"
+		spinnerChars = "-\\|/" // Absolute fallback
+		if p.Debug {           // Check the global debug flag
+			fmt.Fprintf(os.Stderr, "[FO_DEBUG_SPINNER] Fallback: spinnerChars was empty, reset to absolute default ASCII: \"%s\"\n", spinnerChars)
+		}
 	}
 
-	// Default interval
-	interval := 180 * time.Millisecond
+	if p.Debug { // Check the global debug flag
+		fmt.Fprintf(os.Stderr, "[FO_DEBUG_SPINNER] Final Chars: \"%s\"\n", spinnerChars)
+	}
+
+	// Determine spinner interval
+	interval := 180 * time.Millisecond // Default interval
 	if p.Task.Config.Style.SpinnerInterval > 0 {
 		interval = time.Duration(p.Task.Config.Style.SpinnerInterval) * time.Millisecond
+	}
+	if p.Debug { // Check the global debug flag
+		fmt.Fprintf(os.Stderr, "[FO_DEBUG_SPINNER] Interval: %v\n", interval)
 	}
 
 	ticker := time.NewTicker(interval)
@@ -249,6 +275,9 @@ func (p *InlineProgress) runSpinner(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			if p.Debug { // Check the global debug flag
+				fmt.Fprintf(os.Stderr, "[FO_DEBUG_SPINNER] Event: Context done, exiting spinner loop.\n")
+			}
 			return
 		case <-ticker.C:
 			p.mutex.Lock()
@@ -256,12 +285,20 @@ func (p *InlineProgress) runSpinner(ctx context.Context) {
 			p.mutex.Unlock()
 
 			if !isActive {
+				if p.Debug { // Check the global debug flag
+					fmt.Fprintf(os.Stderr, "[FO_DEBUG_SPINNER] Event: Task no longer active, exiting spinner loop.\n")
+				}
 				return
 			}
 
 			// Update spinner index
 			p.mutex.Lock()
 			p.SpinnerIndex = (p.SpinnerIndex + 1) % len(spinnerChars)
+			// Optional: Debug for each frame, can be very verbose
+			// if p.Debug {
+			// 	currentSpinnerCharForFrame := string(spinnerChars[p.SpinnerIndex])
+			// 	fmt.Fprintf(os.Stderr, "[FO_DEBUG_SPINNER] Frame: Index: %d, Char: '%s'\n", p.SpinnerIndex, currentSpinnerCharForFrame)
+			// }
 			p.mutex.Unlock()
 
 			// Re-render the progress line with the new spinner char and updated time
