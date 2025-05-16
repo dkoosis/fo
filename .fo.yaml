@@ -42,8 +42,8 @@ themes:
 
     # Colors
     colors:
-      process: "\033[0;34m" # Blue
-      success: "\033[0;32m" # Green
+      process: "\033[0;97m" # White
+      success: "\033[0;97m" # White
       warning: "\033[0;33m" # Yellow
       error: "\033[0;31m" # Red
       detail: "\033[0m" # Default
@@ -65,6 +65,7 @@ themes:
         text_case: "upper"
         text_style: ["bold"]
         color_fg: "process"
+        color_bg: "\033[44m"
 
       Task_StartIndicator_Line:
         icon_key: "start"
