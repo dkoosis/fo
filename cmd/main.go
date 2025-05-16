@@ -140,12 +140,11 @@ func convertAppConfigToLocal(appCfg *config.AppConfig) LocalAppConfig {
 		NoTimer:       appCfg.NoTimer,
 		NoColor:       appCfg.NoColor,
 		CI:            appCfg.CI,
-		Debug:         appCfg.Debug,
+		Debug:         false, // Default to false, only enable when explicitly set by flag
 		MaxBufferSize: appCfg.MaxBufferSize,
 		MaxLineLength: appCfg.MaxLineLength,
 	}
 }
-
 func findCommandArgs() []string {
 	for i, arg := range os.Args {
 		if arg == "--" {

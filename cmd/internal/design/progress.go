@@ -114,10 +114,8 @@ func (p *InlineProgress) formatProgressMessage(status string) string {
 	// Running state for spinner
 	if status == "running" {
 		if usePlainAscii {
-			baseVerb := getBaseVerb(p.Task.Intent)
-			target := getTargetDescription(p.Task.Command, p.Task.Args)
-			actionPhrase := fmt.Sprintf("%s %s", baseVerb, target)
-			return fmt.Sprintf("[BUSY] %s: %s [Working...]", toolLabel, actionPhrase)
+			// Simplified format - just show task label and status
+			return fmt.Sprintf("[BUSY] %s [Working...]", toolLabel)
 		}
 
 		// Themed running state (spinner animation)
@@ -125,10 +123,6 @@ func (p *InlineProgress) formatProgressMessage(status string) string {
 		if p.Task.Config.Style.UseBoxes && !p.Task.Config.IsMonochrome {
 			indent = p.Task.Config.Border.VerticalChar + " "
 		}
-
-		baseVerb := getBaseVerb(p.Task.Intent)
-		target := getTargetDescription(p.Task.Command, p.Task.Args)
-		actionPhrase := fmt.Sprintf("%s %s", baseVerb, target)
 
 		p.mutex.Lock()
 		spinnerChars := "-\\|/"
@@ -144,13 +138,11 @@ func (p *InlineProgress) formatProgressMessage(status string) string {
 		runningColor := p.Task.Config.GetColor("Process")
 		runningDuration := formatDuration(time.Since(p.StartTime))
 
-		return fmt.Sprintf("%s%s %s: %s%s%s [%sWorking%s %s]",
+		// Simplified format - no action phrase
+		return fmt.Sprintf("%s%s %s [%sWorking%s %s]",
 			indent,
 			spinnerIcon,
 			toolLabel,
-			runningColor,
-			actionPhrase,
-			p.Task.Config.ResetColor(),
 			runningColor,
 			p.Task.Config.ResetColor(),
 			runningDuration)
@@ -183,7 +175,7 @@ func (p *InlineProgress) formatProgressMessage(status string) string {
 		case "error":
 			plainStatusPrefix = "[ERROR]"
 		case "warning":
-			plainStatusPrefix = "[WARN]"
+			plainStatusPrefix = "[WARNING]"
 		default:
 			plainStatusPrefix = "[INFO]"
 		}
