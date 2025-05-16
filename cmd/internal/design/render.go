@@ -565,19 +565,30 @@ func getProcessLabel(intent string) string {
 	return "Running"
 }
 
+// cmd/internal/design/render.go
+// ... (imports and titler definition) ...
+
 func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, indentLevel int) string {
 	var sb strings.Builder
 	var iconToUse string
 	var rawFgColor, rawBgColor string
-	var finalFgColor, finalBgColor, finalTextStyle string
+	var finalFgColor, finalBgColor, finalTextStyle string // Added finalTextStyle
 	var elementStyle ElementStyleDef
 
 	lowerMessageType := strings.ToLower(messageType)
 	styleKey := ""
 
+	// Determine the styleKey based on messageType to fetch ElementStyleDef
 	switch lowerMessageType {
 	case "header":
-		styleKey = "Print_Header_Highlight"
+		// Apply Print_Header_Highlight only to the specific "Check for required tools" message
+		if message == "Check for required tools" {
+			styleKey = "Print_Header_Highlight"
+		} else {
+			// For other headers, you might want a default header style from elements
+			// or just use the fallback logic based on messageType directly.
+			// For now, let's ensure other headers don't unintentionally get blue BG.
+		}
 	case "success":
 		styleKey = "Print_Success_Style"
 	case "warning":
@@ -592,14 +603,15 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 		elementStyle = cfg.GetElementStyle(styleKey)
 	}
 
+	// Determine Icon
 	if customIcon != "" {
 		iconToUse = customIcon
 	} else if elementStyle.IconKey != "" {
 		iconToUse = cfg.GetIcon(elementStyle.IconKey)
-	} else {
+	} else { // Fallback icon logic
 		switch lowerMessageType {
 		case "header":
-			iconToUse = cfg.GetIcon("Start")
+			iconToUse = cfg.GetIcon("Start") // This will be "▶️"
 		case "success":
 			iconToUse = cfg.GetIcon("Success")
 		case "warning":
@@ -611,12 +623,18 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 		}
 	}
 
+	// Determine RAW color strings from ElementStyleDef or defaults
+	// FG Color
 	if elementStyle.ColorFG != "" {
 		rawFgColor = elementStyle.ColorFG
 	} else {
 		switch lowerMessageType {
 		case "header":
-			rawFgColor = "White"
+			if message == "Check for required tools" { // Specific for this header
+				rawFgColor = "White" // For white text on blue BG
+			} else {
+				rawFgColor = "Process" // Default header color (your theme makes this white)
+			}
 		case "success":
 			rawFgColor = "Success"
 		case "warning":
@@ -627,10 +645,11 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 			rawFgColor = "Detail"
 		}
 	}
+	// BG Color
 	if elementStyle.ColorBG != "" {
 		rawBgColor = elementStyle.ColorBG
 	} else if lowerMessageType == "header" && message == "Check for required tools" {
-		rawBgColor = "BlueBg"
+		rawBgColor = "BlueBg" // Apply BlueBg only for this specific header
 	}
 
 	if lowerMessageType == "raw" {
@@ -638,6 +657,7 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 		rawBgColor = ""
 	}
 
+	// Resolve raw color names/keys to actual ANSI codes
 	if rawFgColor != "" {
 		finalFgColor = cfg.GetColor(rawFgColor)
 	}
@@ -648,8 +668,7 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 	if !cfg.IsMonochrome && elementStyle.TextStyle != nil {
 		var styleParts []string
 		for _, styleName := range elementStyle.TextStyle {
-			// Use titler for "bold" -> "Bold" for map lookup consistency
-			stylePart := cfg.GetColor(titler.String(strings.ToLower(styleName)))
+			stylePart := cfg.GetColor(titler.String(strings.ToLower(styleName))) // e.g. "Bold"
 			if stylePart != "" {
 				styleParts = append(styleParts, stylePart)
 			}
@@ -675,7 +694,7 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 		}
 
 		if iconToUse != "" {
-			sb.WriteString(iconToUse)
+			sb.WriteString(iconToUse) // Icon is now inside color block
 			sb.WriteString(" ")
 		}
 	}
@@ -688,8 +707,8 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 
 	sb.WriteString("\n")
 	if os.Getenv("FO_DEBUG_RENDER") != "" {
-		fmt.Fprintf(os.Stderr, "[DEBUG RenderDirectMessage] FG_raw: %q, FG_final: %q, BG_raw: %q, BG_final: %q, Style_final: %q, Output: %q\n",
-			rawFgColor, finalFgColor, rawBgColor, finalBgColor, finalTextStyle, sb.String())
+		fmt.Fprintf(os.Stderr, "[DEBUG RenderDirectMessage] FG_raw: %q, FG_final: %q, BG_raw: %q, BG_final: %q, Style_final: %q, Message: %q, Output: %q\n",
+			rawFgColor, finalFgColor, rawBgColor, finalBgColor, finalTextStyle, message, sb.String())
 	}
 	return sb.String()
 }
