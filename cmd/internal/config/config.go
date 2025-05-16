@@ -77,8 +77,6 @@ func LoadConfig() *AppConfig {
 		Presets: make(map[string]*design.ToolConfig),
 	}
 
-	// Check initial hardcoded themes for debug purposes if FO_DEBUG is set
-	// This debug check must happen before YAML overrides debug settings.
 	initialDebug := os.Getenv("FO_DEBUG") != ""
 
 	if initialDebug {
@@ -86,22 +84,16 @@ func LoadConfig() *AppConfig {
 		for themeName, themeCfg := range appCfg.Themes {
 			if themeCfg != nil {
 				fmt.Fprintf(os.Stderr, "Theme: %s (IsMonochrome: %t)\n", themeName, themeCfg.IsMonochrome)
-				fmt.Fprintf(os.Stderr, "  Process: '%s' (Hex: %x)\n", themeCfg.Colors.Process, themeCfg.Colors.Process)
-				fmt.Fprintf(os.Stderr, "  Success: '%s' (Hex: %x)\n", themeCfg.Colors.Success, themeCfg.Colors.Success)
-				fmt.Fprintf(os.Stderr, "  Warning: '%s' (Hex: %x)\n", themeCfg.Colors.Warning, themeCfg.Colors.Warning)
-				fmt.Fprintf(os.Stderr, "  Error:   '%s' (Hex: %x)\n", themeCfg.Colors.Error, themeCfg.Colors.Error)
-				fmt.Fprintf(os.Stderr, "  Detail:  '%s' (Hex: %x)\n", themeCfg.Colors.Detail, themeCfg.Colors.Detail)
-				fmt.Fprintf(os.Stderr, "  Muted:   '%s' (Hex: %x)\n", themeCfg.Colors.Muted, themeCfg.Colors.Muted)
-				fmt.Fprintf(os.Stderr, "  Reset:   '%s' (Hex: %x)\n", themeCfg.Colors.Reset, themeCfg.Colors.Reset)
+				// Add more detailed color logging here if needed for debugging themes
 			}
 		}
 		fmt.Fprintln(os.Stderr, "-------------------------------------------------")
 	}
 
-	configPath := getConfigPath()
+	configPath := getConfigPath() // Uses the corrected getConfigPath
 	if configPath == "" {
-		if initialDebug { // Use initialDebug as appCfg.Debug might not be set yet
-			fmt.Fprintln(os.Stderr, "[DEBUG LoadConfig] No .fo.yaml config file found, using defaults only.")
+		if initialDebug {
+			fmt.Fprintln(os.Stderr, "[DEBUG LoadConfig] No .fo.yaml config file found or user config dir problematic, using defaults only.")
 		}
 		return appCfg
 	}
@@ -116,7 +108,7 @@ func LoadConfig() *AppConfig {
 		return appCfg
 	}
 
-	var yamlAppCfg AppConfig // Temporary struct to unmarshal YAML into
+	var yamlAppCfg AppConfig
 	err = yaml.Unmarshal(yamlFile, &yamlAppCfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: Error unmarshalling config file %s: %v. Using defaults.\n", configPath, err)
@@ -124,18 +116,17 @@ func LoadConfig() *AppConfig {
 	}
 
 	// Merge YAML settings onto the base appCfg
-	// General settings
 	if yamlAppCfg.Label != "" {
 		appCfg.Label = yamlAppCfg.Label
 	}
-	appCfg.Stream = yamlAppCfg.Stream // Overwrites default
+	appCfg.Stream = yamlAppCfg.Stream
 	if yamlAppCfg.ShowOutput != "" {
 		appCfg.ShowOutput = yamlAppCfg.ShowOutput
 	}
 	appCfg.NoTimer = yamlAppCfg.NoTimer
 	appCfg.NoColor = yamlAppCfg.NoColor
 	appCfg.CI = yamlAppCfg.CI
-	appCfg.Debug = yamlAppCfg.Debug // YAML can set debug status
+	appCfg.Debug = yamlAppCfg.Debug
 
 	if yamlAppCfg.MaxBufferSize > 0 {
 		appCfg.MaxBufferSize = yamlAppCfg.MaxBufferSize
@@ -150,28 +141,17 @@ func LoadConfig() *AppConfig {
 		appCfg.Presets = yamlAppCfg.Presets
 	}
 
-	// Merge themes from YAML. This will override hardcoded themes if names match,
-	// or add new themes defined only in YAML.
 	if yamlAppCfg.Themes != nil {
-		if appCfg.Debug || initialDebug { // Use current debug status
+		if appCfg.Debug || initialDebug {
 			fmt.Fprintln(os.Stderr, "--- [DEBUG LoadConfig] Processing Themes from YAML ---")
 		}
 		for name, themeFromFile := range yamlAppCfg.Themes {
-			// DeepCopy is important here to avoid modifying the original themeFromFile
-			// if it's used elsewhere or if multiple YAML configs point to the same theme object.
 			copiedTheme := design.DeepCopyConfig(themeFromFile)
 			if copiedTheme != nil {
-				copiedTheme.ThemeName = name      // Ensure the theme knows its own name
-				appCfg.Themes[name] = copiedTheme // Add or overwrite in appCfg.Themes
+				copiedTheme.ThemeName = name
+				appCfg.Themes[name] = copiedTheme
 				if appCfg.Debug || initialDebug {
 					fmt.Fprintf(os.Stderr, "Loaded/Overwrote Theme from YAML: %s (IsMonochrome: %t)\n", name, copiedTheme.IsMonochrome)
-					fmt.Fprintf(os.Stderr, "  YAML Process: '%s' (Hex: %x)\n", copiedTheme.Colors.Process, copiedTheme.Colors.Process)
-					fmt.Fprintf(os.Stderr, "  YAML Success: '%s' (Hex: %x)\n", copiedTheme.Colors.Success, copiedTheme.Colors.Success)
-					fmt.Fprintf(os.Stderr, "  YAML Warning: '%s' (Hex: %x)\n", copiedTheme.Colors.Warning, copiedTheme.Colors.Warning)
-					fmt.Fprintf(os.Stderr, "  YAML Error:   '%s' (Hex: %x)\n", copiedTheme.Colors.Error, copiedTheme.Colors.Error)
-					fmt.Fprintf(os.Stderr, "  YAML Detail:  '%s' (Hex: %x)\n", copiedTheme.Colors.Detail, copiedTheme.Colors.Detail)
-					fmt.Fprintf(os.Stderr, "  YAML Muted:   '%s' (Hex: %x)\n", copiedTheme.Colors.Muted, copiedTheme.Colors.Muted)
-					fmt.Fprintf(os.Stderr, "  YAML Reset:   '%s' (Hex: %x)\n", copiedTheme.Colors.Reset, copiedTheme.Colors.Reset)
 				}
 			}
 		}
@@ -180,108 +160,112 @@ func LoadConfig() *AppConfig {
 		}
 	}
 
-	// Validate that the active theme (possibly set from YAML) actually exists.
 	if _, ok := appCfg.Themes[appCfg.ActiveThemeName]; !ok {
 		if appCfg.Debug || initialDebug {
-			fmt.Fprintf(os.Stderr, "[DEBUG LoadConfig] Active theme '%s' (from config file or default) not found in final themes map. Falling back to '%s'.\n", appCfg.ActiveThemeName, DefaultActiveThemeName)
+			fmt.Fprintf(os.Stderr, "[DEBUG LoadConfig] Active theme '%s' not found. Falling back to '%s'.\n", appCfg.ActiveThemeName, DefaultActiveThemeName)
 		}
-		appCfg.ActiveThemeName = DefaultActiveThemeName // Fallback to a known default.
+		appCfg.ActiveThemeName = DefaultActiveThemeName
 	}
 
 	if appCfg.Debug || initialDebug {
-		fmt.Fprintf(os.Stderr, "[DEBUG LoadConfig] Loaded config from %s. Final Active theme: %s. Presets loaded: %d\n", configPath, appCfg.ActiveThemeName, len(appCfg.Presets))
-		// Use the two-value assignment directly in an if statement's initializer part
-		if finalActiveThemeForDebug, ok := appCfg.Themes[appCfg.ActiveThemeName]; ok && finalActiveThemeForDebug != nil {
-			// Key was found, and the theme pointer is not nil
-			fmt.Fprintf(os.Stderr, "  Final Active Theme '%s' Colors (found and not nil):\n", appCfg.ActiveThemeName)
-			fmt.Fprintf(os.Stderr, "    Process: '%s' (Hex: %x)\n", finalActiveThemeForDebug.Colors.Process, finalActiveThemeForDebug.Colors.Process)
-			// ... print other colors if needed for deep debugging
-		} else if ok && finalActiveThemeForDebug == nil {
-			// Key was found, but the theme pointer itself was nil in the map
-			fmt.Fprintf(os.Stderr, "[DEBUG LoadConfig] Final Active Theme '%s' was found in the themes map, but its value is nil.\n", appCfg.ActiveThemeName)
-		} else if !ok {
-			// Key was not found in the map
-			fmt.Fprintf(os.Stderr, "[DEBUG LoadConfig] Final Active Theme '%s' was NOT found in the themes map.\n", appCfg.ActiveThemeName)
-		}
+		fmt.Fprintf(os.Stderr, "[DEBUG LoadConfig] Loaded config from %s. Final Active theme: %s.\n", configPath, appCfg.ActiveThemeName)
 	}
 	return appCfg
 }
 
 // getConfigPath tries to find the .fo.yaml configuration file.
-// It checks local directory first, then XDG UserConfigDir.
+// It checks local directory first, then XDG UserConfigDir (if valid).
 func getConfigPath() string {
+	// Try local path first
 	localPath := ".fo.yaml"
 	if _, err := os.Stat(localPath); err == nil {
+		// If FO_DEBUG is set, print that we're using the local path
+		if os.Getenv("FO_DEBUG") != "" {
+			absLocalPath, _ := filepath.Abs(localPath)
+			fmt.Fprintf(os.Stderr, "[DEBUG getConfigPath] Using local config file: %s\n", absLocalPath)
+		}
 		return localPath
 	}
 
 	configHome, err := os.UserConfigDir()
-	if err == nil {
+	// If UserConfigDir fails OR returns an empty path or "/", it's not suitable for XDG path construction here.
+	if err == nil && configHome != "" && configHome != "/" {
+		// Construct path like /home/user/.config/fo/.fo.yaml
+		// Ensure "fo" subdirectory is part of the path.
 		xdgPath := filepath.Join(configHome, "fo", ".fo.yaml")
-		if _, err := os.Stat(xdgPath); err == nil {
+		if _, errStat := os.Stat(xdgPath); errStat == nil {
+			// If FO_DEBUG is set, print that we're using the XDG path
+			if os.Getenv("FO_DEBUG") != "" {
+				fmt.Fprintf(os.Stderr, "[DEBUG getConfigPath] Using XDG config file: %s\n", xdgPath)
+			}
 			return xdgPath
 		}
+		// If FO_DEBUG is set and XDG path not found, print that.
+		if os.Getenv("FO_DEBUG") != "" {
+			fmt.Fprintf(os.Stderr, "[DEBUG getConfigPath] XDG config file not found at: %s\n", xdgPath)
+		}
+	} else {
+		// If FO_DEBUG is set and UserConfigDir was problematic, print that.
+		if os.Getenv("FO_DEBUG") != "" {
+			fmt.Fprintf(os.Stderr, "[DEBUG getConfigPath] UserConfigDir error or unsuitable path. Error: %v, Path: '%s'\n", err, configHome)
+		}
 	}
-	return "" // No config file found
+
+	// Fallback or if XDG path is not viable/found
+	if os.Getenv("FO_DEBUG") != "" {
+		fmt.Fprintln(os.Stderr, "[DEBUG getConfigPath] No config file found. Will use default settings.")
+	}
+	return "" // No config file found or UserConfigDir was problematic
 }
 
 // MergeWithFlags takes the application config (post-YAML and presets) and CLI flags,
 // and returns the final design.Config to be used for rendering.
-// It resolves theme selection, monochrome mode, and timer display.
 func MergeWithFlags(appCfg *AppConfig, cliFlags CliFlags) *design.Config {
-	// Determine the effective theme name (CLI flag > app config).
 	effectiveThemeName := appCfg.ActiveThemeName
 	if cliFlags.ThemeName != "" {
 		effectiveThemeName = cliFlags.ThemeName
 	}
 
-	// Get the design.Config for the effective theme.
 	finalDesignConfig, themeExists := appCfg.Themes[effectiveThemeName]
 	if !themeExists {
-		// This fallback should ideally use the hardcoded default theme if the named one isn't found.
 		if appCfg.Debug || os.Getenv("FO_DEBUG") != "" {
-			fmt.Fprintf(os.Stderr, "[DEBUG MergeWithFlags] Theme '%s' not found in appCfg.Themes. Falling back to default theme '%s'.\n", effectiveThemeName, DefaultActiveThemeName)
+			fmt.Fprintf(os.Stderr, "[DEBUG MergeWithFlags] Theme '%s' not found. Falling back to '%s'.\n", effectiveThemeName, DefaultActiveThemeName)
 		}
-		finalDesignConfig = appCfg.Themes[DefaultActiveThemeName] // Assumes DefaultActiveThemeName exists
-		if finalDesignConfig == nil {                             // Absolute fallback if even default is missing (should not happen)
+		finalDesignConfig = appCfg.Themes[DefaultActiveThemeName]
+		if finalDesignConfig == nil {
 			if appCfg.Debug || os.Getenv("FO_DEBUG") != "" {
-				fmt.Fprintln(os.Stderr, "[DEBUG MergeWithFlags] Default theme definition also missing. Using coded UnicodeVibrant theme as absolute fallback.")
+				fmt.Fprintln(os.Stderr, "[DEBUG MergeWithFlags] Default theme also missing. Using coded UnicodeVibrant as fallback.")
 			}
 			finalDesignConfig = design.UnicodeVibrantTheme()
 		}
 	}
 
-	// It's crucial to work on a copy to avoid modifying the shared theme in appCfg.Themes.
 	finalDesignConfig = design.DeepCopyConfig(finalDesignConfig)
-	finalDesignConfig.ThemeName = effectiveThemeName // Ensure the copied config knows its name.
+	finalDesignConfig.ThemeName = effectiveThemeName
 
-	// Determine effective NoColor, CI, and NoTimer states.
-	// Priority: CLI flag > Environment Variable > AppConfig setting.
-	effectiveNoColor := appCfg.NoColor // Start with AppConfig value
+	effectiveNoColor := appCfg.NoColor
 	effectiveCI := appCfg.CI
 	effectiveNoTimer := appCfg.NoTimer
 
-	// Environment variables override AppConfig.
 	envNoColorStr := os.Getenv("FO_NO_COLOR")
 	if envNoColorStr == "" {
-		envNoColorStr = os.Getenv("NO_COLOR") // Standard NO_COLOR
+		envNoColorStr = os.Getenv("NO_COLOR")
 	}
 	if envNoColorStr != "" {
 		if bVal, err := strconv.ParseBool(envNoColorStr); err == nil {
 			effectiveNoColor = bVal
 		}
 	}
-	if envCIStr := os.Getenv("FO_CI"); envCIStr != "" { // FO_CI specific env var
-		if bVal, err := strconv.ParseBool(envCIStr); err == nil {
-			effectiveCI = bVal
-		}
-	} else if envCIStr := os.Getenv("CI"); envCIStr != "" { // Standard CI env var
+	envCIStr := os.Getenv("FO_CI")
+	if envCIStr == "" {
+		envCIStr = os.Getenv("CI")
+	}
+	if envCIStr != "" {
 		if bVal, err := strconv.ParseBool(envCIStr); err == nil {
 			effectiveCI = bVal
 		}
 	}
 
-	// CLI flags override everything else if they were set.
 	if cliFlags.NoColorSet {
 		effectiveNoColor = cliFlags.NoColor
 	}
@@ -292,35 +276,21 @@ func MergeWithFlags(appCfg *AppConfig, cliFlags CliFlags) *design.Config {
 		effectiveNoTimer = cliFlags.NoTimer
 	}
 
-	// Apply final decisions to the design config.
-	// CI mode implies monochrome and no timer.
 	if effectiveCI {
-		design.ApplyMonochromeDefaults(finalDesignConfig) // This sets IsMonochrome = true
+		design.ApplyMonochromeDefaults(finalDesignConfig)
 		finalDesignConfig.Style.NoTimer = true
-		// Ensure UseBoxes is false for CI, as ApplyMonochromeDefaults should do.
 		finalDesignConfig.Style.UseBoxes = false
 	} else if effectiveNoColor {
-		design.ApplyMonochromeDefaults(finalDesignConfig) // This sets IsMonochrome = true
+		design.ApplyMonochromeDefaults(finalDesignConfig)
 	}
 
-	// Explicit --no-timer overrides theme/CI settings for timer.
 	if effectiveNoTimer {
 		finalDesignConfig.Style.NoTimer = true
 	}
 
-	// Stream flag logic is primarily handled in main.go for execution flow.
-	// If stream mode inherently changes design (e.g., always non-boxed), that can be set here.
-	// Currently, stream mode doesn't force design changes beyond what main.go handles for output.
-	// Example: if cliFlags.StreamSet && cliFlags.Stream && finalDesignConfig.Style.UseBoxes {
-	//    finalDesignConfig.Style.UseBoxes = false
-	// }
-
 	if appCfg.Debug || os.Getenv("FO_DEBUG") != "" {
-		fmt.Fprintf(os.Stderr, "[DEBUG MergeWithFlags] Final Design Config for theme '%s': IsMonochrome=%t, NoTimer=%t, UseBoxes=%t\n",
-			finalDesignConfig.ThemeName, finalDesignConfig.IsMonochrome, finalDesignConfig.Style.NoTimer, finalDesignConfig.Style.UseBoxes)
-		fmt.Fprintf(os.Stderr, "  Final Colors - Process: '%s' (Hex: %x), Reset: '%s' (Hex: %x)\n",
-			finalDesignConfig.Colors.Process, finalDesignConfig.Colors.Process,
-			finalDesignConfig.Colors.Reset, finalDesignConfig.Colors.Reset)
+		fmt.Fprintf(os.Stderr, "[DEBUG MergeWithFlags] Final Design for theme '%s': IsMonochrome=%t, NoTimer=%t\n",
+			finalDesignConfig.ThemeName, finalDesignConfig.IsMonochrome, finalDesignConfig.Style.NoTimer)
 	}
 
 	return finalDesignConfig
@@ -329,21 +299,19 @@ func MergeWithFlags(appCfg *AppConfig, cliFlags CliFlags) *design.Config {
 // ApplyCommandPreset modifies the AppConfig based on a preset matching the commandName.
 func ApplyCommandPreset(appCfg *AppConfig, commandName string) {
 	baseCommand := filepath.Base(commandName)
-	keysToTry := []string{commandName, baseCommand} // Try full path then base name.
+	keysToTry := []string{commandName, baseCommand}
 
 	for _, cmdKey := range keysToTry {
 		if preset, ok := appCfg.Presets[cmdKey]; ok {
 			if appCfg.Debug || os.Getenv("FO_DEBUG") != "" {
-				fmt.Fprintf(os.Stderr, "[DEBUG ApplyCommandPreset] Applying preset for command '%s'\n", cmdKey)
+				fmt.Fprintf(os.Stderr, "[DEBUG ApplyCommandPreset] Applying preset for '%s'\n", cmdKey)
 			}
 			if preset.Label != "" {
-				appCfg.Label = preset.Label // This will be used if CLI -l is not set.
+				appCfg.Label = preset.Label
 			}
-			// If design.ToolConfig had fields like Stream, ShowOutput, NoTimer, etc.,
-			// they would be applied to appCfg here.
-			// Example:
-			// if preset.StreamIsSet { appCfg.Stream = preset.StreamValue }
-			return // Preset found and applied.
+			// Apply other preset fields to appCfg if they exist in design.ToolConfig
+			// e.g., if preset.StreamIsSet { appCfg.Stream = preset.StreamValue }
+			return
 		}
 	}
 }

@@ -16,7 +16,7 @@ BINARY_NAME  := $(SERVICE_NAME)
 MODULE_PATH  := github.com/davidkoosis/fo
 CMD_PATH     := ./cmd
 SCRIPT_DIR   := ./scripts
-FO_PATH      := ./bin # Store path to fo binary directory
+FO_PATH      := ./bin
 FO           := $(FO_PATH)/$(BINARY_NAME) # Use this for invoking fo
 
 # --- Fo Configuration ---
@@ -78,10 +78,12 @@ all: ensure-fo check deps fmt lint lint-yaml check-line-length test build
 
 # Ensure fo is built and up-to-date
 ensure-fo:
+	@echo "DEBUG: FO_PATH='$(FO_PATH)'"
+	@echo "DEBUG: FO='$(FO)'"
 	@mkdir -p $(FO_PATH) # Ensure bin directory exists
 	@if [ ! -f "$(FO)" ] || [ -n "$(shell find cmd -name '*.go' -newer $(FO))" ]; then \
-	    echo "ℹ️ Building $(SERVICE_NAME) utility (ensure-fo)..."; \
-	    go build $(LDFLAGS) -o $(FO) $(CMD_PATH); \
+	echo "ℹ️ Building $(SERVICE_NAME) utility (ensure-fo)..."; \
+	go build $(LDFLAGS) -o $(FO) $(CMD_PATH); \
 	fi
 
 build: ensure-fo
@@ -104,7 +106,7 @@ lint-yaml: install-tools ensure-fo
 	@if ! command -v yamllint >/dev/null 2>&1; then \
 	    $(call FO_PRINT,warning,⚠️,0,Yamllint not found. Skipping YAML lint. Please install it (e.g., pip install yamllint).); \
 	else \
-	    if [ -n "$(YAML_FILES)" ]; then \
+	if [ -n "$(YAML_FILES)" ]; then \
 	        $(call FO_RUN,Lint YAML files,yamllint $(YAML_FILES)); \
 	    else \
 	        $(call FO_RUN,Lint YAML files (skipped),echo "No YAML files found to lint."); \
@@ -158,12 +160,12 @@ tree: ensure-fo
 	    $(call FO_PRINT,info,ℹ️,1,To install on macOS: brew install tree); \
 	    $(call FO_PRINT,info,ℹ️,1,To install on Debian/Ubuntu: sudo apt-get install tree); \
 	else \
-	    if tree -F -I "vendor|.git|.idea*|*.DS_Store|coverage.out|$(FO_PATH)" --dirsfirst -o ./docs/project_folder_tree.txt .; then \
+	if tree -F -I "vendor|.git|.idea*|*.DS_Store|coverage.out|$(FO_PATH)" --dirsfirst -o ./docs/project_folder_tree.txt .; then \
 	        $(call FO_PRINT,success,✅,0,Project tree generated at ./docs/project_folder_tree.txt); \
 	    else \
 	        $(call FO_PRINT,error,❌,0,Failed to generate project tree. 'tree' command may have failed.); \
 	        $(call FO_PRINT,info,ℹ️,1,Check for errors above or try running the tree command manually with the same options.); \
-	        rm -f ./docs/project_folder_tree.txt; \
+	rm -f ./docs/project_folder_tree.txt; \
 	    fi \
 	fi
 
@@ -174,41 +176,41 @@ install-tools: ensure-fo
 	@echo -ne "$($(call FO_PRINT,info,ℹ️,1,Check for golangci-lint...)\033[0K)" # Print initial check line, \033[0K clears rest of line
 	@path_to_tool=$$(which golangci-lint 2>/dev/null); \
 	if [ -n "$$path_to_tool" ]; then \
-	    echo -ne "\r$($(call FO_PRINT,success,✅,1,golangci-lint already installed: $$path_to_tool)\033[0K)\n"; \
+	echo -ne "\r$($(call FO_PRINT,success,✅,1,golangci-lint already installed: $$path_to_tool)\033[0K)\n"; \
 	else \
-	    echo -ne "\r$($(call FO_PRINT,info,ℹ️,1,Installing golangci-lint@$(GOLANGCILINT_VERSION)...)\033[0K)"; \
-	    if GOBIN=$(PWD)/$(FO_PATH) go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCILINT_VERSION); then \
-	        echo -ne "\r$($(call FO_PRINT,success,✅,1,golangci-lint installed to $(PWD)/$(FO_PATH))\033[0K)\n"; \
+	echo -ne "\r$($(call FO_PRINT,info,ℹ️,1,Installing golangci-lint@$(GOLANGCILINT_VERSION)...)\033[0K)"; \
+	if GOBIN=$(PWD)/$(FO_PATH) go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCILINT_VERSION); then \
+	echo -ne "\r$($(call FO_PRINT,success,✅,1,golangci-lint installed to $(PWD)/$(FO_PATH))\033[0K)\n"; \
 	    else \
-	        echo -ne "\r$($(call FO_PRINT,error,❌,1,Failed to install golangci-lint)\033[0K)\n" && exit 1; \
+	echo -ne "\r$($(call FO_PRINT,error,❌,1,Failed to install golangci-lint)\033[0K)\n" && exit 1; \
 	    fi \
 	fi
 	@echo -ne "$($(call FO_PRINT,info,ℹ️,1,Check for gotestsum...)\033[0K)"
 	@path_to_tool=$$(which gotestsum 2>/dev/null); \
 	if [ -n "$$path_to_tool" ]; then \
-	    echo -ne "\r$($(call FO_PRINT,success,✅,1,gotestsum already installed: $$path_to_tool)\033[0K)\n"; \
+	echo -ne "\r$($(call FO_PRINT,success,✅,1,gotestsum already installed: $$path_to_tool)\033[0K)\n"; \
 	else \
-	    echo -ne "\r$($(call FO_PRINT,info,ℹ️,1,Installing gotestsum@$(GOTESTSUM_VERSION)...)\033[0K)"; \
-	    if GOBIN=$(PWD)/$(FO_PATH) go install gotest.tools/gotestsum@$(GOTESTSUM_VERSION); then \
-	        echo -ne "\r$($(call FO_PRINT,success,✅,1,gotestsum installed to $(PWD)/$(FO_PATH))\033[0K)\n"; \
+	echo -ne "\r$($(call FO_PRINT,info,ℹ️,1,Installing gotestsum@$(GOTESTSUM_VERSION)...)\033[0K)"; \
+	if GOBIN=$(PWD)/$(FO_PATH) go install gotest.tools/gotestsum@$(GOTESTSUM_VERSION); then \
+	echo -ne "\r$($(call FO_PRINT,success,✅,1,gotestsum installed to $(PWD)/$(FO_PATH))\033[0K)\n"; \
 	    else \
-	        echo -ne "\r$($(call FO_PRINT,error,❌,1,Failed to install gotestsum)\033[0K)\n" && exit 1; \
+	echo -ne "\r$($(call FO_PRINT,error,❌,1,Failed to install gotestsum)\033[0K)\n" && exit 1; \
 	    fi \
 	fi
 	@echo -ne "$($(call FO_PRINT,info,ℹ️,1,Check for yamllint (via pip)...)\033[0K)"
 	@path_to_tool=$$(which yamllint 2>/dev/null); \
 	if [ -n "$$path_to_tool" ]; then \
-	    echo -ne "\r$($(call FO_PRINT,success,✅,1,yamllint already installed: $$path_to_tool)\033[0K)\n"; \
+	echo -ne "\r$($(call FO_PRINT,success,✅,1,yamllint already installed: $$path_to_tool)\033[0K)\n"; \
 	else \
-	    echo -ne "\r$($(call FO_PRINT,info,ℹ️,1,Attempting to install yamllint via pip/pip3...)\033[0K)"; \
-	    if python3 -m pip install --user yamllint >/dev/null 2>&1 || python -m pip install --user yamllint >/dev/null 2>&1; then \
-	        if command -v yamllint >/dev/null 2>&1; then \
-	             echo -ne "\r$($(call FO_PRINT,success,✅,1,yamllint installed successfully: $$(which yamllint))\033[0K)\n"; \
+	echo -ne "\r$($(call FO_PRINT,info,ℹ️,1,Attempting to install yamllint via pip/pip3...)\033[0K)"; \
+	if python3 -m pip install --user yamllint >/dev/null 2>&1 || python -m pip install --user yamllint >/dev/null 2>&1; then \
+	if command -v yamllint >/dev/null 2>&1; then \
+	echo -ne "\r$($(call FO_PRINT,success,✅,1,yamllint installed successfully: $$(which yamllint))\033[0K)\n"; \
 	        else \
-	             echo -ne "\r$($(call FO_PRINT,warning,⚠️,1,yamllint installed but not found in PATH. Please check your pip user bin path.)\033[0K)\n"; \
+	echo -ne "\r$($(call FO_PRINT,warning,⚠️,1,yamllint installed but not found in PATH. Please check your pip user bin path.)\033[0K)\n"; \
 	        fi \
 	    else \
-	        echo -ne "\r$($(call FO_PRINT,warning,⚠️,1,Could not install yamllint. Please install it manually.)\033[0K)\n"; \
+	echo -ne "\r$($(call FO_PRINT,warning,⚠️,1,Could not install yamllint. Please install it manually.)\033[0K)\n"; \
 	    fi \
 	fi
 
