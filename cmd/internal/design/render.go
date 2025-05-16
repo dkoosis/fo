@@ -568,11 +568,12 @@ func getProcessLabel(intent string) string {
 // cmd/internal/design/render.go
 // ... (imports and titler definition) ...
 
+// RenderDirectMessage creates the formatted status line
 func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, indentLevel int) string {
 	var sb strings.Builder
 	var iconToUse string
 	var rawFgColor, rawBgColor string
-	var finalFgColor, finalBgColor, finalTextStyle string // Added finalTextStyle
+	var finalFgColor, finalBgColor, finalTextStyle string
 	var elementStyle ElementStyleDef
 
 	lowerMessageType := strings.ToLower(messageType)
@@ -580,23 +581,11 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 
 	// Determine the styleKey based on messageType to fetch ElementStyleDef
 	switch lowerMessageType {
-	case "header":
-		// Apply Print_Header_Highlight only to the specific "Check for required tools" message
-		if message == "Check for required tools" {
-			styleKey = "Print_Header_Highlight"
-		} else {
-			// For other headers, you might want a default header style from elements
-			// or just use the fallback logic based on messageType directly.
-			// For now, let's ensure other headers don't unintentionally get blue BG.
-		}
-	case "success":
-		styleKey = "Print_Success_Style"
-	case "warning":
-		styleKey = "Print_Warning_Style"
-	case "error":
-		styleKey = "Print_Error_Style"
-	case "info":
-		styleKey = "Print_Info_Style"
+	case "h1", "h2", "h3", "success", "warning", "error", "info":
+		// Direct mapping from type to element style key (properly capitalized)
+		styleKey = titler.String(lowerMessageType)
+	case "header": // Legacy support for "header" type
+		styleKey = "H1"
 	}
 
 	if styleKey != "" {
@@ -608,48 +597,52 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 		iconToUse = customIcon
 	} else if elementStyle.IconKey != "" {
 		iconToUse = cfg.GetIcon(elementStyle.IconKey)
-	} else { // Fallback icon logic
+	} else {
+		// Fallback icon logic based on message type
 		switch lowerMessageType {
-		case "header":
-			iconToUse = cfg.GetIcon("Start") // This will be "▶️"
+		case "h1", "header":
+			iconToUse = cfg.GetIcon("Start")
+		case "h2":
+			iconToUse = cfg.GetIcon("Info")
+		case "h3":
+			iconToUse = cfg.GetIcon("Bullet")
 		case "success":
 			iconToUse = cfg.GetIcon("Success")
 		case "warning":
 			iconToUse = cfg.GetIcon("Warning")
 		case "error":
 			iconToUse = cfg.GetIcon("Error")
+		case "info":
+			iconToUse = cfg.GetIcon("Info")
 		default:
 			iconToUse = cfg.GetIcon("Info")
 		}
 	}
 
-	// Determine RAW color strings from ElementStyleDef or defaults
-	// FG Color
+	// Determine colors from ElementStyleDef
 	if elementStyle.ColorFG != "" {
 		rawFgColor = elementStyle.ColorFG
 	} else {
+		// Fallback color logic based on message type
 		switch lowerMessageType {
-		case "header":
-			if message == "Check for required tools" { // Specific for this header
-				rawFgColor = "White" // For white text on blue BG
-			} else {
-				rawFgColor = "Process" // Default header color (your theme makes this white)
-			}
+		case "h1", "h2", "header":
+			rawFgColor = "Process"
 		case "success":
 			rawFgColor = "Success"
 		case "warning":
 			rawFgColor = "Warning"
 		case "error":
 			rawFgColor = "Error"
+		case "info":
+			rawFgColor = "Process"
 		default:
 			rawFgColor = "Detail"
 		}
 	}
-	// BG Color
+
+	// BG Color from ElementStyleDef
 	if elementStyle.ColorBG != "" {
 		rawBgColor = elementStyle.ColorBG
-	} else if lowerMessageType == "header" && message == "Check for required tools" {
-		rawBgColor = "BlueBg" // Apply BlueBg only for this specific header
 	}
 
 	if lowerMessageType == "raw" {
@@ -668,7 +661,7 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 	if !cfg.IsMonochrome && elementStyle.TextStyle != nil {
 		var styleParts []string
 		for _, styleName := range elementStyle.TextStyle {
-			stylePart := cfg.GetColor(titler.String(strings.ToLower(styleName))) // e.g. "Bold"
+			stylePart := cfg.GetColor(titler.String(strings.ToLower(styleName)))
 			if stylePart != "" {
 				styleParts = append(styleParts, stylePart)
 			}
@@ -680,21 +673,28 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 
 	needsReset := false
 	if lowerMessageType != "raw" {
+		// Apply all styling at once to ensure proper ordering
+		// Background must come before foreground for proper display
+		fullStyle := ""
 		if finalBgColor != "" {
-			sb.WriteString(finalBgColor)
+			fullStyle += finalBgColor
 			needsReset = true
 		}
 		if finalFgColor != "" {
-			sb.WriteString(finalFgColor)
+			fullStyle += finalFgColor
 			needsReset = true
 		}
 		if finalTextStyle != "" {
-			sb.WriteString(finalTextStyle)
+			fullStyle += finalTextStyle
 			needsReset = true
 		}
 
+		if fullStyle != "" {
+			sb.WriteString(fullStyle)
+		}
+
 		if iconToUse != "" {
-			sb.WriteString(iconToUse) // Icon is now inside color block
+			sb.WriteString(iconToUse)
 			sb.WriteString(" ")
 		}
 	}

@@ -44,7 +44,7 @@ endef
 
 # NO leading @ here
 define FO_PRINT
-    $(FO) $(FO_PRINT_FLAGS) print --type "$(1)" --icon "$(2)" --indent $(3) -- "$(4)"
+    make$(FO) $(FO_PRINT_FLAGS) print --type "$(1)" --icon "$(2)" --indent $(3) -- "$(4)"
 endef
 
 # --- Core Targets ---
@@ -56,48 +56,47 @@ ensure-fo:
 	@if [ ! -f "$(FO)" ] || [ -n "$(shell find cmd -name '*.go' -newer $(FO))" ]; then \
 	echo "ℹ️ Building $(SERVICE_NAME) utility..."; \
 	go build $(LDFLAGS) -o $(FO) $(CMD_PATH); \
-    fi
+	fi
 
 build: ensure-fo
-	@$(call FO_PRINT,header,▶️,0,Build fo application)
+	@$(call FO_PRINT,h1,▶️,0,Build fo application)
 	@$(call FO_PRINT,success,✓,1,Build successful: $(realpath $(FO)))
 
 fmt: ensure-fo
-	@$(call FO_PRINT,header,▶️,0,Format and organize code)
+	@$(call FO_PRINT,h1,▶️,0,Format and organize code)
 	@$(call FO_RUN,Tidy modules,go mod tidy -v)
 	@$(call FO_RUN,Download modules,go mod download)
 	@$(call FO_RUN,Format Go code,golangci-lint fmt ./...)
 
 lint: ensure-fo
-	@$(call FO_PRINT,header,▶️,0,Lint code)
+	@$(call FO_PRINT,h1,▶️,0,Lint code)
 	@$(call FO_RUN,Run Go linter,golangci-lint run ./...)
 	@if command -v yamllint >/dev/null 2>&1 && [ -n "$(YAML_FILES)" ]; then \
-        $(call FO_RUN,Lint YAML files,yamllint $(YAML_FILES)); \
-    fi
+	$(call FO_RUN,Lint YAML files,yamllint $(YAML_FILES)); \
+	fi
 	@$(call FO_RUN,Check file line lengths,$(SCRIPT_DIR)/check_file_length.sh $(WARN_LINES) $(FAIL_LINES) $(GO_FILES))
 	@if [ -x "$(SCRIPT_DIR)/check_go_mod_path.sh" ]; then \
-        $(call FO_RUN,Check go.mod path,$(SCRIPT_DIR)/check_go_mod_path.sh $(MODULE_PATH)); \
-    fi
+	$(call FO_RUN,Check go.mod path,$(SCRIPT_DIR)/check_go_mod_path.sh $(MODULE_PATH)); \
+	fi
 
 test: ensure-fo
-	@$(call FO_PRINT,header,▶️,0,Run tests)
+	@$(call FO_PRINT,h1,▶️,0,Run tests)
 	@$(call FO_RUN,Run tests,gotestsum --format short -- ./...,-s)
 
 check: ensure-fo
-	@$(call FO_PRINT,header,▶️,0,Check for required tools)
+	@$(call FO_PRINT,h1,▶️,0,Check for required tools)
 	@$(call FO_PRINT,success,✅,1,Go: $(shell go version 2>/dev/null || echo "Not installed"))
 	@$(call FO_PRINT,success,✅,1,GoLangCI-Lint: $(shell golangci-lint --version 2>/dev/null | head -n1 || echo "Not installed"))
 	@$(call FO_PRINT,success,✅,1,GoTestSum: $(shell gotestsum --version 2>/dev/null || echo "Not installed"))
 	@$(call FO_PRINT,success,✅,1,Tree: $(shell tree --version 2>/dev/null | head -n1 || echo "Not installed"))
 	@$(call FO_PRINT,success,✅,1,YamlLint: $(shell yamllint --version 2>/dev/null || echo "Not installed"))
-	@$(call FO_PRINT,success,✅,1,Environment check completed)
 
 tree: ensure-fo
 	@$(call FO_PRINT,info,🌲,0,Generate project tree)
 	@mkdir -p ./docs
 	@if command -v tree > /dev/null; then \
-        tree -F -I "vendor|.git|.idea*|*.DS_Store|coverage.out|$(FO_PATH)" --dirsfirst -o ./docs/project_folder_tree.txt . && \
-        $(call FO_PRINT,success,✅,0,Project tree generated at ./docs/project_folder_tree.txt); \
+	tree -F -I "vendor|.git|.idea*|*.DS_Store|coverage.out|$(FO_PATH)" --dirsfirst -o ./docs/project_folder_tree.txt . && \
+	$(call FO_PRINT,success,✅,0,Project tree generated at ./docs/project_folder_tree.txt); \
     else \
         $(call FO_PRINT,warning,⚠️,0,Tree command not found. Install with: brew install tree); \
     fi

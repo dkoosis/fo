@@ -45,6 +45,7 @@
 │   ├── check_file_length.sh*
 │   ├── check_go_bin_path.sh*
 │   ├── check_go_mod_path.sh*
+│   ├── fix_formatting.sh*
 │   └── pkgdep.sh*
 ├── fo*
 ├── go.mod
@@ -57,4 +58,4 @@
 ├── test.mk
 └── tst.txt
 
-11 directories, 47 files
+11 directories, 48 files

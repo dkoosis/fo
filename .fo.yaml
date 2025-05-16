@@ -2,20 +2,20 @@
 # .fo.yaml - Configuration for fo utility
 
 # Global settings
-stream: false # Default to capture mode
-show_output: "on-fail" # Only show output on failure
-max_buffer_size: 10485760 # 10MB buffer limit
-max_line_length: 1048576 # 1MB max line length
-no_timer: false # Show execution time
-no_color: false # Use colors
-ci: false # Not CI mode
-debug: false # Set via CLI flag usually
+stream: false  # Default to capture mode
+show_output: "on-fail"  # Only show output on failure
+max_buffer_size: 10485760  # 10MB buffer limit
+max_line_length: 1048576  # 1MB max line length
+no_timer: false  # Show execution time
+no_color: false  # Use colors
+ci: false  # Not CI mode
+debug: false  # Set via CLI flag usually
 
 # Global style settings
 style:
-  use_inline_progress: true # Enable inline progress indicator
-  no_spinner: false # Enable spinner animation
-  spinner_interval: 80 # Milliseconds between spinner updates
+  use_inline_progress: true  # Enable inline progress indicator
+  no_spinner: false  # Enable spinner animation
+  spinner_interval: 80  # Milliseconds between spinner updates
 
 # Active theme selection
 active_theme: "unicode_vibrant"
@@ -29,7 +29,7 @@ themes:
       show_timestamps: false
       no_timer: false
       density: "balanced"
-      use_inline_progress: true # This enables spinner logic in Go code
+      use_inline_progress: true  # This enables spinner logic in Go code
 
     # Icons
     icons:
@@ -41,26 +41,24 @@ themes:
       bullet: "•"
 
     # Colors - These are the raw ANSI codes your Go code will process
-    # ensureEscapePrefix will turn these into actual \x1b sequences.
     colors:
-      Process: "\033[0;97m" # White (used by default for some headers if not overridden by element)
-      Success: "\033[0;97m" # White (used by default for success type if not overridden)
-      Warning: "\033[0;33m" # Yellow
-      Error: "\033[0;31m" # Red
-      Detail: "\033[0m" # Default/Reset (usually no color)
-      Muted: "\033[2m" # Dim
-      Reset: "\033[0m" # ANSI Reset
+      Process: "\033[0;97m"  # White (used by default for some headers if not overridden by element)
+      Success: "\033[0;32m"  # Green
+      Warning: "\033[0;33m"  # Yellow
+      Error: "\033[0;31m"  # Red
+      Detail: "\033[0m"  # Default/Reset (usually no color)
+      Muted: "\033[2m"  # Dim
+      Reset: "\033[0m"  # ANSI Reset
 
       # Specific colors for precise control via element styles
-      White: "\033[0;97m" # Bright White foreground
-      BlueBg: "\033[44m" # Blue Background
+      White: "\033[0;97m"  # Bright White foreground
+      BlueBg: "\033[44m"  # Blue Background
       Bold: "\033[1m"
       Italic: "\033[3m"
-      # Add other specific color names + codes if your element styles refer to them
 
     # Border characters (primarily for non-inline progress Task rendering)
     border:
-      task_style: "left_double" # Example, can be 'none' for fo print
+      task_style: "left_double"
       header_char: "═"
       vertical_char: "│"
       top_corner_char: "╒"
@@ -68,45 +66,55 @@ themes:
       footer_continuation_char: "─"
 
     # Element styles
-    # These are keys your Go `RenderDirectMessage` or other render functions will use.
     elements:
-      # For: fo print --type "header" --icon "▶️" --message "Check for required tools"
-      Print_Header_Highlight:
-        color_fg: "White" # Refers to colors.White
-        color_bg: "BlueBg" # Refers to colors.BlueBg
-        text_style: ["bold"] # Refers to colors.Bold
-        icon_key: "Start" # Uses icons.Start for ▶️ (optional if icon passed via CLI)
+      # Heading hierarchy
+      H1:  # Main section headers (blue background)
+        color_fg: "White"
+        color_bg: "BlueBg"
+        text_style: ["bold"]
+        icon_key: "Start"
 
-      # For: fo print --type "success" --icon "✅" --message "Go: ..."
-      Print_Success_Style:
-        color_fg: "Success" # Refers to colors.Success (which is white)
-        icon_key: "Success" # Uses icons.Success for ✅ (optional if icon passed via CLI)
-
-      # You can define styles for other `fo print --type <type>` if needed
-      Print_Warning_Style:
-        color_fg: "Warning"
-        icon_key: "Warning"
-      Print_Error_Style:
-        color_fg: "Error"
-        icon_key: "Error"
-      Print_Info_Style:
-        color_fg: "Process" # Or another color you define for info text
+      H2:  # Subsection headers
+        color_fg: "Process"
+        text_style: ["bold"]
         icon_key: "Info"
 
-      # Styles for the fo -- <command> wrapper output (Task rendering)
+      H3:  # Minor headers
+        color_fg: "Process"
+        text_style: []
+        icon_key: "Bullet"
+
+      # Status messages
+      Success:
+        color_fg: "Success"
+        icon_key: "Success"
+
+      Warning:
+        color_fg: "Warning"
+        icon_key: "Warning"
+
+      Error:
+        color_fg: "Error"
+        icon_key: "Error"
+
+      Info:
+        color_fg: "Process"
+        icon_key: "Info"
+
+      # Maintain existing task-related styles
       Task_Label_Header:
         text_case: "upper"
         text_style: ["bold"]
-        color_fg: "Process" # Default white for this in your theme
+        color_fg: "Process"
 
       Task_StartIndicator_Line:
         icon_key: "Start"
-        color_fg: "Process" # Default white
+        color_fg: "Process"
 
       Task_Status_Success_Block:
         icon_key: "Success"
         text_content: "Complete"
-        color_fg: "Success" # Default white
+        color_fg: "Success"
 
       Task_Status_Failed_Block:
         icon_key: "Error"
@@ -123,12 +131,11 @@ themes:
         suffix: ")"
         color_fg: "Muted"
 
-      Task_Progress_Line: # For the inline spinner
-        additional_chars: "-\\|/" # Simple ASCII spinner, works everywhere
-        # additional_chars: "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏" # Braille spinner (example)
+      Task_Progress_Line:
+        additional_chars: "-\\|/"
 
       Stdout_Line_Prefix:
-        additional_chars: "  " # For indenting captured output
+        additional_chars: "  "
       Stderr_Warning_Line_Prefix:
         icon_key: "Warning"
         additional_chars: "  "
@@ -137,15 +144,15 @@ themes:
         icon_key: "Error"
         additional_chars: "  "
         color_fg: "Error"
-      Task_Content_Stderr_Warning_Text: # Text color for stderr warning lines
+      Task_Content_Stderr_Warning_Text:
         color_fg: "Warning"
-      Task_Content_Stderr_Error_Text: # Text color for stderr error lines
+      Task_Content_Stderr_Error_Text:
         color_fg: "Error"
 
       Task_Content_Summary_Heading:
         text_content: "SUMMARY:"
         text_style: ["bold"]
-        color_fg: "Process" # Default white
+        color_fg: "Process"
       Task_Content_Summary_Item_Error:
         bullet_char: "•"
         color_fg: "Error"
@@ -153,7 +160,7 @@ themes:
         bullet_char: "•"
         color_fg: "Warning"
 
-  # ASCII minimal theme for CI environments or --no-color / --ci flags
+  # ASCII minimal theme for CI environments
   ascii_minimal:
     style:
       use_boxes: false
@@ -161,7 +168,7 @@ themes:
       show_timestamps: false
       no_timer: false
       density: "compact"
-      use_inline_progress: true # Spinner will be plain text
+      use_inline_progress: true
 
     icons:
       start: "[START]"
@@ -171,36 +178,45 @@ themes:
       info: "[INFO]"
       bullet: "*"
 
-    # No colors defined for monochrome
-    colors: {} # Empty, IsMonochrome flag in Go code will prevent color lookups
+    colors: {}  # Empty, IsMonochrome flag in Go code will prevent color lookups
 
     elements:
-      Print_Header_Highlight: # Plain text version
-        text_style: ["bold"] # If your monochrome still wants some emphasis
+      H1:
+        text_style: ["bold"]
         icon_key: "Start"
-      Print_Success_Style:
+      H2:
+        text_style: ["bold"]
+        icon_key: "Info"
+      H3:
+        icon_key: "Bullet"
+      Success:
         icon_key: "Success"
+      Warning:
+        icon_key: "Warning"
+      Error:
+        icon_key: "Error"
+      Info:
+        icon_key: "Info"
 
-      Task_Status_Success_Block: { text_content: "SUCCESS" }
-      Task_Status_Failed_Block: { text_content: "FAILED" }
-      Task_Status_Warning_Block: { text_content: "WARNING" }
-      Task_Status_Duration: { prefix: "(", suffix: ")" }
-      Task_Progress_Line: { additional_chars: "-\\|/" } # ASCII spinner
+      Task_Status_Success_Block: {text_content: "SUCCESS"}
+      Task_Status_Failed_Block: {text_content: "FAILED"}
+      Task_Status_Warning_Block: {text_content: "WARNING"}
+      Task_Status_Duration: {prefix: "(", suffix: ")"}
+      Task_Progress_Line: {additional_chars: "-\\|/"}
 
-# Command presets (examples, adjust as needed)
+# Command presets
 presets:
   go:
-    label: "Go Task" # Generic label for 'go' commands
-    intent: "building" # Default intent for 'go'
+    label: "Go Task"
+    intent: "building"
 
-  "go build": # More specific preset
+  "go build":
     label: "Go Build"
     intent: "building"
 
   "go test":
     label: "Testing"
     intent: "testing"
-    # stream: true # You might want tests to stream by default
 
   golangci-lint:
     label: "Linting"

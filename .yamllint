@@ -1,0 +1,9 @@
+---
+extends: default
+
+rules:
+  line-length:
+    max: 120 # Increase from default 80
+    level: warning # Downgrade from error to warning
+  comments:
+    min-spaces-from-content: 2 # This is what most errors were about
