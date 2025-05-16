@@ -1,4 +1,5 @@
-# Enhanced Makefile for fo utility with robust development support
+# Enhanced Makefile for fo utility with robust development support and 'fo' integration
+# This version assumes 'fo' has a 'print --type <type> "message"' subcommand.
 
 # Force bash shell for consistent behavior
 SHELL := /bin/bash
@@ -6,31 +7,27 @@ SHELL := /bin/bash
 
 # Specify phony targets
 .PHONY: all build test lint lint-yaml check-line-length clean deps fmt golangci-lint check-gomod check \
-        install-tools check-vulns test-verbose vet tree help
+        install-tools check-vulns test-verbose vet tree help ensure-fo \
+        download-check-file-length-script
 
-# --- Configuration ---
-# Colors for output formatting
-RESET   := \033[0m
-BOLD    := \033[1m
-GREEN   := \033[0;32m
-YELLOW  := \033[0;33m
-RED     := \033[0;31m
-BLUE    := \033[0;34m
-NC      := $(RESET) # No Color Alias
-
-# Icons for visually distinct output
-ICON_START := $(BLUE)▶$(NC)
-ICON_OK    := $(GREEN)✓$(NC)
-ICON_WARN  := $(YELLOW)⚠$(NC)
-ICON_FAIL  := $(RED)✗$(NC)
-ICON_INFO  := $(BLUE)ℹ$(NC)
-
-# Variables
+# --- Variables ---
 SERVICE_NAME := fo
 BINARY_NAME := $(SERVICE_NAME)
 MODULE_PATH := github.com/davidkoosis/fo
 CMD_PATH := ./cmd
 SCRIPT_DIR := ./scripts
+FO := bin/fo
+
+# Fo Flags for use within this Makefile for wrapping commands.
+# --ci ensures ASCII output and spinner for wrapped commands.
+FO_FLAGS := --ci
+
+# Fo Flags for 'fo print' subcommand.
+# We might want colors for these, so we don't use --ci by default.
+# If a specific theme is desired for print that differs from command wrapping, set it here.
+# For example, to use unicode_vibrant for print messages: FO_PRINT_FLAGS := --theme unicode_vibrant
+# For now, let's assume 'fo print' will use the default theme or one specified in .fo.yaml
+FO_PRINT_FLAGS :=
 
 # Build-time variables for version injection
 LOCAL_VERSION := $(shell git describe --tags --always --dirty --match=v* 2>/dev/null || echo "dev")
@@ -39,9 +36,9 @@ BUILD_DATE := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 
 # LDFLAGS for injecting build information
 LDFLAGS := -ldflags "-s -w \
-            -X $(MODULE_PATH)/internal/version.Version=$(LOCAL_VERSION) \
-            -X $(MODULE_PATH)/internal/version.CommitHash=$(LOCAL_COMMIT_HASH) \
-            -X $(MODULE_PATH)/internal/version.BuildDate=$(BUILD_DATE)"
+            -X $(MODULE_PATH)/cmd/internal/version.Version=$(LOCAL_VERSION) \
+            -X $(MODULE_PATH)/cmd/internal/version.CommitHash=$(LOCAL_COMMIT_HASH) \
+            -X $(MODULE_PATH)/cmd/internal/version.BuildDate=$(BUILD_DATE)"
 
 # Tool Versions
 GOLANGCILINT_VERSION := latest
@@ -58,205 +55,173 @@ YAML_FILES := $(shell find . -type f \( -name "*.yaml" -o -name "*.yml" \) -not 
 # --- Core Targets ---
 # Default target: Run all checks and build
 all: check deps fmt lint lint-yaml check-line-length test build
-	@printf "$(GREEN)$(BOLD)✨ All tasks completed successfully! ✨$(NC)\n"
+	@$(FO) $(FO_PRINT_FLAGS) print --type success --icon sparkles "All development cycle tasks completed successfully!"
+	# The --icon sparkles is hypothetical; 'fo print' would need a way to specify icons
+	# or use a default success icon from the theme.
 
-# Build the application
-build:
-	@printf "$(ICON_START) $(BOLD)$(BLUE)Building $(BINARY_NAME)...$(NC)\n"
-	@mkdir -p bin
-	@go build $(LDFLAGS) -o bin/$(BINARY_NAME) $(CMD_PATH)
-	@printf "  $(ICON_OK) $(GREEN)Build successful: $(PWD)/bin/$(BINARY_NAME)$(NC)\n"
+# Ensure fo is built and up-to-date
+ensure-fo:
+	@if [ ! -f "$(FO)" ] || [ -n "$(shell find cmd -name '*.go' -newer $(FO))" ]; then \
+		$(FO) $(FO_PRINT_FLAGS) print --type info "Building $(SERVICE_NAME) utility..."; \
+		go build $(LDFLAGS) -o $(FO) $(CMD_PATH); \
+	fi
+
+# Build the application (fo itself)
+build: ensure-fo
+	@$(FO) $(FO_PRINT_FLAGS) print --type info "$(SERVICE_NAME) utility is up to date: $(PWD)/$(FO)"
 
 # Run tests
-test:
-	@printf "$(ICON_START) $(BOLD)$(BLUE)Running tests...$(NC)\n"
-	@go test -race -coverprofile=coverage.out ./...
-	@printf "  $(ICON_OK) $(GREEN)Tests passed$(NC)\n"
+test: ensure-fo
+	$(FO) $(FO_FLAGS) -l "Run tests" -s -- gotestsum --format short -- ./...
 
 # Run tests with verbose output
-test-verbose:
-	@printf "$(ICON_START) $(BOLD)$(BLUE)Running verbose tests...$(NC)\n"
-	@go test -v -race ./...
-	@printf "  $(ICON_OK) $(GREEN)Tests completed$(NC)\n"
+test-verbose: ensure-fo
+	$(FO) $(FO_FLAGS) -l "Run verbose tests" -s -- go test -v -race ./...
 
-# Format code
-fmt: install-tools
-	@printf "$(ICON_START) $(BOLD)$(BLUE)Formatting code...$(NC)\n"
-	@golangci-lint fmt ./...
-	@go mod tidy -v
-	@printf "  $(ICON_OK) $(GREEN)Code formatted$(NC)\n"
+# Format code (golangci-lint fmt and go mod tidy)
+fmt: install-tools ensure-fo
+	$(FO) $(FO_FLAGS) -l "Format Go code" -- golangci-lint fmt ./...
+	$(FO) $(FO_FLAGS) -l "Tidy Go modules" -- go mod tidy -v
 
 # Run linter
-lint: install-tools
-	@printf "$(ICON_START) $(BOLD)$(BLUE)Running linter...$(NC)\n"
-	@golangci-lint run ./...
-	@printf "  $(ICON_OK) $(GREEN)Linting passed$(NC)\n"
+lint: install-tools ensure-fo
+	$(FO) $(FO_FLAGS) -l "Run Go linter" -- golangci-lint run ./...
 
 # Lint YAML files
-lint-yaml:
-	@printf "$(ICON_START) $(BOLD)$(BLUE)Linting YAML files...$(NC)\n"
+lint-yaml: install-tools ensure-fo
 	@if ! command -v yamllint >/dev/null 2>&1; then \
-		printf "  $(ICON_WARN) $(YELLOW)yamllint not found. Installing...$(NC)\n"; \
-		pip install --user yamllint || pip3 install --user yamllint || \
-		(printf "  $(ICON_FAIL) $(RED)Failed to install yamllint$(NC)\n" && exit 1); \
-	fi
-	@if [ -n "$(YAML_FILES)" ]; then \
-		yamllint $(YAML_FILES) && \
-		printf "  $(ICON_OK) $(GREEN)YAML linting passed$(NC)\n" || \
-		(printf "  $(ICON_FAIL) $(RED)YAML linting failed$(NC)\n" && exit 1); \
+		$(FO) $(FO_PRINT_FLAGS) print --type warning "Yamllint not found. Skipping YAML lint. Please install it (e.g., pip install yamllint)."; \
 	else \
-		printf "  $(ICON_INFO) $(YELLOW)No YAML files found$(NC)\n"; \
+		if [ -n "$(YAML_FILES)" ]; then \
+			$(FO) $(FO_FLAGS) -l "Lint YAML files" -- yamllint $(YAML_FILES); \
+		else \
+			$(FO) $(FO_FLAGS) -l "Lint YAML files (skipped)" -- echo "No YAML files found to lint."; \
+		fi \
 	fi
 
-ensure-fo:
-	@if [ ! -f bin/fo ] || [ bin/fo -ot cmd/main.go ]; then \
-		mkdir -p bin && \
-		echo "Building fo..." && \
-		go build -o bin/fo ./cmd; \
+# Download check_file_length.sh if it doesn't exist
+download-check-file-length-script:
+	@mkdir -p $(SCRIPT_DIR)
+	@if [ ! -f "$(SCRIPT_DIR)/check_file_length.sh" ]; then \
+		$(FO) $(FO_PRINT_FLAGS) print --type info "Downloading check_file_length.sh..."; \
+		curl -sfL https://raw.githubusercontent.com/dkoosis/go-script-examples/main/check_file_length.sh -o $(SCRIPT_DIR)/check_file_length.sh && chmod +x $(SCRIPT_DIR)/check_file_length.sh \
+			|| ($(FO) $(FO_PRINT_FLAGS) print --type error "Failed to download check_file_length.sh" && exit 1); \
 	fi
-
-# Start with one simple target as a test
-fo-vet: ensure-fo
-	@bin/fo -l "Vetting code" -- go vet ./...
-
-# Replace original targets one by one
-vet: ensure-fo
-	@bin/fo -l "Vetting code" -- go vet ./...
 
 # Check file line length
-check-line-length:
-	@printf "$(ICON_START) $(BOLD)$(BLUE)Checking file line length...$(NC)\n"
-	@if [ -x "$(SCRIPT_DIR)/check_file_length.sh" ]; then \
-		$(SCRIPT_DIR)/check_file_length.sh $(WARN_LINES) $(FAIL_LINES) $(GO_FILES); \
-	else \
-		printf "  $(ICON_WARN) $(YELLOW)Script $(SCRIPT_DIR)/check_file_length.sh not found or not executable$(NC)\n"; \
-		mkdir -p $(SCRIPT_DIR); \
-		printf "  $(ICON_INFO) Installing check script...$(NC)\n"; \
-		curl -s https://raw.githubusercontent.com/dkoosis/go-script-examples/main/check_file_length.sh > $(SCRIPT_DIR)/check_file_length.sh 2>/dev/null || \
-		(printf "  $(ICON_FAIL) $(RED)Failed to download check_file_length.sh$(NC)\n" && exit 1); \
-		chmod +x $(SCRIPT_DIR)/check_file_length.sh; \
-		$(SCRIPT_DIR)/check_file_length.sh $(WARN_LINES) $(FAIL_LINES) $(GO_FILES) || exit 0; \
-	fi
-	@printf "  $(ICON_OK) $(GREEN)Line length check completed$(NC)\n"
+check-line-length: ensure-fo download-check-file-length-script
+	$(FO) $(FO_FLAGS) -l "Check Go file line lengths" -- $(SCRIPT_DIR)/check_file_length.sh $(WARN_LINES) $(FAIL_LINES) $(GO_FILES)
 
-# Verify go.mod setup
-check-gomod:
-	@printf "$(ICON_START) $(BOLD)$(BLUE)Checking go.mod module path...$(NC)\n"
-	@if [ ! -f "go.mod" ]; then \
-		printf "  $(ICON_FAIL) $(RED)go.mod file is missing. Run: go mod init $(MODULE_PATH)$(NC)\n"; \
-		exit 1; \
-	fi
-	@if ! grep -q "^module $(MODULE_PATH)$$" go.mod; then \
-		printf "  $(ICON_FAIL) $(RED)go.mod has incorrect module path.$(NC)\n"; \
-		printf "    $(ICON_INFO) $(YELLOW)Expected: module $(MODULE_PATH)$(NC)\n"; \
-		printf "    $(ICON_INFO) $(YELLOW)Found:    $$(grep "^module" go.mod)$(NC)\n"; \
-		exit 1; \
+# Verify go.mod setup using the provided script
+check-gomod: ensure-fo
+	@if [ ! -x "$(SCRIPT_DIR)/check_go_mod_path.sh" ]; then \
+		$(FO) $(FO_PRINT_FLAGS) print --type warning "$(SCRIPT_DIR)/check_go_mod_path.sh not found or not executable. Skipping go.mod check."; \
 	else \
-		printf "  $(ICON_OK) $(GREEN)go.mod has correct module path.$(NC)\n"; \
+		$(FO) $(FO_FLAGS) -l "Check go.mod module path" -- $(SCRIPT_DIR)/check_go_mod_path.sh $(MODULE_PATH); \
 	fi
 
 # Clean build artifacts
-clean:
-	@printf "$(ICON_START) $(BOLD)$(BLUE)Cleaning up...$(NC)\n"
-	@rm -rf bin/ coverage.out
+clean: ensure-fo
+	@$(FO) $(FO_PRINT_FLAGS) print --type info "Cleaning up..."
+	@rm -rf $(FO) coverage.out
 	@go clean -cache -testcache
-	@printf "  $(ICON_OK) $(GREEN)Cleaned$(NC)\n"
+	@$(FO) $(FO_PRINT_FLAGS) print --type success "Cleanup complete."
 
 # Sync dependencies
-deps:
-	@printf "$(ICON_START) $(BOLD)$(BLUE)Syncing dependencies...$(NC)\n"
-	@go mod tidy -v
-	@go mod download
-	@printf "  $(ICON_OK) $(GREEN)Dependencies synchronized$(NC)\n"
+deps: ensure-fo
+	$(FO) $(FO_FLAGS) -l "Tidy Go modules" -- go mod tidy -v
+	$(FO) $(FO_FLAGS) -l "Download Go modules" -- go mod download
 
 # Run go vet
-vet:
-	@printf "$(ICON_START) $(BOLD)$(BLUE)Vetting code...$(NC)\n"
-	@go vet ./...
-	@printf "  $(ICON_OK) $(GREEN)Vetting passed$(NC)\n"
+vet: ensure-fo
+	$(FO) $(FO_FLAGS) -l "Vet Go code" -- go vet ./...
 
 # Scan for vulnerabilities
-check-vulns: install-tools
-	@printf "$(ICON_START) $(BOLD)$(BLUE)Checking for vulnerabilities...$(NC)\n"
+check-vulns: install-tools ensure-fo
 	@if ! command -v govulncheck >/dev/null 2>&1; then \
-		printf "  $(ICON_INFO) $(YELLOW)Installing govulncheck...$(NC)\n"; \
-		go install golang.org/x/vuln/cmd/govulncheck@latest; \
+		$(FO) $(FO_PRINT_FLAGS) print --type warning "govulncheck not found. Skipping vulnerability check. Install with: go install golang.org/x/vuln/cmd/govulncheck@latest"; \
+	else \
+		$(FO) $(FO_FLAGS) -l "Check for vulnerabilities" -- govulncheck ./...; \
 	fi
-	@govulncheck ./...
-	@printf "  $(ICON_OK) $(GREEN)No known vulnerabilities found$(NC)\n"
 
 # Generate project directory tree
-tree:
-	@printf "$(ICON_START) $(BOLD)$(BLUE)Generating project tree...$(NC)\n"
+tree: ensure-fo
+	@$(FO) $(FO_PRINT_FLAGS) print --type info "Generating project tree..."
 	@mkdir -p ./docs
 	@if ! command -v tree > /dev/null; then \
-		printf "  $(ICON_WARN) $(YELLOW)'tree' command not found. Skipping tree generation.$(NC)\n"; \
-		printf "  $(ICON_INFO) $(YELLOW)To install on macOS: brew install tree$(NC)\n"; \
-		printf "  $(ICON_INFO) $(YELLOW)To install on Debian/Ubuntu: sudo apt-get install tree$(NC)\n"; \
+		$(FO) $(FO_PRINT_FLAGS) print --type warning "'tree' command not found. Skipping tree generation."; \
+		$(FO) $(FO_PRINT_FLAGS) print --type info "  To install on macOS: brew install tree"; \
+		$(FO) $(FO_PRINT_FLAGS) print --type info "  To install on Debian/Ubuntu: sudo apt-get install tree"; \
 	else \
 		tree -F -I "vendor|.git|.idea*|*.DS_Store|$(BINARY_NAME)|coverage.out|bin" --dirsfirst > ./docs/project_directory_tree.txt && \
-		printf "  $(ICON_OK) $(GREEN)Project tree generated at ./docs/project_directory_tree.txt$(NC)\n"; \
+		$(FO) $(FO_PRINT_FLAGS) print --type success "Project tree generated at ./docs/project_directory_tree.txt"; \
 	fi
 
 # Install required development tools
-install-tools:
-	@printf "$(ICON_START) $(BOLD)$(BLUE)Installing dev tools...$(NC)\n"
+# This target is more about setup, so its sub-steps print their own info.
+install-tools: ensure-fo
+	@$(FO) $(FO_PRINT_FLAGS) print --type header "Ensuring development tools..."
+	@$(FO) $(FO_PRINT_FLAGS) print --type info "Checking golangci-lint..."
 	@if ! command -v golangci-lint >/dev/null 2>&1; then \
-		printf "  $(ICON_INFO) $(YELLOW)Installing golangci-lint...$(NC)\n"; \
-		go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCILINT_VERSION) && \
-		printf "  $(ICON_OK) $(GREEN)golangci-lint installed successfully$(NC)\n" || \
-		(printf "  $(ICON_FAIL) $(RED)Failed to install golangci-lint$(NC)\n" && exit 1); \
+		$(FO) $(FO_PRINT_FLAGS) print --type info "  Installing golangci-lint@$(GOLANGCILINT_VERSION)..."; \
+		GOBIN=$(PWD)/bin go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCILINT_VERSION) && \
+		$(FO) $(FO_PRINT_FLAGS) print --type success "  golangci-lint installed successfully to $(PWD)/bin" || \
+		($(FO) $(FO_PRINT_FLAGS) print --type error "  Failed to install golangci-lint" && exit 1); \
 	else \
-		printf "  $(ICON_OK) $(GREEN)golangci-lint already installed$(NC)\n"; \
+		$(FO) $(FO_PRINT_FLAGS) print --type success "  golangci-lint already installed: $(shell which golangci-lint)"; \
 	fi
+	@$(FO) $(FO_PRINT_FLAGS) print --type info "Checking gotestsum..."
 	@if ! command -v gotestsum >/dev/null 2>&1; then \
-		printf "  $(ICON_INFO) $(YELLOW)Installing gotestsum...$(NC)\n"; \
-		go install gotest.tools/gotestsum@$(GOTESTSUM_VERSION) && \
-		printf "  $(ICON_OK) $(GREEN)gotestsum installed successfully$(NC)\n" || \
-		(printf "  $(ICON_FAIL) $(RED)Failed to install gotestsum$(NC)\n" && exit 1); \
+		$(FO) $(FO_PRINT_FLAGS) print --type info "  Installing gotestsum@$(GOTESTSUM_VERSION)..."; \
+		GOBIN=$(PWD)/bin go install gotest.tools/gotestsum@$(GOTESTSUM_VERSION) && \
+		$(FO) $(FO_PRINT_FLAGS) print --type success "  gotestsum installed successfully to $(PWD)/bin" || \
+		($(FO) $(FO_PRINT_FLAGS) print --type error "  Failed to install gotestsum" && exit 1); \
 	else \
-		printf "  $(ICON_OK) $(GREEN)gotestsum already installed$(NC)\n"; \
+		$(FO) $(FO_PRINT_FLAGS) print --type success "  gotestsum already installed: $(shell which gotestsum)"; \
+	fi
+	@$(FO) $(FO_PRINT_FLAGS) print --type info "Checking yamllint (via pip)..."
+	@if ! command -v yamllint >/dev/null 2>&1; then \
+		$(FO) $(FO_PRINT_FLAGS) print --type info "  Attempting to install yamllint via pip/pip3..."; \
+		python3 -m pip install --user yamllint || python -m pip install --user yamllint || \
+		($(FO) $(FO_PRINT_FLAGS) print --type warning "  Could not install yamllint. Please install it manually (e.g., 'pip install yamllint')."); \
+		if command -v yamllint >/dev/null 2>&1; then \
+			$(FO) $(FO_PRINT_FLAGS) print --type success "  yamllint installed successfully."; \
+		fi \
+	else \
+		$(FO) $(FO_PRINT_FLAGS) print --type success "  yamllint already installed: $(shell which yamllint)"; \
 	fi
 
+
 # Comprehensive environment check
-check: install-tools check-gomod
-	@printf "$(ICON_START) $(BOLD)$(BLUE)Checking environment...$(NC)\n"
-	@printf "  $(ICON_INFO) Go: $(shell go version)\n"
-	@printf "  $(ICON_INFO) GoLangCI-Lint: $(shell golangci-lint --version 2>/dev/null || echo "Not installed")\n"
-	@if command -v gotestsum >/dev/null 2>&1; then \
-		printf "  $(ICON_INFO) Gotestsum: $(shell gotestsum --version 2>/dev/null || echo "Version unknown")\n"; \
-	else \
-		printf "  $(ICON_INFO) Gotestsum: Not installed\n"; \
-	fi
-	@if command -v tree >/dev/null 2>&1; then \
-		printf "  $(ICON_OK) Tree: Installed\n"; \
-	else \
-		printf "  $(ICON_WARN) Tree: Not installed\n"; \
-	fi
-	@if command -v yamllint >/dev/null 2>&1; then \
-		printf "  $(ICON_OK) Yamllint: $(shell yamllint --version 2>/dev/null || echo "Version unknown")\n"; \
-	else \
-		printf "  $(ICON_WARN) Yamllint: Not installed\n"; \
-	fi
-	@printf "  $(ICON_OK) $(GREEN)Environment check completed$(NC)\n"
+# This target is informational, so direct printf is clearer.
+check: install-tools # check-gomod is already wrapped, so it will use fo.
+	@$(FO) $(FO_PRINT_FLAGS) print --type header "Checking environment..."
+	@$(FO) $(FO_PRINT_FLAGS) print --type info "$(SERVICE_NAME) utility: $(PWD)/$(FO) $(shell $(FO) --version 2>/dev/null)"
+	@$(FO) $(FO_PRINT_FLAGS) print --type info "Go: $(shell go version)"
+	@$(FO) $(FO_PRINT_FLAGS) print --type info "GoLangCI-Lint: $(shell golangci-lint --version 2>/dev/null || echo "Not detected")"
+	@$(FO) $(FO_PRINT_FLAGS) print --type info "Gotestsum: $(shell gotestsum --version 2>/dev/null || echo "Not detected")"
+	@$(FO) $(FO_PRINT_FLAGS) print --type info "Tree: $(shell tree --version 2>/dev/null || echo "Not detected")"
+	@$(FO) $(FO_PRINT_FLAGS) print --type info "Yamllint: $(shell yamllint --version 2>/dev/null || echo "Not detected")"
+	@$(FO) $(FO_PRINT_FLAGS) print --type success "Environment check completed"
 
 # Display help information
 help:
-	@printf "$(BLUE)$(BOLD)$(SERVICE_NAME) Makefile targets:$(NC)\n"
-	@printf "  %-25s %s\n" "all" "Run all checks and build (default)"
-	@printf "  %-25s %s\n" "build" "Build the application binary"
-	@printf "  %-25s %s\n" "test" "Run tests with coverage"
-	@printf "  %-25s %s\n" "test-verbose" "Run tests with verbose output"
-	@printf "  %-25s %s\n" "fmt" "Format code using golangci-lint fmt"
-	@printf "  %-25s %s\n" "lint" "Run linter with golangci-lint"
-	@printf "  %-25s %s\n" "lint-yaml" "Lint YAML files with yamllint"
-	@printf "  %-25s %s\n" "check-line-length" "Check Go file line count (W:$(WARN_LINES), F:$(FAIL_LINES))"
-	@printf "  %-25s %s\n" "clean" "Clean build artifacts and caches"
-	@printf "  %-25s %s\n" "deps" "Tidy and download Go module dependencies"
-	@printf "  %-25s %s\n" "vet" "Run go vet with output display"
-	@printf "  %-25s %s\n" "check-vulns" "Scan for known vulnerabilities"
-	@printf "  %-25s %s\n" "tree" "Generate project directory tree view"
-	@printf "  %-25s %s\n" "install-tools" "Install/update required Go tools"
-	@printf "  %-25s %s\n" "check" "Check environment setup"
-	@printf "  %-25s %s\n" "check-gomod" "Verify go.mod configuration"
-	@printf "  %-25s %s\n" "help" "Display this help message"
+	@printf "\033[1m\033[0;34m$(SERVICE_NAME) Makefile targets:\033[0m\n" # Keep help output simple and direct
+	@printf "  %-28s %s\n" "all" "Run all checks and build (default)"
+	@printf "  %-28s %s\n" "ensure-fo" "Builds the 'fo' utility if missing or outdated"
+	@printf "  %-28s %s\n" "build" "Ensures 'fo' utility is up to date"
+	@printf "  %-28s %s\n" "test" "Run tests with gotestsum (uses fo)"
+	@printf "  %-28s %s\n" "test-verbose" "Run tests with verbose Go output (uses fo)"
+	@printf "  %-28s %s\n" "fmt" "Format code and tidy modules (uses fo)"
+	@printf "  %-28s %s\n" "lint" "Run Go linter (uses fo)"
+	@printf "  %-28s %s\n" "lint-yaml" "Lint YAML files (uses fo)"
+	@printf "  %-28s %s\n" "check-line-length" "Check Go file line count (uses fo)"
+	@printf "  %-28s %s\n" "clean" "Clean build artifacts and caches (uses fo print)"
+	@printf "  %-28s %s\n" "deps" "Tidy and download Go module dependencies (uses fo)"
+	@printf "  %-28s %s\n" "vet" "Run go vet (uses fo)"
+	@printf "  %-28s %s\n" "check-vulns" "Scan for known vulnerabilities (uses fo if govulncheck installed)"
+	@printf "  %-28s %s\n" "tree" "Generate project directory tree view (uses fo print)"
+	@printf "  %-28s %s\n" "install-tools" "Install/update required Go tools (uses fo print)"
+	@printf "  %-28s %s\n" "check" "Check environment setup (uses fo print)"
+	@printf "  %-28s %s\n" "check-gomod" "Verify go.mod configuration (uses fo)"
+	@printf "  %-28s %s\n" "help" "Display this help message"
