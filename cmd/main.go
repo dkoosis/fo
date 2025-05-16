@@ -40,6 +40,7 @@ var versionFlag bool
 var cliFlagsGlobal config.CliFlags // Holds parsed CLI flags
 
 // main is the entry point of the application.
+// main is the entry point of the application.
 func main() {
 	// Check for subcommand first
 	if len(os.Args) > 1 {
@@ -87,20 +88,27 @@ func main() {
 	if cliFlagsGlobal.Label != "" {
 		behavioralSettings.Label = cliFlagsGlobal.Label
 	}
-	if cliFlagsGlobal.StreamSet { // Check if -s/--stream was actually used
+	if cliFlagsGlobal.StreamSet {
 		behavioralSettings.Stream = cliFlagsGlobal.Stream
 	}
-	if cliFlagsGlobal.ShowOutputSet && cliFlagsGlobal.ShowOutput != "" { // Check if --show-output was used
+	if cliFlagsGlobal.ShowOutputSet && cliFlagsGlobal.ShowOutput != "" {
 		behavioralSettings.ShowOutput = cliFlagsGlobal.ShowOutput
 	}
-	if cliFlagsGlobal.DebugSet { // CLI debug flag overrides all
+
+	// Debug is ONLY enabled by explicit --debug flag
+	if cliFlagsGlobal.DebugSet {
 		behavioralSettings.Debug = cliFlagsGlobal.Debug
 		fileAppConfig.Debug = cliFlagsGlobal.Debug // Ensure this is passed to MergeWithFlags
+	} else {
+		// Force debug off unless explicitly enabled by flag
+		behavioralSettings.Debug = false
+		fileAppConfig.Debug = false
 	}
-	if cliFlagsGlobal.MaxBufferSize > 0 { // CLI overrides config if set
+
+	if cliFlagsGlobal.MaxBufferSize > 0 {
 		behavioralSettings.MaxBufferSize = cliFlagsGlobal.MaxBufferSize
 	}
-	if cliFlagsGlobal.MaxLineLength > 0 { // CLI overrides config if set
+	if cliFlagsGlobal.MaxLineLength > 0 {
 		behavioralSettings.MaxLineLength = cliFlagsGlobal.MaxLineLength
 	}
 
@@ -112,12 +120,8 @@ func main() {
 	behavioralSettings.NoTimer = finalDesignConfig.Style.NoTimer
 	behavioralSettings.NoColor = finalDesignConfig.IsMonochrome
 	behavioralSettings.CI = finalDesignConfig.IsMonochrome && finalDesignConfig.Style.NoTimer
-	if fileAppConfig.Debug {
-		behavioralSettings.Debug = true
-	}
-	if cliFlagsGlobal.DebugSet {
-		behavioralSettings.Debug = cliFlagsGlobal.Debug
-	}
+	// Ensure debug is still controlled only by explicit --debug flag
+	behavioralSettings.Debug = cliFlagsGlobal.DebugSet && cliFlagsGlobal.Debug
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -132,6 +136,7 @@ func main() {
 	}
 	os.Exit(exitCode)
 }
+
 func convertAppConfigToLocal(appCfg *config.AppConfig) LocalAppConfig {
 	return LocalAppConfig{
 		Label:         appCfg.Label,
