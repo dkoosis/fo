@@ -90,6 +90,11 @@ type Config struct {
 		Detail  string `yaml:"detail"`
 		Muted   string `yaml:"muted"`
 		Reset   string `yaml:"reset"`
+		White   string `yaml:"white,omitempty"`
+		BlueFg  string `yaml:"blue_fg,omitempty"`
+		BlueBg  string `yaml:"blue_bg,omitempty"`
+		Bold    string `yaml:"bold,omitempty"`
+		Italic  string `yaml:"italic,omitempty"`
 	} `yaml:"colors"`
 
 	Icons struct {
@@ -115,35 +120,98 @@ type PatternsRepo struct {
 	Output map[string][]string `yaml:"output"`
 }
 
-// ensureEscapePrefix checks if a string starts with "33[" and converts it to a proper ANSI escape sequence.
 func ensureEscapePrefix(s string) string {
-	// Debug print to see what this function receives and returns.
-	// This should only be active if FO_DEBUG is set.
 	if os.Getenv("FO_DEBUG") != "" {
-		originalS := s
-		defer func() {
-			// This defer will execute after the return, showing the final state.
-			fmt.Fprintf(os.Stderr, "[DEBUG ensureEscapePrefix] Input: '%s' (Hex: %x), Output: '%s' (Hex: %x)\n",
-				originalS, originalS, s, s)
-		}()
+		fmt.Fprintf(os.Stderr, "[DEBUG ensureEscapePrefix] INPUT: '%s' (len %d, GoStr: %q, hex: %x)\n", s, len(s), s, s)
 	}
 
 	if s == "" {
 		return ""
 	}
 
-	escChar := string([]byte{27}) // ASCII escape character
+	escChar := string([]byte{27}) // The actual ESC character (\x1b)
 
-	if strings.HasPrefix(s, escChar) { // Already has correct ESCAPE char
+	// 1. If it already starts with the true ESC character, it's perfect.
+	if strings.HasPrefix(s, escChar) {
+		if os.Getenv("FO_DEBUG") != "" {
+			fmt.Fprintf(os.Stderr, "[DEBUG ensureEscapePrefix] Condition 1: Already correct (starts with actual ESC). Output: %q\n", s)
+		}
 		return s
 	}
-	if strings.HasPrefix(s, "\033") { // String literal representation
-		return escChar + s[1:] // Replace "\033" with real escape char
+
+	// 2. If it's a Go string literal like `\033[` (where \033 is a single ESC char in Go source)
+	goOctalLiteralEsc := "\033" // This is the single ESC char in Go source code
+	if strings.HasPrefix(s, goOctalLiteralEsc) {
+		if os.Getenv("FO_DEBUG") != "" {
+			fmt.Fprintf(os.Stderr, "[DEBUG ensureEscapePrefix] Condition 2: Go literal form (like \"\\033[\"). Output: %q\n", s)
+		}
+		return s
 	}
-	if strings.HasPrefix(s, "33[") { // Missing escape character
-		return escChar + "[" + s[3:] // Replace "33[" with escape char + "["
+
+	// 3. CRITICAL FIX: Check for NULL character followed by "33["
+	//    Input 's' is like "\x00" + "33[" + "0;97m"
+	//    We want escChar + "[" + "0;97m"
+	if len(s) > 0 && s[0] == '\x00' && strings.HasPrefix(s[1:], "33[") {
+		// s[1:] is "33[0;97m"
+		// s[1+len("33["):] is "0;97m" (this is the remainder of the code *after* "33[")
+		// The '[' is already part of s[1:], so we take from s[1+len("33"):] to get the part after "33" which is "[0;97m"
+		// Or, more directly, if s[1+2] is '[', then s[1+2:] is what we want.
+		// s[1+len("33[")-1] is the '[' character itself.
+		// The remainder of the code, including the '[', is s[1+len("33")-1:]
+		// Correct: we need what comes *after* the "\x0033", which is the starting '[' and the code.
+		// So, if s[1:3] == "33", then s[3] should be '['. The part we need is s[3:].
+		// More robustly: s_after_null = s[1:]. If s_after_null starts with "33[", then take s_after_null[2:]
+		// Which means original s[1+2:] or s[3:].
+		// Let's test: if s = "\x0033[0m", s[3:] = "[0m"
+		// Corrected should be: escChar (being \x1b) + "[0m"
+		corrected := escChar + s[3:]
+		if os.Getenv("FO_DEBUG") != "" {
+			fmt.Fprintf(os.Stderr, "[DEBUG ensureEscapePrefix] Condition 3 (FIXED): Corrected NULL followed by '33'. Input: %q, Corrected part: %q, Output: %q\n", s, s[3:], corrected)
+		}
+		return corrected
 	}
-	return s // Return as is if no known malformation
+
+	// 4. Check for the literal string "\\033[" (e.g., from YAML `"\033[...]"`)
+	yamlLiteralOctalEsc := `\033[`
+	if strings.HasPrefix(s, yamlLiteralOctalEsc) {
+		// s is like literal backslash, 0, 3, 3, [
+		// We want to replace this whole prefix with escChar + "["
+		// The part after `\033` is what we need, which starts with `[`
+		// s[len(yamlLiteralOctalEsc)-1:] should give us the `[` and onwards.
+		corrected := escChar + s[len(yamlLiteralOctalEsc)-1:]
+		if os.Getenv("FO_DEBUG") != "" {
+			fmt.Fprintf(os.Stderr, "[DEBUG ensureEscapePrefix] Condition 4: Corrected YAML literal '\\033['. Output: %q\n", corrected)
+		}
+		return corrected
+	}
+
+	// 5. Check for the literal string "\\x1b[" (e.g., from YAML `"\x1b[...]"`)
+	yamlLiteralHexEsc := `\x1b[`
+	if strings.HasPrefix(s, yamlLiteralHexEsc) {
+		corrected := escChar + s[len(yamlLiteralHexEsc)-1:]
+		if os.Getenv("FO_DEBUG") != "" {
+			fmt.Fprintf(os.Stderr, "[DEBUG ensureEscapePrefix] Condition 5: Corrected YAML literal '\\x1b['. Output: %q\n", corrected)
+		}
+		return corrected
+	}
+
+	// 6. Check for the plain literal string "33[" (if no null prefix or other literal prefixes)
+	literalDigitsEsc := "33["
+	if strings.HasPrefix(s, literalDigitsEsc) {
+		// s is like "33[0m"
+		// We want escChar + "[0m"
+		// s[len(literalDigitsEsc)-1:] is "[0m"
+		corrected := escChar + s[len(literalDigitsEsc)-1:]
+		if os.Getenv("FO_DEBUG") != "" {
+			fmt.Fprintf(os.Stderr, "[DEBUG ensureEscapePrefix] Condition 6: Corrected plain literal '33['. Output: %q\n", corrected)
+		}
+		return corrected
+	}
+
+	if os.Getenv("FO_DEBUG") != "" {
+		fmt.Fprintf(os.Stderr, "[DEBUG ensureEscapePrefix] No known prefix transformation applied. Returning as-is: %q\n", s)
+	}
+	return s
 }
 
 func DefaultConfig() *Config {
@@ -177,7 +245,7 @@ func AsciiMinimalTheme() *Config {
 
 	cfg.Style.UseInlineProgress = true
 	cfg.Style.NoSpinner = false
-	cfg.Style.SpinnerInterval = 80 // Default to 80ms
+	cfg.Style.SpinnerInterval = 80
 
 	cfg.Colors = struct {
 		Process string `yaml:"process"`
@@ -187,6 +255,11 @@ func AsciiMinimalTheme() *Config {
 		Detail  string `yaml:"detail"`
 		Muted   string `yaml:"muted"`
 		Reset   string `yaml:"reset"`
+		White   string `yaml:"white,omitempty"`
+		BlueFg  string `yaml:"blue_fg,omitempty"`
+		BlueBg  string `yaml:"blue_bg,omitempty"`
+		Bold    string `yaml:"bold,omitempty"`
+		Italic  string `yaml:"italic,omitempty"`
 	}{}
 
 	cfg.Border.TaskStyle = BorderNone
@@ -207,6 +280,8 @@ func AsciiMinimalTheme() *Config {
 	cfg.Elements["Task_Content_Summary_Heading"] = ElementStyleDef{TextContent: "SUMMARY:"}
 	cfg.Elements["Task_Content_Summary_Item_Error"] = ElementStyleDef{BulletChar: "*"}
 	cfg.Elements["Task_Content_Summary_Item_Warning"] = ElementStyleDef{BulletChar: "*"}
+	cfg.Elements["Print_Header_Highlight"] = ElementStyleDef{TextCase: "none", TextStyle: []string{"bold"}}
+	cfg.Elements["Print_Success_Style"] = ElementStyleDef{}
 
 	cfg.Patterns = defaultPatterns()
 	cfg.Tools = make(map[string]*ToolConfig)
@@ -234,13 +309,18 @@ func UnicodeVibrantTheme() *Config {
 	cfg.Icons.Info = "ℹ️"
 	cfg.Icons.Bullet = "•"
 
-	cfg.Colors.Process = "\033[0;34m" // Blue
-	cfg.Colors.Success = "\033[0;32m" // Green
-	cfg.Colors.Warning = "\033[0;33m" // Yellow
-	cfg.Colors.Error = "\033[0;31m"   // Red
-	cfg.Colors.Detail = "\033[0m"     // Default/Reset
-	cfg.Colors.Muted = "\033[2m"      // Dim
-	cfg.Colors.Reset = "\033[0m"      // ANSI Reset
+	cfg.Colors.Process = "\033[0;97m"
+	cfg.Colors.Success = "\033[0;97m"
+	cfg.Colors.Warning = "\033[0;33m"
+	cfg.Colors.Error = "\033[0;31m"
+	cfg.Colors.Detail = "\033[0m"
+	cfg.Colors.Muted = "\033[2m"
+	cfg.Colors.Reset = "\033[0m"
+	cfg.Colors.White = "\033[0;97m"
+	cfg.Colors.BlueFg = "\033[0;34m"
+	cfg.Colors.BlueBg = "\033[44m"
+	cfg.Colors.Bold = "\033[1m"
+	cfg.Colors.Italic = "\033[3m"
 
 	cfg.Border.TaskStyle = BorderLeftDouble
 	cfg.Border.HeaderChar = "═"
@@ -248,7 +328,6 @@ func UnicodeVibrantTheme() *Config {
 	cfg.Border.TopCornerChar = "╒"
 	cfg.Border.BottomCornerChar = "└"
 	cfg.Border.FooterContinuationChar = "─"
-	// ... (other border characters)
 
 	cfg.Elements = make(map[string]ElementStyleDef)
 	initBaseElementStyles(cfg.Elements)
@@ -270,6 +349,8 @@ func UnicodeVibrantTheme() *Config {
 	cfg.Elements["Task_Content_Summary_Item_Error"] = ElementStyleDef{BulletChar: "•", ColorFG: "Error"}
 	cfg.Elements["Task_Content_Summary_Item_Warning"] = ElementStyleDef{BulletChar: "•", ColorFG: "Warning"}
 	cfg.Elements["Table_Header_Cell_Text"] = ElementStyleDef{TextStyle: []string{"bold"}, ColorFG: "Process"}
+	cfg.Elements["Print_Header_Highlight"] = ElementStyleDef{TextCase: "none", TextStyle: []string{"bold"}, ColorFG: "White", ColorBG: "BlueBg"}
+	cfg.Elements["Print_Success_Style"] = ElementStyleDef{ColorFG: "Success"}
 
 	cfg.Patterns = defaultPatterns()
 	cfg.Tools = make(map[string]*ToolConfig)
@@ -294,14 +375,17 @@ func initBaseElementStyles(elements map[string]ElementStyleDef) {
 		"Table_Header_Cell_Text", "Table_Body_Cell_Text",
 		"ProgressIndicator_Spinner_Chars", "ProgressIndicator_Text",
 		"Task_Progress_Line",
+		"Print_Header_Highlight", "Print_Success_Style", "Print_Warning_Style", "Print_Error_Style", "Print_Info_Style",
 	}
 	elements["Task_Progress_Line"] = ElementStyleDef{
-		AdditionalChars: "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏",                   // Spinner chars
-		Text:            "{verb}ing {subject}...",       // In-progress template
-		TextContent:     "{verb}ing {subject} complete", // Complete template
+		AdditionalChars: "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏",
+		Text:            "{verb}ing {subject}...",
+		TextContent:     "{verb}ing {subject} complete",
 	}
 	for _, elKey := range knownElements {
-		elements[elKey] = ElementStyleDef{}
+		if _, exists := elements[elKey]; !exists {
+			elements[elKey] = ElementStyleDef{}
+		}
 	}
 }
 
@@ -359,8 +443,6 @@ func (c *Config) GetIndentation(level int) string {
 
 func (c *Config) GetIcon(iconKey string) string {
 	if c.IsMonochrome {
-		// Return ASCII versions if in monochrome mode
-		// These values are similar to what AsciiMinimalTheme would provide
 		switch strings.ToLower(iconKey) {
 		case "start":
 			return "[START]"
@@ -375,11 +457,9 @@ func (c *Config) GetIcon(iconKey string) string {
 		case "bullet":
 			return "*"
 		default:
-			return "?" // Default for unknown keys in monochrome
+			return "?"
 		}
 	}
-
-	// Return Unicode icons from the current theme's configuration
 	switch strings.ToLower(iconKey) {
 	case "start":
 		return c.Icons.Start
@@ -394,139 +474,104 @@ func (c *Config) GetIcon(iconKey string) string {
 	case "bullet":
 		return c.Icons.Bullet
 	default:
-		// Fallback for unknown icon keys, could be an empty string or a default Unicode char
-		return "" // Unicode replacement character, or handle as you see fit
+		return ""
 	}
 }
 
-func (c *Config) GetColor(colorKey string, elementName ...string) string {
+func (c *Config) GetColor(colorKeyOrName string, elementName ...string) string {
 	if c.IsMonochrome {
 		return ""
 	}
+
 	if len(elementName) > 0 && elementName[0] != "" {
-		if elemStyle, ok := c.Elements[elementName[0]]; ok && elemStyle.ColorFG != "" {
-			return c.resolveColorName(elemStyle.ColorFG)
-		}
-	}
-	return c.resolveColorName(colorKey)
-}
-
-// resolveColorName translates a color name or a direct ANSI code string.
-// resolveColorName translates a color name or a direct ANSI code string.
-// It applies ensureEscapePrefix to the final code for backward compatibility.
-func (c *Config) resolveColorName(name string) string {
-	if c.IsMonochrome { // Should be handled by GetColor, but defensive check.
-		return ""
-	}
-
-	// Debug print for input to resolveColorName
-	if os.Getenv("FO_DEBUG") != "" {
-		fmt.Fprintf(os.Stderr, "[DEBUG resolveColorName] Input name: '%s' (Hex: %x)\n", name, name)
-	}
-
-	// Create the escape character directly
-	escChar := string([]byte{27}) // ASCII escape (decimal 27, hex 0x1B)
-
-	// Map symbolic names to ANSI codes
-	var colorCode string
-	switch strings.ToLower(name) {
-	// Primary theme colors
-	case "process", "blue":
-		colorCode = escChar + "[0;34m"
-	case "success", "green":
-		colorCode = escChar + "[0;32m"
-	case "warning", "yellow":
-		colorCode = escChar + "[0;33m"
-	case "error", "red":
-		colorCode = escChar + "[0;31m"
-	case "detail", "default":
-		colorCode = escChar + "[0m"
-	case "muted", "dim":
-		colorCode = escChar + "[2m"
-	case "reset":
-		colorCode = escChar + "[0m"
-
-	// Text styles
-	case "bold":
-		colorCode = escChar + "[1m"
-	case "italic":
-		colorCode = escChar + "[3m"
-	case "underline":
-		colorCode = escChar + "[4m"
-
-	// More colors for completeness
-	case "black":
-		colorCode = escChar + "[0;30m"
-	case "white":
-		colorCode = escChar + "[0;37m"
-	case "cyan":
-		colorCode = escChar + "[0;36m"
-	case "magenta":
-		colorCode = escChar + "[0;35m"
-
-	// Bright variants
-	case "brightblack", "gray":
-		colorCode = escChar + "[0;90m"
-	case "brightred":
-		colorCode = escChar + "[0;91m"
-	case "brightgreen":
-		colorCode = escChar + "[0;92m"
-	case "brightyellow":
-		colorCode = escChar + "[0;93m"
-	case "brightblue":
-		colorCode = escChar + "[0;94m"
-	case "brightmagenta":
-		colorCode = escChar + "[0;95m"
-	case "brightcyan":
-		colorCode = escChar + "[0;96m"
-	case "brightwhite":
-		colorCode = escChar + "[0;97m"
-
-	default:
-		// Handle legacy direct ANSI codes for backward compatibility
-		if strings.HasPrefix(name, "\033[") || strings.HasPrefix(name, "33[") {
-			colorCode = ensureEscapePrefix(name)
-		} else {
-			colorCode = escChar + "[0m" // Fallback to default
-			if os.Getenv("FO_DEBUG") != "" {
-				fmt.Fprintf(os.Stderr, "[DEBUG resolveColorName] Unknown color name '%s', falling back to default\n", name)
+		if elemStyle, ok := c.Elements[elementName[0]]; ok {
+			if elemStyle.ColorFG != "" {
+				return c.resolveColorName(elemStyle.ColorFG)
 			}
 		}
 	}
-
-	// Debug print for the code chosen by the switch statement.
-	if os.Getenv("FO_DEBUG") != "" {
-		fmt.Fprintf(os.Stderr, "[DEBUG resolveColorName] Code from switch: '%s' (Hex: %x)\n", colorCode, colorCode)
-	}
-
-	// We're directly using the escape character, so we don't need ensureEscapePrefix anymore
-	// but keeping it for potential edge cases in legacy configurations
-	finalCode := colorCode
-
-	// Debug print for the final code.
-	if os.Getenv("FO_DEBUG") != "" {
-		fmt.Fprintf(os.Stderr, "[DEBUG resolveColorName] Final code: '%s' (Hex: %x)\n", finalCode, finalCode)
-	}
-	return finalCode
+	return c.resolveColorName(colorKeyOrName)
 }
 
-// ResetColor returns the ANSI reset code if not in monochrome mode.
+func (c *Config) resolveColorName(name string) string {
+	if c.IsMonochrome || name == "" {
+		return ""
+	}
+
+	var codeToProcess string
+	lowerName := strings.ToLower(name)
+
+	switch lowerName {
+	case "process":
+		codeToProcess = c.Colors.Process
+	case "success":
+		codeToProcess = c.Colors.Success
+	case "warning":
+		codeToProcess = c.Colors.Warning
+	case "error":
+		codeToProcess = c.Colors.Error
+	case "detail":
+		codeToProcess = c.Colors.Detail
+	case "muted":
+		codeToProcess = c.Colors.Muted
+	case "reset":
+		codeToProcess = c.Colors.Reset
+	case "white":
+		codeToProcess = c.Colors.White
+	case "bluefg":
+		codeToProcess = c.Colors.BlueFg
+	case "bluebg":
+		codeToProcess = c.Colors.BlueBg
+	case "bold":
+		codeToProcess = c.Colors.Bold
+	case "italic":
+		codeToProcess = c.Colors.Italic
+	default:
+		if strings.Contains(name, "[") && (strings.HasPrefix(name, "\033") || strings.HasPrefix(name, "\\033") || strings.HasPrefix(name, "\\x1b") || strings.HasPrefix(name, "33") || (len(name) > 0 && name[0] == '\x00' && strings.Contains(name, "33["))) {
+			codeToProcess = name
+		}
+	}
+
+	escChar := string([]byte{27})
+	if codeToProcess == "" {
+		switch lowerName {
+		case "process", "success", "white":
+			codeToProcess = escChar + "[0;97m"
+		case "warning":
+			codeToProcess = escChar + "[0;33m"
+		case "error":
+			codeToProcess = escChar + "[0;31m"
+		case "detail", "reset":
+			codeToProcess = escChar + "[0m"
+		case "muted":
+			codeToProcess = escChar + "[2m"
+		case "bluefg":
+			codeToProcess = escChar + "[0;34m"
+		case "bluebg":
+			codeToProcess = escChar + "[44m"
+		case "bold":
+			codeToProcess = escChar + "[1m"
+		case "italic":
+			codeToProcess = escChar + "[3m"
+		default:
+			codeToProcess = escChar + "[0m"
+			if os.Getenv("FO_DEBUG") != "" {
+				fmt.Fprintf(os.Stderr, "[DEBUG resolveColorName] Color key/name '%s' not found in theme or defaults, using reset.\n", name)
+			}
+		}
+	}
+	return ensureEscapePrefix(codeToProcess)
+}
+
 func (c *Config) ResetColor() string {
 	if c.IsMonochrome {
 		return ""
 	}
-	// Debug print for ResetColor input
-	if os.Getenv("FO_DEBUG") != "" {
-		fmt.Fprintf(os.Stderr, "[DEBUG ResetColor] Input c.Colors.Reset: '%s' (Hex: %x)\n", c.Colors.Reset, c.Colors.Reset)
+	resetCode := c.Colors.Reset
+	if resetCode == "" {
+		resetCode = string([]byte{27}) + "[0m"
 	}
-
-	// Get the reset color code
-	finalReset := c.resolveColorName("reset")
-
-	if os.Getenv("FO_DEBUG") != "" {
-		fmt.Fprintf(os.Stderr, "[DEBUG ResetColor] Output finalReset: '%s' (Hex: %x)\n", finalReset, finalReset)
-	}
-	return finalReset
+	return ensureEscapePrefix(resetCode)
 }
 
 func DeepCopyConfig(original *Config) *Config {
@@ -544,29 +589,33 @@ func DeepCopyConfig(original *Config) *Config {
 			copied.Elements[k] = v
 		}
 	}
-	copied.Patterns.Intent = make(map[string][]string)
-	for k, v := range original.Patterns.Intent {
-		s := make([]string, len(v))
-		copy(s, v)
-		copied.Patterns.Intent[k] = s
+	if original.Patterns.Intent != nil {
+		copied.Patterns.Intent = make(map[string][]string)
+		for k, v := range original.Patterns.Intent {
+			s := make([]string, len(v))
+			copy(s, v)
+			copied.Patterns.Intent[k] = s
+		}
 	}
-	copied.Patterns.Output = make(map[string][]string)
-	for k, v := range original.Patterns.Output {
-		s := make([]string, len(v))
-		copy(s, v)
-		copied.Patterns.Output[k] = s
+	if original.Patterns.Output != nil {
+		copied.Patterns.Output = make(map[string][]string)
+		for k, v := range original.Patterns.Output {
+			s := make([]string, len(v))
+			copy(s, v)
+			copied.Patterns.Output[k] = s
+		}
 	}
 	if original.Tools != nil {
 		copied.Tools = make(map[string]*ToolConfig)
-		for k, v := range original.Tools {
-			if v == nil {
+		for k, vOriginalTool := range original.Tools {
+			if vOriginalTool == nil {
 				copied.Tools[k] = nil
 				continue
 			}
-			toolCfgCopy := *v
-			if v.OutputPatterns != nil {
+			toolCfgCopy := *vOriginalTool
+			if vOriginalTool.OutputPatterns != nil {
 				toolCfgCopy.OutputPatterns = make(map[string][]string)
-				for pk, pv := range v.OutputPatterns {
+				for pk, pv := range vOriginalTool.OutputPatterns {
 					s := make([]string, len(pv))
 					copy(s, pv)
 					toolCfgCopy.OutputPatterns[pk] = s
@@ -593,6 +642,11 @@ func ApplyMonochromeDefaults(cfg *Config) {
 		Detail  string `yaml:"detail"`
 		Muted   string `yaml:"muted"`
 		Reset   string `yaml:"reset"`
+		White   string `yaml:"white,omitempty"`
+		BlueFg  string `yaml:"blue_fg,omitempty"`
+		BlueBg  string `yaml:"blue_bg,omitempty"`
+		Bold    string `yaml:"bold,omitempty"`
+		Italic  string `yaml:"italic,omitempty"`
 	}{}
 
 	asciiMinimalElements := AsciiMinimalTheme().Elements
@@ -605,7 +659,6 @@ func ApplyMonochromeDefaults(cfg *Config) {
 		elDef := cfg.Elements[key]
 		elDef.ColorFG = ""
 		elDef.ColorBG = ""
-
 		if asciiStyle, ok := asciiMinimalElements[key]; ok {
 			if asciiStyle.Text != "" {
 				elDef.Text = asciiStyle.Text
@@ -620,6 +673,13 @@ func ApplyMonochromeDefaults(cfg *Config) {
 				elDef.TextContent = asciiStyle.TextContent
 			}
 		}
+		elDef.TextStyle = nil
 		cfg.Elements[key] = elDef
 	}
+	cfg.Icons.Start = "[START]"
+	cfg.Icons.Success = "[SUCCESS]"
+	cfg.Icons.Warning = "[WARNING]"
+	cfg.Icons.Error = "[FAILED]"
+	cfg.Icons.Info = "[INFO]"
+	cfg.Icons.Bullet = "*"
 }

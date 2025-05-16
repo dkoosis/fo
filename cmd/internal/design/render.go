@@ -3,59 +3,61 @@ package design
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
-// RenderStartLine returns the formatted start line for the task
+var titler = cases.Title(language.English)
+
 // RenderStartLine returns the formatted start line for the task
 func (t *Task) RenderStartLine() string {
 	var sb strings.Builder
 
 	if t.Config.IsMonochrome {
-		// Simple monochrome output (for --no-color, --ci)
-		icon := t.Config.GetIcon("Start") // Should be "[START]" from GetIcon's monochrome path
-		sb.WriteString(fmt.Sprintf("%s %s...", icon, t.Label))
-	} else { // Themed output
+		icon := t.Config.GetIcon("Start")
+		// Not using fmt.Sprintf to avoid any potential mangling of icon if it had %
+		sb.WriteString(icon)
+		sb.WriteString(" ")
+		sb.WriteString(t.Label)
+		sb.WriteString("...")
+	} else {
 		headerStyle := t.Config.GetElementStyle("Task_Label_Header")
 		startIndicatorStyle := t.Config.GetElementStyle("Task_StartIndicator_Line")
 
 		if t.Config.Style.UseBoxes {
 			sb.WriteString(t.Config.Border.TopCornerChar)
 			sb.WriteString(t.Config.Border.HeaderChar)
-
-			// Apply color only to the label text, not the border
 			labelColor := t.Config.GetColor(headerStyle.ColorFG, "Task_Label_Header")
 			sb.WriteString(" ")
 			sb.WriteString(labelColor)
 			if contains(headerStyle.TextStyle, "bold") {
-				sb.WriteString("\033[1m") // ANSI bold
+				sb.WriteString(t.Config.GetColor("Bold"))
 			}
 			sb.WriteString(applyTextCase(t.Label, headerStyle.TextCase))
 			sb.WriteString(t.Config.ResetColor())
 			sb.WriteString(" ")
 
-			// Calculate border length - rendered after color reset
 			labelRenderedLength := len(t.Label) + 2
 			desiredHeaderContentVisualWidth := 40
 			repeatCount := desiredHeaderContentVisualWidth - labelRenderedLength
 			if repeatCount < 0 {
 				repeatCount = 0
 			}
-
-			// Border characters without color
 			sb.WriteString(strings.Repeat(t.Config.Border.HeaderChar, repeatCount))
 			sb.WriteString("\n")
-
 			sb.WriteString(t.Config.Border.VerticalChar + "\n")
 			sb.WriteString(t.Config.Border.VerticalChar + " ")
 			sb.WriteString(t.Config.GetIndentation(1))
-		} else { // Line-oriented (non-boxed) themed output
+		} else {
 			h2Style := t.Config.GetElementStyle("H2_Target_Title")
 			labelColor := t.Config.GetColor(h2Style.ColorFG, "H2_Target_Title")
 			sb.WriteString(labelColor)
 			if contains(h2Style.TextStyle, "bold") {
-				sb.WriteString("\033[1m") // ANSI bold
+				sb.WriteString(t.Config.GetColor("Bold"))
 			}
 			sb.WriteString(h2Style.Prefix)
 			sb.WriteString(applyTextCase(t.Label, h2Style.TextCase))
@@ -74,11 +76,15 @@ func (t *Task) RenderStartLine() string {
 			icon = t.Config.GetIcon("Start")
 		}
 
-		sb.WriteString(fmt.Sprintf("%s %s%s...%s",
-			icon,
-			processColor,
-			processLabelText,
-			t.Config.ResetColor()))
+		sb.WriteString(icon)
+		sb.WriteString(" ")
+		sb.WriteString(processColor)
+		sb.WriteString(processLabelText)
+		sb.WriteString("...")
+		sb.WriteString(t.Config.ResetColor())
+	}
+	if os.Getenv("FO_DEBUG_RENDER") != "" {
+		fmt.Fprintf(os.Stderr, "[DEBUG RenderStartLine] Output: %q\n", sb.String())
 	}
 	return sb.String()
 }
@@ -92,7 +98,6 @@ func (t *Task) RenderEndLine() string {
 		durationStyle := t.Config.GetElementStyle("Task_Status_Duration")
 		prefix := durationStyle.Prefix
 		suffix := durationStyle.Suffix
-
 		if t.Config.IsMonochrome {
 			if prefix == "" {
 				prefix = "("
@@ -106,20 +111,23 @@ func (t *Task) RenderEndLine() string {
 				suffix = ")"
 			}
 		}
-
 		durationColorName := durationStyle.ColorFG
 		if durationColorName == "" {
 			durationColorName = "Muted"
 		}
 		durationAnsiColor := t.Config.GetColor(durationColorName)
-
 		space := " "
 		if prefix != "" && (strings.HasSuffix(prefix, " ") || strings.HasPrefix(suffix, " ")) {
 			space = ""
 		}
-
-		durationStr = fmt.Sprintf("%s%s%s%s%s%s",
-			space, durationAnsiColor, prefix, formatDuration(t.Duration), suffix, t.Config.ResetColor())
+		var durSb strings.Builder
+		durSb.WriteString(space)
+		durSb.WriteString(durationAnsiColor)
+		durSb.WriteString(prefix)
+		durSb.WriteString(formatDuration(t.Duration))
+		durSb.WriteString(suffix)
+		durSb.WriteString(t.Config.ResetColor())
+		durationStr = durSb.String()
 	}
 
 	if t.Config.IsMonochrome {
@@ -134,12 +142,14 @@ func (t *Task) RenderEndLine() string {
 		default:
 			icon = t.Config.GetIcon("Info")
 		}
-		sb.WriteString(fmt.Sprintf("%s %s%s", icon, t.Label, durationStr))
+		sb.WriteString(icon)
+		sb.WriteString(" ")
+		sb.WriteString(t.Label)
+		sb.WriteString(durationStr)
 
-	} else { // Themed output
+	} else {
 		var statusStyle ElementStyleDef
 		var icon, statusText, colorKey string
-
 		switch t.Status {
 		case StatusSuccess:
 			statusStyle = t.Config.GetElementStyle("Task_Status_Success_Block")
@@ -198,22 +208,34 @@ func (t *Task) RenderEndLine() string {
 				colorKey = "Process"
 			}
 		}
-
 		colorCode := t.Config.GetColor(colorKey)
-		statusTextWithStyle := statusText
-		if !t.Config.IsMonochrome && contains(statusStyle.TextStyle, "bold") { // Check IsMonochrome
-			statusTextWithStyle = "\033[1m" + statusText + "\033[22m" // ANSI bold on/off
+
+		var styledStatusTextBuilder strings.Builder
+		if !t.Config.IsMonochrome && contains(statusStyle.TextStyle, "bold") {
+			styledStatusTextBuilder.WriteString(t.Config.GetColor("Bold"))
 		}
+		styledStatusTextBuilder.WriteString(statusText)
+		if !t.Config.IsMonochrome && contains(statusStyle.TextStyle, "bold") {
+			styledStatusTextBuilder.WriteString(t.Config.ResetColor())
+		}
+		statusTextWithStyle := styledStatusTextBuilder.String()
 
 		if t.Config.Style.UseBoxes {
 			sb.WriteString(t.Config.Border.VerticalChar + " ")
+		}
+		if t.Config.Style.UseBoxes || statusStyle.Prefix == "" {
 			sb.WriteString(t.Config.GetIndentation(1))
-		} else if statusStyle.Prefix != "" {
+		}
+		if statusStyle.Prefix != "" && !t.Config.Style.UseBoxes {
 			sb.WriteString(statusStyle.Prefix)
 		}
 
-		sb.WriteString(fmt.Sprintf("%s %s%s%s%s",
-			icon, colorCode, statusTextWithStyle, t.Config.ResetColor(), durationStr))
+		sb.WriteString(icon)
+		sb.WriteString(" ")
+		sb.WriteString(colorCode)
+		sb.WriteString(statusTextWithStyle)
+		sb.WriteString(t.Config.ResetColor())
+		sb.WriteString(durationStr)
 		sb.WriteString("\n")
 
 		if t.Config.Style.UseBoxes {
@@ -235,10 +257,12 @@ func (t *Task) RenderEndLine() string {
 			}
 		}
 	}
+	if os.Getenv("FO_DEBUG_RENDER") != "" {
+		fmt.Fprintf(os.Stderr, "[DEBUG RenderEndLine] Output: %q\n", sb.String())
+	}
 	return sb.String()
 }
 
-// RenderOutputLine formats an output line according to the design system
 func (t *Task) RenderOutputLine(line OutputLine) string {
 	var sb strings.Builder
 
@@ -252,26 +276,28 @@ func (t *Task) RenderOutputLine(line OutputLine) string {
 		if line.Indentation > 0 {
 			sb.WriteString(strings.Repeat(t.Config.GetIndentation(1), line.Indentation))
 		}
-
 		if isFoInternalMessage {
 			sb.WriteString(line.Content)
 		} else {
 			var prefixText string
 			switch line.Type {
 			case TypeError:
-				prefixStyle := t.Config.GetElementStyle("Stderr_Error_Line_Prefix")
-				prefixText = prefixStyle.Text
+				prefixText = t.Config.GetElementStyle("Stderr_Error_Line_Prefix").Text
 			case TypeWarning:
-				prefixStyle := t.Config.GetElementStyle("Stderr_Warning_Line_Prefix")
-				prefixText = prefixStyle.Text
+				prefixText = t.Config.GetElementStyle("Stderr_Warning_Line_Prefix").Text
 			default:
-				prefixStyle := t.Config.GetElementStyle("Stdout_Line_Prefix")
-				prefixText = prefixStyle.Text
+				prefixText = t.Config.GetElementStyle("Stdout_Line_Prefix").Text
+			}
+			if prefixText == "" && (line.Type == TypeError || line.Type == TypeWarning) {
+				prefixText = "  > "
+			}
+			if prefixText == "" && line.Type == TypeDetail {
+				prefixText = "  "
 			}
 			sb.WriteString(prefixText)
 			sb.WriteString(line.Content)
 		}
-	} else { // Themed rendering
+	} else {
 		if t.Config.Style.UseBoxes {
 			sb.WriteString(t.Config.Border.VerticalChar + " ")
 		}
@@ -281,9 +307,7 @@ func (t *Task) RenderOutputLine(line OutputLine) string {
 		}
 
 		var prefixStyle ElementStyleDef
-		var contentColorKey string
-		var contentElementStyleKey string
-
+		var contentColorKey, contentElementStyleKey string
 		switch line.Type {
 		case TypeError:
 			if isFoInternalMessage {
@@ -312,7 +336,7 @@ func (t *Task) RenderOutputLine(line OutputLine) string {
 				contentColorKey = "Process"
 			}
 			contentElementStyleKey = "Task_Content_Info_Text"
-		default:
+		default: // TypeDetail
 			prefixStyle = t.Config.GetElementStyle("Stdout_Line_Prefix")
 			contentColorKey = prefixStyle.ColorFG
 			if contentColorKey == "" {
@@ -338,28 +362,33 @@ func (t *Task) RenderOutputLine(line OutputLine) string {
 
 		finalContentColor := t.Config.GetColor(contentColorKey)
 		contentStyleDef := t.Config.GetElementStyle(contentElementStyleKey)
-		styleStart, styleEnd := "", ""
 
+		var styleBuilder strings.Builder
 		if !t.Config.IsMonochrome {
 			if line.Context.CognitiveLoad == LoadHigh && line.Type == TypeError && !isFoInternalMessage {
-				styleStart += "\033[3m"
+				styleBuilder.WriteString(t.Config.GetColor("Italic"))
 			}
 			if contains(contentStyleDef.TextStyle, "bold") {
-				styleStart += "\033[1m"
+				styleBuilder.WriteString(t.Config.GetColor("Bold"))
 			}
-			if contains(contentStyleDef.TextStyle, "italic") && !strings.Contains(styleStart, "\033[3m") {
-				styleStart += "\033[3m"
-			}
-			if styleStart != "" {
-				styleEnd = t.Config.ResetColor()
+			if contains(contentStyleDef.TextStyle, "italic") && !strings.Contains(styleBuilder.String(), t.Config.GetColor("Italic")) {
+				styleBuilder.WriteString(t.Config.GetColor("Italic"))
 			}
 		}
-		sb.WriteString(fmt.Sprintf("%s%s%s%s", finalContentColor, styleStart, line.Content, styleEnd))
+
+		sb.WriteString(finalContentColor)
+		sb.WriteString(styleBuilder.String())
+		sb.WriteString(line.Content)
+		if styleBuilder.Len() > 0 || finalContentColor != "" {
+			sb.WriteString(t.Config.ResetColor())
+		}
+	}
+	if os.Getenv("FO_DEBUG_RENDER") != "" {
+		fmt.Fprintf(os.Stderr, "[DEBUG RenderOutputLine] Output: %q\n", sb.String())
 	}
 	return sb.String()
 }
 
-// RenderSummary creates a summary section for the output
 func (t *Task) RenderSummary() string {
 	errorCount, warningCount := 0, 0
 	t.OutputLinesLock()
@@ -372,7 +401,6 @@ func (t *Task) RenderSummary() string {
 		if isFoInternalError {
 			continue
 		}
-
 		switch line.Type {
 		case TypeError:
 			errorCount++
@@ -381,7 +409,6 @@ func (t *Task) RenderSummary() string {
 		}
 	}
 	t.OutputLinesUnlock()
-
 	if errorCount == 0 && warningCount == 0 {
 		return ""
 	}
@@ -390,9 +417,8 @@ func (t *Task) RenderSummary() string {
 	summaryHeadingStyle := t.Config.GetElementStyle("Task_Content_Summary_Heading")
 	errorItemStyle := t.Config.GetElementStyle("Task_Content_Summary_Item_Error")
 	warningItemStyle := t.Config.GetElementStyle("Task_Content_Summary_Item_Warning")
-
 	baseIndentForSummaryItems := ""
-	if t.Config.Style.UseBoxes && !t.Config.IsMonochrome { // Only box if not monochrome
+	if t.Config.Style.UseBoxes && !t.Config.IsMonochrome {
 		sb.WriteString(t.Config.Border.VerticalChar + "\n")
 		baseIndentForSummaryItems = t.Config.Border.VerticalChar + " " + t.Config.GetIndentation(1)
 	} else {
@@ -400,7 +426,6 @@ func (t *Task) RenderSummary() string {
 		baseIndentForSummaryItems = t.Config.GetIndentation(1)
 	}
 	sb.WriteString(baseIndentForSummaryItems)
-
 	headingText := summaryHeadingStyle.TextContent
 	if headingText == "" {
 		headingText = "SUMMARY:"
@@ -410,16 +435,20 @@ func (t *Task) RenderSummary() string {
 		headingColor = t.Config.GetColor("Process")
 	}
 
-	hStyleStart, hStyleEnd := "", ""
-	// Apply bold styling for summary heading only if not monochrome
+	var headingStyleBuilder strings.Builder
 	if !t.Config.IsMonochrome && contains(summaryHeadingStyle.TextStyle, "bold") {
-		hStyleStart = "\033[1m" // ANSI bold
-		hStyleEnd = t.Config.ResetColor()
+		headingStyleBuilder.WriteString(t.Config.GetColor("Bold"))
 	}
-	sb.WriteString(fmt.Sprintf("%s%s%s%s%s\n", headingColor, hStyleStart, headingText, hStyleEnd, t.Config.ResetColor()))
+
+	sb.WriteString(headingColor)
+	sb.WriteString(headingStyleBuilder.String())
+	sb.WriteString(headingText)
+	if headingStyleBuilder.Len() > 0 || headingColor != "" {
+		sb.WriteString(t.Config.ResetColor())
+	}
+	sb.WriteString("\n")
 
 	itemFurtherIndent := baseIndentForSummaryItems + t.Config.GetIndentation(1)
-
 	if errorCount > 0 {
 		sb.WriteString(itemFurtherIndent)
 		bulletChar := errorItemStyle.BulletChar
@@ -430,9 +459,12 @@ func (t *Task) RenderSummary() string {
 		if itemColor == "" && !t.Config.IsMonochrome {
 			itemColor = t.Config.GetColor("Error")
 		}
-		sb.WriteString(fmt.Sprintf("%s%s %d error%s%s\n", itemColor, bulletChar, errorCount, pluralSuffix(errorCount), t.Config.ResetColor()))
+		sb.WriteString(itemColor)
+		sb.WriteString(bulletChar)
+		sb.WriteString(fmt.Sprintf(" %d error%s", errorCount, pluralSuffix(errorCount)))
+		sb.WriteString(t.Config.ResetColor())
+		sb.WriteString("\n")
 	}
-
 	if warningCount > 0 {
 		sb.WriteString(itemFurtherIndent)
 		bulletChar := warningItemStyle.BulletChar
@@ -443,7 +475,11 @@ func (t *Task) RenderSummary() string {
 		if itemColor == "" && !t.Config.IsMonochrome {
 			itemColor = t.Config.GetColor("Warning")
 		}
-		sb.WriteString(fmt.Sprintf("%s%s %d warning%s%s\n", itemColor, bulletChar, warningCount, pluralSuffix(warningCount), t.Config.ResetColor()))
+		sb.WriteString(itemColor)
+		sb.WriteString(bulletChar)
+		sb.WriteString(fmt.Sprintf(" %d warning%s", warningCount, pluralSuffix(warningCount)))
+		sb.WriteString(t.Config.ResetColor())
+		sb.WriteString("\n")
 	}
 
 	if t.Config.Style.UseBoxes && !t.Config.IsMonochrome {
@@ -451,7 +487,9 @@ func (t *Task) RenderSummary() string {
 	} else {
 		sb.WriteString("\n")
 	}
-
+	if os.Getenv("FO_DEBUG_RENDER") != "" {
+		fmt.Fprintf(os.Stderr, "[DEBUG RenderSummary] Output: %q\n", sb.String())
+	}
 	return sb.String()
 }
 
@@ -461,14 +499,8 @@ func applyTextCase(text, caseType string) string {
 		return strings.ToUpper(text)
 	case "lower":
 		return strings.ToLower(text)
-	case "title":
-		words := strings.Fields(text)
-		for i, word := range words {
-			if len(word) > 0 {
-				words[i] = strings.ToUpper(string(word[0])) + strings.ToLower(word[1:])
-			}
-		}
-		return strings.Join(words, " ")
+	case "title": // Corrected to use golang.org/x/text/cases
+		return titler.String(text)
 	default:
 		return text
 	}
@@ -533,79 +565,131 @@ func getProcessLabel(intent string) string {
 	return "Running"
 }
 
-// RenderDirectMessage formats and returns a string for the 'fo print' subcommand.
 func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, indentLevel int) string {
 	var sb strings.Builder
 	var iconToUse string
-	var colorToUse string // ANSI color code
+	var rawFgColor, rawBgColor string
+	var finalFgColor, finalBgColor, finalTextStyle string
+	var elementStyle ElementStyleDef
 
-	// Determine icon
+	lowerMessageType := strings.ToLower(messageType)
+	styleKey := ""
+
+	switch lowerMessageType {
+	case "header":
+		styleKey = "Print_Header_Highlight"
+	case "success":
+		styleKey = "Print_Success_Style"
+	case "warning":
+		styleKey = "Print_Warning_Style"
+	case "error":
+		styleKey = "Print_Error_Style"
+	case "info":
+		styleKey = "Print_Info_Style"
+	}
+
+	if styleKey != "" {
+		elementStyle = cfg.GetElementStyle(styleKey)
+	}
+
 	if customIcon != "" {
-		iconToUse = customIcon // User-defined icon takes precedence
+		iconToUse = customIcon
+	} else if elementStyle.IconKey != "" {
+		iconToUse = cfg.GetIcon(elementStyle.IconKey)
 	} else {
-		// Get icon based on message type from theme
-		switch strings.ToLower(messageType) {
+		switch lowerMessageType {
+		case "header":
+			iconToUse = cfg.GetIcon("Start")
 		case "success":
 			iconToUse = cfg.GetIcon("Success")
 		case "warning":
 			iconToUse = cfg.GetIcon("Warning")
 		case "error":
 			iconToUse = cfg.GetIcon("Error")
-		case "info":
+		default:
 			iconToUse = cfg.GetIcon("Info")
-		case "header": // For headers, icon might be different or none
-			iconToUse = cfg.GetIcon("Start") // Or a specific "Header" icon if defined
-		case "raw":
-			iconToUse = "" // No icon for raw
-		default:
-			iconToUse = cfg.GetIcon("Info") // Default to info icon
 		}
 	}
 
-	// Determine color
-	// For 'raw', no color is applied by default unless message contains its own ANSI codes
-	if strings.ToLower(messageType) != "raw" {
-		switch strings.ToLower(messageType) {
-		case "success":
-			colorToUse = cfg.GetColor("Success")
-		case "warning":
-			colorToUse = cfg.GetColor("Warning")
-		case "error":
-			colorToUse = cfg.GetColor("Error")
-		case "info":
-			colorToUse = cfg.GetColor("Process") // Often blue for info
+	if elementStyle.ColorFG != "" {
+		rawFgColor = elementStyle.ColorFG
+	} else {
+		switch lowerMessageType {
 		case "header":
-			colorToUse = cfg.GetColor("Process") // Example: Blue for headers
+			rawFgColor = "White"
+		case "success":
+			rawFgColor = "Success"
+		case "warning":
+			rawFgColor = "Warning"
+		case "error":
+			rawFgColor = "Error"
 		default:
-			colorToUse = cfg.GetColor("Detail") // Default color
+			rawFgColor = "Detail"
 		}
 	}
-
-	// Apply indentation
-	if indentLevel > 0 {
-		sb.WriteString(strings.Repeat(cfg.GetIndentation(1), indentLevel))
+	if elementStyle.ColorBG != "" {
+		rawBgColor = elementStyle.ColorBG
+	} else if lowerMessageType == "header" && message == "Check for required tools" {
+		rawBgColor = "BlueBg"
 	}
 
-	// Apply color and icon if not raw type
-	if strings.ToLower(messageType) != "raw" {
-		if colorToUse != "" {
-			sb.WriteString(colorToUse)
+	if lowerMessageType == "raw" {
+		rawFgColor = ""
+		rawBgColor = ""
+	}
+
+	if rawFgColor != "" {
+		finalFgColor = cfg.GetColor(rawFgColor)
+	}
+	if rawBgColor != "" {
+		finalBgColor = cfg.GetColor(rawBgColor)
+	}
+
+	if !cfg.IsMonochrome && elementStyle.TextStyle != nil {
+		var styleParts []string
+		for _, styleName := range elementStyle.TextStyle {
+			// Use titler for "bold" -> "Bold" for map lookup consistency
+			stylePart := cfg.GetColor(titler.String(strings.ToLower(styleName)))
+			if stylePart != "" {
+				styleParts = append(styleParts, stylePart)
+			}
 		}
+		finalTextStyle = strings.Join(styleParts, "")
+	}
+
+	sb.WriteString(strings.Repeat(cfg.GetIndentation(1), indentLevel))
+
+	needsReset := false
+	if lowerMessageType != "raw" {
+		if finalBgColor != "" {
+			sb.WriteString(finalBgColor)
+			needsReset = true
+		}
+		if finalFgColor != "" {
+			sb.WriteString(finalFgColor)
+			needsReset = true
+		}
+		if finalTextStyle != "" {
+			sb.WriteString(finalTextStyle)
+			needsReset = true
+		}
+
 		if iconToUse != "" {
 			sb.WriteString(iconToUse)
-			sb.WriteString(" ") // Space after icon
+			sb.WriteString(" ")
 		}
 	}
 
-	// Append the message
 	sb.WriteString(message)
 
-	// Reset color if a color was applied (and not raw)
-	if strings.ToLower(messageType) != "raw" && colorToUse != "" {
+	if needsReset {
 		sb.WriteString(cfg.ResetColor())
 	}
 
-	sb.WriteString("\n") // Always add a newline for 'print' messages
-
+	sb.WriteString("\n")
+	if os.Getenv("FO_DEBUG_RENDER") != "" {
+		fmt.Fprintf(os.Stderr, "[DEBUG RenderDirectMessage] FG_raw: %q, FG_final: %q, BG_raw: %q, BG_final: %q, Style_final: %q, Output: %q\n",
+			rawFgColor, finalFgColor, rawBgColor, finalBgColor, finalTextStyle, sb.String())
+	}
 	return sb.String()
 }
