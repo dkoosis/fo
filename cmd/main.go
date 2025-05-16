@@ -283,7 +283,7 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 	task.Complete(exitCode)
 
 	// Debug output for CI mode test troubleshooting
-	if appSettings.Debug || appSettings.CI {
+	if appSettings.Debug { // MODIFIED: Only depends on appSettings.Debug
 		fmt.Fprintf(os.Stderr, "[DEBUG executeCommand] CI=%t, exitCode=%d, task.Status=%s, isActualFoStartupFailure=%t\n",
 			appSettings.CI, exitCode, task.Status, isActualFoStartupFailure)
 	}
@@ -299,7 +299,7 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 		}
 
 		// For test debugging
-		if appSettings.Debug || appSettings.CI {
+		if appSettings.Debug { // MODIFIED: Only depends on appSettings.Debug
 			fmt.Fprintf(os.Stderr, "[DEBUG executeCommand] About to call progress.Complete with status: %s\n", status)
 		}
 
@@ -389,7 +389,7 @@ func executeStreamMode(cmd *exec.Cmd, task *design.Task, appSettings LocalAppCon
 		task.AddOutputLine(fmt.Sprintf("[fo] Error setting up stderr pipe for stream mode: %v", err), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
 
 		// Return exit code, but don't mark as startup failure for normal ExitError
-		exitCode := getExitCode(runErr)
+		exitCode := getExitCode(runErr, appSettings.Debug) // MODIFIED: Pass appSettings.Debug
 		var exitErr *exec.ExitError
 		if errors.As(runErr, &exitErr) {
 			// Normal exit with non-zero code, not a startup failure
@@ -438,14 +438,14 @@ func executeStreamMode(cmd *exec.Cmd, task *design.Task, appSettings LocalAppCon
 		_ = stderrPipe.Close()
 		wg.Wait() // Wait for stderr goroutine to finish
 
-		return getExitCode(startErr), startErr
+		return getExitCode(startErr, appSettings.Debug), startErr // MODIFIED: Pass appSettings.Debug
 	}
 
 	runErr := cmd.Wait() // Wait for command to complete
 	wg.Wait()            // Wait for stderr goroutine to finish
 
 	// Get exit code but don't mark as startup failure for normal ExitError
-	exitCode := getExitCode(runErr)
+	exitCode := getExitCode(runErr, appSettings.Debug) // MODIFIED: Pass appSettings.Debug
 	if runErr != nil {
 		var exitErr *exec.ExitError
 		if errors.As(runErr, &exitErr) {
@@ -525,8 +525,8 @@ func executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design
 		// Explicitly close pipes to avoid hanging goroutines
 		_ = stdoutPipe.Close()
 		_ = stderrPipe.Close()
-		wgRead.Wait() // Ensure goroutines finish
-		return getExitCode(startErr), startErr
+		wgRead.Wait()                                             // Ensure goroutines finish
+		return getExitCode(startErr, appSettings.Debug), startErr // MODIFIED: Pass appSettings.Debug
 	}
 
 	// Wait for command to complete
@@ -624,7 +624,7 @@ func executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design
 			return exitCode, cmdWaitErr
 		}
 		// Only treat as startup failure if it's not an ExitError (unusual case)
-		exitCode = getExitCode(cmdWaitErr)
+		exitCode = getExitCode(cmdWaitErr, appSettings.Debug) // MODIFIED: Pass appSettings.Debug
 		return exitCode, cmdWaitErr
 	}
 
@@ -648,7 +648,7 @@ func executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design
 	return 0, nil // Success
 }
 
-func getExitCode(err error) int {
+func getExitCode(err error, debug bool) int { // MODIFIED: Added debug parameter
 	if err == nil {
 		return 0
 	}
@@ -656,7 +656,10 @@ func getExitCode(err error) int {
 		return exitErr.ExitCode()
 	}
 	// Debug print to help diagnose issues
-	fmt.Fprintf(os.Stderr, "[DEBUG getExitCode] Non-ExitError type: %T, error: %v\n", err, err)
+	// MODIFIED: Conditional debug print
+	if debug {
+		fmt.Fprintf(os.Stderr, "[DEBUG getExitCode] Non-ExitError type: %T, error: %v\n", err, err)
+	}
 
 	if errors.Is(err, exec.ErrNotFound) ||
 		strings.Contains(err.Error(), "executable file not found") ||
