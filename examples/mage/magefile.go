@@ -54,7 +54,12 @@ func QA() error {
 	if _, err := console.Run("Gosec Security Scan", "gosec", "-quiet", "./..."); err != nil {
 		fmt.Println("⚠️  Gosec failed (install: go install github.com/securego/gosec/v2/cmd/gosec@latest)")
 	}
-	
+
+	// Build
+	if _, err := console.Run("Go Build", "go", "build", "./..."); err != nil {
+		return fmt.Errorf("build failed: %w", err)
+	}
+
 	fmt.Println("✅ QA complete!")
 	return nil
 }
