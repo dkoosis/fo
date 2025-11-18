@@ -14,7 +14,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/davidkoosis/fo/internal/design"
@@ -66,7 +65,7 @@ func (c *Console) Run(label, command string, args ...string) (*TaskResult, error
 	defer cancel()
 
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigChan, getInterruptSignals()...)
 	defer signal.Stop(sigChan)
 
 	return c.runContext(ctx, cancel, sigChan, label, command, args)
@@ -110,7 +109,7 @@ func (c *Console) runContext(ctx context.Context, cancel context.CancelFunc, sig
 
 	cmd := exec.CommandContext(ctx, command, args...)
 	cmd.Env = os.Environ()
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	setProcessGroup(cmd)
 
 	cmdDone := make(chan struct{})
 	go func() {
@@ -135,20 +134,8 @@ func (c *Console) runContext(ctx context.Context, cancel context.CancelFunc, sig
 			if c.cfg.Debug {
 				fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Received signal %v for PID %d. Forwarding...\n", sig, cmd.Process.Pid)
 			}
-			pgid, err := syscall.Getpgid(cmd.Process.Pid)
-			if err == nil {
-				if c.cfg.Debug {
-					fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Sending signal %v to PGID %d\n", sig, pgid)
-				}
-				sigVal, ok := sig.(syscall.Signal)
-				if ok {
-					_ = syscall.Kill(-pgid, sigVal)
-				}
-			} else {
-				if c.cfg.Debug {
-					fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Failed to get PGID for PID %d (%v), sending to PID directly.\n", cmd.Process.Pid, err)
-				}
-				_ = cmd.Process.Signal(sig)
+			if err := killProcessGroup(cmd, sig); err != nil && c.cfg.Debug {
+				fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Error killing process group: %v\n", err)
 			}
 			select {
 			case <-cmdDone:
@@ -160,12 +147,7 @@ func (c *Console) runContext(ctx context.Context, cancel context.CancelFunc, sig
 					fmt.Fprintln(os.Stderr, "[DEBUG sigChan] Timeout after signal, ensuring process is killed.")
 				}
 				if cmd.Process != nil && cmd.ProcessState == nil {
-					pgidKill, errKill := syscall.Getpgid(cmd.Process.Pid)
-					if errKill == nil {
-						_ = syscall.Kill(-pgidKill, syscall.SIGKILL)
-					} else {
-						_ = cmd.Process.Kill()
-					}
+					_ = killProcessGroupWithSIGKILL(cmd)
 				}
 				cancel()
 			}
@@ -175,12 +157,7 @@ func (c *Console) runContext(ctx context.Context, cancel context.CancelFunc, sig
 				fmt.Fprintln(os.Stderr, "[DEBUG sigChan] Context done, ensuring process is killed if running.")
 			}
 			if cmd.Process != nil && cmd.ProcessState == nil {
-				pgid, err := syscall.Getpgid(cmd.Process.Pid)
-				if err == nil {
-					_ = syscall.Kill(-pgid, syscall.SIGKILL)
-				} else {
-					_ = cmd.Process.Kill()
-				}
+				_ = killProcessGroupWithSIGKILL(cmd)
 			}
 			return
 		case <-cmdDone:
@@ -515,9 +492,8 @@ func getExitCode(err error, debug bool) int {
 
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
-		waitStatus, ok := exitErr.Sys().(syscall.WaitStatus)
-		if ok {
-			return waitStatus.ExitStatus()
+		if code, ok := getExitCodeFromError(exitErr); ok {
+			return code
 		}
 		if debug {
 			fmt.Fprintf(os.Stderr, "[DEBUG getExitCode] ExitError.Sys() not WaitStatus: %T\n", exitErr.Sys())
