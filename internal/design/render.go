@@ -90,43 +90,121 @@ func (t *Task) RenderStartLine() string {
 }
 
 // RenderEndLine returns the formatted end line for the task.
-func (t *Task) RenderEndLine() string {
-	var sb strings.Builder
-	durationStr := ""
+// renderDuration returns the formatted duration string for the task.
+func (t *Task) renderDuration() string {
+	if t.Config.Style.NoTimer {
+		return ""
+	}
 
-	if !t.Config.Style.NoTimer {
-		durationStyle := t.Config.GetElementStyle("Task_Status_Duration")
-		prefix := durationStyle.Prefix
-		suffix := durationStyle.Suffix
-		if t.Config.IsMonochrome {
-			if prefix == "" {
-				prefix = "("
-			}
-			if suffix == "" {
-				suffix = ")"
-			}
-		} else if prefix == "" && suffix == "" {
+	durationStyle := t.Config.GetElementStyle("Task_Status_Duration")
+	prefix := durationStyle.Prefix
+	suffix := durationStyle.Suffix
+	if t.Config.IsMonochrome {
+		if prefix == "" {
 			prefix = "("
+		}
+		if suffix == "" {
 			suffix = ")"
 		}
-		durationColorName := durationStyle.ColorFG
-		if durationColorName == "" {
-			durationColorName = "Muted"
-		}
-		durationAnsiColor := t.Config.GetColor(durationColorName)
-		space := " "
-		if prefix != "" && (strings.HasSuffix(prefix, " ") || strings.HasPrefix(suffix, " ")) {
-			space = ""
-		}
-		var durSb strings.Builder
-		durSb.WriteString(space)
-		durSb.WriteString(durationAnsiColor)
-		durSb.WriteString(prefix)
-		durSb.WriteString(formatDuration(t.Duration))
-		durSb.WriteString(suffix)
-		durSb.WriteString(t.Config.ResetColor())
-		durationStr = durSb.String()
+	} else if prefix == "" && suffix == "" {
+		prefix = "("
+		suffix = ")"
 	}
+	durationColorName := durationStyle.ColorFG
+	if durationColorName == "" {
+		durationColorName = "Muted"
+	}
+	durationAnsiColor := t.Config.GetColor(durationColorName)
+	space := " "
+	if prefix != "" && (strings.HasSuffix(prefix, " ") || strings.HasPrefix(suffix, " ")) {
+		space = ""
+	}
+	var sb strings.Builder
+	sb.WriteString(space)
+	sb.WriteString(durationAnsiColor)
+	sb.WriteString(prefix)
+	sb.WriteString(formatDuration(t.Duration))
+	sb.WriteString(suffix)
+	sb.WriteString(t.Config.ResetColor())
+	return sb.String()
+}
+
+// statusBlockData holds the computed values for rendering a status block.
+type statusBlockData struct {
+	style      ElementStyleDef
+	icon       string
+	text       string
+	colorKey   string
+}
+
+// getStatusBlockData returns the styling data for the current task status.
+func (t *Task) getStatusBlockData() statusBlockData {
+	var data statusBlockData
+	switch t.Status {
+	case StatusSuccess:
+		data.style = t.Config.GetElementStyle("Task_Status_Success_Block")
+		data.icon = t.Config.GetIcon(data.style.IconKey)
+		if data.icon == "" {
+			data.icon = t.Config.GetIcon("Success")
+		}
+		data.text = data.style.TextContent
+		if data.text == "" {
+			data.text = "Complete"
+		}
+		data.colorKey = data.style.ColorFG
+		if data.colorKey == "" {
+			data.colorKey = ColorKeySuccess
+		}
+	case StatusWarning:
+		data.style = t.Config.GetElementStyle("Task_Status_Warning_Block")
+		data.icon = t.Config.GetIcon(data.style.IconKey)
+		if data.icon == "" {
+			data.icon = t.Config.GetIcon("Warning")
+		}
+		data.text = data.style.TextContent
+		if data.text == "" {
+			data.text = "Completed with warnings"
+		}
+		data.colorKey = data.style.ColorFG
+		if data.colorKey == "" {
+			data.colorKey = ColorKeyWarning
+		}
+	case StatusError:
+		data.style = t.Config.GetElementStyle("Task_Status_Failed_Block")
+		data.icon = t.Config.GetIcon(data.style.IconKey)
+		if data.icon == "" {
+			data.icon = t.Config.GetIcon("Error")
+		}
+		data.text = data.style.TextContent
+		if data.text == "" {
+			data.text = "Failed"
+		}
+		data.colorKey = data.style.ColorFG
+		if data.colorKey == "" {
+			data.colorKey = ColorKeyError
+		}
+	default:
+		data.style = t.Config.GetElementStyle("Task_Status_Info_Block")
+		data.icon = t.Config.GetIcon(data.style.IconKey)
+		if data.icon == "" {
+			data.icon = t.Config.GetIcon("Info")
+		}
+		data.text = data.style.TextContent
+		if data.text == "" {
+			data.text = "Done"
+		}
+		data.colorKey = data.style.ColorFG
+		if data.colorKey == "" {
+			data.colorKey = ColorKeyProcess
+		}
+	}
+	return data
+}
+
+// RenderEndLine returns the formatted end line for the task.
+func (t *Task) RenderEndLine() string {
+	var sb strings.Builder
+	durationStr := t.renderDuration()
 
 	if t.Config.IsMonochrome {
 		var icon string
@@ -145,67 +223,11 @@ func (t *Task) RenderEndLine() string {
 		sb.WriteString(t.Label)
 		sb.WriteString(durationStr)
 	} else {
-		var statusStyle ElementStyleDef
-		var icon, statusText, colorKey string
-		switch t.Status {
-		case StatusSuccess:
-			statusStyle = t.Config.GetElementStyle("Task_Status_Success_Block")
-			icon = t.Config.GetIcon(statusStyle.IconKey)
-			if icon == "" {
-				icon = t.Config.GetIcon("Success")
-			}
-			statusText = statusStyle.TextContent
-			if statusText == "" {
-				statusText = "Complete"
-			}
-			colorKey = statusStyle.ColorFG
-			if colorKey == "" {
-				colorKey = ColorKeySuccess
-			}
-		case StatusWarning:
-			statusStyle = t.Config.GetElementStyle("Task_Status_Warning_Block")
-			icon = t.Config.GetIcon(statusStyle.IconKey)
-			if icon == "" {
-				icon = t.Config.GetIcon("Warning")
-			}
-			statusText = statusStyle.TextContent
-			if statusText == "" {
-				statusText = "Completed with warnings"
-			}
-			colorKey = statusStyle.ColorFG
-			if colorKey == "" {
-				colorKey = ColorKeyWarning
-			}
-		case StatusError:
-			statusStyle = t.Config.GetElementStyle("Task_Status_Failed_Block")
-			icon = t.Config.GetIcon(statusStyle.IconKey)
-			if icon == "" {
-				icon = t.Config.GetIcon("Error")
-			}
-			statusText = statusStyle.TextContent
-			if statusText == "" {
-				statusText = "Failed"
-			}
-			colorKey = statusStyle.ColorFG
-			if colorKey == "" {
-				colorKey = ColorKeyError
-			}
-		default:
-			statusStyle = t.Config.GetElementStyle("Task_Status_Info_Block")
-			icon = t.Config.GetIcon(statusStyle.IconKey)
-			if icon == "" {
-				icon = t.Config.GetIcon("Info")
-			}
-			statusText = statusStyle.TextContent
-			if statusText == "" {
-				statusText = "Done"
-			}
-			colorKey = statusStyle.ColorFG
-			if colorKey == "" {
-				colorKey = ColorKeyProcess
-			}
-		}
-		colorCode := t.Config.GetColor(colorKey)
+		data := t.getStatusBlockData()
+		statusStyle := data.style
+		icon := data.icon
+		statusText := data.text
+		colorCode := t.Config.GetColor(data.colorKey)
 
 		var styledStatusTextBuilder strings.Builder
 		if !t.Config.IsMonochrome && contains(statusStyle.TextStyle, "bold") {
