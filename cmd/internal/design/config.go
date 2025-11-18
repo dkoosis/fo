@@ -173,7 +173,7 @@ func ensureEscapePrefix(s string) string {
 	// 3. CRITICAL FIX: Check for NULL character followed by "33["
 	//    Input 's' is like "\x00" + "33[" + "0;97m"
 	//    We want escChar + "[" + "0;97m"
-	if len(s) > 0 && s[0] == '\x00' && strings.HasPrefix(s[1:], "33[") {
+	if s != "" && s[0] == '\x00' && strings.HasPrefix(s[1:], "33[") {
 		// s[1:] is "33[0;97m"
 		// s[1+len("33["):] is "0;97m" (this is the remainder of the code *after* "33[")
 		// The '[' is already part of s[1:], so we take from s[1+len("33"):] to get the part after "33" which is "[0;97m"
@@ -485,13 +485,13 @@ func (c *Config) GetIcon(iconKey string) string {
 	switch strings.ToLower(iconKey) {
 	case "start":
 		return c.Icons.Start
-	case "success":
+	case StatusSuccess:
 		return c.Icons.Success
-	case "warning":
+	case StatusWarning:
 		return c.Icons.Warning
-	case "error":
+	case StatusError:
 		return c.Icons.Error
-	case "info":
+	case TypeInfo:
 		return c.Icons.Info
 	case "bullet":
 		return c.Icons.Bullet
@@ -526,11 +526,11 @@ func (c *Config) resolveColorName(name string) string {
 	switch lowerName {
 	case "process":
 		codeToProcess = c.Colors.Process
-	case "success":
+	case StatusSuccess:
 		codeToProcess = c.Colors.Success
-	case "warning":
+	case StatusWarning:
 		codeToProcess = c.Colors.Warning
-	case "error":
+	case StatusError:
 		codeToProcess = c.Colors.Error
 	case "detail":
 		codeToProcess = c.Colors.Detail
@@ -549,7 +549,7 @@ func (c *Config) resolveColorName(name string) string {
 	case "italic":
 		codeToProcess = c.Colors.Italic
 	default:
-		if strings.Contains(name, "[") && (strings.HasPrefix(name, "\033") || strings.HasPrefix(name, "\\033") || strings.HasPrefix(name, "\\x1b") || strings.HasPrefix(name, "33") || (len(name) > 0 && name[0] == '\x00' && strings.Contains(name, "33["))) {
+		if strings.Contains(name, "[") && (strings.HasPrefix(name, "\033") || strings.HasPrefix(name, "\\033") || strings.HasPrefix(name, "\\x1b") || strings.HasPrefix(name, "33") || (name != "" && name[0] == '\x00' && strings.Contains(name, "33["))) {
 			codeToProcess = name
 		}
 	}

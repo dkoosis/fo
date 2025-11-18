@@ -91,7 +91,7 @@ func (p *InlineProgress) RenderProgress(status string) {
 		fmt.Print(message)
 
 		// Add newline for completed states
-		if status != "running" {
+		if status != StatusRunning {
 			fmt.Println()
 		}
 	} else {
@@ -112,7 +112,7 @@ func (p *InlineProgress) formatProgressMessage(status string) string {
 	formattedDuration := formatDuration(p.Task.Duration) // For completed states
 
 	// Running state for spinner
-	if status == "running" {
+	if status == StatusRunning {
 		if usePlainAscii {
 			// Simplified format - just show task label and status
 			return fmt.Sprintf("[BUSY] %s [Working...]", toolLabel)
@@ -125,12 +125,12 @@ func (p *InlineProgress) formatProgressMessage(status string) string {
 		}
 
 		p.mutex.Lock()
-		spinnerChars := "-\\|/"
+		spinnerChars := DefaultSpinnerChars
 		if elemStyle := p.Task.Config.GetElementStyle("Task_Progress_Line"); elemStyle.AdditionalChars != "" {
 			spinnerChars = elemStyle.AdditionalChars
 		}
 		if len(spinnerChars) == 0 {
-			spinnerChars = "-\\|/"
+			spinnerChars = DefaultSpinnerChars
 		}
 		spinnerIcon := string(spinnerChars[p.SpinnerIndex])
 		p.mutex.Unlock()
@@ -203,7 +203,7 @@ func (p *InlineProgress) formatProgressMessage(status string) string {
 // runSpinner animates the spinner while the task is running
 func (p *InlineProgress) runSpinner(ctx context.Context) {
 	// Default to ASCII spinner for maximum compatibility
-	spinnerChars := "-\\|/"
+	spinnerChars := DefaultSpinnerChars
 
 	// Debug: Initial state
 	if p.Debug {
@@ -232,7 +232,7 @@ func (p *InlineProgress) runSpinner(ctx context.Context) {
 
 	// Ensure we have at least one character for the spinner animation
 	if len(spinnerChars) == 0 {
-		spinnerChars = "-\\|/"
+		spinnerChars = DefaultSpinnerChars
 		if p.Debug {
 			fmt.Fprintf(os.Stderr, "[FO_DEBUG_SPINNER] Fallback: spinnerChars was empty, reset to absolute default ASCII: \"%s\"\n", spinnerChars)
 		}
