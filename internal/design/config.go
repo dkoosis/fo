@@ -180,12 +180,6 @@ func normalizeANSIEscape(s string) string {
 		return escChar + strings.TrimPrefix(s, `\033`)
 	}
 
-	// Handle malformed sequences like "33[" (missing ESC prefix)
-	// This shouldn't happen with proper YAML, but handle it gracefully
-	if strings.HasPrefix(s, "33[") {
-		return escChar + s[2:] // Replace "33" with ESC, keep the rest
-	}
-
 	// If we don't recognize it as an ANSI sequence, return as-is
 	// (might be a color name or non-ANSI string)
 	return s
@@ -503,7 +497,7 @@ func (c *Config) resolveColorName(name string) string {
 		codeToProcess = c.Colors.Italic
 	default:
 		// If name contains '[' and starts with an escape sequence, treat it as a raw ANSI code
-		if strings.Contains(name, "[") && (strings.HasPrefix(name, "\033") || strings.HasPrefix(name, "\x1b") || strings.HasPrefix(name, "\\033") || strings.HasPrefix(name, "\\x1b") || strings.HasPrefix(name, "33[")) {
+		if strings.Contains(name, "[") && (strings.HasPrefix(name, "\033") || strings.HasPrefix(name, "\x1b") || strings.HasPrefix(name, "\\033") || strings.HasPrefix(name, "\\x1b")) {
 			codeToProcess = name
 		}
 	}

@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
-	"github.com/davidkoosis/fo/internal/design"
 	"github.com/davidkoosis/fo/internal/design"
 	"gopkg.in/yaml.v3"
 )
@@ -243,10 +243,6 @@ func normalizeThemeColors(cfg *design.Config) {
 		}
 		if strings.HasPrefix(s, `\033`) {
 			return escChar + strings.TrimPrefix(s, `\033`)
-		}
-		// Handle malformed "33[" prefix
-		if strings.HasPrefix(s, "33[") {
-			return escChar + s[2:]
 		}
 		return s
 	}
