@@ -8,11 +8,14 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/davidkoosis/fo/mageconsole"
 )
 
 var (
 	binPath    = "./bin/fo"
 	modulePath = "github.com/davidkoosis/fo"
+	console    = mageconsole.DefaultConsole()
 )
 
 // Build builds the fo binary.
