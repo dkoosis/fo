@@ -25,10 +25,6 @@ type LocalAppConfig struct {
 	MaxLineLength int   // Max size for a single line from stdout/stderr
 }
 
-var (
-	versionFlag    bool
-	cliFlagsGlobal config.CliFlags // Holds parsed CLI flags
-)
 
 // main is the entry point of the application.
 func main() {
@@ -45,7 +41,7 @@ func main() {
 	}
 
 	// If not a recognized subcommand, proceed as command wrapper
-	parseGlobalFlags()
+	cliFlags, versionFlag := parseGlobalFlags()
 
 	// Handle version flag
 	if versionFlag {
@@ -75,43 +71,43 @@ func main() {
 	behavioralSettings := convertAppConfigToLocal(fileAppConfig)
 
 	// Override behavioral settings with any explicitly set CLI flags
-	if cliFlagsGlobal.Label != "" {
-		behavioralSettings.Label = cliFlagsGlobal.Label
+	if cliFlags.Label != "" {
+		behavioralSettings.Label = cliFlags.Label
 	}
-	if cliFlagsGlobal.StreamSet {
-		behavioralSettings.Stream = cliFlagsGlobal.Stream
+	if cliFlags.StreamSet {
+		behavioralSettings.Stream = cliFlags.Stream
 	}
-	if cliFlagsGlobal.ShowOutputSet && cliFlagsGlobal.ShowOutput != "" {
-		behavioralSettings.ShowOutput = cliFlagsGlobal.ShowOutput
+	if cliFlags.ShowOutputSet && cliFlags.ShowOutput != "" {
+		behavioralSettings.ShowOutput = cliFlags.ShowOutput
 	}
 
 	// Debug is ONLY enabled by explicit --debug flag
-	if cliFlagsGlobal.DebugSet {
-		behavioralSettings.Debug = cliFlagsGlobal.Debug
-		fileAppConfig.Debug = cliFlagsGlobal.Debug // Ensure this is passed to MergeWithFlags
+	if cliFlags.DebugSet {
+		behavioralSettings.Debug = cliFlags.Debug
+		fileAppConfig.Debug = cliFlags.Debug // Ensure this is passed to MergeWithFlags
 	} else {
 		// Force debug off unless explicitly enabled by flag
 		behavioralSettings.Debug = false
 		fileAppConfig.Debug = false
 	}
 
-	if cliFlagsGlobal.MaxBufferSize > 0 {
-		behavioralSettings.MaxBufferSize = cliFlagsGlobal.MaxBufferSize
+	if cliFlags.MaxBufferSize > 0 {
+		behavioralSettings.MaxBufferSize = cliFlags.MaxBufferSize
 	}
-	if cliFlagsGlobal.MaxLineLength > 0 {
-		behavioralSettings.MaxLineLength = cliFlagsGlobal.MaxLineLength
+	if cliFlags.MaxLineLength > 0 {
+		behavioralSettings.MaxLineLength = cliFlags.MaxLineLength
 	}
 
 	// Get the final design configuration (styling, icons, colors) by merging
 	// the file configuration with CLI flags related to presentation
-	finalDesignConfig := config.MergeWithFlags(fileAppConfig, cliFlagsGlobal)
+	finalDesignConfig := config.MergeWithFlags(fileAppConfig, cliFlags)
 
 	// Update behavioralSettings with final decisions on NoTimer, NoColor, CI from finalDesignConfig
 	behavioralSettings.NoTimer = finalDesignConfig.Style.NoTimer
 	behavioralSettings.NoColor = finalDesignConfig.IsMonochrome
 	behavioralSettings.CI = finalDesignConfig.IsMonochrome && finalDesignConfig.Style.NoTimer
 	// Ensure debug is still controlled only by explicit --debug flag
-	behavioralSettings.Debug = cliFlagsGlobal.DebugSet && cliFlagsGlobal.Debug
+	behavioralSettings.Debug = cliFlags.DebugSet && cliFlags.Debug
 
 	consoleCfg := mageconsole.ConsoleConfig{
 		ThemeName:      finalDesignConfig.ThemeName,
@@ -236,25 +232,28 @@ func handlePrintCommand(args []string) {
 	os.Exit(0)
 }
 
-func parseGlobalFlags() {
+func parseGlobalFlags() (config.CliFlags, bool) {
+	var cliFlags config.CliFlags
+	var versionFlag bool
+
 	// Define flags for version and help
 	flag.BoolVar(&versionFlag, "version", false, "Print fo version and exit.")
 	flag.BoolVar(&versionFlag, "v", false, "Print fo version and exit (shorthand).")
 
 	// These are global flags, also potentially usable by 'print' if implemented
-	flag.BoolVar(&cliFlagsGlobal.Debug, "debug", false, "Enable debug output.")
-	flag.BoolVar(&cliFlagsGlobal.Debug, "d", false, "Enable debug output (shorthand).")
-	flag.StringVar(&cliFlagsGlobal.ThemeName, "theme", "", "Select visual theme (e.g., 'ascii_minimal', 'unicode_vibrant').")
-	flag.BoolVar(&cliFlagsGlobal.NoColor, "no-color", false, "Disable ANSI color/styling output.")
-	flag.BoolVar(&cliFlagsGlobal.CI, "ci", false, "Enable CI-friendly, plain-text output.")
+	flag.BoolVar(&cliFlags.Debug, "debug", false, "Enable debug output.")
+	flag.BoolVar(&cliFlags.Debug, "d", false, "Enable debug output (shorthand).")
+	flag.StringVar(&cliFlags.ThemeName, "theme", "", "Select visual theme (e.g., 'ascii_minimal', 'unicode_vibrant').")
+	flag.BoolVar(&cliFlags.NoColor, "no-color", false, "Disable ANSI color/styling output.")
+	flag.BoolVar(&cliFlags.CI, "ci", false, "Enable CI-friendly, plain-text output.")
 
 	// Flags specific to command wrapping mode
-	flag.StringVar(&cliFlagsGlobal.Label, "l", "", "Label for the task.")
-	flag.StringVar(&cliFlagsGlobal.Label, "label", "", "Label for the task.")
-	flag.BoolVar(&cliFlagsGlobal.Stream, "s", false, "Stream mode - print command's stdout/stderr live.")
-	flag.BoolVar(&cliFlagsGlobal.Stream, "stream", false, "Stream mode.")
-	flag.StringVar(&cliFlagsGlobal.ShowOutput, "show-output", "", "When to show captured output: on-fail, always, never.")
-	flag.BoolVar(&cliFlagsGlobal.NoTimer, "no-timer", false, "Disable showing the duration.")
+	flag.StringVar(&cliFlags.Label, "l", "", "Label for the task.")
+	flag.StringVar(&cliFlags.Label, "label", "", "Label for the task.")
+	flag.BoolVar(&cliFlags.Stream, "s", false, "Stream mode - print command's stdout/stderr live.")
+	flag.BoolVar(&cliFlags.Stream, "stream", false, "Stream mode.")
+	flag.StringVar(&cliFlags.ShowOutput, "show-output", "", "When to show captured output: on-fail, always, never.")
+	flag.BoolVar(&cliFlags.NoTimer, "no-timer", false, "Disable showing the duration.")
 
 	var maxBufferSizeMB int
 	var maxLineLengthKB int
@@ -266,33 +265,35 @@ func parseGlobalFlags() {
 	flag.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "s", "stream":
-			cliFlagsGlobal.StreamSet = true
+			cliFlags.StreamSet = true
 		case "show-output":
-			cliFlagsGlobal.ShowOutputSet = true
+			cliFlags.ShowOutputSet = true
 		case "no-timer":
-			cliFlagsGlobal.NoTimerSet = true
+			cliFlags.NoTimerSet = true
 		case "no-color":
-			cliFlagsGlobal.NoColorSet = true
+			cliFlags.NoColorSet = true
 		case "ci":
-			cliFlagsGlobal.CISet = true
+			cliFlags.CISet = true
 		case "d", "debug":
-			cliFlagsGlobal.DebugSet = true
+			cliFlags.DebugSet = true
 		}
 	})
 
 	if maxBufferSizeMB > 0 {
-		cliFlagsGlobal.MaxBufferSize = int64(maxBufferSizeMB) * 1024 * 1024
+		cliFlags.MaxBufferSize = int64(maxBufferSizeMB) * 1024 * 1024
 	}
 	if maxLineLengthKB > 0 {
-		cliFlagsGlobal.MaxLineLength = maxLineLengthKB * 1024
+		cliFlags.MaxLineLength = maxLineLengthKB * 1024
 	}
 
-	if cliFlagsGlobal.ShowOutput != "" {
+	if cliFlags.ShowOutput != "" {
 		validValues := map[string]bool{"on-fail": true, "always": true, "never": true}
-		if !validValues[cliFlagsGlobal.ShowOutput] {
-			fmt.Fprintf(os.Stderr, "Error: Invalid value for --show-output: %s\nValid values are: on-fail, always, never\n", cliFlagsGlobal.ShowOutput)
+		if !validValues[cliFlags.ShowOutput] {
+			fmt.Fprintf(os.Stderr, "Error: Invalid value for --show-output: %s\nValid values are: on-fail, always, never\n", cliFlags.ShowOutput)
 			flag.Usage()
 			os.Exit(1)
 		}
 	}
+
+	return cliFlags, versionFlag
 }
