@@ -34,6 +34,8 @@ type ConsoleConfig struct {
 	MaxBufferSize  int64
 	MaxLineLength  int
 	Design         *design.Config
+	Out            io.Writer // Output writer, defaults to os.Stdout
+	Err            io.Writer // Error writer, defaults to os.Stderr
 }
 
 type TaskResult struct {
@@ -104,7 +106,7 @@ func (c *Console) runContext(ctx context.Context, cancel context.CancelFunc, sig
 		enableSpinner := !designCfg.Style.NoSpinner
 		progress.Start(ctx, enableSpinner)
 	} else {
-		_, _ = os.Stdout.WriteString(task.RenderStartLine() + "\n")
+		_, _ = c.cfg.Out.Write([]byte(task.RenderStartLine() + "\n"))
 	}
 
 	cmd := exec.CommandContext(ctx, command, args...)
@@ -211,12 +213,12 @@ func (c *Console) runContext(ctx context.Context, cancel context.CancelFunc, sig
 	} else if (task.Status == design.StatusError || task.Status == design.StatusWarning) && !isActualFoStartupFailure {
 		summary := task.RenderSummary()
 		if summary != "" {
-			_, _ = os.Stdout.WriteString(summary)
+			_, _ = c.cfg.Out.Write([]byte(summary))
 		}
 	}
 
 	if !useInlineProgress {
-		_, _ = os.Stdout.WriteString(task.RenderEndLine() + "\n")
+		_, _ = c.cfg.Out.Write([]byte(task.RenderEndLine() + "\n"))
 	}
 
 	return &TaskResult{
@@ -244,7 +246,7 @@ func (c *Console) renderCapturedOutput(task *design.Task, exitCode int, isActual
 	if showCaptured && !isActualFoStartupFailure {
 		summary := task.RenderSummary()
 		if summary != "" {
-			_, _ = os.Stdout.WriteString(summary)
+			_, _ = c.cfg.Out.Write([]byte(summary))
 		}
 
 		hasActualRenderableOutput := false
@@ -258,22 +260,22 @@ func (c *Console) renderCapturedOutput(task *design.Task, exitCode int, isActual
 		task.OutputLinesUnlock()
 
 		if hasActualRenderableOutput {
-			_, _ = os.Stdout.WriteString(task.Config.GetColor("Muted") + "--- Captured output: ---" + task.Config.ResetColor() + "\n")
+			_, _ = c.cfg.Out.Write([]byte(task.Config.GetColor("Muted") + "--- Captured output: ---" + task.Config.ResetColor() + "\n"))
 			task.OutputLinesLock()
 			for _, line := range task.OutputLines {
-				_, _ = os.Stdout.WriteString(task.RenderOutputLine(line) + "\n")
+				_, _ = c.cfg.Out.Write([]byte(task.RenderOutputLine(line) + "\n"))
 			}
 			task.OutputLinesUnlock()
 		} else if (task.Status == design.StatusError || task.Status == design.StatusWarning) && summary == "" {
 			summary = task.RenderSummary()
 			if summary != "" {
-				_, _ = os.Stdout.WriteString(summary)
+				_, _ = c.cfg.Out.Write([]byte(summary))
 			}
 		}
 	} else if !showCaptured && (task.Status == design.StatusError || task.Status == design.StatusWarning) && !isActualFoStartupFailure {
 		summary := task.RenderSummary()
 		if summary != "" {
-			_, _ = os.Stdout.WriteString(summary)
+			_, _ = c.cfg.Out.Write([]byte(summary))
 		}
 	}
 }
@@ -310,7 +312,7 @@ func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task) (int, erro
 			if c.cfg.Debug {
 				fmt.Fprintf(os.Stderr, "[DEBUG executeStreamMode STDERR] Scanned line: %s\n", line)
 			}
-			fmt.Fprintln(os.Stderr, line)
+			fmt.Fprintln(c.cfg.Err, line)
 			task.AddOutputLine(line, design.TypeDetail, design.LineContext{CognitiveLoad: design.LoadMedium, Importance: 2})
 		}
 		if scanErr := scanner.Err(); scanErr != nil {
@@ -329,7 +331,7 @@ func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task) (int, erro
 	if startErr != nil {
 		errMsg := fmt.Sprintf("Error starting command '%s': %v", strings.Join(cmd.Args, " "), startErr)
 		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
-		fmt.Fprintln(os.Stderr, errMsg)
+		fmt.Fprintln(c.cfg.Err, errMsg)
 
 		_ = stderrPipe.Close()
 		waitGroup.Wait()
@@ -360,7 +362,7 @@ func (c *Console) executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMa
 	if err != nil {
 		errMsg := fmt.Sprintf("[fo] Error creating stdout pipe: %v", err)
 		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
-		fmt.Fprintln(os.Stderr, errMsg)
+		fmt.Fprintln(c.cfg.Err, errMsg)
 		return 1, err
 	}
 
@@ -368,7 +370,7 @@ func (c *Console) executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMa
 	if err != nil {
 		errMsg := fmt.Sprintf("[fo] Error creating stderr pipe: %v", err)
 		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
-		fmt.Fprintln(os.Stderr, errMsg)
+		fmt.Fprintln(c.cfg.Err, errMsg)
 		_ = stdoutPipe.Close()
 		return 1, err
 	}
@@ -412,7 +414,7 @@ func (c *Console) executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMa
 	if err := cmd.Start(); err != nil {
 		errMsg := fmt.Sprintf("Error starting command '%s': %v", strings.Join(cmd.Args, " "), err)
 		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
-		fmt.Fprintln(os.Stderr, errMsg)
+		fmt.Fprintln(c.cfg.Err, errMsg)
 		_ = stdoutPipe.Close()
 		_ = stderrPipe.Close()
 		wgRead.Wait()
@@ -534,6 +536,12 @@ func normalizeConfig(cfg ConsoleConfig) ConsoleConfig {
 		normalized.InlineProgress = cfg.Design.Style.UseInlineProgress
 	default:
 		normalized.InlineProgress = true
+	}
+	if normalized.Out == nil {
+		normalized.Out = os.Stdout
+	}
+	if normalized.Err == nil {
+		normalized.Err = os.Stderr
 	}
 	return normalized
 }
