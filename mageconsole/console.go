@@ -70,6 +70,17 @@ func NewConsole(cfg ConsoleConfig) *Console {
 	return &Console{cfg: normalized, designConf: resolveDesignConfig(normalized)}
 }
 
+// Run executes a command and returns the result.
+//
+// Error semantics:
+//   - Returns (result, nil) when the command runs successfully (exit code 0)
+//   - Returns (result, error) when the command runs but exits non-zero;
+//     the error wraps the underlying exec.ExitError
+//   - Returns (nil, error) for infrastructure failures (command not found,
+//     IO errors, context cancelled)
+//
+// The TaskResult.ExitCode is always set when result is non-nil.
+// Use errors.Is(err, exec.ErrNotFound) to check for missing commands.
 func (c *Console) Run(label, command string, args ...string) (*TaskResult, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -81,15 +92,26 @@ func (c *Console) Run(label, command string, args ...string) (*TaskResult, error
 	return c.runContext(ctx, cancel, sigChan, label, command, args)
 }
 
-var errCommandExited = errors.New("command exited with non-zero code")
+// ErrNonZeroExit is returned when a command completes but exits with a non-zero code.
+// Use errors.Is(err, ErrNonZeroExit) to check for this condition.
+// The exit code can be extracted from the wrapped error message or TaskResult.ExitCode.
+var ErrNonZeroExit = errors.New("command exited with non-zero code")
 
+// RunSimple executes a command and returns only an error.
+// This is a convenience wrapper around Run for simple use cases.
+//
+// Returns nil on success (exit code 0).
+// Returns ErrNonZeroExit (wrapped) if the command exits with non-zero code.
+// Returns other errors for infrastructure failures.
+//
+// Use errors.Is(err, ErrNonZeroExit) to check for non-zero exit.
 func (c *Console) RunSimple(command string, args ...string) error {
 	res, err := c.Run("", command, args...)
 	if err != nil {
 		return err
 	}
 	if res != nil && res.ExitCode != 0 {
-		return fmt.Errorf("%w: %d", errCommandExited, res.ExitCode)
+		return fmt.Errorf("%w: %d", ErrNonZeroExit, res.ExitCode)
 	}
 	return nil
 }
@@ -525,10 +547,28 @@ func getExitCode(err error, debug bool) int {
 		fmt.Fprintf(os.Stderr, "[DEBUG getExitCode] Non-ExitError type: %T, error: %v\n", err, err)
 	}
 
-	if errors.Is(err, exec.ErrNotFound) || strings.Contains(err.Error(), "executable file not found") || (runtime.GOOS != "windows" && strings.Contains(err.Error(), "no such file or directory")) {
+	if isCommandNotFoundError(err) {
 		return 127
 	}
 	return 1
+}
+
+// isCommandNotFoundError checks if the error indicates the command was not found.
+// This handles the standard exec.ErrNotFound and platform-specific string fallbacks
+// for older Go versions or edge cases.
+func isCommandNotFoundError(err error) bool {
+	if errors.Is(err, exec.ErrNotFound) {
+		return true
+	}
+	// Fallback string matching for edge cases
+	errStr := err.Error()
+	if strings.Contains(errStr, "executable file not found") {
+		return true
+	}
+	if runtime.GOOS != "windows" && strings.Contains(errStr, "no such file or directory") {
+		return true
+	}
+	return false
 }
 
 func normalizeConfig(cfg ConsoleConfig) ConsoleConfig {
