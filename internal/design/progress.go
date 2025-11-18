@@ -61,6 +61,11 @@ func (p *InlineProgress) Start(ctx context.Context, enableSpinner bool) {
 	p.StartTime = time.Now()
 	p.mutex.Unlock()
 
+	// Hide cursor during spinner animation for cleaner UX
+	if enableSpinner && p.isTerminal && !p.Task.Config.IsMonochrome {
+		_, _ = os.Stdout.WriteString("\033[?25l") // Hide cursor
+	}
+
 	// Render initial state
 	p.RenderProgress("running")
 
@@ -73,11 +78,17 @@ func (p *InlineProgress) Start(ctx context.Context, enableSpinner bool) {
 // Complete marks the progress as complete and renders final state.
 func (p *InlineProgress) Complete(status string) {
 	p.mutex.Lock()
+	wasTerminal := p.isTerminal && !p.Task.Config.IsMonochrome
 	p.IsActive = false
 	p.mutex.Unlock()
 
 	// Render final state
 	p.RenderProgress(status)
+
+	// Show cursor again after spinner animation
+	if wasTerminal {
+		_, _ = os.Stdout.WriteString("\033[?25h") // Show cursor
+	}
 }
 
 // RenderProgress updates the terminal with the current progress state.
