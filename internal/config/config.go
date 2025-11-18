@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/davidkoosis/fo/cmd/internal/design"
+        "github.com/davidkoosis/fo/internal/design"
 	"gopkg.in/yaml.v3"
 )
 
