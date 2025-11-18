@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/davidkoosis/fo/internal/design"
+	"github.com/davidkoosis/fo/internal/design"
 	"gopkg.in/yaml.v3"
 )
 
@@ -149,6 +150,8 @@ func LoadConfig() *AppConfig {
 			copiedTheme := design.DeepCopyConfig(themeFromFile)
 			if copiedTheme != nil {
 				copiedTheme.ThemeName = name
+				// Normalize color strings after YAML unmarshal to ensure proper ANSI escape sequences
+				normalizeThemeColors(copiedTheme)
 				appCfg.Themes[name] = copiedTheme
 				if appCfg.Debug || initialDebug {
 					fmt.Fprintf(os.Stderr, "Loaded/Overwrote Theme from YAML: %s (IsMonochrome: %t)\n", name, copiedTheme.IsMonochrome)
@@ -214,6 +217,52 @@ func getConfigPath() string {
 		fmt.Fprintln(os.Stderr, "[DEBUG getConfigPath] No config file found. Will use default settings.")
 	}
 	return "" // No config file found or UserConfigDir was problematic
+}
+
+// normalizeThemeColors normalizes all ANSI escape sequences in a theme's color settings
+// after YAML unmarshal. This ensures colors are properly formatted regardless of how
+// they were specified in the YAML file.
+func normalizeThemeColors(cfg *design.Config) {
+	if cfg == nil || cfg.IsMonochrome {
+		return
+	}
+
+	// Normalize all color fields
+	escChar := string([]byte{27})
+	normalizeColor := func(s string) string {
+		if s == "" {
+			return ""
+		}
+		// If already has ESC, it's fine
+		if strings.HasPrefix(s, escChar) || strings.HasPrefix(s, "\033") {
+			return s
+		}
+		// Handle YAML escape sequences that might come through as literals
+		if strings.HasPrefix(s, `\x1b`) {
+			return escChar + strings.TrimPrefix(s, `\x1b`)
+		}
+		if strings.HasPrefix(s, `\033`) {
+			return escChar + strings.TrimPrefix(s, `\033`)
+		}
+		// Handle malformed "33[" prefix
+		if strings.HasPrefix(s, "33[") {
+			return escChar + s[2:]
+		}
+		return s
+	}
+
+	cfg.Colors.Process = normalizeColor(cfg.Colors.Process)
+	cfg.Colors.Success = normalizeColor(cfg.Colors.Success)
+	cfg.Colors.Warning = normalizeColor(cfg.Colors.Warning)
+	cfg.Colors.Error = normalizeColor(cfg.Colors.Error)
+	cfg.Colors.Detail = normalizeColor(cfg.Colors.Detail)
+	cfg.Colors.Muted = normalizeColor(cfg.Colors.Muted)
+	cfg.Colors.Reset = normalizeColor(cfg.Colors.Reset)
+	cfg.Colors.White = normalizeColor(cfg.Colors.White)
+	cfg.Colors.BlueFg = normalizeColor(cfg.Colors.BlueFg)
+	cfg.Colors.BlueBg = normalizeColor(cfg.Colors.BlueBg)
+	cfg.Colors.Bold = normalizeColor(cfg.Colors.Bold)
+	cfg.Colors.Italic = normalizeColor(cfg.Colors.Italic)
 }
 
 // MergeWithFlags takes the application config (post-YAML and presets) and CLI flags,

@@ -6,16 +6,91 @@ import (
 	"strings"
 )
 
+// CompiledPattern holds a precompiled regex pattern with metadata.
+type CompiledPattern struct {
+	Re     *regexp.Regexp
+	Type   string
+	Weight int
+}
+
 // PatternMatcher provides intelligent pattern detection for commands and output.
 type PatternMatcher struct {
-	Config *Config
+	Config              *Config
+	compiledOutputPatterns map[string][]CompiledPattern
+	compiledToolPatterns   map[string]map[string][]CompiledPattern
+	// Precompiled special patterns
+	fileLinePattern     *regexp.Regexp
+	passFailPattern     *regexp.Regexp
 }
 
 // NewPatternMatcher creates a pattern matcher with the given configuration.
+// All regex patterns are precompiled at initialization time for performance.
 func NewPatternMatcher(config *Config) *PatternMatcher {
-	return &PatternMatcher{
-		Config: config,
+	pm := &PatternMatcher{
+		Config:                config,
+		compiledOutputPatterns: make(map[string][]CompiledPattern),
+		compiledToolPatterns:   make(map[string]map[string][]CompiledPattern),
 	}
+
+	// Precompile global output patterns
+	for category, patterns := range config.Patterns.Output {
+		compiled := make([]CompiledPattern, 0, len(patterns))
+		for _, pattern := range patterns {
+			if pattern == "" {
+				continue
+			}
+			re, err := regexp.Compile(pattern)
+			if err != nil {
+				// Skip invalid patterns, but in production you might want to log this
+				continue
+			}
+			compiled = append(compiled, CompiledPattern{
+				Re:     re,
+				Type:   category,
+				Weight: 1,
+			})
+		}
+		if len(compiled) > 0 {
+			pm.compiledOutputPatterns[category] = compiled
+		}
+	}
+
+	// Precompile tool-specific patterns
+	for toolName, toolConfig := range config.Tools {
+		if toolConfig == nil || toolConfig.OutputPatterns == nil {
+			continue
+		}
+		toolPatterns := make(map[string][]CompiledPattern)
+		for category, patterns := range toolConfig.OutputPatterns {
+			compiled := make([]CompiledPattern, 0, len(patterns))
+			for _, pattern := range patterns {
+				if pattern == "" {
+					continue
+				}
+				re, err := regexp.Compile(pattern)
+				if err != nil {
+					continue
+				}
+				compiled = append(compiled, CompiledPattern{
+					Re:     re,
+					Type:   category,
+					Weight: 1,
+				})
+			}
+			if len(compiled) > 0 {
+				toolPatterns[category] = compiled
+			}
+		}
+		if len(toolPatterns) > 0 {
+			pm.compiledToolPatterns[toolName] = toolPatterns
+		}
+	}
+
+	// Precompile special patterns used in ClassifyOutputLine
+	pm.fileLinePattern = regexp.MustCompile(`\w+\.(go|js|py|java|rb|cpp|c):\d+`)
+	pm.passFailPattern = regexp.MustCompile(`^(PASS|FAIL):`)
+
+	return pm
 }
 
 // DetectCommandIntent identifies the purpose of a command.
@@ -75,6 +150,7 @@ func (pm *PatternMatcher) DetectCommandIntent(cmd string, args []string) string 
 }
 
 // ClassifyOutputLine determines the type of an output line.
+// Uses precompiled regex patterns for performance.
 func (pm *PatternMatcher) ClassifyOutputLine(line, cmd string, args []string) (string, LineContext) {
 	// Default context
 	context := LineContext{
@@ -83,27 +159,38 @@ func (pm *PatternMatcher) ClassifyOutputLine(line, cmd string, args []string) (s
 		IsHighlighted: false,
 	}
 
-	// Check tool-specific patterns first
+	// Check tool-specific patterns first using precompiled regexes
 	toolConfig := pm.findToolConfig(cmd, args)
-	if toolConfig != nil && toolConfig.OutputPatterns != nil {
-		for category, patterns := range toolConfig.OutputPatterns {
-			for _, pattern := range patterns {
-				// Handle empty pattern as a special case
-				if pattern == "" {
-					continue
+	if toolConfig != nil {
+		cmdName := filepath.Base(cmd)
+		toolKey := cmdName
+		if len(args) > 0 {
+			toolKeyWithArg := cmdName + " " + args[0]
+			if patterns, ok := pm.compiledToolPatterns[toolKeyWithArg]; ok {
+				for category, compiledPatterns := range patterns {
+					for _, cp := range compiledPatterns {
+						if cp.Re.MatchString(line) {
+							return adjustCategoryImportance(category, &context)
+						}
+					}
 				}
-
-				if regexp.MustCompile(pattern).MatchString(line) {
-					return adjustCategoryImportance(category, &context)
+			}
+		}
+		if patterns, ok := pm.compiledToolPatterns[toolKey]; ok {
+			for category, compiledPatterns := range patterns {
+				for _, cp := range compiledPatterns {
+					if cp.Re.MatchString(line) {
+						return adjustCategoryImportance(category, &context)
+					}
 				}
 			}
 		}
 	}
 
-	// Check against global patterns
-	for category, patterns := range pm.Config.Patterns.Output {
-		for _, pattern := range patterns {
-			if regexp.MustCompile(pattern).MatchString(line) {
+	// Check against global patterns using precompiled regexes
+	for category, compiledPatterns := range pm.compiledOutputPatterns {
+		for _, cp := range compiledPatterns {
+			if cp.Re.MatchString(line) {
 				return adjustCategoryImportance(category, &context)
 			}
 		}
@@ -112,13 +199,13 @@ func (pm *PatternMatcher) ClassifyOutputLine(line, cmd string, args []string) (s
 	// Special case handling for common patterns not covered above
 
 	// Stack traces often have file:line format
-	if regexp.MustCompile(`\w+\.(go|js|py|java|rb|cpp|c):\d+`).MatchString(line) {
+	if pm.fileLinePattern.MatchString(line) {
 		context.Importance = 4
 		return TypeError, context
 	}
 
 	// Lines with "PASS" or "FAIL" for tests
-	if regexp.MustCompile(`^(PASS|FAIL):`).MatchString(line) {
+	if pm.passFailPattern.MatchString(line) {
 		if strings.HasPrefix(line, "PASS") {
 			context.Importance = 3
 			return TypeSuccess, context
@@ -205,14 +292,15 @@ func (pm *PatternMatcher) FindSimilarLines(lines []OutputLine) map[string][]Outp
 }
 
 // extractPatternKey creates a representative key for a line to group similar outputs.
+// Uses a precompiled regex pattern for file:line matching.
 func (pm *PatternMatcher) extractPatternKey(content, lineType string) string {
 	// Different extraction strategies based on line type
 	switch lineType {
 	case TypeError, TypeWarning:
 		// For errors and warnings, use file:line format as base if present
-		fileLineMatch := regexp.MustCompile(`([^/\s]+\.[a-zA-Z0-9]+:\d+)`).FindStringSubmatch(content)
-		if len(fileLineMatch) > 1 {
-			return lineType + "_" + fileLineMatch[1]
+		// Reuse the fileLinePattern which matches similar format
+		if matches := pm.fileLinePattern.FindStringSubmatch(content); len(matches) > 0 {
+			return lineType + "_" + matches[0]
 		}
 
 		// Otherwise use first significant word

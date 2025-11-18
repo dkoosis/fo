@@ -148,97 +148,46 @@ type PatternsRepo struct {
 	Output map[string][]string `yaml:"output"`
 }
 
-func ensureEscapePrefix(s string) string {
-	if os.Getenv("FO_DEBUG") != "" {
-		fmt.Fprintf(os.Stderr, "[DEBUG ensureEscapePrefix] INPUT: '%s' (len %d, GoStr: %q, hex: %x)\n", s, len(s), s, s)
-	}
-
+// normalizeANSIEscape normalizes ANSI escape sequences to ensure they start with
+// the ESC character (0x1b). YAML should handle escape sequences correctly, but
+// this function normalizes them to handle edge cases and ensure consistency.
+func normalizeANSIEscape(s string) string {
 	if s == "" {
 		return ""
 	}
 
 	escChar := string([]byte{27}) // The actual ESC character (\x1b)
 
-	// 1. If it already starts with the true ESC character, it's perfect.
+	// If it already starts with the ESC character, it's correct.
 	if strings.HasPrefix(s, escChar) {
-		if os.Getenv("FO_DEBUG") != "" {
-			fmt.Fprintf(os.Stderr, "[DEBUG ensureEscapePrefix] Condition 1: Already correct (starts with actual ESC). Output: %q\n", s)
-		}
 		return s
 	}
 
-	// 2. If it's a Go string literal like `\033[` (where \033 is a single ESC char in Go source)
-	goOctalLiteralEsc := "\033" // This is the single ESC char in Go source code
-	if strings.HasPrefix(s, goOctalLiteralEsc) {
-		if os.Getenv("FO_DEBUG") != "" {
-			fmt.Fprintf(os.Stderr, "[DEBUG ensureEscapePrefix] Condition 2: Go literal form (like \"\\033[\"). Output: %q\n", s)
-		}
+	// Handle octal escape sequence \033 (which is ESC in octal)
+	if strings.HasPrefix(s, "\033") {
 		return s
 	}
 
-	// 3. CRITICAL FIX: Check for NULL character followed by "33["
-	//    Input 's' is like "\x00" + "33[" + "0;97m"
-	//    We want escChar + "[" + "0;97m"
-	if s != "" && s[0] == '\x00' && strings.HasPrefix(s[1:], "33[") {
-		// s[1:] is "33[0;97m"
-		// s[1+len("33["):] is "0;97m" (this is the remainder of the code *after* "33[")
-		// The '[' is already part of s[1:], so we take from s[1+len("33"):] to get the part after "33" which is "[0;97m"
-		// Or, more directly, if s[1+2] is '[', then s[1+2:] is what we want.
-		// s[1+len("33[")-1] is the '[' character itself.
-		// The remainder of the code, including the '[', is s[1+len("33")-1:]
-		// Correct: we need what comes *after* the "\x0033", which is the starting '[' and the code.
-		// So, if s[1:3] == "33", then s[3] should be '['. The part we need is s[3:].
-		// More robustly: s_after_null = s[1:]. If s_after_null starts with "33[", then take s_after_null[2:]
-		// Which means original s[1+2:] or s[3:].
-		// Let's test: if s = "\x0033[0m", s[3:] = "[0m"
-		// Corrected should be: escChar (being \x1b) + "[0m"
-		corrected := escChar + s[3:]
-		if os.Getenv("FO_DEBUG") != "" {
-			fmt.Fprintf(os.Stderr, "[DEBUG ensureEscapePrefix] Condition 3 (FIXED): Corrected NULL followed by '33'. Input: %q, Corrected part: %q, Output: %q\n", s, s[3:], corrected)
-		}
-		return corrected
+	// Handle literal backslash sequences that might come from YAML
+	// YAML string like "\x1b[32m" should be unmarshaled as actual ESC, but
+	// double-escaped like "\\x1b[32m" comes through as literal "\x1b[32m"
+	if strings.HasPrefix(s, `\x1b`) {
+		// Replace literal "\x1b" with actual ESC character
+		return escChar + strings.TrimPrefix(s, `\x1b`)
+	}
+	if strings.HasPrefix(s, `\033`) {
+		// Replace literal "\033" with actual ESC character
+		return escChar + strings.TrimPrefix(s, `\033`)
 	}
 
-	// 4. Check for the literal string "\\033[" (e.g., from YAML `"\033[...]"`)
-	yamlLiteralOctalEsc := `\033[`
-	if strings.HasPrefix(s, yamlLiteralOctalEsc) {
-		// s is like literal backslash, 0, 3, 3, [
-		// We want to replace this whole prefix with escChar + "["
-		// The part after `\033` is what we need, which starts with `[`
-		// s[len(yamlLiteralOctalEsc)-1:] should give us the `[` and onwards.
-		corrected := escChar + s[len(yamlLiteralOctalEsc)-1:]
-		if os.Getenv("FO_DEBUG") != "" {
-			fmt.Fprintf(os.Stderr, "[DEBUG ensureEscapePrefix] Condition 4: Corrected YAML literal '\\033['. Output: %q\n", corrected)
-		}
-		return corrected
+	// Handle malformed sequences like "33[" (missing ESC prefix)
+	// This shouldn't happen with proper YAML, but handle it gracefully
+	if strings.HasPrefix(s, "33[") {
+		return escChar + s[2:] // Replace "33" with ESC, keep the rest
 	}
 
-	// 5. Check for the literal string "\\x1b[" (e.g., from YAML `"\x1b[...]"`)
-	yamlLiteralHexEsc := `\x1b[`
-	if strings.HasPrefix(s, yamlLiteralHexEsc) {
-		corrected := escChar + s[len(yamlLiteralHexEsc)-1:]
-		if os.Getenv("FO_DEBUG") != "" {
-			fmt.Fprintf(os.Stderr, "[DEBUG ensureEscapePrefix] Condition 5: Corrected YAML literal '\\x1b['. Output: %q\n", corrected)
-		}
-		return corrected
-	}
-
-	// 6. Check for the plain literal string "33[" (if no null prefix or other literal prefixes)
-	literalDigitsEsc := "33["
-	if strings.HasPrefix(s, literalDigitsEsc) {
-		// s is like "33[0m"
-		// We want escChar + "[0m"
-		// s[len(literalDigitsEsc)-1:] is "[0m"
-		corrected := escChar + s[len(literalDigitsEsc)-1:]
-		if os.Getenv("FO_DEBUG") != "" {
-			fmt.Fprintf(os.Stderr, "[DEBUG ensureEscapePrefix] Condition 6: Corrected plain literal '33['. Output: %q\n", corrected)
-		}
-		return corrected
-	}
-
-	if os.Getenv("FO_DEBUG") != "" {
-		fmt.Fprintf(os.Stderr, "[DEBUG ensureEscapePrefix] No known prefix transformation applied. Returning as-is: %q\n", s)
-	}
+	// If we don't recognize it as an ANSI sequence, return as-is
+	// (might be a color name or non-ANSI string)
 	return s
 }
 
@@ -553,7 +502,8 @@ func (c *Config) resolveColorName(name string) string {
 	case "italic":
 		codeToProcess = c.Colors.Italic
 	default:
-		if strings.Contains(name, "[") && (strings.HasPrefix(name, "\033") || strings.HasPrefix(name, "\\033") || strings.HasPrefix(name, "\\x1b") || strings.HasPrefix(name, "33") || (name != "" && name[0] == '\x00' && strings.Contains(name, "33["))) {
+		// If name contains '[' and starts with an escape sequence, treat it as a raw ANSI code
+		if strings.Contains(name, "[") && (strings.HasPrefix(name, "\033") || strings.HasPrefix(name, "\x1b") || strings.HasPrefix(name, "\\033") || strings.HasPrefix(name, "\\x1b") || strings.HasPrefix(name, "33[")) {
 			codeToProcess = name
 		}
 	}
@@ -586,7 +536,7 @@ func (c *Config) resolveColorName(name string) string {
 			}
 		}
 	}
-	return ensureEscapePrefix(codeToProcess)
+	return normalizeANSIEscape(codeToProcess)
 }
 
 func (c *Config) ResetColor() string {
@@ -597,7 +547,7 @@ func (c *Config) ResetColor() string {
 	if resetCode == "" {
 		resetCode = string([]byte{27}) + "[0m"
 	}
-	return ensureEscapePrefix(resetCode)
+	return normalizeANSIEscape(resetCode)
 }
 
 func DeepCopyConfig(original *Config) *Config {
