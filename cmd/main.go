@@ -165,7 +165,6 @@ func findCommandArgs() []string {
 
 func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan os.Signal,
 	appSettings LocalAppConfig, designCfg *design.Config, cmdArgs []string) int {
-
 	if appSettings.Debug {
 		fmt.Fprintf(os.Stderr, "[DEBUG executeCommand] Starting execution for command: %s\n", strings.Join(cmdArgs, " "))
 		fmt.Fprintf(os.Stderr, "[DEBUG executeCommand] Mode: %s, ShowOutput: %s\n",
@@ -206,7 +205,7 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 	go func() {
 		defer close(cmdDone)
 		select {
-		case sig := <-sigChan:			
+		case sig := <-sigChan:
 			if appSettings.Debug {
 				fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Received signal %v\n", sig)
 				processStateStr := "nil"
@@ -323,7 +322,7 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 			fmt.Fprintf(os.Stderr, "[DEBUG executeCommand] About to call progress.Complete with status: %s\n", status)
 		}
 
-		progress.Complete(string(status))
+		progress.Complete(status)
 	}
 
 	// Output display logic
@@ -479,7 +478,6 @@ func executeStreamMode(cmd *exec.Cmd, task *design.Task, appSettings LocalAppCon
 
 // executeCaptureMode uses io.Copy to bytes.Buffer to capture full output before processing.
 func executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design.PatternMatcher, appSettings LocalAppConfig) (int, error) {
-
 	if appSettings.Debug {
 		fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Starting in CAPTURE mode\n")
 	}
@@ -677,7 +675,8 @@ func getExitCode(err error, debug bool) int { // MODIFIED: Added debug parameter
 	if err == nil {
 		return 0
 	}
-	if exitErr, ok := err.(*exec.ExitError); ok {
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
 		return exitErr.ExitCode()
 	}
 	// Debug print to help diagnose issues

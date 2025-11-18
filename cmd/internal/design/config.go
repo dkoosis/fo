@@ -68,7 +68,7 @@ type ElementStyleDef struct {
 	DateTimeFormat   string   `yaml:"date_time_format,omitempty"`
 }
 
-// Config holds all resolved design system settings for rendering
+// Config holds all resolved design system settings for rendering.
 type Config struct {
 	ThemeName    string `yaml:"-"`
 	IsMonochrome bool   `yaml:"-"`

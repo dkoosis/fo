@@ -160,7 +160,7 @@ func (t *Task) RenderEndLine() string {
 			}
 			colorKey = statusStyle.ColorFG
 			if colorKey == "" {
-				colorKey = "Success"
+				colorKey = ColorKeySuccess
 			}
 		case StatusWarning:
 			statusStyle = t.Config.GetElementStyle("Task_Status_Warning_Block")
@@ -174,7 +174,7 @@ func (t *Task) RenderEndLine() string {
 			}
 			colorKey = statusStyle.ColorFG
 			if colorKey == "" {
-				colorKey = "Warning"
+				colorKey = ColorKeyWarning
 			}
 		case StatusError:
 			statusStyle = t.Config.GetElementStyle("Task_Status_Failed_Block")
@@ -188,7 +188,7 @@ func (t *Task) RenderEndLine() string {
 			}
 			colorKey = statusStyle.ColorFG
 			if colorKey == "" {
-				colorKey = "Error"
+				colorKey = ColorKeyError
 			}
 		default:
 			statusStyle = t.Config.GetElementStyle("Task_Status_Info_Block")
@@ -202,7 +202,7 @@ func (t *Task) RenderEndLine() string {
 			}
 			colorKey = statusStyle.ColorFG
 			if colorKey == "" {
-				colorKey = "Process"
+				colorKey = ColorKeyProcess
 			}
 		}
 		colorCode := t.Config.GetColor(colorKey)
@@ -309,13 +309,13 @@ func (t *Task) RenderOutputLine(line OutputLine) string {
 		case TypeError:
 			if isFoInternalMessage {
 				prefixStyle = ElementStyleDef{}
-				contentColorKey = "Error"
+				contentColorKey = ColorKeyError
 				contentElementStyleKey = "Task_Content_Stderr_Error_Text"
 			} else {
 				prefixStyle = t.Config.GetElementStyle("Stderr_Error_Line_Prefix")
 				contentColorKey = prefixStyle.ColorFG
 				if contentColorKey == "" {
-					contentColorKey = "Error"
+					contentColorKey = ColorKeyError
 				}
 				contentElementStyleKey = "Task_Content_Stderr_Error_Text"
 			}
@@ -323,14 +323,14 @@ func (t *Task) RenderOutputLine(line OutputLine) string {
 			prefixStyle = t.Config.GetElementStyle("Stderr_Warning_Line_Prefix")
 			contentColorKey = prefixStyle.ColorFG
 			if contentColorKey == "" {
-				contentColorKey = "Warning"
+				contentColorKey = ColorKeyWarning
 			}
 			contentElementStyleKey = "Task_Content_Stderr_Warning_Text"
 		case TypeInfo:
 			prefixStyle = t.Config.GetElementStyle("Make_Info_Line_Prefix")
 			contentColorKey = prefixStyle.ColorFG
 			if contentColorKey == "" {
-				contentColorKey = "Process"
+				contentColorKey = ColorKeyProcess
 			}
 			contentElementStyleKey = "Task_Content_Info_Text"
 		default: // TypeDetail

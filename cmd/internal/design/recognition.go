@@ -6,19 +6,19 @@ import (
 	"strings"
 )
 
-// PatternMatcher provides intelligent pattern detection for commands and output
+// PatternMatcher provides intelligent pattern detection for commands and output.
 type PatternMatcher struct {
 	Config *Config
 }
 
-// NewPatternMatcher creates a pattern matcher with the given configuration
+// NewPatternMatcher creates a pattern matcher with the given configuration.
 func NewPatternMatcher(config *Config) *PatternMatcher {
 	return &PatternMatcher{
 		Config: config,
 	}
 }
 
-// DetectCommandIntent identifies the purpose of a command
+// DetectCommandIntent identifies the purpose of a command.
 func (pm *PatternMatcher) DetectCommandIntent(cmd string, args []string) string {
 	// Check tool-specific configuration first
 	if toolConfig := pm.findToolConfig(cmd, args); toolConfig != nil && toolConfig.Intent != "" {
@@ -75,7 +75,7 @@ func (pm *PatternMatcher) DetectCommandIntent(cmd string, args []string) string 
 }
 
 // ClassifyOutputLine determines the type of an output line
-func (pm *PatternMatcher) ClassifyOutputLine(line string, cmd string, args []string) (string, LineContext) {
+func (pm *PatternMatcher) ClassifyOutputLine(line, cmd string, args []string) (string, LineContext) {
 	// Default context
 	context := LineContext{
 		CognitiveLoad: pm.Config.CognitiveLoad.Default,
@@ -112,7 +112,7 @@ func (pm *PatternMatcher) ClassifyOutputLine(line string, cmd string, args []str
 	// Special case handling for common patterns not covered above
 
 	// Stack traces often have file:line format
-	if regexp.MustCompile(`\w+\.(go|js|py|java|rb|cpp|c):[0-9]+`).MatchString(line) {
+	if regexp.MustCompile(`\w+\.(go|js|py|java|rb|cpp|c):\d+`).MatchString(line) {
 		context.Importance = 4
 		return TypeError, context
 	}

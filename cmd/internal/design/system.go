@@ -202,11 +202,12 @@ func (t *Task) UpdateTaskContext() {
 
 	// Adjust cognitive load based on errors, warnings, and complexity.
 	// These heuristics can be refined based on user feedback and research.
-	if errorCount > 5 || t.Context.Complexity >= 4 {
+	switch {
+	case errorCount > 5 || t.Context.Complexity >= 4:
 		t.Context.CognitiveLoad = LoadHigh
-	} else if errorCount > 0 || warningCount > 2 || t.Context.Complexity == 3 {
+	case errorCount > 0 || warningCount > 2 || t.Context.Complexity == 3:
 		t.Context.CognitiveLoad = LoadMedium
-	} else {
+	default:
 		t.Context.CognitiveLoad = LoadLow
 	}
 }

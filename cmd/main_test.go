@@ -1,7 +1,8 @@
 package main
 
 import (
-	"bytes" // Import errors package
+	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -71,7 +72,8 @@ func runFo(t *testing.T, foCmdArgs ...string) foResult {
 	// Determine the exit code of the 'fo' process.
 	exitCode := 0
 	if runErr != nil {
-		if exitError, ok := runErr.(*exec.ExitError); ok {
+		var exitError *exec.ExitError
+		if errors.As(runErr, &exitError) {
 			// The command ran and exited with a non-zero status.
 			exitCode = exitError.ExitCode()
 		} else {
@@ -107,7 +109,7 @@ func setupTestScripts(t *testing.T) {
 	t.Helper()
 	scriptsDir := "testdata"
 	if _, err := os.Stat(scriptsDir); os.IsNotExist(err) {
-		if err := os.Mkdir(scriptsDir, 0755); err != nil {
+		if err := os.Mkdir(scriptsDir, 0o755); err != nil {
 			t.Fatalf("Failed to create directory %s: %v", scriptsDir, err)
 		}
 	}
@@ -163,7 +165,7 @@ exit 0`,
 			content += "\n"
 		}
 		// Write the script file with execute permissions
-		if err := os.WriteFile(path, []byte(content), 0755); err != nil {
+		if err := os.WriteFile(path, []byte(content), 0o755); err != nil {
 			t.Fatalf("Failed to write test script %s: %v", name, err)
 		}
 	}
@@ -171,7 +173,7 @@ exit 0`,
 
 // buildPattern creates a regex to match fo's start/end lines.
 // expectTimer for end lines controls if the duration part is included in the regex.
-func buildPattern(iconString string, label string, isStartLine bool, expectTimer bool) *regexp.Regexp {
+func buildPattern(iconString, label string, isStartLine, expectTimer bool) *regexp.Regexp {
 	// QuoteMeta escapes regex special characters in iconString and label.
 	pattern := regexp.QuoteMeta(iconString) + `\s*` + regexp.QuoteMeta(label)
 	if isStartLine {
@@ -282,7 +284,7 @@ func TestFoCoreExecution(t *testing.T) {
 echo "Args: $1 $2"`
 		// Create script in a temporary directory specific to this test run.
 		scriptPath := filepath.Join(t.TempDir(), "args_test.sh")
-		if err := os.WriteFile(scriptPath, []byte(helperScriptContent), 0755); err != nil {
+		if err := os.WriteFile(scriptPath, []byte(helperScriptContent), 0o755); err != nil {
 			t.Fatalf("Failed to write script: %v", err)
 		}
 		res := runFo(t, "--show-output", "always", "--no-color", "--", scriptPath, "hello", "world")
@@ -307,7 +309,7 @@ func TestFoLabels(t *testing.T) {
 	}
 
 	// Make the script executable - ensure proper permissions
-	if err := os.Chmod(scriptPath, 0755); err != nil {
+	if err := os.Chmod(scriptPath, 0o755); err != nil {
 		t.Fatalf("Failed to make script executable: %v", err)
 	}
 
@@ -414,7 +416,6 @@ func TestFoStreamMode(t *testing.T) {
 func TestFoTimer(t *testing.T) {
 	setupTestScripts(t)
 	// Regex for timer: (any_duration_format) e.g., (123ms), (1.2s), (1m02.345s), (12µs).
-	//timerRegex := regexp.MustCompile(`\s*\([\d\.:µms]+\)$`)
 
 	t.Run("TimerShownByDefaultNoColor", func(t *testing.T) {
 		t.Parallel()
@@ -444,7 +445,7 @@ func TestFoTimer(t *testing.T) {
 		}
 
 		// Make the script executable
-		if err := os.Chmod(scriptPath, 0755); err != nil {
+		if err := os.Chmod(scriptPath, 0o755); err != nil {
 			t.Fatalf("Failed to make script executable: %v", err)
 		}
 
@@ -545,7 +546,6 @@ func TestFoColorAndIcons(t *testing.T) {
 func TestFoCIMode(t *testing.T) {
 	setupTestScripts(t)
 	ansiRegex := regexp.MustCompile(`\x1b\[[0-9;]*[mK]`)
-	//timerRegex := regexp.MustCompile(`\s*\([\d\.:µms]+\)$`)
 	tests := []struct {
 		name       string
 		scriptPath string // Full path to the script being run by fo.
@@ -642,7 +642,7 @@ func TestEnvironmentInheritance(t *testing.T) {
 	scriptContent := `#!/bin/sh
 echo "VAR is: $MY_TEST_VAR"` // Script that prints an environment variable.
 	scriptPath := filepath.Join(t.TempDir(), "env.sh")
-	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0755); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0o755); err != nil {
 		t.Fatalf("Failed to write environment test script: %v", err)
 	}
 

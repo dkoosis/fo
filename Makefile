@@ -66,7 +66,7 @@ fmt: ensure-fo
 	@$(call FO_PRINT,h1,▶️,0,Format and organize code)
 	@$(call FO_RUN,Tidy modules,go mod tidy -v)
 	@$(call FO_RUN,Download modules,go mod download)
-	@$(call FO_RUN,Format Go code,golangci-lint fmt ./...)
+	@$(call FO_RUN,Format Go code,gofmt -w -s .)
 
 lint: ensure-fo
 	@$(call FO_PRINT,h1,▶️,0,Lint code)

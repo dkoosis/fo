@@ -204,11 +204,9 @@ func getConfigPath() string {
 		if os.Getenv("FO_DEBUG") != "" {
 			fmt.Fprintf(os.Stderr, "[DEBUG getConfigPath] XDG config file not found at: %s\n", xdgPath)
 		}
-	} else {
+	} else if os.Getenv("FO_DEBUG") != "" {
 		// If FO_DEBUG is set and UserConfigDir was problematic, print that.
-		if os.Getenv("FO_DEBUG") != "" {
-			fmt.Fprintf(os.Stderr, "[DEBUG getConfigPath] UserConfigDir error or unsuitable path. Error: %v, Path: '%s'\n", err, configHome)
-		}
+		fmt.Fprintf(os.Stderr, "[DEBUG getConfigPath] UserConfigDir error or unsuitable path. Error: %v, Path: '%s'\n", err, configHome)
 	}
 
 	// Fallback or if XDG path is not viable/found

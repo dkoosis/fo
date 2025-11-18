@@ -13,7 +13,7 @@ import (
 	"golang.org/x/term"
 )
 
-// InlineProgress tracks and renders task progress with in-place updates
+// InlineProgress tracks and renders task progress with in-place updates.
 type InlineProgress struct {
 	Task         *Task
 	IsActive     bool
@@ -24,7 +24,7 @@ type InlineProgress struct {
 	Debug        bool
 }
 
-// NewInlineProgress creates a progress tracker for a task
+// NewInlineProgress creates a progress tracker for a task.
 func NewInlineProgress(task *Task, debugMode bool) *InlineProgress {
 	// Detect if we're in CI mode from the task config
 	isCIMode := task.Config.IsMonochrome && task.Config.Style.NoTimer
@@ -47,14 +47,14 @@ func NewInlineProgress(task *Task, debugMode bool) *InlineProgress {
 	}
 }
 
-// IsInteractiveTerminal checks if stdout is connected to a terminal
+// IsInteractiveTerminal checks if stdout is connected to a terminal.
 func IsInteractiveTerminal() bool {
 	fd := int(os.Stdout.Fd())
 	isTerminal := term.IsTerminal(fd)
 	return isTerminal
 }
 
-// Start begins progress tracking and renders initial state
+// Start begins progress tracking and renders initial state.
 func (p *InlineProgress) Start(ctx context.Context, enableSpinner bool) {
 	p.mutex.Lock()
 	p.IsActive = true
@@ -70,7 +70,7 @@ func (p *InlineProgress) Start(ctx context.Context, enableSpinner bool) {
 	}
 }
 
-// Complete marks the progress as complete and renders final state
+// Complete marks the progress as complete and renders final state.
 func (p *InlineProgress) Complete(status string) {
 	p.mutex.Lock()
 	p.IsActive = false
@@ -80,7 +80,7 @@ func (p *InlineProgress) Complete(status string) {
 	p.RenderProgress(status)
 }
 
-// RenderProgress updates the terminal with the current progress state
+// RenderProgress updates the terminal with the current progress state.
 func (p *InlineProgress) RenderProgress(status string) {
 	// Generate formatted message based on task and status
 	message := p.formatProgressMessage(status)
@@ -100,7 +100,7 @@ func (p *InlineProgress) RenderProgress(status string) {
 	}
 }
 
-// formatProgressMessage creates the formatted status line
+// formatProgressMessage creates the formatted status line.
 func (p *InlineProgress) formatProgressMessage(status string) string {
 	usePlainAscii := p.Task.Config.IsMonochrome || !p.isTerminal
 
@@ -129,7 +129,7 @@ func (p *InlineProgress) formatProgressMessage(status string) string {
 		if elemStyle := p.Task.Config.GetElementStyle("Task_Progress_Line"); elemStyle.AdditionalChars != "" {
 			spinnerChars = elemStyle.AdditionalChars
 		}
-		if len(spinnerChars) == 0 {
+		if spinnerChars == "" {
 			spinnerChars = DefaultSpinnerChars
 		}
 		spinnerIcon := string(spinnerChars[p.SpinnerIndex])
@@ -200,7 +200,7 @@ func (p *InlineProgress) formatProgressMessage(status string) string {
 		resetColor)
 }
 
-// runSpinner animates the spinner while the task is running
+// runSpinner animates the spinner while the task is running.
 func (p *InlineProgress) runSpinner(ctx context.Context) {
 	// Default to ASCII spinner for maximum compatibility
 	spinnerChars := DefaultSpinnerChars
@@ -219,19 +219,15 @@ func (p *InlineProgress) runSpinner(ctx context.Context) {
 			if p.Debug {
 				fmt.Fprintf(os.Stderr, "[FO_DEBUG_SPINNER] Source: Theme ('%s') Task_Progress_Line.additional_chars: \"%s\"\n", p.Task.Config.ThemeName, spinnerChars)
 			}
-		} else {
-			if p.Debug {
-				fmt.Fprintf(os.Stderr, "[FO_DEBUG_SPINNER] Source: Default ASCII (Theme '%s' Task_Progress_Line.AdditionalChars was empty).\n", p.Task.Config.ThemeName)
-			}
+		} else if p.Debug {
+			fmt.Fprintf(os.Stderr, "[FO_DEBUG_SPINNER] Source: Default ASCII (Theme '%s' Task_Progress_Line.AdditionalChars was empty).\n", p.Task.Config.ThemeName)
 		}
-	} else {
-		if p.Debug {
-			fmt.Fprintf(os.Stderr, "[FO_DEBUG_SPINNER] Source: Default ASCII (Conditions for Unicode not met. IsMonochrome: %t, isTerminal: %t).\n", p.Task.Config.IsMonochrome, p.isTerminal)
-		}
+	} else if p.Debug {
+		fmt.Fprintf(os.Stderr, "[FO_DEBUG_SPINNER] Source: Default ASCII (Conditions for Unicode not met. IsMonochrome: %t, isTerminal: %t).\n", p.Task.Config.IsMonochrome, p.isTerminal)
 	}
 
 	// Ensure we have at least one character for the spinner animation
-	if len(spinnerChars) == 0 {
+	if spinnerChars == "" {
 		spinnerChars = DefaultSpinnerChars
 		if p.Debug {
 			fmt.Fprintf(os.Stderr, "[FO_DEBUG_SPINNER] Fallback: spinnerChars was empty, reset to absolute default ASCII: \"%s\"\n", spinnerChars)
