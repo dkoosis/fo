@@ -27,3 +27,11 @@ go.work.sum
 # env file
 .env
 *.bak
+
+# macOS
+.DS_Store
+
+# Generated docs
+docs/tree.txt
+docs/project_folder_tree.txt
+docs/issues.json
