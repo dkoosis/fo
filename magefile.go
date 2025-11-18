@@ -25,8 +25,8 @@ func Build() error {
 	commit := getGitCommit()
 	date := time.Now().UTC().Format(time.RFC3339)
 
-	ldflags := fmt.Sprintf("-s -w -X '%s/cmd/internal/version.Version=%s' -X '%s/cmd/internal/version.CommitHash=%s' -X '%s/cmd/internal/version.BuildDate=%s'",
-		modulePath, version, modulePath, commit, modulePath, date)
+        ldflags := fmt.Sprintf("-s -w -X '%s/internal/version.Version=%s' -X '%s/internal/version.CommitHash=%s' -X '%s/internal/version.BuildDate=%s'",
+                modulePath, version, modulePath, commit, modulePath, date)
 
 	fmt.Println("Building fo...")
 	cmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", binPath, "./cmd")
