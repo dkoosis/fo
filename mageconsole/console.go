@@ -38,13 +38,21 @@ type ConsoleConfig struct {
 	Err            io.Writer // Error writer, defaults to os.Stderr
 }
 
+// Line represents a classified line of command output.
+// This is the public-facing type that doesn't leak internal design package types.
+type Line struct {
+	Content   string
+	Type      string // "detail", "error", "warning", "success", "info", "progress"
+	Timestamp time.Time
+}
+
 type TaskResult struct {
 	Label    string
 	Intent   string
 	Status   string
 	Duration time.Duration
 	ExitCode int
-	Lines    []design.OutputLine
+	Lines    []Line
 	Err      error
 }
 
@@ -221,13 +229,23 @@ func (c *Console) runContext(ctx context.Context, cancel context.CancelFunc, sig
 		_, _ = c.cfg.Out.Write([]byte(task.RenderEndLine() + "\n"))
 	}
 
+	// Convert design.OutputLine to mageconsole.Line
+	lines := make([]Line, len(task.OutputLines))
+	for i, ol := range task.OutputLines {
+		lines[i] = Line{
+			Content:   ol.Content,
+			Type:      ol.Type,
+			Timestamp: ol.Timestamp,
+		}
+	}
+
 	return &TaskResult{
 		Label:    task.Label,
 		Intent:   task.Intent,
 		Status:   task.Status,
 		Duration: task.Duration,
 		ExitCode: exitCode,
-		Lines:    append([]design.OutputLine(nil), task.OutputLines...),
+		Lines:    lines,
 		Err:      cmdRunError,
 	}, cmdRunError
 }
