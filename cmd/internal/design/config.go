@@ -48,6 +48,12 @@ const (
 // Default spinner characters for ASCII mode.
 const DefaultSpinnerChars = "-\\|/"
 
+// MessageType constant for legacy support.
+const MessageTypeHeader = "header"
+
+// ANSI color code constant.
+const ANSIBrightWhite = "\033[0;97m"
+
 // ElementStyleDef defines visual styling properties for a specific UI element.
 type ElementStyleDef struct {
 	Text             string   `yaml:"text,omitempty"`
@@ -331,8 +337,8 @@ func UnicodeVibrantTheme() *Config {
 	cfg.Icons.Info = "ℹ️"
 	cfg.Icons.Bullet = "•"
 
-	cfg.Colors.Process = "\033[0;97m"
-	cfg.Colors.Success = "\033[0;97m"
+	cfg.Colors.Process = ANSIBrightWhite
+	cfg.Colors.Success = ANSIBrightWhite
 	cfg.Colors.Warning = "\033[0;33m"
 	cfg.Colors.Error = "\033[0;31m"
 	cfg.Colors.Detail = "\033[0m"
@@ -524,10 +530,8 @@ func (c *Config) resolveColorName(name string) string {
 	lowerName := strings.ToLower(name)
 
 	switch lowerName {
-	case "process":
+	case "process", StatusSuccess:
 		codeToProcess = c.Colors.Process
-	case StatusSuccess:
-		codeToProcess = c.Colors.Success
 	case StatusWarning:
 		codeToProcess = c.Colors.Warning
 	case StatusError:
@@ -557,11 +561,11 @@ func (c *Config) resolveColorName(name string) string {
 	escChar := string([]byte{27})
 	if codeToProcess == "" {
 		switch lowerName {
-		case "process", "success", "white":
+		case "process", StatusSuccess, "white":
 			codeToProcess = escChar + "[0;97m"
-		case "warning":
+		case StatusWarning:
 			codeToProcess = escChar + "[0;33m"
-		case "error":
+		case StatusError:
 			codeToProcess = escChar + "[0;31m"
 		case "detail", "reset":
 			codeToProcess = escChar + "[0m"
@@ -604,7 +608,8 @@ func DeepCopyConfig(original *Config) *Config {
 
 	if original.Elements != nil {
 		copied.Elements = make(map[string]ElementStyleDef)
-		for k, v := range original.Elements {
+		for k := range original.Elements {
+			v := original.Elements[k]
 			copiedTextStyle := make([]string, len(v.TextStyle))
 			copy(copiedTextStyle, v.TextStyle)
 			v.TextStyle = copiedTextStyle

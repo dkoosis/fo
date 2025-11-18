@@ -575,10 +575,10 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 
 	// Determine the styleKey based on messageType to fetch ElementStyleDef
 	switch lowerMessageType {
-	case "h1", "h2", "h3", "success", "warning", "error", "info":
+	case "h1", "h2", "h3", StatusSuccess, StatusWarning, StatusError, TypeInfo:
 		// Direct mapping from type to element style key (properly capitalized)
 		styleKey = titler.String(lowerMessageType)
-	case "header": // Legacy support for "header" type
+	case MessageTypeHeader: // Legacy support for MessageTypeHeader type
 		styleKey = "H1"
 	}
 
@@ -595,7 +595,7 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 	default:
 		// Fallback icon logic based on message type
 		switch lowerMessageType {
-		case "h1", "header":
+		case "h1", MessageTypeHeader:
 			iconToUse = cfg.GetIcon("Start")
 		case "h2":
 			iconToUse = cfg.GetIcon("Info")
@@ -620,7 +620,7 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 	} else {
 		// Fallback color logic based on message type
 		switch lowerMessageType {
-		case "h1", "h2", "header":
+		case "h1", "h2", MessageTypeHeader:
 			rawFgColor = "Process"
 		case "success":
 			rawFgColor = "Success"

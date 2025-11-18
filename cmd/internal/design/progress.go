@@ -152,11 +152,11 @@ func (p *InlineProgress) formatProgressMessage(status string) string {
 	var icon string
 
 	switch status {
-	case "success":
+	case StatusSuccess:
 		icon = p.Task.Config.GetIcon("Success")
-	case "error":
+	case StatusError:
 		icon = p.Task.Config.GetIcon("Error")
-	case "warning":
+	case StatusWarning:
 		icon = p.Task.Config.GetIcon("Warning")
 	default:
 		icon = p.Task.Config.GetIcon("Info")
@@ -165,11 +165,11 @@ func (p *InlineProgress) formatProgressMessage(status string) string {
 	if usePlainAscii {
 		var plainStatusPrefix string
 		switch status {
-		case "success":
+		case StatusSuccess:
 			plainStatusPrefix = "[OK]"
-		case "error":
+		case StatusError:
 			plainStatusPrefix = "[ERROR]"
-		case "warning":
+		case StatusWarning:
 			plainStatusPrefix = "[WARNING]"
 		default:
 			plainStatusPrefix = "[INFO]"

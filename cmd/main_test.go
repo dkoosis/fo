@@ -176,13 +176,14 @@ exit 0`,
 func buildPattern(iconString, label string, isStartLine, expectTimer bool) *regexp.Regexp {
 	// QuoteMeta escapes regex special characters in iconString and label.
 	pattern := regexp.QuoteMeta(iconString) + `\s*` + regexp.QuoteMeta(label)
-	if isStartLine {
+	switch {
+	case isStartLine:
 		pattern += `\.\.\.` // Start lines end with "...".
-	} else if expectTimer { // For end lines where a timer is expected.
+	case expectTimer: // For end lines where a timer is expected.
 		// Matches (optional_whitespace)(duration_format)(optional_whitespace).
 		// Duration format example: (123ms), (1.2s), (1:02.345s).
 		pattern += `\s*\([\wµ\.:]+\)$` // `\w` includes numbers, `\.` for decimal, `:` for M:SS.
-	} else { // For end lines where NO timer is expected (e.g., --no-timer or --ci).
+	default: // For end lines where NO timer is expected (e.g., --no-timer or --ci).
 		pattern += `$` // Must be the end of the string/line.
 	}
 	return regexp.MustCompile(pattern)
