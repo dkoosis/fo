@@ -7,14 +7,14 @@ import (
 	"strings"
 )
 
-// ToolConfig defines specific settings for a command/tool preset for design purposes
+// ToolConfig defines specific settings for a command/tool preset for design purposes.
 type ToolConfig struct {
 	Label          string              `yaml:"label,omitempty"`
 	Intent         string              `yaml:"intent,omitempty"`
 	OutputPatterns map[string][]string `yaml:"output_patterns,omitempty"`
 }
 
-// BorderStyle defines the type of border to use for task output
+// BorderStyle defines the type of border to use for task output.
 type BorderStyle string
 
 const (
@@ -26,7 +26,29 @@ const (
 	BorderAscii      BorderStyle = "ascii"
 )
 
-// ElementStyleDef defines visual styling properties for a specific UI element
+// Icon constants for monochrome/ASCII mode.
+const (
+	IconStart   = "[START]"
+	IconSuccess = "[SUCCESS]"
+	IconWarning = "[WARNING]"
+	IconFailed  = "[FAILED]"
+	IconInfo    = "[INFO]"
+	IconBullet  = "*"
+)
+
+// Color key constants for theme color lookups.
+const (
+	ColorKeyProcess = "Process"
+	ColorKeySuccess = "Success"
+	ColorKeyWarning = "Warning"
+	ColorKeyError   = "Error"
+	ColorKeyMuted   = "Muted"
+)
+
+// Default spinner characters for ASCII mode.
+const DefaultSpinnerChars = "-\\|/"
+
+// ElementStyleDef defines visual styling properties for a specific UI element.
 type ElementStyleDef struct {
 	Text             string   `yaml:"text,omitempty"`
 	Prefix           string   `yaml:"prefix,omitempty"`
@@ -236,12 +258,12 @@ func AsciiMinimalTheme() *Config {
 	cfg.Style.Density = "compact"
 	cfg.Style.NoTimer = false
 
-	cfg.Icons.Start = "[START]"
-	cfg.Icons.Success = "[SUCCESS]"
-	cfg.Icons.Warning = "[WARNING]"
-	cfg.Icons.Error = "[FAILED]"
-	cfg.Icons.Info = "[INFO]"
-	cfg.Icons.Bullet = "*"
+	cfg.Icons.Start = IconStart
+	cfg.Icons.Success = IconSuccess
+	cfg.Icons.Warning = IconWarning
+	cfg.Icons.Error = IconFailed
+	cfg.Icons.Info = IconInfo
+	cfg.Icons.Bullet = IconBullet
 
 	cfg.Style.UseInlineProgress = true
 	cfg.Style.NoSpinner = false
@@ -445,17 +467,17 @@ func (c *Config) GetIcon(iconKey string) string {
 	if c.IsMonochrome {
 		switch strings.ToLower(iconKey) {
 		case "start":
-			return "[START]"
-		case "success":
-			return "[SUCCESS]"
-		case "warning":
-			return "[WARNING]"
-		case "error":
-			return "[FAILED]"
-		case "info":
-			return "[INFO]"
+			return IconStart
+		case StatusSuccess:
+			return IconSuccess
+		case StatusWarning:
+			return IconWarning
+		case StatusError:
+			return IconFailed
+		case TypeInfo:
+			return IconInfo
 		case "bullet":
-			return "*"
+			return IconBullet
 		default:
 			return "?"
 		}
@@ -676,10 +698,10 @@ func ApplyMonochromeDefaults(cfg *Config) {
 		elDef.TextStyle = nil
 		cfg.Elements[key] = elDef
 	}
-	cfg.Icons.Start = "[START]"
-	cfg.Icons.Success = "[SUCCESS]"
-	cfg.Icons.Warning = "[WARNING]"
-	cfg.Icons.Error = "[FAILED]"
-	cfg.Icons.Info = "[INFO]"
-	cfg.Icons.Bullet = "*"
+	cfg.Icons.Start = IconStart
+	cfg.Icons.Success = IconSuccess
+	cfg.Icons.Warning = IconWarning
+	cfg.Icons.Error = IconFailed
+	cfg.Icons.Info = IconInfo
+	cfg.Icons.Bullet = IconBullet
 }

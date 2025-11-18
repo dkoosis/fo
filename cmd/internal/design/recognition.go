@@ -211,7 +211,7 @@ func (pm *PatternMatcher) extractPatternKey(content, lineType string) string {
 	switch lineType {
 	case TypeError, TypeWarning:
 		// For errors and warnings, use file:line format as base if present
-		fileLineMatch := regexp.MustCompile(`([^/\s]+\.[a-zA-Z0-9]+:[0-9]+)`).FindStringSubmatch(content)
+		fileLineMatch := regexp.MustCompile(`([^/\s]+\.[a-zA-Z0-9]+:\d+)`).FindStringSubmatch(content)
 		if len(fileLineMatch) > 1 {
 			return lineType + "_" + fileLineMatch[1]
 		}

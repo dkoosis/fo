@@ -94,7 +94,7 @@ const (
 )
 
 // NewTask creates and initializes a new Task.
-func NewTask(label, intent string, command string, args []string, config *Config) *Task {
+func NewTask(label, intent, command string, args []string, config *Config) *Task {
 	return &Task{
 		Label:     label,
 		Intent:    intent,
@@ -139,17 +139,15 @@ func (t *Task) Complete(exitCode int) {
 	// hasOutputIssues safely reads OutputLines using its internal lock.
 	hasErrors, hasWarnings := t.hasOutputIssues()
 
-	if exitCode != 0 {
+	switch {
+	case exitCode != 0:
 		t.Status = StatusError // Non-zero exit code always means an error status.
-	} else {
-		// If exit code is 0, check output lines for issues.
-		if hasErrors {
-			t.Status = StatusError // Errors in output override a success exit code.
-		} else if hasWarnings {
-			t.Status = StatusWarning
-		} else {
-			t.Status = StatusSuccess
-		}
+	case hasErrors:
+		t.Status = StatusError // Errors in output override a success exit code.
+	case hasWarnings:
+		t.Status = StatusWarning
+	default:
+		t.Status = StatusSuccess
 	}
 }
 
@@ -191,13 +189,14 @@ func (t *Task) UpdateTaskContext() {
 	outputSize := len(t.OutputLines) // Safely read length while holding the lock.
 
 	// Adjust complexity based on output size.
-	if outputSize > 100 {
+	switch {
+	case outputSize > 100:
 		t.Context.Complexity = 5
-	} else if outputSize > 50 {
+	case outputSize > 50:
 		t.Context.Complexity = 4
-	} else if outputSize > 20 {
+	case outputSize > 20:
 		t.Context.Complexity = 3
-	} else {
+	default:
 		t.Context.Complexity = 2 // Default/low complexity.
 	}
 

@@ -40,7 +40,6 @@ var versionFlag bool
 var cliFlagsGlobal config.CliFlags // Holds parsed CLI flags
 
 // main is the entry point of the application.
-// main is the entry point of the application.
 func main() {
 	// Check for subcommand first
 	if len(os.Args) > 1 {
@@ -134,6 +133,8 @@ func main() {
 	if behavioralSettings.Debug {
 		fmt.Fprintf(os.Stderr, "[DEBUG main()] about to os.Exit(%d).\nBehavioral Config: %+v\n", exitCode, behavioralSettings)
 	}
+	// Note: defer signal.Stop(sigChan) will not run after os.Exit
+	signal.Stop(sigChan)
 	os.Exit(exitCode)
 }
 
@@ -164,6 +165,13 @@ func findCommandArgs() []string {
 
 func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan os.Signal,
 	appSettings LocalAppConfig, designCfg *design.Config, cmdArgs []string) int {
+
+	if appSettings.Debug {
+		fmt.Fprintf(os.Stderr, "[DEBUG executeCommand] Starting execution for command: %s\n", strings.Join(cmdArgs, " "))
+		fmt.Fprintf(os.Stderr, "[DEBUG executeCommand] Mode: %s, ShowOutput: %s\n",
+			map[bool]string{true: "STREAM", false: "CAPTURE"}[appSettings.Stream],
+			appSettings.ShowOutput)
+	}
 
 	labelToUse := appSettings.Label
 	if labelToUse == "" {
@@ -198,7 +206,15 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 	go func() {
 		defer close(cmdDone)
 		select {
-		case sig := <-sigChan:
+		case sig := <-sigChan:			
+			if appSettings.Debug {
+				fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Received signal %v\n", sig)
+				processStateStr := "nil"
+				if cmd.ProcessState != nil {
+					processStateStr = fmt.Sprintf("%+v", cmd.ProcessState)
+				}
+				fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Process state: %s\n", processStateStr)
+			}
 			if cmd.Process == nil {
 				if appSettings.Debug {
 					fmt.Fprintln(os.Stderr, "[DEBUG sigChan] Process is nil, canceling context.")
@@ -463,6 +479,11 @@ func executeStreamMode(cmd *exec.Cmd, task *design.Task, appSettings LocalAppCon
 
 // executeCaptureMode uses io.Copy to bytes.Buffer to capture full output before processing.
 func executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design.PatternMatcher, appSettings LocalAppConfig) (int, error) {
+
+	if appSettings.Debug {
+		fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Starting in CAPTURE mode\n")
+	}
+
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
 		errMsg := fmt.Sprintf("[fo] Error creating stdout pipe: %v", err)
@@ -673,7 +694,6 @@ func getExitCode(err error, debug bool) int { // MODIFIED: Added debug parameter
 	return 1
 }
 
-// handlePrintCommand handles the 'fo print' subcommand.
 // handlePrintCommand handles the 'fo print' subcommand.
 func handlePrintCommand(args []string) {
 	printFlagSet := flag.NewFlagSet("print", flag.ExitOnError)

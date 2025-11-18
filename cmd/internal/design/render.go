@@ -105,11 +105,9 @@ func (t *Task) RenderEndLine() string {
 			if suffix == "" {
 				suffix = ")"
 			}
-		} else {
-			if prefix == "" && suffix == "" {
-				prefix = "("
-				suffix = ")"
-			}
+		} else if prefix == "" && suffix == "" {
+			prefix = "("
+			suffix = ")"
 		}
 		durationColorName := durationStyle.ColorFG
 		if durationColorName == "" {
@@ -146,7 +144,6 @@ func (t *Task) RenderEndLine() string {
 		sb.WriteString(" ")
 		sb.WriteString(t.Label)
 		sb.WriteString(durationStr)
-
 	} else {
 		var statusStyle ElementStyleDef
 		var icon, statusText, colorKey string
@@ -559,10 +556,7 @@ func getProcessLabel(intent string) string {
 	if intent == "" {
 		return "Running"
 	}
-	if len(intent) > 0 {
-		return strings.ToUpper(string(intent[0])) + strings.ToLower(intent[1:])
-	}
-	return "Running"
+	return strings.ToUpper(string(intent[0])) + strings.ToLower(intent[1:])
 }
 
 // cmd/internal/design/render.go
@@ -593,11 +587,12 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 	}
 
 	// Determine Icon
-	if customIcon != "" {
+	switch {
+	case customIcon != "":
 		iconToUse = customIcon
-	} else if elementStyle.IconKey != "" {
+	case elementStyle.IconKey != "":
 		iconToUse = cfg.GetIcon(elementStyle.IconKey)
-	} else {
+	default:
 		// Fallback icon logic based on message type
 		switch lowerMessageType {
 		case "h1", "header":

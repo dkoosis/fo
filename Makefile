@@ -44,7 +44,7 @@ endef
 
 # NO leading @ here
 define FO_PRINT
-    make$(FO) $(FO_PRINT_FLAGS) print --type "$(1)" --icon "$(2)" --indent $(3) -- "$(4)"
+    $(FO) $(FO_PRINT_FLAGS) print --type "$(1)" --icon "$(2)" --indent $(3) -- "$(4)"
 endef
 
 # --- Core Targets ---
@@ -119,3 +119,69 @@ help:
 	@printf "  %-20s %s\n" "tree" "Generate project directory tree"
 	@printf "  %-20s %s\n" "clean" "Clean build artifacts"
 	@printf "  %-20s %s\n" "help" "Show this help message"
+
+# ============================================================================
+# Documentation Generation Targets (added by install-docs-hooks.sh)
+# ============================================================================
+# Documentation generation targets
+# Add these to your Makefile for generating docs/tree.txt and docs/issues.json
+
+.PHONY: docs-tree docs-issues docs-all install-hooks
+
+# Generate project documentation tree
+docs-tree:
+	@mkdir -p docs
+	@if ! which tree > /dev/null 2>&1; then \
+		echo "⚠️  tree command not found. Install with: brew install tree (macOS)"; \
+		echo "Generating fallback tree.txt with find..."; \
+		find . -type d -name '.git' -prune -o \
+		       -type d -name 'node_modules' -prune -o \
+		       -type d -name 'vendor' -prune -o \
+		       -type d -name 'bin' -prune -o \
+		       -type d -name 'build' -prune -o \
+		       -type f -name '.DS_Store' -prune -o \
+		       -type f -print | sort > docs/tree.txt; \
+	else \
+		tree --gitignore -F --dirsfirst -I '.git|.DS_Store|*.log|*.db|coverage.*|bin|tmp|test-output|test-results|build|node_modules|vendor' > docs/tree.txt 2>/dev/null || \
+		tree -F --dirsfirst -I '.git|.DS_Store|*.log|*.db|coverage.*|bin|tmp|test-output|test-results|build|node_modules|vendor' > docs/tree.txt; \
+	fi
+	@wc -l docs/tree.txt | awk '{print "✓ Generated docs/tree.txt with " $$1 " entries"}'
+
+# Fetch and export GitHub issues to JSON
+docs-issues:
+	@mkdir -p docs
+	@if ! which gh > /dev/null 2>&1; then \
+		echo "❌ GitHub CLI 'gh' not found. Install with: brew install gh"; \
+		exit 1; \
+	fi
+	@if ! gh auth status > /dev/null 2>&1; then \
+		echo "❌ GitHub CLI not authenticated. Run: gh auth login"; \
+		exit 1; \
+	fi
+	@OWNER_REPO=$$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null); \
+	if [ -z "$$OWNER_REPO" ]; then \
+		echo "❌ Could not determine repository. Make sure you're in a git repo with a remote."; \
+		exit 1; \
+	fi; \
+	echo "📥 Fetching issues for $$OWNER_REPO..."; \
+	gh issue list -R "$$OWNER_REPO" --state all --limit 9999 --json \
+		number,title,body,state,labels,assignees,milestone,createdAt,updatedAt,closedAt,author,comments \
+		> docs/issues.json && \
+	ISSUE_COUNT=$$(cat docs/issues.json | grep -o '"number"' | wc -l | tr -d ' ') && \
+	echo "✓ Exported $$ISSUE_COUNT issues to docs/issues.json"
+
+# Generate both tree and issues documentation
+docs-all: docs-tree docs-issues
+	@echo "✅ Documentation generation complete!"
+
+# Install git hooks for automatic documentation generation
+install-hooks:
+	@echo "Installing git hooks..."
+	@if [ -f scripts/pre-commit-template ]; then \
+		cp scripts/pre-commit-template .git/hooks/pre-commit; \
+		chmod +x .git/hooks/pre-commit; \
+		echo "✓ Installed pre-commit hook"; \
+	else \
+		echo "⚠️  scripts/pre-commit-template not found"; \
+		echo "Download from: https://github.com/dkoosis/pha-wix-ccs/scripts/pre-commit-template"; \
+	fi
