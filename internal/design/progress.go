@@ -87,22 +87,22 @@ func (p *InlineProgress) RenderProgress(status string) {
 
 	// In terminal mode with color support, update in-place
 	if p.isTerminal && !p.Task.Config.IsMonochrome {
-		fmt.Print("\r\033[K") // Carriage return + erase line
-		fmt.Print(message)
+		_, _ = os.Stdout.WriteString("\r\033[K") // Carriage return + erase line
+		_, _ = os.Stdout.WriteString(message)
 
 		// Add newline for completed states
 		if status != StatusRunning {
-			fmt.Println()
+			_, _ = os.Stdout.WriteString("\n")
 		}
 	} else {
 		// Non-terminal mode or CI mode, just print new lines
-		fmt.Println(message)
+		_, _ = os.Stdout.WriteString(message + "\n")
 	}
 }
 
 // formatProgressMessage creates the formatted status line.
 func (p *InlineProgress) formatProgressMessage(status string) string {
-	usePlainAscii := p.Task.Config.IsMonochrome || !p.isTerminal
+	usePlainASCII := p.Task.Config.IsMonochrome || !p.isTerminal
 
 	toolLabel := p.Task.Label
 	if toolLabel == "" {
@@ -113,7 +113,7 @@ func (p *InlineProgress) formatProgressMessage(status string) string {
 
 	// Running state for spinner
 	if status == StatusRunning {
-		if usePlainAscii {
+		if usePlainASCII {
 			// Simplified format - just show task label and status
 			return fmt.Sprintf("[BUSY] %s [Working...]", toolLabel)
 		}
@@ -162,7 +162,7 @@ func (p *InlineProgress) formatProgressMessage(status string) string {
 		icon = p.Task.Config.GetIcon("Info")
 	}
 
-	if usePlainAscii {
+	if usePlainASCII {
 		var plainStatusPrefix string
 		switch status {
 		case StatusSuccess:

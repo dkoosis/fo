@@ -72,13 +72,15 @@ func (c *Console) Run(label, command string, args ...string) (*TaskResult, error
 	return c.runContext(ctx, cancel, sigChan, label, command, args)
 }
 
+var errCommandExited = errors.New("command exited with non-zero code")
+
 func (c *Console) RunSimple(command string, args ...string) error {
 	res, err := c.Run("", command, args...)
 	if err != nil {
 		return err
 	}
 	if res != nil && res.ExitCode != 0 {
-		return fmt.Errorf("command exited with code %d", res.ExitCode)
+		return fmt.Errorf("%w: %d", errCommandExited, res.ExitCode)
 	}
 	return nil
 }
@@ -103,7 +105,7 @@ func (c *Console) runContext(ctx context.Context, cancel context.CancelFunc, sig
 		enableSpinner := !designCfg.Style.NoSpinner
 		progress.Start(ctx, enableSpinner)
 	} else {
-		fmt.Println(task.RenderStartLine())
+		_, _ = os.Stdout.WriteString(task.RenderStartLine() + "\n")
 	}
 
 	cmd := exec.CommandContext(ctx, command, args...)
@@ -138,7 +140,10 @@ func (c *Console) runContext(ctx context.Context, cancel context.CancelFunc, sig
 				if c.cfg.Debug {
 					fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Sending signal %v to PGID %d\n", sig, pgid)
 				}
-				_ = syscall.Kill(-pgid, sig.(syscall.Signal))
+				sigVal, ok := sig.(syscall.Signal)
+				if ok {
+					_ = syscall.Kill(-pgid, sigVal)
+				}
 			} else {
 				if c.cfg.Debug {
 					fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Failed to get PGID for PID %d (%v), sending to PID directly.\n", cmd.Process.Pid, err)
@@ -229,12 +234,12 @@ func (c *Console) runContext(ctx context.Context, cancel context.CancelFunc, sig
 	} else if (task.Status == design.StatusError || task.Status == design.StatusWarning) && !isActualFoStartupFailure {
 		summary := task.RenderSummary()
 		if summary != "" {
-			fmt.Print(summary)
+			_, _ = os.Stdout.WriteString(summary)
 		}
 	}
 
 	if !useInlineProgress {
-		fmt.Println(task.RenderEndLine())
+		_, _ = os.Stdout.WriteString(task.RenderEndLine() + "\n")
 	}
 
 	return &TaskResult{
@@ -262,7 +267,7 @@ func (c *Console) renderCapturedOutput(task *design.Task, exitCode int, isActual
 	if showCaptured && !isActualFoStartupFailure {
 		summary := task.RenderSummary()
 		if summary != "" {
-			fmt.Print(summary)
+			_, _ = os.Stdout.WriteString(summary)
 		}
 
 		hasActualRenderableOutput := false
@@ -276,22 +281,22 @@ func (c *Console) renderCapturedOutput(task *design.Task, exitCode int, isActual
 		task.OutputLinesUnlock()
 
 		if hasActualRenderableOutput {
-			fmt.Println(task.Config.GetColor("Muted"), "--- Captured output: ---", task.Config.ResetColor())
+			_, _ = os.Stdout.WriteString(task.Config.GetColor("Muted") + "--- Captured output: ---" + task.Config.ResetColor() + "\n")
 			task.OutputLinesLock()
 			for _, line := range task.OutputLines {
-				fmt.Println(task.RenderOutputLine(line))
+				_, _ = os.Stdout.WriteString(task.RenderOutputLine(line) + "\n")
 			}
 			task.OutputLinesUnlock()
 		} else if (task.Status == design.StatusError || task.Status == design.StatusWarning) && summary == "" {
 			summary = task.RenderSummary()
 			if summary != "" {
-				fmt.Print(summary)
+				_, _ = os.Stdout.WriteString(summary)
 			}
 		}
 	} else if !showCaptured && (task.Status == design.StatusError || task.Status == design.StatusWarning) && !isActualFoStartupFailure {
 		summary := task.RenderSummary()
 		if summary != "" {
-			fmt.Print(summary)
+			_, _ = os.Stdout.WriteString(summary)
 		}
 	}
 }
@@ -315,10 +320,10 @@ func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task) (int, erro
 	}
 	cmd.Stdout = os.Stdout
 
-	var wg sync.WaitGroup
-	wg.Add(1)
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(1)
 	go func() {
-		defer wg.Done()
+		defer waitGroup.Done()
 		scanner := bufio.NewScanner(stderrPipe)
 		buffer := make([]byte, 0, bufio.MaxScanTokenSize)
 		scanner.Buffer(buffer, c.cfg.MaxLineLength)
@@ -350,13 +355,13 @@ func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task) (int, erro
 		fmt.Fprintln(os.Stderr, errMsg)
 
 		_ = stderrPipe.Close()
-		wg.Wait()
+		waitGroup.Wait()
 
 		return getExitCode(startErr, c.cfg.Debug), startErr
 	}
 
 	runErr := cmd.Wait()
-	wg.Wait()
+	waitGroup.Wait()
 
 	exitCode := getExitCode(runErr, c.cfg.Debug)
 	if runErr != nil {
@@ -508,7 +513,8 @@ func getExitCode(err error, debug bool) int {
 		return 0
 	}
 
-	if exitErr, ok := err.(*exec.ExitError); ok {
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
 		waitStatus, ok := exitErr.Sys().(syscall.WaitStatus)
 		if ok {
 			return waitStatus.ExitStatus()
@@ -545,11 +551,12 @@ func normalizeConfig(cfg ConsoleConfig) ConsoleConfig {
 	} else {
 		normalized.ShowTimer = true
 	}
-	if cfg.InlineSet {
+	switch {
+	case cfg.InlineSet:
 		normalized.InlineProgress = cfg.InlineProgress
-	} else if cfg.Design != nil {
+	case cfg.Design != nil:
 		normalized.InlineProgress = cfg.Design.Style.UseInlineProgress
-	} else {
+	default:
 		normalized.InlineProgress = true
 	}
 	return normalized
@@ -563,7 +570,7 @@ func resolveDesignConfig(cfg ConsoleConfig) *design.Config {
 	var base *design.Config
 	switch cfg.ThemeName {
 	case "ascii_minimal":
-		base = design.AsciiMinimalTheme()
+		base = design.ASCIIMinimalTheme()
 	default:
 		base = design.UnicodeVibrantTheme()
 	}

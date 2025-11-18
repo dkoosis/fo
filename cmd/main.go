@@ -25,8 +25,10 @@ type LocalAppConfig struct {
 	MaxLineLength int   // Max size for a single line from stdout/stderr
 }
 
-var versionFlag bool
-var cliFlagsGlobal config.CliFlags // Holds parsed CLI flags
+var (
+	versionFlag    bool
+	cliFlagsGlobal config.CliFlags // Holds parsed CLI flags
+)
 
 // main is the entry point of the application.
 func main() {
@@ -47,9 +49,9 @@ func main() {
 
 	// Handle version flag
 	if versionFlag {
-		fmt.Printf("fo version %s\n", version.Version)
-		fmt.Printf("Commit: %s\n", version.CommitHash)
-		fmt.Printf("Built: %s\n", version.BuildDate)
+		_, _ = fmt.Fprintf(os.Stdout, "fo version %s\n", version.Version)
+		_, _ = fmt.Fprintf(os.Stdout, "Commit: %s\n", version.CommitHash)
+		_, _ = fmt.Fprintf(os.Stdout, "Built: %s\n", version.BuildDate)
 		os.Exit(0)
 	}
 
@@ -158,6 +160,7 @@ func convertAppConfigToLocal(appCfg *config.AppConfig) LocalAppConfig {
 		MaxLineLength: appCfg.MaxLineLength,
 	}
 }
+
 func findCommandArgs() []string {
 	for i, arg := range os.Args {
 		if arg == "--" {
@@ -229,7 +232,7 @@ func handlePrintCommand(args []string) {
 
 	// Use the new render function for direct messages
 	output := design.RenderDirectMessage(finalDesignConfig, *typeFlag, *iconFlag, message, *indentFlag)
-	fmt.Print(output) // Print directly to stdout
+	_, _ = os.Stdout.WriteString(output) // Print directly to stdout
 	os.Exit(0)
 }
 

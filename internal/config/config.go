@@ -72,7 +72,7 @@ func LoadConfig() *AppConfig {
 		ActiveThemeName: DefaultActiveThemeName,
 		Themes: map[string]*design.Config{
 			"unicode_vibrant": design.UnicodeVibrantTheme(), // Hardcoded default
-			"ascii_minimal":   design.AsciiMinimalTheme(),   // Hardcoded default
+			"ascii_minimal":   design.ASCIIMinimalTheme(),   // Hardcoded default
 		},
 		Presets: make(map[string]*design.ToolConfig),
 	}

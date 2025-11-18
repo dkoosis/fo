@@ -153,10 +153,11 @@ func (t *Task) Complete(exitCode int) {
 
 // hasOutputIssues checks the collected OutputLines for any lines classified as errors or warnings.
 // This method is thread-safe for reading OutputLines.
-func (t *Task) hasOutputIssues() (hasErrors, hasWarnings bool) {
+func (t *Task) hasOutputIssues() (bool, bool) {
 	t.outputLock.Lock()         // Acquire lock for reading shared OutputLines.
 	defer t.outputLock.Unlock() // Release lock.
 
+	var hasErrors, hasWarnings bool
 	for _, line := range t.OutputLines {
 		switch line.Type {
 		case TypeError:
@@ -166,7 +167,7 @@ func (t *Task) hasOutputIssues() (hasErrors, hasWarnings bool) {
 			// Note: TypeInfo, TypeDetail, etc., are not considered "issues" for status determination.
 		}
 	}
-	return // Return the found flags.
+	return hasErrors, hasWarnings
 }
 
 // UpdateTaskContext heuristically adjusts the task's cognitive load and complexity

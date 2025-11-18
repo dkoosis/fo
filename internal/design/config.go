@@ -23,7 +23,7 @@ const (
 	BorderHeaderBox  BorderStyle = "header_box"
 	BorderFull       BorderStyle = "full_box"
 	BorderNone       BorderStyle = "none"
-	BorderAscii      BorderStyle = "ascii"
+	BorderASCII      BorderStyle = "ascii"
 )
 
 // Icon constants for monochrome/ASCII mode.
@@ -97,17 +97,17 @@ type Config struct {
 		TopCornerChar          string      `yaml:"top_corner_char"`
 		BottomCornerChar       string      `yaml:"bottom_corner_char"`
 		FooterContinuationChar string      `yaml:"footer_continuation_char"`
-		Table_HChar            string      `yaml:"table_h_char"`
-		Table_VChar            string      `yaml:"table_v_char"`
-		Table_XChar            string      `yaml:"table_x_char"`
-		Table_Corner_TL        string      `yaml:"table_corner_tl"`
-		Table_Corner_TR        string      `yaml:"table_corner_tr"`
-		Table_Corner_BL        string      `yaml:"table_corner_bl"`
-		Table_Corner_BR        string      `yaml:"table_corner_br"`
-		Table_T_Down           string      `yaml:"table_t_down"`
-		Table_T_Up             string      `yaml:"table_t_up"`
-		Table_T_Left           string      `yaml:"table_t_left"`
-		Table_T_Right          string      `yaml:"table_t_right"`
+		TableHChar            string      `yaml:"table_h_char"`
+		TableVChar             string      `yaml:"table_v_char"`
+		TableXChar             string      `yaml:"table_x_char"`
+		TableCornerTL          string      `yaml:"table_corner_tl"`
+		TableCornerTR          string      `yaml:"table_corner_tr"`
+		TableCornerBL          string      `yaml:"table_corner_bl"`
+		TableCornerBR          string      `yaml:"table_corner_br"`
+		TableTDown             string      `yaml:"table_t_down"`
+		TableTUp               string      `yaml:"table_t_up"`
+		TableTLeft             string      `yaml:"table_t_left"`
+		TableTRight            string      `yaml:"table_t_right"`
 	} `yaml:"border"`
 
 	Colors struct {
@@ -247,13 +247,13 @@ func DefaultConfig() *Config {
 }
 
 func NoColorConfig() *Config {
-	cfg := AsciiMinimalTheme()
+	cfg := ASCIIMinimalTheme()
 	ApplyMonochromeDefaults(cfg)
 	cfg.ThemeName = "no_color_derived_from_ascii"
 	return cfg
 }
 
-func AsciiMinimalTheme() *Config {
+func ASCIIMinimalTheme() *Config {
 	cfg := &Config{
 		ThemeName:    "ascii_minimal",
 		IsMonochrome: true,
@@ -608,35 +608,35 @@ func DeepCopyConfig(original *Config) *Config {
 
 	if original.Elements != nil {
 		copied.Elements = make(map[string]ElementStyleDef)
-		for k := range original.Elements {
-			v := original.Elements[k]
+		for elementKey := range original.Elements {
+			v := original.Elements[elementKey]
 			copiedTextStyle := make([]string, len(v.TextStyle))
 			copy(copiedTextStyle, v.TextStyle)
 			v.TextStyle = copiedTextStyle
-			copied.Elements[k] = v
+			copied.Elements[elementKey] = v
 		}
 	}
 	if original.Patterns.Intent != nil {
 		copied.Patterns.Intent = make(map[string][]string)
-		for k, v := range original.Patterns.Intent {
-			s := make([]string, len(v))
-			copy(s, v)
-			copied.Patterns.Intent[k] = s
+		for patternKey, patternValue := range original.Patterns.Intent {
+			s := make([]string, len(patternValue))
+			copy(s, patternValue)
+			copied.Patterns.Intent[patternKey] = s
 		}
 	}
 	if original.Patterns.Output != nil {
 		copied.Patterns.Output = make(map[string][]string)
-		for k, v := range original.Patterns.Output {
-			s := make([]string, len(v))
-			copy(s, v)
-			copied.Patterns.Output[k] = s
+		for patternKey, patternValue := range original.Patterns.Output {
+			s := make([]string, len(patternValue))
+			copy(s, patternValue)
+			copied.Patterns.Output[patternKey] = s
 		}
 	}
 	if original.Tools != nil {
 		copied.Tools = make(map[string]*ToolConfig)
-		for k, vOriginalTool := range original.Tools {
+		for toolKey, vOriginalTool := range original.Tools {
 			if vOriginalTool == nil {
-				copied.Tools[k] = nil
+				copied.Tools[toolKey] = nil
 				continue
 			}
 			toolCfgCopy := *vOriginalTool
@@ -648,7 +648,7 @@ func DeepCopyConfig(original *Config) *Config {
 					toolCfgCopy.OutputPatterns[pk] = s
 				}
 			}
-			copied.Tools[k] = &toolCfgCopy
+			copied.Tools[toolKey] = &toolCfgCopy
 		}
 	}
 	return &copied
@@ -676,7 +676,7 @@ func ApplyMonochromeDefaults(cfg *Config) {
 		Italic  string `yaml:"italic,omitempty"`
 	}{}
 
-	asciiMinimalElements := AsciiMinimalTheme().Elements
+	asciiMinimalElements := ASCIIMinimalTheme().Elements
 	if cfg.Elements == nil {
 		cfg.Elements = make(map[string]ElementStyleDef)
 		initBaseElementStyles(cfg.Elements)

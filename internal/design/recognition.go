@@ -122,10 +122,9 @@ func (pm *PatternMatcher) ClassifyOutputLine(line, cmd string, args []string) (s
 		if strings.HasPrefix(line, "PASS") {
 			context.Importance = 3
 			return TypeSuccess, context
-		} else {
-			context.Importance = 4
-			return TypeError, context
 		}
+		context.Importance = 4
+		return TypeError, context
 	}
 
 	// Default to detail type with medium importance

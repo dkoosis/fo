@@ -414,7 +414,7 @@ func (t *Task) RenderSummary() string {
 	summaryHeadingStyle := t.Config.GetElementStyle("Task_Content_Summary_Heading")
 	errorItemStyle := t.Config.GetElementStyle("Task_Content_Summary_Item_Error")
 	warningItemStyle := t.Config.GetElementStyle("Task_Content_Summary_Item_Warning")
-	baseIndentForSummaryItems := ""
+	var baseIndentForSummaryItems string
 	if t.Config.Style.UseBoxes && !t.Config.IsMonochrome {
 		sb.WriteString(t.Config.Border.VerticalChar + "\n")
 		baseIndentForSummaryItems = t.Config.Border.VerticalChar + " " + t.Config.GetIndentation(1)
@@ -529,19 +529,19 @@ func calculateHeaderWidth(label string, defaultWidth int) int {
 	return width
 }
 
-func formatDuration(d time.Duration) string {
-	if d < time.Millisecond {
-		return fmt.Sprintf("%dµs", d.Microseconds())
+func formatDuration(duration time.Duration) string {
+	if duration < time.Millisecond {
+		return fmt.Sprintf("%dµs", duration.Microseconds())
 	}
-	if d < time.Second {
-		return fmt.Sprintf("%dms", d.Milliseconds())
+	if duration < time.Second {
+		return fmt.Sprintf("%dms", duration.Milliseconds())
 	}
-	if d < time.Minute {
-		return fmt.Sprintf("%.1fs", d.Seconds())
+	if duration < time.Minute {
+		return fmt.Sprintf("%.1fs", duration.Seconds())
 	}
-	minutes := int(d.Minutes())
-	seconds := int(d.Seconds()) % 60
-	milliseconds := int(d.Milliseconds()) % 1000
+	minutes := int(duration.Minutes())
+	seconds := int(duration.Seconds()) % 60
+	milliseconds := int(duration.Milliseconds()) % 1000
 	return fmt.Sprintf("%d:%02d.%03ds", minutes, seconds, milliseconds)
 }
 
