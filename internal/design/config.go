@@ -2,6 +2,7 @@
 package design
 
 import (
+	"encoding/json"
 	"fmt"
 	"os" // For debug prints to stderr
 	"strings"
@@ -544,57 +545,29 @@ func (c *Config) ResetColor() string {
 	return normalizeANSIEscape(resetCode)
 }
 
+// DeepCopyConfig creates a deep copy of the Config using JSON marshal/unmarshal.
+// This automatically handles all fields, preventing bugs when new fields are added.
+// The small overhead of JSON encoding is acceptable since this is not in a hot path.
 func DeepCopyConfig(original *Config) *Config {
 	if original == nil {
 		return nil
 	}
-	copied := *original
 
-	if original.Elements != nil {
-		copied.Elements = make(map[string]ElementStyleDef)
-		for elementKey := range original.Elements {
-			v := original.Elements[elementKey]
-			copiedTextStyle := make([]string, len(v.TextStyle))
-			copy(copiedTextStyle, v.TextStyle)
-			v.TextStyle = copiedTextStyle
-			copied.Elements[elementKey] = v
-		}
+	// Use JSON round-trip for automatic deep copy of all fields
+	data, err := json.Marshal(original)
+	if err != nil {
+		// Fallback to shallow copy if marshal fails (shouldn't happen with valid configs)
+		copied := *original
+		return &copied
 	}
-	if original.Patterns.Intent != nil {
-		copied.Patterns.Intent = make(map[string][]string)
-		for patternKey, patternValue := range original.Patterns.Intent {
-			s := make([]string, len(patternValue))
-			copy(s, patternValue)
-			copied.Patterns.Intent[patternKey] = s
-		}
+
+	var copied Config
+	if err := json.Unmarshal(data, &copied); err != nil {
+		// Fallback to shallow copy if unmarshal fails
+		shallow := *original
+		return &shallow
 	}
-	if original.Patterns.Output != nil {
-		copied.Patterns.Output = make(map[string][]string)
-		for patternKey, patternValue := range original.Patterns.Output {
-			s := make([]string, len(patternValue))
-			copy(s, patternValue)
-			copied.Patterns.Output[patternKey] = s
-		}
-	}
-	if original.Tools != nil {
-		copied.Tools = make(map[string]*ToolConfig)
-		for toolKey, vOriginalTool := range original.Tools {
-			if vOriginalTool == nil {
-				copied.Tools[toolKey] = nil
-				continue
-			}
-			toolCfgCopy := *vOriginalTool
-			if vOriginalTool.OutputPatterns != nil {
-				toolCfgCopy.OutputPatterns = make(map[string][]string)
-				for pk, pv := range vOriginalTool.OutputPatterns {
-					s := make([]string, len(pv))
-					copy(s, pv)
-					toolCfgCopy.OutputPatterns[pk] = s
-				}
-			}
-			copied.Tools[toolKey] = &toolCfgCopy
-		}
-	}
+
 	return &copied
 }
 
