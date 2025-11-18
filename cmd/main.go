@@ -123,17 +123,15 @@ func main() {
 	behavioralSettings.Debug = cliFlagsGlobal.DebugSet && cliFlagsGlobal.Debug
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	defer signal.Stop(sigChan)
 
 	exitCode := executeCommand(ctx, cancel, sigChan, behavioralSettings, finalDesignConfig, cmdArgs)
 
 	if behavioralSettings.Debug {
 		fmt.Fprintf(os.Stderr, "[DEBUG main()] about to os.Exit(%d).\nBehavioral Config: %+v\n", exitCode, behavioralSettings)
 	}
-	// Note: defer signal.Stop(sigChan) will not run after os.Exit
+	cancel()
 	signal.Stop(sigChan)
 	os.Exit(exitCode)
 }
@@ -376,12 +374,10 @@ func executeCommand(ctx context.Context, cancel context.CancelFunc, sigChan chan
 				fmt.Print(summary)
 			}
 		}
-	} else {
-		if (task.Status == design.StatusError || task.Status == design.StatusWarning) && !isActualFoStartupFailure {
-			summary := task.RenderSummary()
-			if summary != "" {
-				fmt.Print(summary)
-			}
+	} else if (task.Status == design.StatusError || task.Status == design.StatusWarning) && !isActualFoStartupFailure {
+		summary := task.RenderSummary()
+		if summary != "" {
+			fmt.Print(summary)
 		}
 	}
 

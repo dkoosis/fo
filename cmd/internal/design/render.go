@@ -13,7 +13,7 @@ import (
 
 var titler = cases.Title(language.English)
 
-// RenderStartLine returns the formatted start line for the task
+// RenderStartLine returns the formatted start line for the task.
 func (t *Task) RenderStartLine() string {
 	var sb strings.Builder
 
@@ -89,7 +89,7 @@ func (t *Task) RenderStartLine() string {
 	return sb.String()
 }
 
-// RenderEndLine returns the formatted end line for the task
+// RenderEndLine returns the formatted end line for the task.
 func (t *Task) RenderEndLine() string {
 	var sb strings.Builder
 	durationStr := ""
@@ -562,7 +562,7 @@ func getProcessLabel(intent string) string {
 // cmd/internal/design/render.go
 // ... (imports and titler definition) ...
 
-// RenderDirectMessage creates the formatted status line
+// RenderDirectMessage creates the formatted status line.
 func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, indentLevel int) string {
 	var sb strings.Builder
 	var iconToUse string

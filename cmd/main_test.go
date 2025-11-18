@@ -15,7 +15,7 @@ import (
 	"github.com/davidkoosis/fo/cmd/internal/design"
 )
 
-// Updated plain text icon constants to match GetIcon's monochrome output
+// Updated plain text icon constants to match GetIcon's monochrome output.
 const (
 	plainIconStart   = "[START]"
 	plainIconSuccess = "[SUCCESS]"

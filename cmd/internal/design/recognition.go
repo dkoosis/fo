@@ -74,7 +74,7 @@ func (pm *PatternMatcher) DetectCommandIntent(cmd string, args []string) string 
 	return "running"
 }
 
-// ClassifyOutputLine determines the type of an output line
+// ClassifyOutputLine determines the type of an output line.
 func (pm *PatternMatcher) ClassifyOutputLine(line, cmd string, args []string) (string, LineContext) {
 	// Default context
 	context := LineContext{
@@ -132,7 +132,7 @@ func (pm *PatternMatcher) ClassifyOutputLine(line, cmd string, args []string) (s
 	return TypeDetail, context
 }
 
-// findToolConfig looks for a configuration for the specific tool being executed
+// findToolConfig looks for a configuration for the specific tool being executed.
 func (pm *PatternMatcher) findToolConfig(cmd string, args []string) *ToolConfig {
 	// Get the base command name without path
 	cmdName := filepath.Base(cmd)
@@ -154,7 +154,7 @@ func (pm *PatternMatcher) findToolConfig(cmd string, args []string) *ToolConfig 
 }
 
 // adjustCategoryImportance sets the appropriate importance level based on category
-// and returns the category type along with the updated context
+// and returns the category type along with the updated context.
 func adjustCategoryImportance(category string, context *LineContext) (string, LineContext) {
 	switch category {
 	case TypeError:
@@ -184,7 +184,7 @@ func adjustCategoryImportance(category string, context *LineContext) (string, Li
 	}
 }
 
-// FindSimilarLines groups similar output lines for summarization
+// FindSimilarLines groups similar output lines for summarization.
 func (pm *PatternMatcher) FindSimilarLines(lines []OutputLine) map[string][]OutputLine {
 	// Group lines by pattern similarity
 	groups := make(map[string][]OutputLine)
@@ -205,7 +205,7 @@ func (pm *PatternMatcher) FindSimilarLines(lines []OutputLine) map[string][]Outp
 	return groups
 }
 
-// extractPatternKey creates a representative key for a line to group similar outputs
+// extractPatternKey creates a representative key for a line to group similar outputs.
 func (pm *PatternMatcher) extractPatternKey(content, lineType string) string {
 	// Different extraction strategies based on line type
 	switch lineType {
@@ -227,7 +227,7 @@ func (pm *PatternMatcher) extractPatternKey(content, lineType string) string {
 	return lineType + "_" + strings.Split(content, " ")[0]
 }
 
-// DetermineCognitiveLoad analyzes output to determine overall cognitive load
+// DetermineCognitiveLoad analyzes output to determine overall cognitive load.
 func (pm *PatternMatcher) DetermineCognitiveLoad(lines []OutputLine) CognitiveLoadContext {
 	if !pm.Config.CognitiveLoad.AutoDetect {
 		return pm.Config.CognitiveLoad.Default

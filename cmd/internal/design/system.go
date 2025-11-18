@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Task represents a command execution as a visual task with formatted output
+// Task represents a command execution as a visual task with formatted output.
 type Task struct {
 	// Core properties
 	Label     string
@@ -28,7 +28,7 @@ type Task struct {
 	Context TaskContext
 }
 
-// OutputLine represents a classified line of command output
+// OutputLine represents a classified line of command output.
 type OutputLine struct {
 	// Content and metadata
 	Content     string

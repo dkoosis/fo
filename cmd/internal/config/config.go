@@ -11,7 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// CliFlags holds the values of command-line flags
+// CliFlags holds the values of command-line flags.
 type CliFlags struct {
 	Label         string
 	Stream        bool
@@ -33,7 +33,7 @@ type CliFlags struct {
 	DebugSet      bool
 }
 
-// AppConfig represents the application's overall configuration from .fo.yaml
+// AppConfig represents the application's overall configuration from .fo.yaml.
 type AppConfig struct {
 	Label           string                        `yaml:"label,omitempty"`
 	Stream          bool                          `yaml:"stream"`
@@ -49,7 +49,7 @@ type AppConfig struct {
 	Themes          map[string]*design.Config     `yaml:"themes"`  // Holds fully resolved design.Config objects
 }
 
-// Constants for default values
+// Constants for default values.
 const (
 	DefaultShowOutput      = "on-fail"
 	DefaultMaxBufferSize   = 10 * 1024 * 1024 // 10MB

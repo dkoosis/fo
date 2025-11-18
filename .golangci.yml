@@ -70,6 +70,7 @@ issues:
         - funlen
         - gocyclo
         - gocognit
+        - nestif
 
     # Exclude complexity checks from render.go (rendering logic is inherently complex)
     - path: 'cmd/internal/design/render\.go'
@@ -91,6 +92,11 @@ issues:
         - gocyclo
         - nestif
         - funlen
+
+    # Exclude nestif from progress.go (spinner logic has necessary nesting)
+    - path: 'cmd/internal/design/progress\.go'
+      linters:
+        - nestif
 
     # Exclude from bin directory (test utilities)
     - path: 'bin/'
