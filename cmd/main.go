@@ -25,19 +25,25 @@ type LocalAppConfig struct {
 	MaxLineLength int   // Max size for a single line from stdout/stderr
 }
 
-// main is the entry point of the application.
-func main() {
+// run executes the application logic and returns the exit code.
+// This allows integration tests to invoke the logic without os.Exit() terminating the test runner.
+func run(args []string) int {
 	// Check for subcommand first
-	if len(os.Args) > 1 {
-		command := os.Args[1]
+	if len(args) > 1 {
+		command := args[1]
 		if !strings.HasPrefix(command, "-") { // It's a potential subcommand
 			if command == "print" {
-				handlePrintCommand(os.Args[2:]) // Pass remaining args to print handler
-				return
+				handlePrintCommand(args[2:]) // Pass remaining args to print handler
+				return 0
 			}
 			// Add other subcommands here if needed
 		}
 	}
+
+	// Temporarily override os.Args for flag parsing
+	originalArgs := os.Args
+	os.Args = args
+	defer func() { os.Args = originalArgs }()
 
 	// If not a recognized subcommand, proceed as command wrapper
 	cliFlags, versionFlag := parseGlobalFlags()
@@ -47,7 +53,7 @@ func main() {
 		_, _ = fmt.Fprintf(os.Stdout, "fo version %s\n", version.Version)
 		_, _ = fmt.Fprintf(os.Stdout, "Commit: %s\n", version.CommitHash)
 		_, _ = fmt.Fprintf(os.Stdout, "Built: %s\n", version.BuildDate)
-		os.Exit(0)
+		return 0
 	}
 
 	// Load application configuration from .fo.yaml
@@ -58,7 +64,7 @@ func main() {
 	if len(cmdArgs) == 0 {
 		fmt.Fprintln(os.Stderr, "Error: No command specified after --")
 		fmt.Fprintln(os.Stderr, "Usage: fo [flags] -- <COMMAND> [ARGS...]")
-		os.Exit(1) // Exit if no command is provided
+		return 1 // Exit if no command is provided
 	}
 
 	// Apply any command-specific presets from the config file
@@ -137,9 +143,15 @@ func main() {
 	}
 
 	if behavioralSettings.Debug {
-		fmt.Fprintf(os.Stderr, "[DEBUG main()] about to os.Exit(%d).\nBehavioral Config: %+v\n", exitCode, behavioralSettings)
+		fmt.Fprintf(os.Stderr, "[DEBUG run()] returning exit code %d.\nBehavioral Config: %+v\n", exitCode, behavioralSettings)
 	}
-	os.Exit(exitCode)
+	return exitCode
+}
+
+// main is the entry point of the application.
+// It calls run() and exits with the returned exit code.
+func main() {
+	os.Exit(run(os.Args))
 }
 
 func convertAppConfigToLocal(appCfg *config.AppConfig) LocalAppConfig {
@@ -157,10 +169,11 @@ func convertAppConfigToLocal(appCfg *config.AppConfig) LocalAppConfig {
 }
 
 func findCommandArgs() []string {
-	for i, arg := range os.Args {
+	args := os.Args
+	for i, arg := range args {
 		if arg == "--" {
-			if i < len(os.Args)-1 {
-				return os.Args[i+1:]
+			if i < len(args)-1 {
+				return args[i+1:]
 			}
 			return []string{}
 		}
