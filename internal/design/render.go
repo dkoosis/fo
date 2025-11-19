@@ -756,8 +756,9 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 
 	sb.WriteString("\n")
 	if os.Getenv("FO_DEBUG_RENDER") != "" {
-		fmt.Fprintf(os.Stderr, "[DEBUG RenderDirectMessage] FG_raw: %q, FG_final: %q, BG_raw: %q, BG_final: %q, Style_final: %q, Message: %q, Output: %q\n",
-			rawFgColor, finalFgColor, rawBgColor, finalBgColor, finalTextStyle, message, sb.String())
+		fmt.Fprintf(os.Stderr,
+			"[DEBUG RenderDirectMessage] FG: %q->%q, BG: %q->%q, Style: %q, Msg: %q\n",
+			rawFgColor, finalFgColor, rawBgColor, finalBgColor, finalTextStyle, message)
 	}
 	return sb.String()
 }

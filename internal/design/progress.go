@@ -223,13 +223,19 @@ func (p *InlineProgress) runSpinner(ctx context.Context) {
 		if elemStyle.AdditionalChars != "" {
 			spinnerChars = elemStyle.AdditionalChars
 			if p.Debug {
-				fmt.Fprintf(os.Stderr, "[FO_DEBUG_SPINNER] Source: Theme ('%s') Task_Progress_Line.additional_chars: \"%s\"\n", p.Task.Config.ThemeName, spinnerChars)
+				fmt.Fprintf(os.Stderr,
+					"[FO_DEBUG_SPINNER] Source: Theme ('%s') Task_Progress_Line.additional_chars: \"%s\"\n",
+					p.Task.Config.ThemeName, spinnerChars)
 			}
 		} else if p.Debug {
-			fmt.Fprintf(os.Stderr, "[FO_DEBUG_SPINNER] Source: Default ASCII (Theme '%s' Task_Progress_Line.AdditionalChars was empty).\n", p.Task.Config.ThemeName)
+			fmt.Fprintf(os.Stderr,
+				"[FO_DEBUG_SPINNER] Source: Default ASCII (Theme '%s' AdditionalChars was empty).\n",
+				p.Task.Config.ThemeName)
 		}
 	} else if p.Debug {
-		fmt.Fprintf(os.Stderr, "[FO_DEBUG_SPINNER] Source: Default ASCII (Conditions for Unicode not met. IsMonochrome: %t, isTerminal: %t).\n", p.Task.Config.IsMonochrome, p.isTerminal)
+		fmt.Fprintf(os.Stderr,
+			"[FO_DEBUG_SPINNER] Source: Default ASCII (IsMonochrome: %t, isTerminal: %t).\n",
+			p.Task.Config.IsMonochrome, p.isTerminal)
 	}
 
 	// Ensure we have at least one character for the spinner animation

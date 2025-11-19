@@ -119,7 +119,10 @@ func (c *Console) RunSimple(command string, args ...string) error {
 	return err // Infrastructure error, pass through
 }
 
-func (c *Console) runContext(ctx context.Context, cancel context.CancelFunc, sigChan chan os.Signal, label, command string, args []string) (*TaskResult, error) {
+func (c *Console) runContext(
+	ctx context.Context, cancel context.CancelFunc, sigChan chan os.Signal,
+	label, command string, args []string,
+) (*TaskResult, error) {
 	labelToUse := label
 	if labelToUse == "" {
 		labelToUse = filepath.Base(command)
@@ -244,7 +247,9 @@ func (c *Console) runContext(ctx context.Context, cancel context.CancelFunc, sig
 	task.Complete(exitCode)
 
 	if c.cfg.Debug {
-		fmt.Fprintf(os.Stderr, "[DEBUG executeCommand] CI=%t, exitCode=%d, task.Status=%s, isActualFoStartupFailure=%t\n", c.cfg.Monochrome && !c.cfg.ShowTimer, exitCode, task.Status, isActualFoStartupFailure)
+		fmt.Fprintf(os.Stderr,
+			"[DEBUG executeCommand] CI=%t, exitCode=%d, task.Status=%s, isActualFoStartupFailure=%t\n",
+			c.cfg.Monochrome && !c.cfg.ShowTimer, exitCode, task.Status, isActualFoStartupFailure)
 	}
 
 	if useInlineProgress {
@@ -355,7 +360,10 @@ func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task, cmdDone ch
 		cmd.Stderr = os.Stderr
 		runErr := cmd.Run()
 		close(cmdDone) // Signal that command has finished
-		task.AddOutputLine(fmt.Sprintf("[fo] Error setting up stderr pipe for stream mode: %v", err), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true})
+		errCtx := design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true}
+		task.AddOutputLine(
+			fmt.Sprintf("[fo] Error setting up stderr pipe for stream mode: %v", err),
+			design.TypeError, errCtx)
 		exitCode := getExitCode(runErr, c.cfg.Debug)
 		var exitErr *exec.ExitError
 		if errors.As(runErr, &exitErr) {
@@ -385,8 +393,16 @@ func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task, cmdDone ch
 			if c.cfg.Debug {
 				fmt.Fprintf(os.Stderr, "[DEBUG executeStreamMode STDERR] Scanner error: %v\n", scanErr)
 			}
-			if !errors.Is(scanErr, io.EOF) && !strings.Contains(scanErr.Error(), "file already closed") && !strings.Contains(scanErr.Error(), "broken pipe") {
-				task.AddOutputLine(fmt.Sprintf("[fo] Error reading stderr in stream mode: %v", scanErr), design.TypeError, design.LineContext{CognitiveLoad: design.LoadMedium, Importance: 3, IsInternal: true})
+			isIgnorable := errors.Is(scanErr, io.EOF) ||
+				strings.Contains(scanErr.Error(), "file already closed") ||
+				strings.Contains(scanErr.Error(), "broken pipe")
+			if !isIgnorable {
+				errCtx := design.LineContext{
+					CognitiveLoad: design.LoadMedium, Importance: 3, IsInternal: true,
+				}
+				task.AddOutputLine(
+					fmt.Sprintf("[fo] Error reading stderr in stream mode: %v", scanErr),
+					design.TypeError, errCtx)
 			}
 		} else if c.cfg.Debug {
 			fmt.Fprintln(os.Stderr, "[DEBUG executeStreamMode STDERR] Scanner finished without error.")
@@ -421,7 +437,9 @@ func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task, cmdDone ch
 	return exitCode, runErr
 }
 
-func (c *Console) executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design.PatternMatcher, cmdDone chan struct{}) (int, error) {
+func (c *Console) executeCaptureMode(
+	cmd *exec.Cmd, task *design.Task, patternMatcher *design.PatternMatcher, cmdDone chan struct{},
+) (int, error) {
 	if c.cfg.Debug {
 		fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Starting in CAPTURE mode\n")
 	}
@@ -486,10 +504,14 @@ func (c *Console) executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMa
 		}
 
 		if scanErr := scanner.Err(); scanErr != nil {
-			if !errors.Is(scanErr, io.EOF) && !strings.Contains(scanErr.Error(), "file already closed") && !strings.Contains(scanErr.Error(), "broken pipe") {
+			isIgnorable := errors.Is(scanErr, io.EOF) ||
+				strings.Contains(scanErr.Error(), "file already closed") ||
+				strings.Contains(scanErr.Error(), "broken pipe")
+			if !isIgnorable {
 				*errVar = scanErr
 				if c.cfg.Debug {
-					fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Error scanning %s: %v\n", streamName, scanErr)
+					fmt.Fprintf(os.Stderr,
+						"[DEBUG executeCaptureMode] Error scanning %s: %v\n", streamName, scanErr)
 				}
 			}
 		} else if c.cfg.Debug {
@@ -518,11 +540,21 @@ func (c *Console) executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMa
 
 	// Note: Output was already classified line-by-line during capture above
 	// Report any scanning errors
-	if errStdoutCopy != nil && !errors.Is(errStdoutCopy, io.EOF) && !strings.Contains(errStdoutCopy.Error(), "file already closed") && !strings.Contains(errStdoutCopy.Error(), "broken pipe") {
-		task.AddOutputLine(fmt.Sprintf("[fo] Error reading stdout: %v", errStdoutCopy), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true})
+	isIgnorableErr := func(err error) bool {
+		return errors.Is(err, io.EOF) ||
+			strings.Contains(err.Error(), "file already closed") ||
+			strings.Contains(err.Error(), "broken pipe")
 	}
-	if errStderrCopy != nil && !errors.Is(errStderrCopy, io.EOF) && !strings.Contains(errStderrCopy.Error(), "file already closed") && !strings.Contains(errStderrCopy.Error(), "broken pipe") {
-		task.AddOutputLine(fmt.Sprintf("[fo] Error reading stderr: %v", errStderrCopy), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true})
+	errCtx := design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true}
+	if errStdoutCopy != nil && !isIgnorableErr(errStdoutCopy) {
+		task.AddOutputLine(
+			fmt.Sprintf("[fo] Error reading stdout: %v", errStdoutCopy),
+			design.TypeError, errCtx)
+	}
+	if errStderrCopy != nil && !isIgnorableErr(errStderrCopy) {
+		task.AddOutputLine(
+			fmt.Sprintf("[fo] Error reading stderr: %v", errStderrCopy),
+			design.TypeError, errCtx)
 	}
 
 	exitCode := getExitCode(runErr, c.cfg.Debug)

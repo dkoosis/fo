@@ -98,6 +98,7 @@ func LoadConfig() *AppConfig {
 		return appCfg
 	}
 
+	// #nosec G304 -- configPath is from getConfigPath() which returns only local or XDG config paths
 	yamlFile, err := os.ReadFile(configPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -164,7 +165,9 @@ func LoadConfig() *AppConfig {
 
 	if _, ok := appCfg.Themes[appCfg.ActiveThemeName]; !ok {
 		if appCfg.Debug || debugEnabled {
-			fmt.Fprintf(os.Stderr, "[DEBUG LoadConfig] Active theme '%s' not found. Falling back to '%s'.\n", appCfg.ActiveThemeName, DefaultActiveThemeName)
+			fmt.Fprintf(os.Stderr,
+				"[DEBUG LoadConfig] Active theme '%s' not found. Falling back to '%s'.\n",
+				appCfg.ActiveThemeName, DefaultActiveThemeName)
 		}
 		appCfg.ActiveThemeName = DefaultActiveThemeName
 	}
@@ -255,7 +258,9 @@ func MergeWithFlags(appCfg *AppConfig, cliFlags CliFlags) *design.Config {
 	finalDesignConfig, themeExists := appCfg.Themes[effectiveThemeName]
 	if !themeExists {
 		if appCfg.Debug || envDebug {
-			fmt.Fprintf(os.Stderr, "[DEBUG MergeWithFlags] Theme '%s' not found. Falling back to '%s'.\n", effectiveThemeName, DefaultActiveThemeName)
+			fmt.Fprintf(os.Stderr,
+				"[DEBUG MergeWithFlags] Theme '%s' not found. Falling back to '%s'.\n",
+				effectiveThemeName, DefaultActiveThemeName)
 		}
 		finalDesignConfig = appCfg.Themes[DefaultActiveThemeName]
 		if finalDesignConfig == nil {

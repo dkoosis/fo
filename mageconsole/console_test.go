@@ -9,6 +9,7 @@ func TestNewConsole_DefaultConfig(t *testing.T) {
 	c := NewConsole(ConsoleConfig{})
 	if c == nil {
 		t.Fatal("NewConsole returned nil")
+		return
 	}
 	if c.cfg.ShowOutputMode != "on-fail" {
 		t.Errorf("expected ShowOutputMode 'on-fail', got '%s'", c.cfg.ShowOutputMode)
@@ -103,6 +104,7 @@ func TestConsole_Run_Success(t *testing.T) {
 	}
 	if result == nil {
 		t.Fatal("expected result, got nil")
+		return
 	}
 	if result.ExitCode != 0 {
 		t.Errorf("expected exit code 0, got %d", result.ExitCode)
@@ -126,6 +128,7 @@ func TestConsole_Run_FailedCommand(t *testing.T) {
 	}
 	if result == nil {
 		t.Fatal("expected result even on failure")
+		return
 	}
 	if result.ExitCode != 42 {
 		t.Errorf("expected exit code 42, got %d", result.ExitCode)

@@ -269,8 +269,12 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 
 	var maxBufferSizeMB int
 	var maxLineLengthKB int
-	flag.IntVar(&maxBufferSizeMB, "max-buffer-size", 0, fmt.Sprintf("Maximum total buffer size in MB (per stream). Default: %dMB", config.DefaultMaxBufferSize/(1024*1024)))
-	flag.IntVar(&maxLineLengthKB, "max-line-length", 0, fmt.Sprintf("Maximum length in KB for a single line. Default: %dKB", config.DefaultMaxLineLength/1024))
+	defaultBufferMB := config.DefaultMaxBufferSize / (1024 * 1024)
+	defaultLineKB := config.DefaultMaxLineLength / 1024
+	flag.IntVar(&maxBufferSizeMB, "max-buffer-size", 0,
+		fmt.Sprintf("Maximum total buffer size in MB (per stream). Default: %dMB", defaultBufferMB))
+	flag.IntVar(&maxLineLengthKB, "max-line-length", 0,
+		fmt.Sprintf("Maximum length in KB for a single line. Default: %dKB", defaultLineKB))
 
 	flag.Parse()
 

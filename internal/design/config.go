@@ -354,7 +354,9 @@ func UnicodeVibrantTheme() *Config {
 	cfg.Elements["Task_Content_Summary_Item_Error"] = ElementStyleDef{BulletChar: "•", ColorFG: "Error"}
 	cfg.Elements["Task_Content_Summary_Item_Warning"] = ElementStyleDef{BulletChar: "•", ColorFG: "Warning"}
 	cfg.Elements["Table_Header_Cell_Text"] = ElementStyleDef{TextStyle: []string{"bold"}, ColorFG: "Process"}
-	cfg.Elements["Print_Header_Highlight"] = ElementStyleDef{TextCase: "none", TextStyle: []string{"bold"}, ColorFG: "White", ColorBG: "BlueBg"}
+	cfg.Elements["Print_Header_Highlight"] = ElementStyleDef{
+		TextCase: "none", TextStyle: []string{"bold"}, ColorFG: "White", ColorBG: "BlueBg",
+	}
 	cfg.Elements["Print_Success_Style"] = ElementStyleDef{ColorFG: "Success"}
 
 	cfg.Patterns = defaultPatterns()
@@ -531,7 +533,9 @@ func (c *Config) resolveColorName(name string) string {
 		codeToProcess = c.Colors.Italic
 	default:
 		// If name contains '[' and starts with an escape sequence, treat it as a raw ANSI code
-		if strings.Contains(name, "[") && (strings.HasPrefix(name, "\033") || strings.HasPrefix(name, "\x1b") || strings.HasPrefix(name, "\\033") || strings.HasPrefix(name, "\\x1b")) {
+		hasEscPrefix := strings.HasPrefix(name, "\033") || strings.HasPrefix(name, "\x1b") ||
+			strings.HasPrefix(name, "\\033") || strings.HasPrefix(name, "\\x1b")
+		if strings.Contains(name, "[") && hasEscPrefix {
 			codeToProcess = name
 		}
 	}
@@ -594,6 +598,7 @@ func DeepCopyConfig(original *Config) *Config {
 	}
 
 	// Use JSON round-trip for automatic deep copy of all fields
+	//nolint:musttag // Config fields have yaml tags; json marshal works for deep copy
 	data, err := json.Marshal(original)
 	if err != nil {
 		// Fallback to shallow copy if marshal fails (shouldn't happen with valid configs)
@@ -602,6 +607,7 @@ func DeepCopyConfig(original *Config) *Config {
 	}
 
 	var copied Config
+	//nolint:musttag // Config fields have yaml tags; json marshal works for deep copy
 	if err := json.Unmarshal(data, &copied); err != nil {
 		// Fallback to shallow copy if unmarshal fails
 		shallow := *original

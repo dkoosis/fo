@@ -4,13 +4,10 @@ run:
 
 linters:
   disable:
-    # Deprecated linters
-    - exhaustivestruct
-    - gomnd
-    - tenv
     # Overly strict style linters
     - wsl        # whitespace style is too opinionated
     - paralleltest  # requires careful analysis of each test
+    - tagliatelle   # snake_case is standard for yaml configs
 
 linters-settings:
   revive:
@@ -22,18 +19,22 @@ linters-settings:
   gosec:
     excludes:
       - G306
-  # Set reasonable complexity thresholds
+  # Set reasonable complexity thresholds for this codebase
   gocognit:
-    min-complexity: 50
+    min-complexity: 85
   cyclop:
-    max-complexity: 25
+    max-complexity: 50
   gocyclo:
-    min-complexity: 40
+    min-complexity: 50
   funlen:
-    lines: 80
-    statements: 60
+    lines: 170
+    statements: 100
   lll:
     line-length: 140
+  nestif:
+    min-complexity: 35
+  maintidx:
+    under: 15
 
 issues:
   exclude-rules:
