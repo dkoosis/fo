@@ -597,7 +597,7 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 
 	// Determine the styleKey based on messageType to fetch ElementStyleDef
 	switch lowerMessageType {
-	case "h1", "h2", "h3", StatusSuccess, StatusWarning, StatusError, TypeInfo:
+	case MessageTypeH1, MessageTypeH2, MessageTypeH3, StatusSuccess, StatusWarning, StatusError, TypeInfo:
 		// Direct mapping from type to element style key (properly capitalized)
 		styleKey = titler.String(lowerMessageType)
 	case MessageTypeHeader: // Legacy support for MessageTypeHeader type
@@ -617,19 +617,19 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 	default:
 		// Fallback icon logic based on message type
 		switch lowerMessageType {
-		case "h1", MessageTypeHeader:
+		case MessageTypeH1, MessageTypeHeader:
 			iconToUse = cfg.GetIcon("Start")
-		case "h2":
+		case MessageTypeH2:
 			iconToUse = cfg.GetIcon("Info")
-		case "h3":
+		case MessageTypeH3:
 			iconToUse = cfg.GetIcon("Bullet")
-		case "success":
+		case MessageTypeSuccess, StatusSuccess:
 			iconToUse = cfg.GetIcon("Success")
-		case "warning":
+		case MessageTypeWarning, StatusWarning:
 			iconToUse = cfg.GetIcon("Warning")
-		case "error":
+		case MessageTypeError, StatusError:
 			iconToUse = cfg.GetIcon("Error")
-		case "info":
+		case MessageTypeInfo, TypeInfo:
 			iconToUse = cfg.GetIcon("Info")
 		default:
 			iconToUse = cfg.GetIcon("Info")
@@ -642,15 +642,15 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 	} else {
 		// Fallback color logic based on message type
 		switch lowerMessageType {
-		case "h1", "h2", MessageTypeHeader:
+		case MessageTypeH1, MessageTypeH2, MessageTypeHeader:
 			rawFgColor = "Process"
-		case "success":
+		case MessageTypeSuccess, StatusSuccess:
 			rawFgColor = "Success"
-		case "warning":
+		case MessageTypeWarning, StatusWarning:
 			rawFgColor = "Warning"
-		case "error":
+		case MessageTypeError, StatusError:
 			rawFgColor = "Error"
-		case "info":
+		case MessageTypeInfo, TypeInfo:
 			rawFgColor = "Process"
 		default:
 			rawFgColor = "Detail"
@@ -662,7 +662,7 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 		rawBgColor = elementStyle.ColorBG
 	}
 
-	if lowerMessageType == "raw" {
+	if lowerMessageType == MessageTypeRaw {
 		rawFgColor = ""
 		rawBgColor = ""
 	}
@@ -689,7 +689,7 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 	sb.WriteString(strings.Repeat(cfg.GetIndentation(1), indentLevel))
 
 	needsReset := false
-	if lowerMessageType != "raw" {
+	if lowerMessageType != MessageTypeRaw {
 		// Apply all styling at once to ensure proper ordering
 		// Background must come before foreground for proper display
 		fullStyle := ""

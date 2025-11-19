@@ -2,6 +2,8 @@
 
 A Go library for running shell commands with formatted, colorful console output. Designed for use in build scripts, particularly with [Mage](https://magefile.org/).
 
+**Note:** This library is the engine behind the [`fo`](../README.md) CLI. All features available in the `fo` command-line tool are also available programmatically via this library. See the [main README](../README.md) for CLI usage examples.
+
 ## Installation
 
 ```bash

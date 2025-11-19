@@ -93,6 +93,18 @@ const (
 	StatusError   = "error"   // Task failed or completed with errors.
 )
 
+// MessageType constants for RenderDirectMessage to provide type safety and prevent typos.
+const (
+	MessageTypeRaw     = "raw"     // Raw output without any formatting
+	MessageTypeH1      = "h1"      // Level 1 header
+	MessageTypeH2      = "h2"      // Level 2 header
+	MessageTypeH3      = "h3"      // Level 3 header
+	MessageTypeSuccess = "success" // Success message (alias for StatusSuccess)
+	MessageTypeWarning = "warning" // Warning message (alias for StatusWarning)
+	MessageTypeError   = "error"   // Error message (alias for StatusError)
+	MessageTypeInfo    = "info"    // Info message (alias for TypeInfo)
+)
+
 // NewTask creates and initializes a new Task.
 func NewTask(label, intent, command string, args []string, config *Config) *Task {
 	return &Task{

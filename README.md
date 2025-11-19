@@ -73,6 +73,19 @@ lint:
 	@fo -l "Running linter" -- golangci-lint run ./...
 ```
 
+## Programmatic Usage
+
+The `fo` CLI is built on top of the `mageconsole` library. If you want to use the same formatting capabilities programmatically in your Go code (e.g., in Magefiles or build scripts), see the [mageconsole documentation](mageconsole/README.md).
+
+```go
+import "github.com/davidkoosis/fo/mageconsole"
+
+console := mageconsole.DefaultConsole()
+_, err := console.Run("My Task", "go", "build", "./...")
+```
+
+The `mageconsole` package provides all the same features as the CLI in a type-safe Go API.
+
 ## License
 
 MIT License
