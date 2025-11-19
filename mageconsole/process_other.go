@@ -28,8 +28,12 @@ func killProcessGroupWithSIGKILL(cmd *exec.Cmd) error {
 	return cmd.Process.Kill()
 }
 
-// getExitCodeFromError returns false on non-Unix platforms as WaitStatus is not available.
+// getExitCodeFromError extracts the exit code from an exec.ExitError on non-Unix platforms.
+// Uses ProcessState.ExitCode() which is available cross-platform since Go 1.12.
 func getExitCodeFromError(exitErr *exec.ExitError) (int, bool) {
+	if exitErr.ProcessState != nil {
+		return exitErr.ProcessState.ExitCode(), true
+	}
 	return 0, false
 }
 
