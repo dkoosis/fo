@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -68,6 +69,23 @@ func getGitCommit() string {
 	return strings.TrimSpace(string(out))
 }
 
+// isCommandNotFound checks if the error indicates the command was not found.
+// This handles exec.ErrNotFound and platform-specific string fallbacks.
+func isCommandNotFound(err error) bool {
+	if errors.Is(err, exec.ErrNotFound) {
+		return true
+	}
+	// Fallback string matching for edge cases
+	errStr := err.Error()
+	if strings.Contains(errStr, "executable file not found") {
+		return true
+	}
+	if strings.Contains(errStr, "no such file or directory") {
+		return true
+	}
+	return false
+}
+
 // QA runs all quality assurance checks.
 func QA() error {
 	fmt.Println("🔍 Running QA checks...")
@@ -84,7 +102,11 @@ func QA() error {
 
 	// Staticcheck
 	if _, err := console.Run("Staticcheck", "staticcheck", "./..."); err != nil {
-		fmt.Println("⚠️  Staticcheck failed (install: go install honnef.co/go/tools/cmd/staticcheck@latest)")
+		if isCommandNotFound(err) {
+			fmt.Println("⚠️  Staticcheck not found (install: go install honnef.co/go/tools/cmd/staticcheck@latest)")
+		} else {
+			return fmt.Errorf("staticcheck failed: %w", err)
+		}
 	}
 
 	// Golangci-lint with extensive checks
@@ -93,12 +115,20 @@ func QA() error {
 		"--disable=exhaustivestruct,exhaustruct,varnamelen,ireturn,wrapcheck,nlreturn,gochecknoglobals,gomnd,mnd,depguard,tagalign",
 		"--timeout=5m",
 		"./..."); err != nil {
-		fmt.Println("⚠️  Golangci-lint failed (install: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)")
+		if isCommandNotFound(err) {
+			fmt.Println("⚠️  Golangci-lint not found (install: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)")
+		} else {
+			return fmt.Errorf("golangci-lint failed: %w", err)
+		}
 	}
 
 	// Security scan
 	if _, err := console.Run("Gosec Security Scan", "gosec", "-quiet", "./..."); err != nil {
-		fmt.Println("⚠️  Gosec failed (install: go install github.com/securego/gosec/v2/cmd/gosec@latest)")
+		if isCommandNotFound(err) {
+			fmt.Println("⚠️  Gosec not found (install: go install github.com/securego/gosec/v2/cmd/gosec@latest)")
+		} else {
+			return fmt.Errorf("gosec failed: %w", err)
+		}
 	}
 
 	// Build
