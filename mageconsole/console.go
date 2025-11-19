@@ -461,26 +461,15 @@ func (c *Console) executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMa
 		return getExitCode(err, c.cfg.Debug), err
 	}
 
-	var outputBuffer bytes.Buffer
-	stdoutDone := make(chan struct{})
-	stderrDone := make(chan struct{})
-
-	go func() {
-		defer close(stdoutDone)
-		limitedReader := io.LimitReader(&stdoutBuffer, c.cfg.MaxBufferSize)
-		_, _ = outputBuffer.ReadFrom(limitedReader)
-	}()
-
-	go func() {
-		defer close(stderrDone)
-		limitedReader := io.LimitReader(&stderrBuffer, c.cfg.MaxBufferSize)
-		_, _ = outputBuffer.ReadFrom(limitedReader)
-	}()
-
 	runErr := cmd.Wait()
 	wgRead.Wait()
-	<-stdoutDone
-	<-stderrDone
+
+	// Combine stdout and stderr after they're fully captured
+	var outputBuffer bytes.Buffer
+	limitedStdout := io.LimitReader(&stdoutBuffer, c.cfg.MaxBufferSize)
+	_, _ = outputBuffer.ReadFrom(limitedStdout)
+	limitedStderr := io.LimitReader(&stderrBuffer, c.cfg.MaxBufferSize)
+	_, _ = outputBuffer.ReadFrom(limitedStderr)
 
 	if errStdoutCopy != nil && !errors.Is(errStdoutCopy, io.EOF) && !strings.Contains(errStdoutCopy.Error(), "file already closed") && !strings.Contains(errStdoutCopy.Error(), "broken pipe") {
 		task.AddOutputLine(fmt.Sprintf("[fo] Error copying stdout: %v", errStdoutCopy), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
