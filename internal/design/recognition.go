@@ -6,6 +6,12 @@ import (
 	"strings"
 )
 
+var (
+	stackTracePattern = regexp.MustCompile(`\w+\.(go|js|py|java|rb|cpp|c):\d+`)
+	passFailPattern   = regexp.MustCompile(`^(PASS|FAIL):`)
+	fileLinePattern   = regexp.MustCompile(`([^/\s]+\.[a-zA-Z0-9]+:\d+)`)
+)
+
 // PatternMatcher provides intelligent pattern detection for commands and output.
 type PatternMatcher struct {
 	Config *Config
@@ -20,6 +26,10 @@ func NewPatternMatcher(config *Config) *PatternMatcher {
 
 // DetectCommandIntent identifies the purpose of a command.
 func (pm *PatternMatcher) DetectCommandIntent(cmd string, args []string) string {
+	if pm == nil || pm.Config == nil {
+		return "running"
+	}
+
 	// Check tool-specific configuration first
 	if toolConfig := pm.findToolConfig(cmd, args); toolConfig != nil && toolConfig.Intent != "" {
 		return toolConfig.Intent
@@ -78,9 +88,15 @@ func (pm *PatternMatcher) DetectCommandIntent(cmd string, args []string) string 
 func (pm *PatternMatcher) ClassifyOutputLine(line, cmd string, args []string) (string, LineContext) {
 	// Default context
 	context := LineContext{
-		CognitiveLoad: pm.Config.CognitiveLoad.Default,
+		CognitiveLoad: LoadMedium,
 		Importance:    2, // Default importance
 		IsHighlighted: false,
+	}
+	if pm != nil && pm.Config != nil {
+		context.CognitiveLoad = pm.Config.CognitiveLoad.Default
+	}
+	if pm == nil || pm.Config == nil {
+		return TypeDetail, context
 	}
 
 	// Check tool-specific patterns first
@@ -93,7 +109,7 @@ func (pm *PatternMatcher) ClassifyOutputLine(line, cmd string, args []string) (s
 					continue
 				}
 
-				if regexp.MustCompile(pattern).MatchString(line) {
+				if matchPattern(line, pattern) {
 					return adjustCategoryImportance(category, &context)
 				}
 			}
@@ -103,7 +119,7 @@ func (pm *PatternMatcher) ClassifyOutputLine(line, cmd string, args []string) (s
 	// Check against global patterns
 	for category, patterns := range pm.Config.Patterns.Output {
 		for _, pattern := range patterns {
-			if regexp.MustCompile(pattern).MatchString(line) {
+			if matchPattern(line, pattern) {
 				return adjustCategoryImportance(category, &context)
 			}
 		}
@@ -112,13 +128,13 @@ func (pm *PatternMatcher) ClassifyOutputLine(line, cmd string, args []string) (s
 	// Special case handling for common patterns not covered above
 
 	// Stack traces often have file:line format
-	if regexp.MustCompile(`\w+\.(go|js|py|java|rb|cpp|c):\d+`).MatchString(line) {
+	if stackTracePattern.MatchString(line) {
 		context.Importance = 4
 		return TypeError, context
 	}
 
 	// Lines with "PASS" or "FAIL" for tests
-	if regexp.MustCompile(`^(PASS|FAIL):`).MatchString(line) {
+	if passFailPattern.MatchString(line) {
 		if strings.HasPrefix(line, "PASS") {
 			context.Importance = 3
 			return TypeSuccess, context
@@ -133,6 +149,10 @@ func (pm *PatternMatcher) ClassifyOutputLine(line, cmd string, args []string) (s
 
 // findToolConfig looks for a configuration for the specific tool being executed.
 func (pm *PatternMatcher) findToolConfig(cmd string, args []string) *ToolConfig {
+	if pm == nil || pm.Config == nil {
+		return nil
+	}
+
 	// Get the base command name without path
 	cmdName := filepath.Base(cmd)
 
@@ -150,6 +170,15 @@ func (pm *PatternMatcher) findToolConfig(cmd string, args []string) *ToolConfig 
 	}
 
 	return nil
+}
+
+func matchPattern(line, pattern string) bool {
+	if pattern == "" {
+		return false
+	}
+
+	matched, err := regexp.MatchString(pattern, line)
+	return err == nil && matched
 }
 
 // adjustCategoryImportance sets the appropriate importance level based on category
@@ -187,6 +216,9 @@ func adjustCategoryImportance(category string, context *LineContext) (string, Li
 func (pm *PatternMatcher) FindSimilarLines(lines []OutputLine) map[string][]OutputLine {
 	// Group lines by pattern similarity
 	groups := make(map[string][]OutputLine)
+	if pm == nil {
+		return groups
+	}
 
 	for _, line := range lines {
 		// Skip lines that are too short to meaningfully group
@@ -210,7 +242,7 @@ func (pm *PatternMatcher) extractPatternKey(content, lineType string) string {
 	switch lineType {
 	case TypeError, TypeWarning:
 		// For errors and warnings, use file:line format as base if present
-		fileLineMatch := regexp.MustCompile(`([^/\s]+\.[a-zA-Z0-9]+:\d+)`).FindStringSubmatch(content)
+		fileLineMatch := fileLinePattern.FindStringSubmatch(content)
 		if len(fileLineMatch) > 1 {
 			return lineType + "_" + fileLineMatch[1]
 		}
@@ -228,6 +260,10 @@ func (pm *PatternMatcher) extractPatternKey(content, lineType string) string {
 
 // DetermineCognitiveLoad analyzes output to determine overall cognitive load.
 func (pm *PatternMatcher) DetermineCognitiveLoad(lines []OutputLine) CognitiveLoadContext {
+	if pm == nil || pm.Config == nil {
+		return LoadMedium
+	}
+
 	if !pm.Config.CognitiveLoad.AutoDetect {
 		return pm.Config.CognitiveLoad.Default
 	}

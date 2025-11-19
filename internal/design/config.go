@@ -97,7 +97,7 @@ type Config struct {
 		TopCornerChar          string      `yaml:"top_corner_char"`
 		BottomCornerChar       string      `yaml:"bottom_corner_char"`
 		FooterContinuationChar string      `yaml:"footer_continuation_char"`
-		TableHChar            string      `yaml:"table_h_char"`
+		TableHChar             string      `yaml:"table_h_char"`
 		TableVChar             string      `yaml:"table_v_char"`
 		TableXChar             string      `yaml:"table_x_char"`
 		TableCornerTL          string      `yaml:"table_corner_tl"`
