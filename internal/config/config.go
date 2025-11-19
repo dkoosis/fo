@@ -78,8 +78,9 @@ func LoadConfig() *AppConfig {
 	}
 
 	initialDebug := os.Getenv("FO_DEBUG") != ""
+	debugEnabled := initialDebug
 
-	if initialDebug {
+	if debugEnabled {
 		fmt.Fprintln(os.Stderr, "--- [DEBUG LoadConfig] Initial Hardcoded Themes ---")
 		for themeName, themeCfg := range appCfg.Themes {
 			if themeCfg != nil {
@@ -92,7 +93,7 @@ func LoadConfig() *AppConfig {
 
 	configPath := getConfigPath() // Uses the corrected getConfigPath
 	if configPath == "" {
-		if initialDebug {
+		if debugEnabled {
 			fmt.Fprintln(os.Stderr, "[DEBUG LoadConfig] No .fo.yaml config file found or user config dir problematic, using defaults only.")
 		}
 		return appCfg
@@ -102,7 +103,7 @@ func LoadConfig() *AppConfig {
 	if err != nil {
 		if !os.IsNotExist(err) {
 			fmt.Fprintf(os.Stderr, "Warning: Error reading config file %s: %v. Using defaults.\n", configPath, err)
-		} else if initialDebug {
+		} else if debugEnabled {
 			fmt.Fprintf(os.Stderr, "[DEBUG LoadConfig] Config file %s not found. Using defaults.\n", configPath)
 		}
 		return appCfg
@@ -142,7 +143,7 @@ func LoadConfig() *AppConfig {
 	}
 
 	if yamlAppCfg.Themes != nil {
-		if appCfg.Debug || initialDebug {
+		if appCfg.Debug || debugEnabled {
 			fmt.Fprintln(os.Stderr, "--- [DEBUG LoadConfig] Processing Themes from YAML ---")
 		}
 		for name, themeFromFile := range yamlAppCfg.Themes {
@@ -150,24 +151,24 @@ func LoadConfig() *AppConfig {
 			if copiedTheme != nil {
 				copiedTheme.ThemeName = name
 				appCfg.Themes[name] = copiedTheme
-				if appCfg.Debug || initialDebug {
+				if appCfg.Debug || debugEnabled {
 					fmt.Fprintf(os.Stderr, "Loaded/Overwrote Theme from YAML: %s (IsMonochrome: %t)\n", name, copiedTheme.IsMonochrome)
 				}
 			}
 		}
-		if appCfg.Debug || initialDebug {
+		if appCfg.Debug || debugEnabled {
 			fmt.Fprintln(os.Stderr, "---------------------------------------------------")
 		}
 	}
 
 	if _, ok := appCfg.Themes[appCfg.ActiveThemeName]; !ok {
-		if appCfg.Debug || initialDebug {
+		if appCfg.Debug || debugEnabled {
 			fmt.Fprintf(os.Stderr, "[DEBUG LoadConfig] Active theme '%s' not found. Falling back to '%s'.\n", appCfg.ActiveThemeName, DefaultActiveThemeName)
 		}
 		appCfg.ActiveThemeName = DefaultActiveThemeName
 	}
 
-	if appCfg.Debug || initialDebug {
+	if appCfg.Debug || debugEnabled {
 		fmt.Fprintf(os.Stderr, "[DEBUG LoadConfig] Loaded config from %s. Final Active theme: %s.\n", configPath, appCfg.ActiveThemeName)
 	}
 	return appCfg
@@ -176,11 +177,13 @@ func LoadConfig() *AppConfig {
 // getConfigPath tries to find the .fo.yaml configuration file.
 // It checks local directory first, then XDG UserConfigDir (if valid).
 func getConfigPath() string {
+	debugEnabled := os.Getenv("FO_DEBUG") != ""
+
 	// Try local path first
 	localPath := ".fo.yaml"
 	if _, err := os.Stat(localPath); err == nil {
 		// If FO_DEBUG is set, print that we're using the local path
-		if os.Getenv("FO_DEBUG") != "" {
+		if debugEnabled {
 			absLocalPath, _ := filepath.Abs(localPath)
 			fmt.Fprintf(os.Stderr, "[DEBUG getConfigPath] Using local config file: %s\n", absLocalPath)
 		}
@@ -195,22 +198,22 @@ func getConfigPath() string {
 		xdgPath := filepath.Join(configHome, "fo", ".fo.yaml")
 		if _, errStat := os.Stat(xdgPath); errStat == nil {
 			// If FO_DEBUG is set, print that we're using the XDG path
-			if os.Getenv("FO_DEBUG") != "" {
+			if debugEnabled {
 				fmt.Fprintf(os.Stderr, "[DEBUG getConfigPath] Using XDG config file: %s\n", xdgPath)
 			}
 			return xdgPath
 		}
 		// If FO_DEBUG is set and XDG path not found, print that.
-		if os.Getenv("FO_DEBUG") != "" {
+		if debugEnabled {
 			fmt.Fprintf(os.Stderr, "[DEBUG getConfigPath] XDG config file not found at: %s\n", xdgPath)
 		}
-	} else if os.Getenv("FO_DEBUG") != "" {
+	} else if debugEnabled {
 		// If FO_DEBUG is set and UserConfigDir was problematic, print that.
 		fmt.Fprintf(os.Stderr, "[DEBUG getConfigPath] UserConfigDir error or unsuitable path. Error: %v, Path: '%s'\n", err, configHome)
 	}
 
 	// Fallback or if XDG path is not viable/found
-	if os.Getenv("FO_DEBUG") != "" {
+	if debugEnabled {
 		fmt.Fprintln(os.Stderr, "[DEBUG getConfigPath] No config file found. Will use default settings.")
 	}
 	return "" // No config file found or UserConfigDir was problematic
@@ -223,15 +226,16 @@ func MergeWithFlags(appCfg *AppConfig, cliFlags CliFlags) *design.Config {
 	if cliFlags.ThemeName != "" {
 		effectiveThemeName = cliFlags.ThemeName
 	}
+	envDebug := os.Getenv("FO_DEBUG") != ""
 
 	finalDesignConfig, themeExists := appCfg.Themes[effectiveThemeName]
 	if !themeExists {
-		if appCfg.Debug || os.Getenv("FO_DEBUG") != "" {
+		if appCfg.Debug || envDebug {
 			fmt.Fprintf(os.Stderr, "[DEBUG MergeWithFlags] Theme '%s' not found. Falling back to '%s'.\n", effectiveThemeName, DefaultActiveThemeName)
 		}
 		finalDesignConfig = appCfg.Themes[DefaultActiveThemeName]
 		if finalDesignConfig == nil {
-			if appCfg.Debug || os.Getenv("FO_DEBUG") != "" {
+			if appCfg.Debug || envDebug {
 				fmt.Fprintln(os.Stderr, "[DEBUG MergeWithFlags] Default theme also missing. Using coded UnicodeVibrant as fallback.")
 			}
 			finalDesignConfig = design.UnicodeVibrantTheme()
@@ -239,6 +243,15 @@ func MergeWithFlags(appCfg *AppConfig, cliFlags CliFlags) *design.Config {
 	}
 
 	finalDesignConfig = design.DeepCopyConfig(finalDesignConfig)
+	if finalDesignConfig == nil {
+		if appCfg.Debug || envDebug {
+			fmt.Fprintln(os.Stderr, "[DEBUG MergeWithFlags] Failed to copy design config. Falling back to default theme.")
+		}
+		finalDesignConfig = design.DeepCopyConfig(appCfg.Themes[DefaultActiveThemeName])
+		if finalDesignConfig == nil {
+			finalDesignConfig = design.UnicodeVibrantTheme()
+		}
+	}
 	finalDesignConfig.ThemeName = effectiveThemeName
 
 	effectiveNoColor := appCfg.NoColor
@@ -286,7 +299,7 @@ func MergeWithFlags(appCfg *AppConfig, cliFlags CliFlags) *design.Config {
 		finalDesignConfig.Style.NoTimer = true
 	}
 
-	if appCfg.Debug || os.Getenv("FO_DEBUG") != "" {
+	if appCfg.Debug || envDebug {
 		fmt.Fprintf(os.Stderr, "[DEBUG MergeWithFlags] Final Design for theme '%s': IsMonochrome=%t, NoTimer=%t\n",
 			finalDesignConfig.ThemeName, finalDesignConfig.IsMonochrome, finalDesignConfig.Style.NoTimer)
 	}
@@ -298,10 +311,11 @@ func MergeWithFlags(appCfg *AppConfig, cliFlags CliFlags) *design.Config {
 func ApplyCommandPreset(appCfg *AppConfig, commandName string) {
 	baseCommand := filepath.Base(commandName)
 	keysToTry := []string{commandName, baseCommand}
+	debugEnabled := appCfg.Debug || os.Getenv("FO_DEBUG") != ""
 
 	for _, cmdKey := range keysToTry {
 		if preset, ok := appCfg.Presets[cmdKey]; ok {
-			if appCfg.Debug || os.Getenv("FO_DEBUG") != "" {
+			if debugEnabled {
 				fmt.Fprintf(os.Stderr, "[DEBUG ApplyCommandPreset] Applying preset for '%s'\n", cmdKey)
 			}
 			if preset.Label != "" {
