@@ -111,6 +111,7 @@ type ElementStyleDef struct {
 type Config struct {
 	ThemeName    string `yaml:"-"`
 	IsMonochrome bool   `yaml:"-"`
+	CI           bool   `yaml:"-"` // Explicit CI mode flag (takes precedence over heuristics)
 
 	Style struct {
 		UseBoxes          bool   `yaml:"use_boxes"`
@@ -181,10 +182,10 @@ type PatternsRepo struct {
 	Output map[string][]string `yaml:"output"`
 }
 
-// normalizeANSIEscape normalizes ANSI escape sequences to ensure they start with
+// NormalizeANSIEscape normalizes ANSI escape sequences to ensure they start with
 // the ESC character (0x1b). YAML should handle escape sequences correctly, but
 // this function normalizes them to handle edge cases and ensure consistency.
-func normalizeANSIEscape(s string) string {
+func NormalizeANSIEscape(s string) string {
 	if s == "" {
 		return ""
 	}
@@ -563,7 +564,7 @@ func (c *Config) resolveColorName(name string) string {
 			}
 		}
 	}
-	return normalizeANSIEscape(codeToProcess)
+	return NormalizeANSIEscape(codeToProcess)
 }
 
 // GetColorObj returns a Color wrapper for the given color key.
@@ -581,7 +582,7 @@ func (c *Config) ResetColor() string {
 	if resetCode == "" {
 		resetCode = string([]byte{27}) + "[0m"
 	}
-	return normalizeANSIEscape(resetCode)
+	return NormalizeANSIEscape(resetCode)
 }
 
 // DeepCopyConfig creates a deep copy of the Config using JSON marshal/unmarshal.

@@ -26,8 +26,10 @@ type InlineProgress struct {
 
 // NewInlineProgress creates a progress tracker for a task.
 func NewInlineProgress(task *Task, debugMode bool) *InlineProgress {
-	// Detect if we're in CI mode from the task config
-	isCIMode := task.Config.IsMonochrome && task.Config.Style.NoTimer
+	// Determine if we're in CI mode:
+	// - Prefer explicit CI flag from config
+	// - Fall back to heuristic (monochrome + no-timer) for backwards compatibility
+	isCIMode := task.Config.CI || (task.Config.IsMonochrome && task.Config.Style.NoTimer)
 
 	// Determine if we're in a terminal
 	isTerminal := IsInteractiveTerminal()

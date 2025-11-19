@@ -177,6 +177,7 @@ func hasPrefix(line string, prefixes []string) bool {
 
 // ClassifyOutputLine determines the type of an output line.
 // Uses fast-path string prefix checks before falling back to regex patterns for performance.
+// When multiple patterns match, the category with the highest accumulated score wins.
 func (pm *PatternMatcher) ClassifyOutputLine(line, cmd string, args []string) (string, LineContext) {
 	// Default context
 	context := LineContext{
@@ -186,6 +187,7 @@ func (pm *PatternMatcher) ClassifyOutputLine(line, cmd string, args []string) (s
 	}
 
 	// Fast-path: Check common prefixes before regex (much faster for most cases)
+	// These are strong signals with high confidence, so return immediately
 	if hasPrefix(line, errorPrefixes) {
 		context.Importance = 5
 		context.CognitiveLoad = LoadHigh
@@ -205,7 +207,11 @@ func (pm *PatternMatcher) ClassifyOutputLine(line, cmd string, args []string) (s
 		return TypeInfo, context
 	}
 
-	// Check tool-specific patterns using precompiled regexes (for complex patterns)
+	// Scoring-based classification for regex patterns
+	// Accumulate scores per category, return the highest
+	scores := make(map[string]int)
+
+	// Check tool-specific patterns using precompiled regexes
 	toolConfig := pm.findToolConfig(cmd, args)
 	if toolConfig != nil {
 		cmdName := filepath.Base(cmd)
@@ -216,7 +222,7 @@ func (pm *PatternMatcher) ClassifyOutputLine(line, cmd string, args []string) (s
 				for category, compiledPatterns := range patterns {
 					for _, cp := range compiledPatterns {
 						if cp.Re.MatchString(line) {
-							return adjustCategoryImportance(category, &context)
+							scores[category] += cp.Weight
 						}
 					}
 				}
@@ -226,38 +232,63 @@ func (pm *PatternMatcher) ClassifyOutputLine(line, cmd string, args []string) (s
 			for category, compiledPatterns := range patterns {
 				for _, cp := range compiledPatterns {
 					if cp.Re.MatchString(line) {
-						return adjustCategoryImportance(category, &context)
+						scores[category] += cp.Weight
 					}
 				}
 			}
 		}
 	}
 
-	// Check against global patterns using precompiled regexes (for complex patterns)
+	// Check against global patterns using precompiled regexes
 	for category, compiledPatterns := range pm.compiledOutputPatterns {
 		for _, cp := range compiledPatterns {
 			if cp.Re.MatchString(line) {
-				return adjustCategoryImportance(category, &context)
+				scores[category] += cp.Weight
 			}
 		}
 	}
 
-	// Special case handling for common patterns not covered above
-
-	// Stack traces often have file:line format
-	if pm.fileLinePattern.MatchString(line) {
-		context.Importance = 4
-		return TypeError, context
+	// Strong signal: file:line pattern combined with existing error score
+	hasFileLine := pm.fileLinePattern.MatchString(line)
+	if hasFileLine {
+		// File:line patterns strongly indicate errors (importance 4, not 5)
+		scores[TypeError] += 3
+		context.Importance = 4 // Slightly lower than explicit error prefixes
 	}
 
-	// Lines with "PASS" or "FAIL" for tests
+	// Strong signal: PASS/FAIL test results
 	if pm.passFailPattern.MatchString(line) {
 		if strings.HasPrefix(line, "PASS") {
+			scores[TypeSuccess] += 5
 			context.Importance = 3
-			return TypeSuccess, context
+		} else {
+			scores[TypeError] += 5
+			context.Importance = 5
+			context.CognitiveLoad = LoadHigh
 		}
-		context.Importance = 4
-		return TypeError, context
+	}
+
+	// Find category with highest score
+	if len(scores) > 0 {
+		bestCategory := TypeDetail
+		bestScore := 0
+		for category, score := range scores {
+			if score > bestScore {
+				bestScore = score
+				bestCategory = category
+			}
+		}
+		// Only adjust importance if not already set by special patterns
+		if context.Importance == 2 {
+			return adjustCategoryImportance(bestCategory, &context)
+		}
+		// Apply cognitive load but keep importance from special patterns
+		if bestCategory == TypeError && context.CognitiveLoad != LoadHigh {
+			context.CognitiveLoad = LoadHigh
+		} else if bestCategory == TypeWarning && context.CognitiveLoad == LoadLow {
+			context.CognitiveLoad = LoadMedium
+		}
+		return bestCategory, context
 	}
 
 	// Default to detail type with medium importance

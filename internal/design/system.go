@@ -63,6 +63,8 @@ type LineContext struct {
 	IsHighlighted bool
 	// IsSummary indicates if this line is part of a generated summary.
 	IsSummary bool
+	// IsInternal indicates if this error originated from fo itself (not the wrapped command).
+	IsInternal bool
 }
 
 // CognitiveLoadContext represents the user's likely cognitive state when processing information.

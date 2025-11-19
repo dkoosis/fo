@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/davidkoosis/fo/internal/design"
 	"gopkg.in/yaml.v3"
@@ -229,38 +228,19 @@ func normalizeThemeColors(cfg *design.Config) {
 		return
 	}
 
-	// Normalize all color fields
-	escChar := string([]byte{27})
-	normalizeColor := func(s string) string {
-		if s == "" {
-			return ""
-		}
-		// If already has ESC, it's fine
-		if strings.HasPrefix(s, escChar) || strings.HasPrefix(s, "\033") {
-			return s
-		}
-		// Handle YAML escape sequences that might come through as literals
-		if strings.HasPrefix(s, `\x1b`) {
-			return escChar + strings.TrimPrefix(s, `\x1b`)
-		}
-		if strings.HasPrefix(s, `\033`) {
-			return escChar + strings.TrimPrefix(s, `\033`)
-		}
-		return s
-	}
-
-	cfg.Colors.Process = normalizeColor(cfg.Colors.Process)
-	cfg.Colors.Success = normalizeColor(cfg.Colors.Success)
-	cfg.Colors.Warning = normalizeColor(cfg.Colors.Warning)
-	cfg.Colors.Error = normalizeColor(cfg.Colors.Error)
-	cfg.Colors.Detail = normalizeColor(cfg.Colors.Detail)
-	cfg.Colors.Muted = normalizeColor(cfg.Colors.Muted)
-	cfg.Colors.Reset = normalizeColor(cfg.Colors.Reset)
-	cfg.Colors.White = normalizeColor(cfg.Colors.White)
-	cfg.Colors.BlueFg = normalizeColor(cfg.Colors.BlueFg)
-	cfg.Colors.BlueBg = normalizeColor(cfg.Colors.BlueBg)
-	cfg.Colors.Bold = normalizeColor(cfg.Colors.Bold)
-	cfg.Colors.Italic = normalizeColor(cfg.Colors.Italic)
+	// Use the canonical ANSI normalization from the design package
+	cfg.Colors.Process = design.NormalizeANSIEscape(cfg.Colors.Process)
+	cfg.Colors.Success = design.NormalizeANSIEscape(cfg.Colors.Success)
+	cfg.Colors.Warning = design.NormalizeANSIEscape(cfg.Colors.Warning)
+	cfg.Colors.Error = design.NormalizeANSIEscape(cfg.Colors.Error)
+	cfg.Colors.Detail = design.NormalizeANSIEscape(cfg.Colors.Detail)
+	cfg.Colors.Muted = design.NormalizeANSIEscape(cfg.Colors.Muted)
+	cfg.Colors.Reset = design.NormalizeANSIEscape(cfg.Colors.Reset)
+	cfg.Colors.White = design.NormalizeANSIEscape(cfg.Colors.White)
+	cfg.Colors.BlueFg = design.NormalizeANSIEscape(cfg.Colors.BlueFg)
+	cfg.Colors.BlueBg = design.NormalizeANSIEscape(cfg.Colors.BlueBg)
+	cfg.Colors.Bold = design.NormalizeANSIEscape(cfg.Colors.Bold)
+	cfg.Colors.Italic = design.NormalizeANSIEscape(cfg.Colors.Italic)
 }
 
 // MergeWithFlags takes the application config (post-YAML and presets) and CLI flags,
@@ -335,6 +315,7 @@ func MergeWithFlags(appCfg *AppConfig, cliFlags CliFlags) *design.Config {
 		design.ApplyMonochromeDefaults(finalDesignConfig)
 		finalDesignConfig.Style.NoTimer = true
 		finalDesignConfig.Style.UseBoxes = false
+		finalDesignConfig.CI = true // Set explicit CI flag
 	} else if effectiveNoColor {
 		design.ApplyMonochromeDefaults(finalDesignConfig)
 	}

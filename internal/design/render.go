@@ -13,6 +13,13 @@ import (
 
 var titler = cases.Title(language.English)
 
+// visualWidth returns the approximate display width of a string.
+// Uses rune count as a simple approximation. For most Western text and common
+// Unicode characters, this provides accurate visual width calculation.
+func visualWidth(s string) int {
+	return len([]rune(s))
+}
+
 // RenderStartLine returns the formatted start line for the task.
 func (t *Task) RenderStartLine() string {
 	var sb strings.Builder
@@ -41,7 +48,7 @@ func (t *Task) RenderStartLine() string {
 			sb.WriteString(t.Config.ResetColor())
 			sb.WriteString(" ")
 
-			labelRenderedLength := len(t.Label) + 2
+			labelRenderedLength := visualWidth(t.Label) + 2
 			desiredHeaderContentVisualWidth := 40
 			repeatCount := desiredHeaderContentVisualWidth - labelRenderedLength
 			if repeatCount < 0 {
@@ -285,7 +292,9 @@ func (t *Task) RenderEndLine() string {
 func (t *Task) RenderOutputLine(line OutputLine) string {
 	var sb strings.Builder
 
-	isFoInternalMessage := strings.HasPrefix(line.Content, "[fo] ") ||
+	// Use the IsInternal flag from context (preferred) or fall back to string prefix for backwards compatibility
+	isFoInternalMessage := line.Context.IsInternal ||
+		strings.HasPrefix(line.Content, "[fo] ") ||
 		(line.Type == TypeError && (strings.HasPrefix(line.Content, "Error starting command") ||
 			strings.HasPrefix(line.Content, "Error creating stdout pipe") ||
 			strings.HasPrefix(line.Content, "Error creating stderr pipe")))
@@ -384,8 +393,14 @@ func (t *Task) RenderOutputLine(line OutputLine) string {
 
 		var styleBuilder strings.Builder
 		if !t.Config.IsMonochrome {
+			// Cognitive-load aware formatting:
+			// - High-load error lines get italic emphasis
+			// - Low-importance detail lines get muted when task has high cognitive load
 			if line.Context.CognitiveLoad == LoadHigh && line.Type == TypeError && !isFoInternalMessage {
 				styleBuilder.WriteString(t.Config.GetColor("Italic"))
+			} else if t.Context.CognitiveLoad == LoadHigh && line.Type == TypeDetail && line.Context.Importance <= 2 {
+				// Dim low-importance details to reduce noise when cognitive load is high
+				finalContentColor = t.Config.GetColor("Muted")
 			}
 			if contains(contentStyleDef.TextStyle, "bold") {
 				styleBuilder.WriteString(t.Config.GetColor("Bold"))
@@ -412,11 +427,13 @@ func (t *Task) RenderSummary() string {
 	errorCount, warningCount := 0, 0
 	t.OutputLinesLock()
 	for _, line := range t.OutputLines {
-		isFoInternalError := (line.Type == TypeError &&
-			(strings.HasPrefix(line.Content, "Error starting command") ||
-				strings.HasPrefix(line.Content, "Error creating stdout pipe") ||
-				strings.HasPrefix(line.Content, "Error creating stderr pipe") ||
-				strings.HasPrefix(line.Content, "[fo] ")))
+		// Skip internal fo errors - use IsInternal flag or fall back to string prefix
+		isFoInternalError := line.Context.IsInternal ||
+			(line.Type == TypeError &&
+				(strings.HasPrefix(line.Content, "Error starting command") ||
+					strings.HasPrefix(line.Content, "Error creating stdout pipe") ||
+					strings.HasPrefix(line.Content, "Error creating stderr pipe") ||
+					strings.HasPrefix(line.Content, "[fo] ")))
 		if isFoInternalError {
 			continue
 		}
@@ -501,6 +518,19 @@ func (t *Task) RenderSummary() string {
 		sb.WriteString("\n")
 	}
 
+	// Add complexity context for high cognitive load tasks
+	if t.Context.CognitiveLoad == LoadHigh && t.Context.Complexity >= 4 {
+		sb.WriteString(itemFurtherIndent)
+		mutedColor := t.Config.GetColor("Muted")
+		sb.WriteString(mutedColor)
+		t.OutputLinesLock()
+		lineCount := len(t.OutputLines)
+		t.OutputLinesUnlock()
+		sb.WriteString(fmt.Sprintf("(%d lines - see above for details)", lineCount))
+		sb.WriteString(t.Config.ResetColor())
+		sb.WriteString("\n")
+	}
+
 	if t.Config.Style.UseBoxes && !t.Config.IsMonochrome {
 		sb.WriteString(t.Config.Border.VerticalChar + "\n")
 	} else {
@@ -536,7 +566,7 @@ func contains(slice []string, item string) bool {
 
 func calculateHeaderWidth(label string, defaultWidth int) int {
 	const maxLabelContribution = 30
-	effectiveLabelLength := len(label)
+	effectiveLabelLength := visualWidth(label)
 	if effectiveLabelLength > maxLabelContribution {
 		effectiveLabelLength = maxLabelContribution
 	}
