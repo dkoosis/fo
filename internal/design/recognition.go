@@ -149,8 +149,34 @@ func (pm *PatternMatcher) DetectCommandIntent(cmd string, args []string) string 
 	return "running"
 }
 
+// Fast-path prefix checks for common patterns (avoids regex overhead)
+var (
+	errorPrefixes   = []string{"Error:", "ERROR:", "E!", "panic:", "fatal:", "Failed", "[ERROR]", "FAIL\t"}
+	warningPrefixes = []string{"Warning:", "WARNING:", "WARN", "W!", "deprecated:", "[warn]", "[WARNING]", "Warn:"}
+	successPrefixes = []string{"Success:", "SUCCESS:", "PASS\t", "ok\t", "Done!", "Completed", "✓", "All tests passed!"}
+	infoPrefixes    = []string{"Info:", "INFO:", "INFO[", "I!", "[info]", "Running"}
+)
+
+// hasPrefix checks if line starts with any of the given prefixes (case-insensitive for some)
+func hasPrefix(line string, prefixes []string) bool {
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(line, prefix) {
+			return true
+		}
+		// Case-insensitive check for common uppercase/lowercase variants
+		if len(line) >= len(prefix) {
+			lineLower := strings.ToLower(line[:len(prefix)])
+			prefixLower := strings.ToLower(prefix)
+			if lineLower == prefixLower {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // ClassifyOutputLine determines the type of an output line.
-// Uses precompiled regex patterns for performance.
+// Uses fast-path string prefix checks before falling back to regex patterns for performance.
 func (pm *PatternMatcher) ClassifyOutputLine(line, cmd string, args []string) (string, LineContext) {
 	// Default context
 	context := LineContext{
@@ -159,7 +185,27 @@ func (pm *PatternMatcher) ClassifyOutputLine(line, cmd string, args []string) (s
 		IsHighlighted: false,
 	}
 
-	// Check tool-specific patterns first using precompiled regexes
+	// Fast-path: Check common prefixes before regex (much faster for most cases)
+	if hasPrefix(line, errorPrefixes) {
+		context.Importance = 5
+		context.CognitiveLoad = LoadHigh
+		return TypeError, context
+	}
+	if hasPrefix(line, warningPrefixes) {
+		context.Importance = 4
+		context.CognitiveLoad = LoadMedium
+		return TypeWarning, context
+	}
+	if hasPrefix(line, successPrefixes) {
+		context.Importance = 3
+		return TypeSuccess, context
+	}
+	if hasPrefix(line, infoPrefixes) {
+		context.Importance = 3
+		return TypeInfo, context
+	}
+
+	// Check tool-specific patterns using precompiled regexes (for complex patterns)
 	toolConfig := pm.findToolConfig(cmd, args)
 	if toolConfig != nil {
 		cmdName := filepath.Base(cmd)
@@ -187,7 +233,7 @@ func (pm *PatternMatcher) ClassifyOutputLine(line, cmd string, args []string) (s
 		}
 	}
 
-	// Check against global patterns using precompiled regexes
+	// Check against global patterns using precompiled regexes (for complex patterns)
 	for category, compiledPatterns := range pm.compiledOutputPatterns {
 		for _, cp := range compiledPatterns {
 			if cp.Re.MatchString(line) {

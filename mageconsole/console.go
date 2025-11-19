@@ -2,7 +2,6 @@ package mageconsole
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -106,14 +105,18 @@ var ErrNonZeroExit = errors.New("command exited with non-zero code")
 //
 // Use errors.Is(err, ErrNonZeroExit) to check for non-zero exit.
 func (c *Console) RunSimple(command string, args ...string) error {
-	res, err := c.Run("", command, args...)
-	if err != nil {
-		return err
+	_, err := c.Run("", command, args...)
+	if err == nil {
+		return nil
 	}
-	if res != nil && res.ExitCode != 0 {
-		return fmt.Errorf("%w: %d", ErrNonZeroExit, res.ExitCode)
+
+	// Map exec.ExitError to our wrapper error
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		code := getExitCode(err, c.cfg.Debug)
+		return fmt.Errorf("%w: %d", ErrNonZeroExit, code)
 	}
-	return nil
+	return err // Infrastructure error, pass through
 }
 
 func (c *Console) runContext(ctx context.Context, cancel context.CancelFunc, sigChan chan os.Signal, label, command string, args []string) (*TaskResult, error) {
@@ -132,8 +135,16 @@ func (c *Console) runContext(ctx context.Context, cancel context.CancelFunc, sig
 
 	progress := design.NewInlineProgress(task, c.cfg.Debug)
 
+	// Set up cursor restoration at the outermost level for inline progress
 	if useInlineProgress {
 		enableSpinner := !designCfg.Style.NoSpinner
+		if enableSpinner && design.IsInteractiveTerminal() && !designCfg.IsMonochrome {
+			// Hide cursor at start, restore on any exit path
+			_, _ = c.cfg.Out.Write([]byte("\033[?25l"))
+			defer func() {
+				_, _ = c.cfg.Out.Write([]byte("\033[?25h\n"))
+			}()
+		}
 		progress.Start(ctx, enableSpinner)
 	} else {
 		_, _ = c.cfg.Out.Write([]byte(task.RenderStartLine() + "\n"))
@@ -144,8 +155,14 @@ func (c *Console) runContext(ctx context.Context, cancel context.CancelFunc, sig
 	setProcessGroup(cmd)
 
 	cmdDone := make(chan struct{})
+
+	// Goroutine: Handle signals
+	signalHandlerDone := make(chan struct{})
 	go func() {
-		defer close(cmdDone)
+		defer func() {
+			signal.Stop(sigChan)
+			close(signalHandlerDone)
+		}()
 		select {
 		case sig := <-sigChan:
 			if c.cfg.Debug {
@@ -183,7 +200,6 @@ func (c *Console) runContext(ctx context.Context, cancel context.CancelFunc, sig
 				}
 				cancel()
 			}
-			return
 		case <-ctx.Done():
 			if c.cfg.Debug {
 				fmt.Fprintln(os.Stderr, "[DEBUG sigChan] Context done, ensuring process is killed if running.")
@@ -191,12 +207,10 @@ func (c *Console) runContext(ctx context.Context, cancel context.CancelFunc, sig
 			if cmd.Process != nil && cmd.ProcessState == nil {
 				_ = killProcessGroupWithSIGKILL(cmd)
 			}
-			return
 		case <-cmdDone:
 			if c.cfg.Debug {
 				fmt.Fprintln(os.Stderr, "[DEBUG sigChan] cmdDone received, command finished naturally.")
 			}
-			return
 		}
 	}()
 
@@ -204,8 +218,10 @@ func (c *Console) runContext(ctx context.Context, cancel context.CancelFunc, sig
 	var cmdRunError error
 	var isActualFoStartupFailure bool
 
+	// Execute command (these functions call cmd.Start() and cmd.Wait())
+	// They will close cmdDone when cmd.Wait() completes
 	if c.cfg.Stream {
-		exitCode, cmdRunError = c.executeStreamMode(cmd, task)
+		exitCode, cmdRunError = c.executeStreamMode(cmd, task, cmdDone)
 		if cmdRunError != nil {
 			var exitErr *exec.ExitError
 			if !errors.As(cmdRunError, &exitErr) {
@@ -213,7 +229,7 @@ func (c *Console) runContext(ctx context.Context, cancel context.CancelFunc, sig
 			}
 		}
 	} else {
-		exitCode, cmdRunError = c.executeCaptureMode(cmd, task, patternMatcher)
+		exitCode, cmdRunError = c.executeCaptureMode(cmd, task, patternMatcher, cmdDone)
 		if cmdRunError != nil {
 			var exitErr *exec.ExitError
 			if !errors.As(cmdRunError, &exitErr) {
@@ -221,6 +237,9 @@ func (c *Console) runContext(ctx context.Context, cancel context.CancelFunc, sig
 			}
 		}
 	}
+
+	// Wait for signal handler to finish
+	<-signalHandlerDone
 
 	task.Complete(exitCode)
 
@@ -320,7 +339,7 @@ func (c *Console) renderCapturedOutput(task *design.Task, exitCode int, isActual
 	}
 }
 
-func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task) (int, error) {
+func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task, cmdDone chan struct{}) (int, error) {
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil {
 		if c.cfg.Debug {
@@ -329,6 +348,7 @@ func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task) (int, erro
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		runErr := cmd.Run()
+		close(cmdDone) // Signal that command has finished
 		task.AddOutputLine(fmt.Sprintf("[fo] Error setting up stderr pipe for stream mode: %v", err), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
 		exitCode := getExitCode(runErr, c.cfg.Debug)
 		var exitErr *exec.ExitError
@@ -375,12 +395,14 @@ func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task) (int, erro
 
 		_ = stderrPipe.Close()
 		waitGroup.Wait()
+		close(cmdDone) // Signal that command has finished (failed to start)
 
 		return getExitCode(startErr, c.cfg.Debug), startErr
 	}
 
 	runErr := cmd.Wait()
 	waitGroup.Wait()
+	close(cmdDone) // Signal that command has finished
 
 	exitCode := getExitCode(runErr, c.cfg.Debug)
 	if runErr != nil {
@@ -393,7 +415,7 @@ func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task) (int, erro
 	return exitCode, runErr
 }
 
-func (c *Console) executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design.PatternMatcher) (int, error) {
+func (c *Console) executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMatcher *design.PatternMatcher, cmdDone chan struct{}) (int, error) {
 	if c.cfg.Debug {
 		fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Starting in CAPTURE mode\n")
 	}
@@ -415,39 +437,102 @@ func (c *Console) executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMa
 		return 1, err
 	}
 
-	var stdoutBuffer, stderrBuffer bytes.Buffer
 	var wgRead sync.WaitGroup
 	wgRead.Add(2)
 
 	var errStdoutCopy, errStderrCopy error
+	var totalBytesRead int64
+	var maxTotalBytes = c.cfg.MaxBufferSize * 2 // Allow MaxBufferSize per stream
+	var bytesMutex sync.Mutex
 
+	// Stream line-by-line classification for real-time processing
 	go func() {
 		defer wgRead.Done()
 		if c.cfg.Debug {
-			fmt.Fprintln(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Copying stdoutPipe")
+			fmt.Fprintln(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Reading stdoutPipe line-by-line")
 		}
-		_, errStdoutCopy = io.Copy(&stdoutBuffer, stdoutPipe)
-		if errStdoutCopy != nil && !errors.Is(errStdoutCopy, io.EOF) && !strings.Contains(errStdoutCopy.Error(), "file already closed") && !strings.Contains(errStdoutCopy.Error(), "broken pipe") {
+		scanner := bufio.NewScanner(stdoutPipe)
+		buf := make([]byte, 0, bufio.MaxScanTokenSize)
+		scanner.Buffer(buf, c.cfg.MaxLineLength)
+		
+		for scanner.Scan() {
+			line := scanner.Text()
+			lineBytes := int64(len(line))
+			
+			// Enforce MaxBufferSize limit (thread-safe check and update)
+			bytesMutex.Lock()
+			if totalBytesRead+lineBytes > maxTotalBytes {
+				bytesMutex.Unlock()
+				if c.cfg.Debug {
+					fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] MaxBufferSize limit reached for stdout, truncating\n")
+				}
+				break
+			}
+			totalBytesRead += lineBytes
+			bytesMutex.Unlock()
+			
+			// Classify and add line immediately (streaming classification)
+			lineType, lineContext := patternMatcher.ClassifyOutputLine(line, task.Command, task.Args)
 			if c.cfg.Debug {
-				fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Error copying stdout: %v\n", errStdoutCopy)
+				fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Line classified as %s: %s\n", lineType, line)
+			}
+			task.AddOutputLine(line, lineType, lineContext)
+		}
+		
+		if scanErr := scanner.Err(); scanErr != nil {
+			if !errors.Is(scanErr, io.EOF) && !strings.Contains(scanErr.Error(), "file already closed") && !strings.Contains(scanErr.Error(), "broken pipe") {
+				errStdoutCopy = scanErr
+				if c.cfg.Debug {
+					fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Error scanning stdout: %v\n", scanErr)
+				}
 			}
 		} else if c.cfg.Debug {
-			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Finished copying stdoutPipe (len: %d)\n", stdoutBuffer.Len())
+			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Finished reading stdoutPipe\n")
 		}
 	}()
 
 	go func() {
 		defer wgRead.Done()
 		if c.cfg.Debug {
-			fmt.Fprintln(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Copying stderrPipe")
+			fmt.Fprintln(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Reading stderrPipe line-by-line")
 		}
-		_, errStderrCopy = io.Copy(&stderrBuffer, stderrPipe)
-		if errStderrCopy != nil && !errors.Is(errStderrCopy, io.EOF) && !strings.Contains(errStderrCopy.Error(), "file already closed") && !strings.Contains(errStderrCopy.Error(), "broken pipe") {
+		scanner := bufio.NewScanner(stderrPipe)
+		buf := make([]byte, 0, bufio.MaxScanTokenSize)
+		scanner.Buffer(buf, c.cfg.MaxLineLength)
+		
+		for scanner.Scan() {
+			line := scanner.Text()
+			lineBytes := int64(len(line))
+			
+			// Enforce MaxBufferSize limit (thread-safe check and update)
+			bytesMutex.Lock()
+			if totalBytesRead+lineBytes > maxTotalBytes {
+				bytesMutex.Unlock()
+				if c.cfg.Debug {
+					fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] MaxBufferSize limit reached for stderr, truncating\n")
+				}
+				break
+			}
+			totalBytesRead += lineBytes
+			bytesMutex.Unlock()
+			
+			// Classify and add line immediately (streaming classification)
+			lineType, lineContext := patternMatcher.ClassifyOutputLine(line, task.Command, task.Args)
 			if c.cfg.Debug {
-				fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Error copying stderr: %v\n", errStderrCopy)
+				fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Line classified as %s: %s\n", lineType, line)
+			}
+			task.AddOutputLine(line, lineType, lineContext)
+		}
+		
+		if scanErr := scanner.Err(); scanErr != nil {
+			if !errors.Is(scanErr, io.EOF) && !strings.Contains(scanErr.Error(), "file already closed") && !strings.Contains(scanErr.Error(), "broken pipe") {
+				errStderrCopy = scanErr
+				if c.cfg.Debug {
+					fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Error scanning stderr: %v\n", scanErr)
+				}
 			}
 		} else if c.cfg.Debug {
-			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Finished copying stderrPipe (len: %d)\n", stderrBuffer.Len())
+			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Finished reading stderrPipe\n")
 		}
 	}()
 
@@ -458,59 +543,34 @@ func (c *Console) executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMa
 		_ = stdoutPipe.Close()
 		_ = stderrPipe.Close()
 		wgRead.Wait()
+		close(cmdDone) // Signal that command has finished (failed to start)
 		return getExitCode(err, c.cfg.Debug), err
 	}
 
 	runErr := cmd.Wait()
 	wgRead.Wait()
+	close(cmdDone) // Signal that command has finished
 
-	// Combine stdout and stderr after they're fully captured
-	var outputBuffer bytes.Buffer
-	limitedStdout := io.LimitReader(&stdoutBuffer, c.cfg.MaxBufferSize)
-	_, _ = outputBuffer.ReadFrom(limitedStdout)
-	limitedStderr := io.LimitReader(&stderrBuffer, c.cfg.MaxBufferSize)
-	_, _ = outputBuffer.ReadFrom(limitedStderr)
-
+	// Note: Output was already classified line-by-line during capture above
+	// Report any scanning errors
 	if errStdoutCopy != nil && !errors.Is(errStdoutCopy, io.EOF) && !strings.Contains(errStdoutCopy.Error(), "file already closed") && !strings.Contains(errStdoutCopy.Error(), "broken pipe") {
-		task.AddOutputLine(fmt.Sprintf("[fo] Error copying stdout: %v", errStdoutCopy), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
+		task.AddOutputLine(fmt.Sprintf("[fo] Error reading stdout: %v", errStdoutCopy), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
 	}
 	if errStderrCopy != nil && !errors.Is(errStderrCopy, io.EOF) && !strings.Contains(errStderrCopy.Error(), "file already closed") && !strings.Contains(errStderrCopy.Error(), "broken pipe") {
-		task.AddOutputLine(fmt.Sprintf("[fo] Error copying stderr: %v", errStderrCopy), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
+		task.AddOutputLine(fmt.Sprintf("[fo] Error reading stderr: %v", errStderrCopy), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5})
 	}
 
 	exitCode := getExitCode(runErr, c.cfg.Debug)
 
 	task.UpdateTaskContext()
 
-	output := outputBuffer.String()
+	// Note: Classification already happened line-by-line during capture above
+	// No need to re-scan and classify here
 	if c.cfg.Debug {
-		fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Combined output size: %d bytes\n", len(output))
-	}
-
-	scanner := bufio.NewScanner(strings.NewReader(output))
-	buf := make([]byte, 0, bufio.MaxScanTokenSize)
-	scanner.Buffer(buf, c.cfg.MaxLineLength)
-
-	lineIndex := 0
-	for scanner.Scan() {
-		line := scanner.Text()
-		lineType, lineContext := patternMatcher.ClassifyOutputLine(line, task.Command, task.Args)
-		if c.cfg.Debug {
-			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Line %d classified as %s: %s\n", lineIndex, lineType, line)
-		}
-		task.AddOutputLine(line, lineType, lineContext)
-		lineIndex++
-	}
-
-	if scanErr := scanner.Err(); scanErr != nil {
-		if c.cfg.Debug {
-			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Scanner error: %v\n", scanErr)
-		}
-		if !errors.Is(scanErr, bufio.ErrTooLong) && !errors.Is(scanErr, io.EOF) {
-			task.AddOutputLine(fmt.Sprintf("[fo] Error scanning captured output: %v", scanErr), design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 4})
-		}
-	} else if c.cfg.Debug {
-		fmt.Fprintln(os.Stderr, "[DEBUG executeCaptureMode] Scanner finished without error.")
+		task.OutputLinesLock()
+		lineCount := len(task.OutputLines)
+		task.OutputLinesUnlock()
+		fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Processed %d lines with streaming classification\n", lineCount)
 	}
 
 	return exitCode, runErr
