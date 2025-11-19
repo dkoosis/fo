@@ -5,6 +5,7 @@ package design
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -16,6 +17,7 @@ import (
 // InlineProgress tracks and renders task progress with in-place updates.
 type InlineProgress struct {
 	Task         *Task
+	Writer       io.Writer // Output writer for progress messages (defaults to os.Stdout)
 	IsActive     bool
 	SpinnerIndex int
 	StartTime    time.Time
@@ -25,7 +27,10 @@ type InlineProgress struct {
 }
 
 // NewInlineProgress creates a progress tracker for a task.
-func NewInlineProgress(task *Task, debugMode bool) *InlineProgress {
+// The writer parameter specifies where progress output should be written;
+// if nil, defaults to os.Stdout. This allows embedding applications to
+// capture or redirect progress output.
+func NewInlineProgress(task *Task, debugMode bool, writer io.Writer) *InlineProgress {
 	// Determine if we're in CI mode:
 	// - Prefer explicit CI flag from config
 	// - Fall back to heuristic (monochrome + no-timer) for backwards compatibility
@@ -39,8 +44,14 @@ func NewInlineProgress(task *Task, debugMode bool) *InlineProgress {
 		isTerminal = false
 	}
 
+	// Default to os.Stdout if no writer provided
+	if writer == nil {
+		writer = os.Stdout
+	}
+
 	return &InlineProgress{
 		Task:         task,
+		Writer:       writer,
 		IsActive:     false,
 		SpinnerIndex: 0,
 		StartTime:    time.Now(),
@@ -93,16 +104,16 @@ func (p *InlineProgress) RenderProgress(status string) {
 
 	// In terminal mode with color support, update in-place
 	if p.isTerminal && !p.Task.Config.IsMonochrome {
-		_, _ = os.Stdout.WriteString("\r\033[K") // Carriage return + erase line
-		_, _ = os.Stdout.WriteString(message)
+		_, _ = p.Writer.Write([]byte("\r\033[K")) // Carriage return + erase line
+		_, _ = p.Writer.Write([]byte(message))
 
 		// Add newline for completed states
 		if status != StatusRunning {
-			_, _ = os.Stdout.WriteString("\n")
+			_, _ = p.Writer.Write([]byte("\n"))
 		}
 	} else {
 		// Non-terminal mode or CI mode, just print new lines
-		_, _ = os.Stdout.WriteString(message + "\n")
+		_, _ = p.Writer.Write([]byte(message + "\n"))
 	}
 }
 

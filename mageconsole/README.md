@@ -114,8 +114,24 @@ For command-not-found errors:
 
 ```go
 result, err := console.Run("Missing", "nonexistent-command")
-if err != nil && result == nil {
-    fmt.Println("Command not found")
+if errors.Is(err, exec.ErrNotFound) {
+    fmt.Printf("Command not found (exit code %d)\n", result.ExitCode)
+}
+```
+
+Note: `TaskResult` is always non-nil, even for infrastructure failures. This allows
+you to access duration, label, and error details regardless of how the command failed.
+Use `result.ExitCode` (127 for command not found) and `result.Err` for details.
+
+For `RunSimple`, you can extract the exit code from errors:
+
+```go
+err := console.RunSimple("go", "test", "./...")
+if errors.Is(err, mageconsole.ErrNonZeroExit) {
+    var exitErr mageconsole.ExitCodeError
+    if errors.As(err, &exitErr) {
+        fmt.Printf("Exit code: %d\n", exitErr.Code)
+    }
 }
 ```
 
