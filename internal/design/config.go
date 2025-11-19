@@ -49,6 +49,38 @@ const (
 // Default spinner characters for ASCII mode.
 const DefaultSpinnerChars = "-\\|/"
 
+// ANSIReset is the escape code to reset all styling.
+const ANSIReset = "\033[0m"
+
+// Color wraps an ANSI escape code for safer and more readable color handling.
+// Use Sprint to wrap text in color codes, which automatically resets styling.
+type Color struct {
+	code string
+}
+
+// NewColor creates a Color from an ANSI escape code.
+func NewColor(code string) Color {
+	return Color{code: code}
+}
+
+// Sprint wraps text in this color and automatically resets styling.
+func (c Color) Sprint(s string) string {
+	if c.code == "" {
+		return s
+	}
+	return c.code + s + ANSIReset
+}
+
+// Code returns the raw ANSI escape code for manual use.
+func (c Color) Code() string {
+	return c.code
+}
+
+// IsEmpty returns true if this color has no escape code.
+func (c Color) IsEmpty() bool {
+	return c.code == ""
+}
+
 // MessageType constant for legacy support.
 const MessageTypeHeader = "header"
 
@@ -532,6 +564,13 @@ func (c *Config) resolveColorName(name string) string {
 		}
 	}
 	return normalizeANSIEscape(codeToProcess)
+}
+
+// GetColorObj returns a Color wrapper for the given color key.
+// This provides a safer interface for color handling with automatic reset.
+// Example: cfg.GetColorObj("Error").Sprint("Error message")
+func (c *Config) GetColorObj(colorKeyOrName string) Color {
+	return NewColor(c.GetColor(colorKeyOrName))
 }
 
 func (c *Config) ResetColor() string {
