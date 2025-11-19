@@ -75,10 +75,14 @@ func NewConsole(cfg ConsoleConfig) *Console {
 //   - Returns (result, nil) when the command runs successfully (exit code 0)
 //   - Returns (result, error) when the command runs but exits non-zero;
 //     the error wraps the underlying exec.ExitError
-//   - Returns (nil, error) for infrastructure failures (command not found,
+//   - Returns (result, error) for infrastructure failures (command not found,
 //     IO errors, context cancelled)
 //
-// The TaskResult.ExitCode is always set when result is non-nil.
+// Note: TaskResult is always non-nil. Even for infrastructure failures, the
+// result contains useful information like duration, label, and any captured
+// internal error messages. Use TaskResult.ExitCode (127 for command not found,
+// 1 for other failures) and TaskResult.Err for failure details.
+//
 // Use errors.Is(err, exec.ErrNotFound) to check for missing commands.
 func (c *Console) Run(label, command string, args ...string) (*TaskResult, error) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -86,35 +90,55 @@ func (c *Console) Run(label, command string, args ...string) (*TaskResult, error
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, getInterruptSignals()...)
-	defer signal.Stop(sigChan)
+	// Note: signal.Stop is called in the signal handler goroutine (see runContext)
 
 	return c.runContext(ctx, cancel, sigChan, label, command, args)
 }
 
 // ErrNonZeroExit is returned when a command completes but exits with a non-zero code.
 // Use errors.Is(err, ErrNonZeroExit) to check for this condition.
-// The exit code can be extracted from the wrapped error message or TaskResult.ExitCode.
 var ErrNonZeroExit = errors.New("command exited with non-zero code")
 
+// ExitCodeError wraps an exit code for programmatic access.
+// Use errors.As(err, &ExitCodeError{}) to extract the exit code from RunSimple errors.
+type ExitCodeError struct {
+	Code int
+}
+
+func (e ExitCodeError) Error() string {
+	return fmt.Sprintf("exit code %d", e.Code)
+}
+
 // RunSimple executes a command and returns only an error.
-// This is a convenience wrapper around Run for simple use cases.
+// This is a convenience wrapper around Run for simple use cases where you
+// only need to know success vs failure.
 //
 // Returns nil on success (exit code 0).
-// Returns ErrNonZeroExit (wrapped) if the command exits with non-zero code.
+// Returns ErrNonZeroExit (wrapped with ExitCodeError) if the command exits
+// with non-zero code.
 // Returns other errors for infrastructure failures.
 //
-// Use errors.Is(err, ErrNonZeroExit) to check for non-zero exit.
+// To check for non-zero exit and extract the code:
+//
+//	if errors.Is(err, ErrNonZeroExit) {
+//	    var exitErr mageconsole.ExitCodeError
+//	    if errors.As(err, &exitErr) {
+//	        fmt.Printf("Exit code: %d\n", exitErr.Code)
+//	    }
+//	}
+//
+// For detailed results including captured output, use Run() instead.
 func (c *Console) RunSimple(command string, args ...string) error {
 	_, err := c.Run("", command, args...)
 	if err == nil {
 		return nil
 	}
 
-	// Map exec.ExitError to our wrapper error
+	// Map exec.ExitError to our wrapper error with extractable exit code
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
 		code := getExitCode(err, c.cfg.Debug)
-		return fmt.Errorf("%w: %d", ErrNonZeroExit, code)
+		return fmt.Errorf("%w: %w", ErrNonZeroExit, ExitCodeError{Code: code})
 	}
 	return err // Infrastructure error, pass through
 }
@@ -136,7 +160,7 @@ func (c *Console) runContext(
 
 	useInlineProgress := designCfg.Style.UseInlineProgress && c.cfg.InlineProgress && !c.cfg.Stream
 
-	progress := design.NewInlineProgress(task, c.cfg.Debug)
+	progress := design.NewInlineProgress(task, c.cfg.Debug, c.cfg.Out)
 
 	// Set up cursor restoration at the outermost level for inline progress
 	if useInlineProgress {
@@ -466,7 +490,7 @@ func (c *Console) executeCaptureMode(
 
 	var errStdoutCopy, errStderrCopy error
 	var totalBytesRead int64
-	maxTotalBytes := c.cfg.MaxBufferSize * 2 // Allow MaxBufferSize per stream
+	maxTotalBytes := c.cfg.MaxBufferSize * 2 // Shared budget: 2x MaxBufferSize across both streams
 	var bytesMutex sync.Mutex
 
 	// Helper function to process a pipe line-by-line with classification
@@ -479,21 +503,28 @@ func (c *Console) executeCaptureMode(
 		buf := make([]byte, 0, bufio.MaxScanTokenSize)
 		scanner.Buffer(buf, c.cfg.MaxLineLength)
 
+		truncated := false
 		for scanner.Scan() {
 			line := scanner.Text()
 			lineBytes := int64(len(line))
 
 			// Enforce MaxBufferSize limit (thread-safe check and update)
+			// Important: We must continue draining the pipe even after limit is reached
+			// to prevent deadlock (child process blocking on write to full pipe buffer)
 			bytesMutex.Lock()
-			if totalBytesRead+lineBytes > maxTotalBytes {
-				bytesMutex.Unlock()
-				if c.cfg.Debug {
-					fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] MaxBufferSize limit reached for %s, truncating\n", streamName)
-				}
-				break
+			overLimit := totalBytesRead+lineBytes > maxTotalBytes
+			if !overLimit {
+				totalBytesRead += lineBytes
 			}
-			totalBytesRead += lineBytes
 			bytesMutex.Unlock()
+
+			if overLimit {
+				if !truncated && c.cfg.Debug {
+					fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] MaxBufferSize limit reached on %s, discarding remaining output\n", streamName)
+				}
+				truncated = true
+				continue // Keep scanning to drain pipe, but don't store
+			}
 
 			// Classify and add line immediately (streaming classification)
 			lineType, lineContext := patternMatcher.ClassifyOutputLine(line, task.Command, task.Args)
