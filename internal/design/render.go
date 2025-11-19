@@ -616,6 +616,7 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 		iconToUse = cfg.GetIcon(elementStyle.IconKey)
 	default:
 		// Fallback icon logic based on message type
+		// Note: MessageType* constants are aliases with same values as Status* and Type* constants
 		switch lowerMessageType {
 		case MessageTypeH1, MessageTypeHeader:
 			iconToUse = cfg.GetIcon("Start")
@@ -623,13 +624,13 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 			iconToUse = cfg.GetIcon("Info")
 		case MessageTypeH3:
 			iconToUse = cfg.GetIcon("Bullet")
-		case MessageTypeSuccess, StatusSuccess:
+		case StatusSuccess: // Also matches MessageTypeSuccess (same value: "success")
 			iconToUse = cfg.GetIcon("Success")
-		case MessageTypeWarning, StatusWarning:
+		case StatusWarning: // Also matches MessageTypeWarning (same value: "warning")
 			iconToUse = cfg.GetIcon("Warning")
-		case MessageTypeError, StatusError:
+		case StatusError: // Also matches MessageTypeError (same value: "error")
 			iconToUse = cfg.GetIcon("Error")
-		case MessageTypeInfo, TypeInfo:
+		case TypeInfo: // Also matches MessageTypeInfo (same value: "info")
 			iconToUse = cfg.GetIcon("Info")
 		default:
 			iconToUse = cfg.GetIcon("Info")
@@ -641,16 +642,17 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 		rawFgColor = elementStyle.ColorFG
 	} else {
 		// Fallback color logic based on message type
+		// Note: MessageType* constants are aliases with same values as Status* and Type* constants
 		switch lowerMessageType {
 		case MessageTypeH1, MessageTypeH2, MessageTypeHeader:
 			rawFgColor = "Process"
-		case MessageTypeSuccess, StatusSuccess:
+		case StatusSuccess: // Also matches MessageTypeSuccess (same value: "success")
 			rawFgColor = "Success"
-		case MessageTypeWarning, StatusWarning:
+		case StatusWarning: // Also matches MessageTypeWarning (same value: "warning")
 			rawFgColor = "Warning"
-		case MessageTypeError, StatusError:
+		case StatusError: // Also matches MessageTypeError (same value: "error")
 			rawFgColor = "Error"
-		case MessageTypeInfo, TypeInfo:
+		case TypeInfo: // Also matches MessageTypeInfo (same value: "info")
 			rawFgColor = "Process"
 		default:
 			rawFgColor = "Detail"
