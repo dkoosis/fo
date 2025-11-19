@@ -7,17 +7,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mattn/go-runewidth"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
 
 var titler = cases.Title(language.English)
 
-// visualWidth returns the approximate display width of a string.
-// Uses rune count as a simple approximation. For most Western text and common
-// Unicode characters, this provides accurate visual width calculation.
+// visualWidth returns the display width of a string in terminal cells.
+// Uses go-runewidth for accurate handling of East Asian Wide characters,
+// emojis, and other Unicode characters that occupy multiple cells.
 func visualWidth(s string) int {
-	return len([]rune(s))
+	return runewidth.StringWidth(s)
 }
 
 // RenderStartLine returns the formatted start line for the task.
@@ -49,7 +50,10 @@ func (t *Task) RenderStartLine() string {
 			sb.WriteString(" ")
 
 			labelRenderedLength := visualWidth(t.Label) + 2
-			desiredHeaderContentVisualWidth := 40
+			desiredHeaderContentVisualWidth := t.Config.Style.HeaderWidth
+			if desiredHeaderContentVisualWidth <= 0 {
+				desiredHeaderContentVisualWidth = 40 // Default fallback
+			}
 			repeatCount := desiredHeaderContentVisualWidth - labelRenderedLength
 			if repeatCount < 0 {
 				repeatCount = 0
@@ -278,7 +282,11 @@ func (t *Task) RenderEndLine() string {
 		} else {
 			footerStyle := t.Config.GetElementStyle("H2_Target_Footer_Line")
 			if footerStyle.LineChar != "" {
-				sb.WriteString(strings.Repeat(footerStyle.LineChar, calculateHeaderWidth(t.Label, 40)))
+				headerWidth := t.Config.Style.HeaderWidth
+				if headerWidth <= 0 {
+					headerWidth = 40
+				}
+				sb.WriteString(strings.Repeat(footerStyle.LineChar, calculateHeaderWidth(t.Label, headerWidth)))
 				sb.WriteString("\n")
 			}
 		}
@@ -292,12 +300,8 @@ func (t *Task) RenderEndLine() string {
 func (t *Task) RenderOutputLine(line OutputLine) string {
 	var sb strings.Builder
 
-	// Use the IsInternal flag from context (preferred) or fall back to string prefix for backwards compatibility
-	isFoInternalMessage := line.Context.IsInternal ||
-		strings.HasPrefix(line.Content, "[fo] ") ||
-		(line.Type == TypeError && (strings.HasPrefix(line.Content, "Error starting command") ||
-			strings.HasPrefix(line.Content, "Error creating stdout pipe") ||
-			strings.HasPrefix(line.Content, "Error creating stderr pipe")))
+	// Use the IsInternal flag from context to identify fo-generated errors
+	isFoInternalMessage := line.Context.IsInternal
 
 	if t.Config.IsMonochrome {
 		sb.WriteString(t.Config.GetIndentation(1))
@@ -427,14 +431,8 @@ func (t *Task) RenderSummary() string {
 	errorCount, warningCount := 0, 0
 	t.OutputLinesLock()
 	for _, line := range t.OutputLines {
-		// Skip internal fo errors - use IsInternal flag or fall back to string prefix
-		isFoInternalError := line.Context.IsInternal ||
-			(line.Type == TypeError &&
-				(strings.HasPrefix(line.Content, "Error starting command") ||
-					strings.HasPrefix(line.Content, "Error creating stdout pipe") ||
-					strings.HasPrefix(line.Content, "Error creating stderr pipe") ||
-					strings.HasPrefix(line.Content, "[fo] ")))
-		if isFoInternalError {
+		// Skip internal fo errors - use IsInternal flag only for clean encapsulation
+		if line.Context.IsInternal {
 			continue
 		}
 		switch line.Type {

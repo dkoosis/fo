@@ -122,6 +122,7 @@ type Config struct {
 		UseInlineProgress bool   `yaml:"use_inline_progress"`
 		NoSpinner         bool   `yaml:"no_spinner"`
 		SpinnerInterval   int    `yaml:"spinner_interval"`
+		HeaderWidth       int    `yaml:"header_width"` // Visual width of header content (default: 40)
 	} `yaml:"style"`
 
 	Border struct {
@@ -240,6 +241,7 @@ func ASCIIMinimalTheme() *Config {
 	cfg.Style.ShowTimestamps = false
 	cfg.Style.Density = "compact"
 	cfg.Style.NoTimer = false
+	cfg.Style.HeaderWidth = 40
 
 	cfg.Icons.Start = IconStart
 	cfg.Icons.Success = IconSuccess
@@ -306,6 +308,7 @@ func UnicodeVibrantTheme() *Config {
 	cfg.Style.ShowTimestamps = false
 	cfg.Style.Density = "balanced"
 	cfg.Style.NoTimer = false
+	cfg.Style.HeaderWidth = 40
 
 	cfg.Icons.Start = "▶️"
 	cfg.Icons.Success = "✅"
