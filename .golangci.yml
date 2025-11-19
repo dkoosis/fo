@@ -1,0 +1,55 @@
+run:
+  timeout: 5m
+  go: '1.22'
+
+linters:
+  disable:
+    # Deprecated linters
+    - exhaustivestruct
+    - gomnd
+    - tenv
+    # Overly strict style linters
+    - wsl        # whitespace style is too opinionated
+    - paralleltest  # requires careful analysis of each test
+
+linters-settings:
+  revive:
+    rules:
+      - name: unused-parameter
+        disabled: false
+  goconst:
+    min-occurrences: 4
+  gosec:
+    excludes:
+      - G306
+  # Set reasonable complexity thresholds
+  gocognit:
+    min-complexity: 50
+  cyclop:
+    max-complexity: 25
+  gocyclo:
+    min-complexity: 40
+  funlen:
+    lines: 80
+    statements: 60
+  lll:
+    line-length: 140
+
+issues:
+  exclude-rules:
+    # Allow os.Chdir in tests (usetesting linter)
+    - path: _test\.go
+      linters:
+        - usetesting
+    # Allow test packages to use same package name
+    - path: _test\.go
+      linters:
+        - testpackage
+    # Allow gosec G306 in tests
+    - path: _test\.go
+      linters:
+        - gosec
+    # Exclude dupword for comments
+    - linters:
+        - dupword
+      source: "^\\s*//"

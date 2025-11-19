@@ -19,7 +19,6 @@ func TestMagefileIntegration_Build(t *testing.T) {
 	dir := getExamplesDir(t)
 	cmd := exec.Command("mage", "-d", dir, "-w", dir, "build")
 	output, err := cmd.CombinedOutput()
-
 	if err != nil {
 		t.Fatalf("mage build failed: %v\nOutput: %s", err, output)
 	}
@@ -41,7 +40,6 @@ func TestMagefileIntegration_ConsoleReuse(t *testing.T) {
 	// The Build target uses the same console instance
 	cmd := exec.Command("mage", "-d", dir, "-w", dir, "build")
 	_, err := cmd.CombinedOutput()
-
 	if err != nil {
 		t.Fatalf("first mage build failed: %v", err)
 	}
@@ -68,7 +66,6 @@ func TestMagefileIntegration_MultipleTargets(t *testing.T) {
 	for _, target := range targets {
 		cmd := exec.Command("mage", "-d", dir, "-w", dir, target)
 		output, err := cmd.CombinedOutput()
-
 		if err != nil {
 			t.Errorf("mage %s failed: %v\nOutput: %s", target, err, output)
 		}

@@ -64,7 +64,7 @@ themes:
       use_boxes: false
 `
 	configFile := filepath.Join(tmpDir, ".fo.yaml")
-	err = os.WriteFile(configFile, []byte(yamlContent), 0644)
+	err = os.WriteFile(configFile, []byte(yamlContent), 0o644)
 	require.NoError(t, err)
 
 	cfg := LoadConfig()
@@ -98,7 +98,7 @@ func TestLoadConfig_When_MalformedYAML(t *testing.T) {
 invalid: yaml: [unclosed
 `
 	configFile := filepath.Join(tmpDir, ".fo.yaml")
-	err = os.WriteFile(configFile, []byte(yamlContent), 0644)
+	err = os.WriteFile(configFile, []byte(yamlContent), 0o644)
 	require.NoError(t, err)
 
 	cfg := LoadConfig()
@@ -121,7 +121,7 @@ func TestLoadConfig_When_FileReadError(t *testing.T) {
 
 	// Create a directory instead of a file to cause a read error
 	configFile := filepath.Join(tmpDir, ".fo.yaml")
-	err = os.Mkdir(configFile, 0755)
+	err = os.Mkdir(configFile, 0o755)
 	require.NoError(t, err)
 
 	cfg := LoadConfig()
@@ -145,7 +145,7 @@ func TestLoadConfig_When_InvalidActiveTheme(t *testing.T) {
 active_theme: "nonexistent_theme"
 `
 	configFile := filepath.Join(tmpDir, ".fo.yaml")
-	err = os.WriteFile(configFile, []byte(yamlContent), 0644)
+	err = os.WriteFile(configFile, []byte(yamlContent), 0o644)
 	require.NoError(t, err)
 
 	cfg := LoadConfig()
@@ -170,7 +170,7 @@ label: "Partial Label"
 stream: false
 `
 	configFile := filepath.Join(tmpDir, ".fo.yaml")
-	err = os.WriteFile(configFile, []byte(yamlContent), 0644)
+	err = os.WriteFile(configFile, []byte(yamlContent), 0o644)
 	require.NoError(t, err)
 
 	cfg := LoadConfig()
@@ -423,7 +423,7 @@ func TestApplyCommandPreset_When_NoMatch(t *testing.T) {
 	appCfg := &AppConfig{
 		Label: originalLabel,
 		Presets: map[string]*design.ToolConfig{
-			"othercmd": &design.ToolConfig{Label: "Other"},
+			"othercmd": {Label: "Other"},
 		},
 	}
 
@@ -458,7 +458,7 @@ func TestGetConfigPath_When_LocalFileExists(t *testing.T) {
 	}()
 
 	configFile := filepath.Join(tmpDir, ".fo.yaml")
-	err = os.WriteFile(configFile, []byte("test: value"), 0644)
+	err = os.WriteFile(configFile, []byte("test: value"), 0o644)
 	require.NoError(t, err)
 
 	path := getConfigPath()

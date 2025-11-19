@@ -49,7 +49,6 @@ func TestPatternMatcher_DetectCommandIntent_When_BuildCommand(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			got := pm.DetectCommandIntent(tc.command, tc.args)
@@ -91,7 +90,6 @@ func TestPatternMatcher_DetectCommandIntent_When_TestCommand(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			got := pm.DetectCommandIntent(tc.command, tc.args)
@@ -182,7 +180,6 @@ func TestPatternMatcher_ClassifyOutputLine_When_ErrorPattern(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			lineType, context := pm.ClassifyOutputLine(tc.line, "cmd", []string{})
@@ -231,7 +228,6 @@ func TestPatternMatcher_ClassifyOutputLine_When_WarningPattern(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			lineType, context := pm.ClassifyOutputLine(tc.line, "cmd", []string{})
@@ -266,7 +262,6 @@ func TestPatternMatcher_ClassifyOutputLine_When_SuccessPattern(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			lineType, context := pm.ClassifyOutputLine(tc.line, "cmd", []string{})
@@ -301,7 +296,6 @@ func TestPatternMatcher_ClassifyOutputLine_When_FileLineFormat(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			lineType, context := pm.ClassifyOutputLine(tc.line, "cmd", []string{})

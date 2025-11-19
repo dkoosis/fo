@@ -149,7 +149,7 @@ func (pm *PatternMatcher) DetectCommandIntent(cmd string, args []string) string 
 	return "running"
 }
 
-// Fast-path prefix checks for common patterns (avoids regex overhead)
+// Fast-path prefix checks for common patterns (avoids regex overhead).
 var (
 	errorPrefixes   = []string{"Error:", "ERROR:", "E!", "panic:", "fatal:", "Failed", "[ERROR]", "FAIL\t"}
 	warningPrefixes = []string{"Warning:", "WARNING:", "WARN", "W!", "deprecated:", "[warn]", "[WARNING]", "Warn:"}
@@ -157,7 +157,7 @@ var (
 	infoPrefixes    = []string{"Info:", "INFO:", "INFO[", "I!", "[info]", "Running"}
 )
 
-// hasPrefix checks if line starts with any of the given prefixes (case-insensitive for some)
+// hasPrefix checks if line starts with any of the given prefixes (case-insensitive for some).
 func hasPrefix(line string, prefixes []string) bool {
 	for _, prefix := range prefixes {
 		if strings.HasPrefix(line, prefix) {

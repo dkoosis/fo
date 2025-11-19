@@ -568,7 +568,7 @@ func (c *Config) resolveColorName(name string) string {
 
 // GetColorObj returns a Color wrapper for the given color key.
 // This provides a safer interface for color handling with automatic reset.
-// Example: cfg.GetColorObj("Error").Sprint("Error message")
+// Example: cfg.GetColorObj("Error").Sprint("Error message").
 func (c *Config) GetColorObj(colorKeyOrName string) Color {
 	return NewColor(c.GetColor(colorKeyOrName))
 }

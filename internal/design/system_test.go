@@ -53,15 +53,15 @@ func TestTask_AddOutputLine_When_ConcurrentAccess(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
 
-	for i := 0; i < numGoroutines; i++ {
-		go func(id int) {
+	for range numGoroutines {
+		go func() {
 			defer wg.Done()
 			task.AddOutputLine(
 				"line content",
 				TypeDetail,
 				LineContext{CognitiveLoad: LoadLow, Importance: 1},
 			)
-		}(i)
+		}()
 	}
 
 	wg.Wait()
@@ -69,7 +69,7 @@ func TestTask_AddOutputLine_When_ConcurrentAccess(t *testing.T) {
 	// All lines should be added without race conditions
 	task.OutputLinesLock()
 	defer task.OutputLinesUnlock()
-	assert.Equal(t, numGoroutines, len(task.OutputLines))
+	assert.Len(t, task.OutputLines, numGoroutines)
 }
 
 func TestTask_AddOutputLine_When_MultipleTypes(t *testing.T) {
@@ -108,7 +108,6 @@ func TestTask_AddOutputLine_When_MultipleTypes(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			cfg := UnicodeVibrantTheme()
@@ -117,7 +116,7 @@ func TestTask_AddOutputLine_When_MultipleTypes(t *testing.T) {
 
 			task.OutputLinesLock()
 			defer task.OutputLinesUnlock()
-			assert.Equal(t, 1, len(task.OutputLines))
+			assert.Len(t, task.OutputLines, 1)
 			assert.Equal(t, tc.content, task.OutputLines[0].Content)
 			assert.Equal(t, tc.lineType, task.OutputLines[0].Type)
 		})
@@ -136,7 +135,7 @@ func TestTask_Complete_When_ExitCodeZero(t *testing.T) {
 
 	assert.Equal(t, 0, task.ExitCode)
 	assert.Equal(t, StatusSuccess, task.Status)
-	assert.True(t, task.Duration > 0)
+	assert.Positive(t, task.Duration)
 	assert.False(t, task.EndTime.IsZero())
 }
 
@@ -261,7 +260,7 @@ func TestTask_hasOutputIssues_When_ConcurrentReads(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
 
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		go func() {
 			defer wg.Done()
 			hasErrors, hasWarnings := task.hasOutputIssues()
@@ -291,7 +290,7 @@ func TestTask_UpdateTaskContext_When_SmallOutput(t *testing.T) {
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		task.AddOutputLine("line", TypeDetail, LineContext{Importance: 1})
 	}
 
@@ -307,7 +306,7 @@ func TestTask_UpdateTaskContext_When_MediumOutput(t *testing.T) {
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
 
-	for i := 0; i < 25; i++ {
+	for range 25 {
 		task.AddOutputLine("line", TypeDetail, LineContext{Importance: 1})
 	}
 
@@ -323,7 +322,7 @@ func TestTask_UpdateTaskContext_When_LargeOutput(t *testing.T) {
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
 
-	for i := 0; i < 60; i++ {
+	for range 60 {
 		task.AddOutputLine("line", TypeDetail, LineContext{Importance: 1})
 	}
 
@@ -340,7 +339,7 @@ func TestTask_UpdateTaskContext_When_VeryLargeOutput(t *testing.T) {
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
 
-	for i := 0; i < 150; i++ {
+	for range 150 {
 		task.AddOutputLine("line", TypeDetail, LineContext{Importance: 1})
 	}
 
@@ -370,7 +369,7 @@ func TestTask_UpdateTaskContext_When_ManyErrors(t *testing.T) {
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		task.AddOutputLine("error", TypeError, LineContext{Importance: 5})
 	}
 
@@ -385,7 +384,7 @@ func TestTask_UpdateTaskContext_When_WarningsIncreaseLoad(t *testing.T) {
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		task.AddOutputLine("warning", TypeWarning, LineContext{Importance: 4})
 	}
 
@@ -404,7 +403,7 @@ func TestTask_UpdateTaskContext_When_ConcurrentAccess(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
 
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		go func() {
 			defer wg.Done()
 			task.AddOutputLine("line", TypeDetail, LineContext{Importance: 1})
@@ -416,7 +415,7 @@ func TestTask_UpdateTaskContext_When_ConcurrentAccess(t *testing.T) {
 
 	task.OutputLinesLock()
 	defer task.OutputLinesUnlock()
-	assert.Equal(t, numGoroutines, len(task.OutputLines))
+	assert.Len(t, task.OutputLines, numGoroutines)
 }
 
 func TestTask_OutputLinesLock_When_ConcurrentAccess(t *testing.T) {
@@ -429,11 +428,11 @@ func TestTask_OutputLinesLock_When_ConcurrentAccess(t *testing.T) {
 	task.AddOutputLine("line2", TypeDetail, LineContext{Importance: 1})
 
 	task.OutputLinesLock()
-	assert.Equal(t, 2, len(task.OutputLines))
+	assert.Len(t, task.OutputLines, 2)
 	task.OutputLinesUnlock()
 
 	// Should still be accessible after unlock
 	task.OutputLinesLock()
 	defer task.OutputLinesUnlock()
-	assert.Equal(t, 2, len(task.OutputLines))
+	assert.Len(t, task.OutputLines, 2)
 }

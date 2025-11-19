@@ -86,7 +86,6 @@ func LoadConfig() *AppConfig {
 		for themeName, themeCfg := range appCfg.Themes {
 			if themeCfg != nil {
 				fmt.Fprintf(os.Stderr, "Theme: %s (IsMonochrome: %t)\n", themeName, themeCfg.IsMonochrome)
-				// Add more detailed color logging here if needed for debugging themes
 			}
 		}
 		fmt.Fprintln(os.Stderr, "-------------------------------------------------")
