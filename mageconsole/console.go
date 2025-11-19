@@ -442,80 +442,35 @@ func (c *Console) executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMa
 
 	var errStdoutCopy, errStderrCopy error
 	var totalBytesRead int64
-	var maxTotalBytes = c.cfg.MaxBufferSize * 2 // Allow MaxBufferSize per stream
+	maxTotalBytes := c.cfg.MaxBufferSize * 2 // Allow MaxBufferSize per stream
 	var bytesMutex sync.Mutex
 
-	// Stream line-by-line classification for real-time processing
-	go func() {
+	// Helper function to process a pipe line-by-line with classification
+	processPipe := func(pipe io.ReadCloser, streamName string, errVar *error) {
 		defer wgRead.Done()
 		if c.cfg.Debug {
-			fmt.Fprintln(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Reading stdoutPipe line-by-line")
+			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Reading %s line-by-line\n", streamName)
 		}
-		scanner := bufio.NewScanner(stdoutPipe)
+		scanner := bufio.NewScanner(pipe)
 		buf := make([]byte, 0, bufio.MaxScanTokenSize)
 		scanner.Buffer(buf, c.cfg.MaxLineLength)
-		
-		for scanner.Scan() {
-			line := scanner.Text()
-			lineBytes := int64(len(line))
-			
-			// Enforce MaxBufferSize limit (thread-safe check and update)
-			bytesMutex.Lock()
-			if totalBytesRead+lineBytes > maxTotalBytes {
-				bytesMutex.Unlock()
-				if c.cfg.Debug {
-					fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] MaxBufferSize limit reached for stdout, truncating\n")
-				}
-				break
-			}
-			totalBytesRead += lineBytes
-			bytesMutex.Unlock()
-			
-			// Classify and add line immediately (streaming classification)
-			lineType, lineContext := patternMatcher.ClassifyOutputLine(line, task.Command, task.Args)
-			if c.cfg.Debug {
-				fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Line classified as %s: %s\n", lineType, line)
-			}
-			task.AddOutputLine(line, lineType, lineContext)
-		}
-		
-		if scanErr := scanner.Err(); scanErr != nil {
-			if !errors.Is(scanErr, io.EOF) && !strings.Contains(scanErr.Error(), "file already closed") && !strings.Contains(scanErr.Error(), "broken pipe") {
-				errStdoutCopy = scanErr
-				if c.cfg.Debug {
-					fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Error scanning stdout: %v\n", scanErr)
-				}
-			}
-		} else if c.cfg.Debug {
-			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Finished reading stdoutPipe\n")
-		}
-	}()
 
-	go func() {
-		defer wgRead.Done()
-		if c.cfg.Debug {
-			fmt.Fprintln(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Reading stderrPipe line-by-line")
-		}
-		scanner := bufio.NewScanner(stderrPipe)
-		buf := make([]byte, 0, bufio.MaxScanTokenSize)
-		scanner.Buffer(buf, c.cfg.MaxLineLength)
-		
 		for scanner.Scan() {
 			line := scanner.Text()
 			lineBytes := int64(len(line))
-			
+
 			// Enforce MaxBufferSize limit (thread-safe check and update)
 			bytesMutex.Lock()
 			if totalBytesRead+lineBytes > maxTotalBytes {
 				bytesMutex.Unlock()
 				if c.cfg.Debug {
-					fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] MaxBufferSize limit reached for stderr, truncating\n")
+					fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] MaxBufferSize limit reached for %s, truncating\n", streamName)
 				}
 				break
 			}
 			totalBytesRead += lineBytes
 			bytesMutex.Unlock()
-			
+
 			// Classify and add line immediately (streaming classification)
 			lineType, lineContext := patternMatcher.ClassifyOutputLine(line, task.Command, task.Args)
 			if c.cfg.Debug {
@@ -523,18 +478,22 @@ func (c *Console) executeCaptureMode(cmd *exec.Cmd, task *design.Task, patternMa
 			}
 			task.AddOutputLine(line, lineType, lineContext)
 		}
-		
+
 		if scanErr := scanner.Err(); scanErr != nil {
 			if !errors.Is(scanErr, io.EOF) && !strings.Contains(scanErr.Error(), "file already closed") && !strings.Contains(scanErr.Error(), "broken pipe") {
-				errStderrCopy = scanErr
+				*errVar = scanErr
 				if c.cfg.Debug {
-					fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Error scanning stderr: %v\n", scanErr)
+					fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Error scanning %s: %v\n", streamName, scanErr)
 				}
 			}
 		} else if c.cfg.Debug {
-			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Finished reading stderrPipe\n")
+			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Finished reading %s\n", streamName)
 		}
-	}()
+	}
+
+	// Stream line-by-line classification for real-time processing
+	go processPipe(stdoutPipe, "stdoutPipe", &errStdoutCopy)
+	go processPipe(stderrPipe, "stderrPipe", &errStderrCopy)
 
 	if err := cmd.Start(); err != nil {
 		errMsg := fmt.Sprintf("Error starting command '%s': %v", strings.Join(cmd.Args, " "), err)
