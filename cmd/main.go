@@ -25,7 +25,6 @@ type LocalAppConfig struct {
 	MaxLineLength int   // Max size for a single line from stdout/stderr
 }
 
-
 // main is the entry point of the application.
 func main() {
 	// Check for subcommand first

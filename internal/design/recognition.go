@@ -15,19 +15,19 @@ type CompiledPattern struct {
 
 // PatternMatcher provides intelligent pattern detection for commands and output.
 type PatternMatcher struct {
-	Config              *Config
+	Config                 *Config
 	compiledOutputPatterns map[string][]CompiledPattern
 	compiledToolPatterns   map[string]map[string][]CompiledPattern
 	// Precompiled special patterns
-	fileLinePattern     *regexp.Regexp
-	passFailPattern     *regexp.Regexp
+	fileLinePattern *regexp.Regexp
+	passFailPattern *regexp.Regexp
 }
 
 // NewPatternMatcher creates a pattern matcher with the given configuration.
 // All regex patterns are precompiled at initialization time for performance.
 func NewPatternMatcher(config *Config) *PatternMatcher {
 	pm := &PatternMatcher{
-		Config:                config,
+		Config:                 config,
 		compiledOutputPatterns: make(map[string][]CompiledPattern),
 		compiledToolPatterns:   make(map[string]map[string][]CompiledPattern),
 	}

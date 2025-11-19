@@ -131,10 +131,10 @@ func (t *Task) renderDuration() string {
 
 // statusBlockData holds the computed values for rendering a status block.
 type statusBlockData struct {
-	style      ElementStyleDef
-	icon       string
-	text       string
-	colorKey   string
+	style    ElementStyleDef
+	icon     string
+	text     string
+	colorKey string
 }
 
 // getStatusBlockData returns the styling data for the current task status.

@@ -76,10 +76,10 @@ func TestTask_AddOutputLine_When_MultipleTypes(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		content     string
-		lineType    string
-		context     LineContext
+		name     string
+		content  string
+		lineType string
+		context  LineContext
 	}{
 		{
 			name:     "error line",
@@ -114,7 +114,7 @@ func TestTask_AddOutputLine_When_MultipleTypes(t *testing.T) {
 			cfg := UnicodeVibrantTheme()
 			task := NewTask("test", "", "cmd", nil, cfg)
 			task.AddOutputLine(tc.content, tc.lineType, tc.context)
-			
+
 			task.OutputLinesLock()
 			defer task.OutputLinesUnlock()
 			assert.Equal(t, 1, len(task.OutputLines))
@@ -129,7 +129,7 @@ func TestTask_Complete_When_ExitCodeZero(t *testing.T) {
 
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
-	
+
 	// Add some time to ensure duration > 0
 	time.Sleep(10 * time.Millisecond)
 	task.Complete(0)
@@ -145,7 +145,7 @@ func TestTask_Complete_When_ExitCodeNonZero(t *testing.T) {
 
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
-	
+
 	time.Sleep(10 * time.Millisecond)
 	task.Complete(1)
 
@@ -158,7 +158,7 @@ func TestTask_Complete_When_ErrorsInOutput(t *testing.T) {
 
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
-	
+
 	task.AddOutputLine("error occurred", TypeError, LineContext{Importance: 5})
 	time.Sleep(10 * time.Millisecond)
 	task.Complete(0)
@@ -171,7 +171,7 @@ func TestTask_Complete_When_WarningsInOutput(t *testing.T) {
 
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
-	
+
 	task.AddOutputLine("warning message", TypeWarning, LineContext{Importance: 4})
 	time.Sleep(10 * time.Millisecond)
 	task.Complete(0)
@@ -184,7 +184,7 @@ func TestTask_Complete_When_ErrorsOverrideWarnings(t *testing.T) {
 
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
-	
+
 	task.AddOutputLine("error message", TypeError, LineContext{Importance: 5})
 	task.AddOutputLine("warning message", TypeWarning, LineContext{Importance: 4})
 	time.Sleep(10 * time.Millisecond)
@@ -198,7 +198,7 @@ func TestTask_Complete_When_ExitCodeOverridesOutput(t *testing.T) {
 
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
-	
+
 	task.AddOutputLine("warning message", TypeWarning, LineContext{Importance: 4})
 	time.Sleep(10 * time.Millisecond)
 	task.Complete(1)
@@ -211,7 +211,7 @@ func TestTask_hasOutputIssues_When_NoIssues(t *testing.T) {
 
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
-	
+
 	task.AddOutputLine("info message", TypeInfo, LineContext{Importance: 2})
 	task.AddOutputLine("detail message", TypeDetail, LineContext{Importance: 1})
 
@@ -226,7 +226,7 @@ func TestTask_hasOutputIssues_When_ErrorsPresent(t *testing.T) {
 
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
-	
+
 	task.AddOutputLine("error message", TypeError, LineContext{Importance: 5})
 
 	hasErrors, hasWarnings := task.hasOutputIssues()
@@ -240,7 +240,7 @@ func TestTask_hasOutputIssues_When_WarningsPresent(t *testing.T) {
 
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
-	
+
 	task.AddOutputLine("warning message", TypeWarning, LineContext{Importance: 4})
 
 	hasErrors, hasWarnings := task.hasOutputIssues()
@@ -254,7 +254,7 @@ func TestTask_hasOutputIssues_When_ConcurrentReads(t *testing.T) {
 
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
-	
+
 	task.AddOutputLine("error message", TypeError, LineContext{Importance: 5})
 
 	const numGoroutines = 50
@@ -278,7 +278,7 @@ func TestTask_UpdateTaskContext_When_NoOutput(t *testing.T) {
 
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
-	
+
 	task.UpdateTaskContext()
 
 	assert.Equal(t, 2, task.Context.Complexity)
@@ -290,11 +290,11 @@ func TestTask_UpdateTaskContext_When_SmallOutput(t *testing.T) {
 
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
-	
+
 	for i := 0; i < 10; i++ {
 		task.AddOutputLine("line", TypeDetail, LineContext{Importance: 1})
 	}
-	
+
 	task.UpdateTaskContext()
 
 	assert.Equal(t, 2, task.Context.Complexity)
@@ -306,11 +306,11 @@ func TestTask_UpdateTaskContext_When_MediumOutput(t *testing.T) {
 
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
-	
+
 	for i := 0; i < 25; i++ {
 		task.AddOutputLine("line", TypeDetail, LineContext{Importance: 1})
 	}
-	
+
 	task.UpdateTaskContext()
 
 	assert.Equal(t, 3, task.Context.Complexity)
@@ -322,11 +322,11 @@ func TestTask_UpdateTaskContext_When_LargeOutput(t *testing.T) {
 
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
-	
+
 	for i := 0; i < 60; i++ {
 		task.AddOutputLine("line", TypeDetail, LineContext{Importance: 1})
 	}
-	
+
 	task.UpdateTaskContext()
 
 	assert.Equal(t, 4, task.Context.Complexity)
@@ -339,11 +339,11 @@ func TestTask_UpdateTaskContext_When_VeryLargeOutput(t *testing.T) {
 
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
-	
+
 	for i := 0; i < 150; i++ {
 		task.AddOutputLine("line", TypeDetail, LineContext{Importance: 1})
 	}
-	
+
 	task.UpdateTaskContext()
 
 	assert.Equal(t, 5, task.Context.Complexity)
@@ -355,10 +355,10 @@ func TestTask_UpdateTaskContext_When_ErrorsIncreaseLoad(t *testing.T) {
 
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
-	
+
 	task.AddOutputLine("error", TypeError, LineContext{Importance: 5})
 	task.AddOutputLine("error", TypeError, LineContext{Importance: 5})
-	
+
 	task.UpdateTaskContext()
 
 	assert.Equal(t, LoadMedium, task.Context.CognitiveLoad)
@@ -369,11 +369,11 @@ func TestTask_UpdateTaskContext_When_ManyErrors(t *testing.T) {
 
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
-	
+
 	for i := 0; i < 10; i++ {
 		task.AddOutputLine("error", TypeError, LineContext{Importance: 5})
 	}
-	
+
 	task.UpdateTaskContext()
 
 	assert.Equal(t, LoadHigh, task.Context.CognitiveLoad)
@@ -384,11 +384,11 @@ func TestTask_UpdateTaskContext_When_WarningsIncreaseLoad(t *testing.T) {
 
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
-	
+
 	for i := 0; i < 5; i++ {
 		task.AddOutputLine("warning", TypeWarning, LineContext{Importance: 4})
 	}
-	
+
 	task.UpdateTaskContext()
 
 	assert.Equal(t, LoadMedium, task.Context.CognitiveLoad)
@@ -399,7 +399,7 @@ func TestTask_UpdateTaskContext_When_ConcurrentAccess(t *testing.T) {
 
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
-	
+
 	const numGoroutines = 50
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
@@ -424,7 +424,7 @@ func TestTask_OutputLinesLock_When_ConcurrentAccess(t *testing.T) {
 
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
-	
+
 	task.AddOutputLine("line1", TypeDetail, LineContext{Importance: 1})
 	task.AddOutputLine("line2", TypeDetail, LineContext{Importance: 1})
 
@@ -437,4 +437,3 @@ func TestTask_OutputLinesLock_When_ConcurrentAccess(t *testing.T) {
 	defer task.OutputLinesUnlock()
 	assert.Equal(t, 2, len(task.OutputLines))
 }
-

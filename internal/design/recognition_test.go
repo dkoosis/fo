@@ -150,33 +150,33 @@ func TestPatternMatcher_ClassifyOutputLine_When_ErrorPattern(t *testing.T) {
 	pm := NewPatternMatcher(cfg)
 
 	tests := []struct {
-		name    string
-		line    string
-		wantType string
+		name           string
+		line           string
+		wantType       string
 		wantImportance int
 	}{
 		{
-			name:          "Error: prefix",
-			line:          "Error: something went wrong",
-			wantType:      TypeError,
+			name:           "Error: prefix",
+			line:           "Error: something went wrong",
+			wantType:       TypeError,
 			wantImportance: 5,
 		},
 		{
-			name:          "ERROR: prefix",
-			line:          "ERROR: critical failure",
-			wantType:      TypeError,
+			name:           "ERROR: prefix",
+			line:           "ERROR: critical failure",
+			wantType:       TypeError,
 			wantImportance: 5,
 		},
 		{
-			name:          "panic: prefix",
-			line:          "panic: runtime error",
-			wantType:      TypeError,
+			name:           "panic: prefix",
+			line:           "panic: runtime error",
+			wantType:       TypeError,
 			wantImportance: 5,
 		},
 		{
-			name:          "FAIL prefix",
-			line:          "FAIL: test failed",
-			wantType:      TypeError,
+			name:           "FAIL prefix",
+			line:           "FAIL: test failed",
+			wantType:       TypeError,
 			wantImportance: 4, // File:line format gives Importance 4, not pattern-based 5
 		},
 	}
@@ -205,27 +205,27 @@ func TestPatternMatcher_ClassifyOutputLine_When_WarningPattern(t *testing.T) {
 	pm := NewPatternMatcher(cfg)
 
 	tests := []struct {
-		name    string
-		line    string
-		wantType string
+		name           string
+		line           string
+		wantType       string
 		wantImportance int
 	}{
 		{
-			name:          "Warning: prefix",
-			line:          "Warning: deprecated function",
-			wantType:      TypeWarning,
+			name:           "Warning: prefix",
+			line:           "Warning: deprecated function",
+			wantType:       TypeWarning,
 			wantImportance: 4,
 		},
 		{
-			name:          "WARNING: prefix",
-			line:          "WARNING: minor issue",
-			wantType:      TypeWarning,
+			name:           "WARNING: prefix",
+			line:           "WARNING: minor issue",
+			wantType:       TypeWarning,
 			wantImportance: 4,
 		},
 		{
-			name:          "deprecated with colon prefix",
-			line:          "deprecated: use new one",
-			wantType:      TypeWarning,
+			name:           "deprecated with colon prefix",
+			line:           "deprecated: use new one",
+			wantType:       TypeWarning,
 			wantImportance: 4,
 		},
 	}
@@ -249,8 +249,8 @@ func TestPatternMatcher_ClassifyOutputLine_When_SuccessPattern(t *testing.T) {
 	pm := NewPatternMatcher(cfg)
 
 	tests := []struct {
-		name    string
-		line    string
+		name     string
+		line     string
 		wantType string
 	}{
 		{
@@ -551,4 +551,3 @@ func TestPatternMatcher_findToolConfig_When_NoMatch(t *testing.T) {
 
 	assert.Nil(t, toolCfg)
 }
-
