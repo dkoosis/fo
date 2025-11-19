@@ -1,4 +1,4 @@
-module github.com/davidkoosis/fo
+module github.com/dkoosis/fo
 
 go 1.24.2
 

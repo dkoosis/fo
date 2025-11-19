@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	config "github.com/davidkoosis/fo/internal/config"
+	config "github.com/dkoosis/fo/internal/config"
 )
 
 func TestFindCommandArgs_WithDoubleDash(t *testing.T) {

@@ -77,7 +77,7 @@ When you run `mage qa`, you'll see beautifully formatted output like:
 
 package main
 
-import "github.com/davidkoosis/fo/mageconsole"
+import "github.com/dkoosis/fo/mageconsole"
 
 var console = mageconsole.DefaultConsole()
 

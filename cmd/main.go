@@ -6,10 +6,10 @@ import (
 	"os"
 	"strings"
 
-	config "github.com/davidkoosis/fo/internal/config"
-	"github.com/davidkoosis/fo/internal/design"
-	"github.com/davidkoosis/fo/internal/version"
-	"github.com/davidkoosis/fo/mageconsole"
+	config "github.com/dkoosis/fo/internal/config"
+	"github.com/dkoosis/fo/internal/design"
+	"github.com/dkoosis/fo/internal/version"
+	"github.com/dkoosis/fo/mageconsole"
 )
 
 // LocalAppConfig holds behavioral settings derived from AppConfig and CLI flags.

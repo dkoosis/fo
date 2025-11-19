@@ -4,7 +4,7 @@
 # Variables
 SERVICE_NAME := fo
 BINARY_NAME  := $(SERVICE_NAME)
-MODULE_PATH  := github.com/davidkoosis/fo
+MODULE_PATH  := github.com/dkoosis/fo
 CMD_PATH     := ./cmd
 BIN_PATH     := ./bin
 

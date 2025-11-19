@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/davidkoosis/fo/internal/design"
+	"github.com/dkoosis/fo/internal/design"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
