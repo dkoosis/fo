@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davidkoosis/fo/mageconsole"
+	"github.com/dkoosis/fo/mageconsole"
 )
 
 var (
 	binPath    = "./bin/fo"
-	modulePath = "github.com/davidkoosis/fo"
+	modulePath = "github.com/dkoosis/fo"
 	console    = mageconsole.DefaultConsole()
 )
 

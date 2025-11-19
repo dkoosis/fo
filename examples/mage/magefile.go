@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/davidkoosis/fo/mageconsole"
+	"github.com/dkoosis/fo/mageconsole"
 )
 
 var console = mageconsole.DefaultConsole()

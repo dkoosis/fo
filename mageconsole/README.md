@@ -7,7 +7,7 @@ A Go library for running shell commands with formatted, colorful console output.
 ## Installation
 
 ```bash
-go get github.com/davidkoosis/fo/mageconsole
+go get github.com/dkoosis/fo/mageconsole
 ```
 
 ## Quick Start
@@ -16,7 +16,7 @@ go get github.com/davidkoosis/fo/mageconsole
 package main
 
 import (
-    "github.com/davidkoosis/fo/mageconsole"
+    "github.com/dkoosis/fo/mageconsole"
 )
 
 func main() {
@@ -192,7 +192,7 @@ console := mageconsole.NewConsole(mageconsole.ConsoleConfig{
 
 package main
 
-import "github.com/davidkoosis/fo/mageconsole"
+import "github.com/dkoosis/fo/mageconsole"
 
 var console = mageconsole.DefaultConsole()
 

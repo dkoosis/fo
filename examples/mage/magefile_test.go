@@ -102,7 +102,7 @@ func getExamplesDir(t *testing.T) string {
 	if _, err := os.Stat(filepath.Join(wd, "magefile.go")); err == nil {
 		// Check if this is examples/mage by looking for its specific go.mod module name
 		if data, err := os.ReadFile(filepath.Join(wd, "go.mod")); err == nil {
-			if strings.Contains(string(data), "github.com/davidkoosis/fo/examples/mage") {
+			if strings.Contains(string(data), "github.com/dkoosis/fo/examples/mage") {
 				return wd // We're in examples/mage
 			}
 		}
