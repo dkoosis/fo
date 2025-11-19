@@ -249,8 +249,9 @@ func TestTask_RenderSummary_When_IgnoresFoInternalErrors(t *testing.T) {
 
 	cfg := UnicodeVibrantTheme()
 	task := NewTask("test", "", "cmd", nil, cfg)
-	task.AddOutputLine("[fo] Error starting command", TypeError, LineContext{Importance: 5})
-	task.AddOutputLine("Error creating stdout pipe", TypeError, LineContext{Importance: 5})
+	// Use IsInternal flag to mark fo-generated errors
+	task.AddOutputLine("[fo] Error starting command", TypeError, LineContext{Importance: 5, IsInternal: true})
+	task.AddOutputLine("Error creating stdout pipe", TypeError, LineContext{Importance: 5, IsInternal: true})
 
 	output := task.RenderSummary()
 

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/davidkoosis/fo/internal/design"
+	"golang.org/x/term"
 )
 
 type ConsoleConfig struct {
@@ -396,6 +397,12 @@ func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task, cmdDone ch
 		return exitCode, runErr
 	}
 	cmd.Stdout = os.Stdout
+
+	// Connect stdin for interactive input support in stream mode
+	// Check if stdin is a terminal to support interactive commands
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		cmd.Stdin = os.Stdin
+	}
 
 	var waitGroup sync.WaitGroup
 	waitGroup.Add(1)
