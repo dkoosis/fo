@@ -3,91 +3,42 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"strings"
-	"time"
 
+	"github.com/dkoosis/fo/internal/magetasks"
 	"github.com/dkoosis/fo/mageconsole"
+	"github.com/magefile/mage/mg"
 )
 
 var (
-	binPath    = "./bin/fo"
-	modulePath = "github.com/dkoosis/fo"
-	console    = mageconsole.DefaultConsole()
+	console = mageconsole.DefaultConsole()
 )
 
-// Build builds the fo binary.
+// Default target - build the binary
+var Default = Build
+
+func init() {
+	if err := magetasks.Initialize(); err != nil {
+		fmt.Fprintf(os.Stderr, "Fatal: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// Build builds the fo binary
 func Build() error {
-	if err := os.MkdirAll("./bin", 0o755); err != nil {
-		return err
-	}
-
-	version := getGitVersion()
-	commit := getGitCommit()
-	date := time.Now().UTC().Format(time.RFC3339)
-
-	ldflags := fmt.Sprintf("-s -w -X '%s/internal/version.Version=%s' -X '%s/internal/version.CommitHash=%s' -X '%s/internal/version.BuildDate=%s'",
-		modulePath, version, modulePath, commit, modulePath, date)
-
-	fmt.Println("Building fo...")
-	cmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", binPath, "./cmd")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return err
-	}
-
-	fmt.Printf("Built: %s\n", binPath)
-	return nil
+	return magetasks.BuildAll()
 }
 
-// Clean removes build artifacts.
+// Clean removes build artifacts
 func Clean() error {
-	os.RemoveAll("./bin")
-	cmd := exec.Command("go", "clean", "-cache")
-	cmd.Run()
-	fmt.Println("Cleaned")
-	return nil
+	return magetasks.Clean()
 }
 
-func getGitVersion() string {
-	out, err := exec.Command("git", "describe", "--tags", "--always", "--dirty", "--match=v*").Output()
-	if err != nil {
-		return "dev"
-	}
-	return strings.TrimSpace(string(out))
-}
-
-func getGitCommit() string {
-	out, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output()
-	if err != nil {
-		return "unknown"
-	}
-	return strings.TrimSpace(string(out))
-}
-
-// isCommandNotFound checks if the error indicates the command was not found.
-// This handles exec.ErrNotFound and platform-specific string fallbacks.
-func isCommandNotFound(err error) bool {
-	if errors.Is(err, exec.ErrNotFound) {
-		return true
-	}
-	// Fallback string matching for edge cases
-	errStr := err.Error()
-	if strings.Contains(errStr, "executable file not found") {
-		return true
-	}
-	if strings.Contains(errStr, "no such file or directory") {
-		return true
-	}
-	return false
-}
-
-// QA runs all quality assurance checks.
+// QA runs all quality assurance checks (uses mageconsole for better output)
 func QA() error {
+	magetasks.PrintH1Header("fo Quality Assurance")
+
 	fmt.Println("🔍 Running QA checks...")
 
 	// Format check
@@ -102,8 +53,8 @@ func QA() error {
 
 	// Staticcheck
 	if _, err := console.Run("Staticcheck", "staticcheck", "./..."); err != nil {
-		if isCommandNotFound(err) {
-			fmt.Println("⚠️  Staticcheck not found (install: go install honnef.co/go/tools/cmd/staticcheck@latest)")
+		if magetasks.IsCommandNotFound(err) {
+			magetasks.PrintWarning("Staticcheck not found (install: go install honnef.co/go/tools/cmd/staticcheck@latest)")
 		} else {
 			return fmt.Errorf("staticcheck failed: %w", err)
 		}
@@ -115,8 +66,8 @@ func QA() error {
 		"--disable=exhaustivestruct,exhaustruct,varnamelen,ireturn,wrapcheck,nlreturn,gochecknoglobals,gomnd,mnd,depguard,tagalign",
 		"--timeout=5m",
 		"./..."); err != nil {
-		if isCommandNotFound(err) {
-			fmt.Println("⚠️  Golangci-lint not found (install: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)")
+		if magetasks.IsCommandNotFound(err) {
+			magetasks.PrintWarning("Golangci-lint not found (install: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)")
 		} else {
 			return fmt.Errorf("golangci-lint failed: %w", err)
 		}
@@ -124,8 +75,8 @@ func QA() error {
 
 	// Security scan
 	if _, err := console.Run("Gosec Security Scan", "gosec", "-quiet", "./..."); err != nil {
-		if isCommandNotFound(err) {
-			fmt.Println("⚠️  Gosec not found (install: go install github.com/securego/gosec/v2/cmd/gosec@latest)")
+		if magetasks.IsCommandNotFound(err) {
+			magetasks.PrintWarning("Gosec not found (install: go install github.com/securego/gosec/v2/cmd/gosec@latest)")
 		} else {
 			return fmt.Errorf("gosec failed: %w", err)
 		}
@@ -136,6 +87,70 @@ func QA() error {
 		return fmt.Errorf("build failed: %w", err)
 	}
 
-	fmt.Println("✅ QA complete!")
+	magetasks.PrintSuccess("QA complete!")
 	return nil
+}
+
+// Lint namespace for linting commands
+type Lint mg.Namespace
+
+// All runs all linters
+func (Lint) All() error {
+	return magetasks.LintAll()
+}
+
+// Format checks code formatting
+func (Lint) Format() error {
+	return magetasks.LintFormat()
+}
+
+// Vet runs go vet
+func (Lint) Vet() error {
+	return magetasks.LintVet()
+}
+
+// Staticcheck runs staticcheck
+func (Lint) Staticcheck() error {
+	return magetasks.LintStaticcheck()
+}
+
+// Golangci runs golangci-lint
+func (Lint) Golangci() error {
+	return magetasks.LintGolangci()
+}
+
+// Fix runs golangci-lint with auto-fixes
+func (Lint) Fix() error {
+	return magetasks.LintGolangciFix()
+}
+
+// Test namespace for testing commands
+type Test mg.Namespace
+
+// All runs all tests
+func (Test) All() error {
+	return magetasks.TestAll()
+}
+
+// Coverage runs tests with coverage
+func (Test) Coverage() error {
+	return magetasks.TestCoverage()
+}
+
+// Race runs tests with race detector
+func (Test) Race() error {
+	return magetasks.TestRace()
+}
+
+// Quality namespace for quality check commands
+type Quality mg.Namespace
+
+// Check runs the quality validation suite
+func (Quality) Check() error {
+	return magetasks.QualityCheck()
+}
+
+// Report generates the quality report
+func (Quality) Report() error {
+	return magetasks.QualityReport()
 }
