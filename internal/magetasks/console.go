@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// PrintH1Header prints a top-level header with decoration
+// PrintH1Header prints a top-level header with decoration.
 func PrintH1Header(title string) {
 	width := 80
 	fmt.Println()
@@ -16,29 +16,29 @@ func PrintH1Header(title string) {
 	fmt.Println()
 }
 
-// PrintH2Header prints a section header
+// PrintH2Header prints a section header.
 func PrintH2Header(title string) {
 	fmt.Println()
 	fmt.Printf("=== %s ===\n", title)
 	fmt.Println()
 }
 
-// PrintSuccess prints a success message
+// PrintSuccess prints a success message.
 func PrintSuccess(msg string) {
 	fmt.Printf("✅ %s\n", msg)
 }
 
-// PrintWarning prints a warning message
+// PrintWarning prints a warning message.
 func PrintWarning(msg string) {
 	fmt.Printf("⚠️  %s\n", msg)
 }
 
-// PrintError prints an error message
+// PrintError prints an error message.
 func PrintError(msg string) {
 	fmt.Printf("❌ %s\n", msg)
 }
 
-// PrintInfo prints an info message
+// PrintInfo prints an info message.
 func PrintInfo(msg string) {
 	fmt.Printf("ℹ️  %s\n", msg)
 }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-// QualityCheck runs all quality checks
+// QualityCheck runs all quality checks.
 func QualityCheck() error {
 	PrintH2Header("Quality Checks")
 
@@ -27,7 +27,7 @@ func QualityCheck() error {
 	return nil
 }
 
-// QualityReport generates a quality report
+// QualityReport generates a quality report.
 func QualityReport() error {
 	PrintH2Header("Quality Report")
 

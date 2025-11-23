@@ -6,13 +6,13 @@ import (
 )
 
 var (
-	// ModulePath is the Go module path
+	// ModulePath is the Go module path.
 	ModulePath = "github.com/dkoosis/fo"
 
-	// BinPath is the output path for built binaries
+	// BinPath is the output path for built binaries.
 	BinPath = "./bin/fo"
 
-	// ProjectRoot is the root directory of the project
+	// ProjectRoot is the root directory of the project.
 	ProjectRoot string
 )
 

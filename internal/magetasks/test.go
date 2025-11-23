@@ -6,7 +6,7 @@ import (
 	"os/exec"
 )
 
-// TestAll runs all tests
+// TestAll runs all tests.
 func TestAll() error {
 	PrintH2Header("Tests")
 
@@ -23,7 +23,7 @@ func TestAll() error {
 	return nil
 }
 
-// TestCoverage runs tests with coverage
+// TestCoverage runs tests with coverage.
 func TestCoverage() error {
 	PrintH2Header("Test Coverage")
 
@@ -40,13 +40,13 @@ func TestCoverage() error {
 	cmd = exec.Command("go", "tool", "cover", "-func=coverage.out")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Run()
+	_ = cmd.Run() // Ignore error for coverage display
 
 	PrintSuccess("Coverage report generated")
 	return nil
 }
 
-// TestRace runs tests with race detector
+// TestRace runs tests with race detector.
 func TestRace() error {
 	PrintH2Header("Race Detector")
 

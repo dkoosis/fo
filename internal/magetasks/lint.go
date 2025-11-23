@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// LintAll runs all linters
+// LintAll runs all linters.
 func LintAll() error {
 	PrintH2Header("Linting")
 
@@ -47,7 +47,7 @@ func LintAll() error {
 	return nil
 }
 
-// LintFormat checks code formatting
+// LintFormat checks code formatting.
 func LintFormat() error {
 	fmt.Println("Running go fmt...")
 	cmd := exec.Command("go", "fmt", "./...")
@@ -59,7 +59,7 @@ func LintFormat() error {
 	return nil
 }
 
-// LintVet runs go vet
+// LintVet runs go vet.
 func LintVet() error {
 	fmt.Println("Running go vet...")
 	cmd := exec.Command("go", "vet", "./...")
@@ -71,7 +71,7 @@ func LintVet() error {
 	return nil
 }
 
-// LintStaticcheck runs staticcheck
+// LintStaticcheck runs staticcheck.
 func LintStaticcheck() error {
 	fmt.Println("Running staticcheck...")
 	cmd := exec.Command("staticcheck", "./...")
@@ -87,12 +87,12 @@ func LintStaticcheck() error {
 	return nil
 }
 
-// LintGolangci runs golangci-lint
+// LintGolangci runs golangci-lint.
 func LintGolangci() error {
 	fmt.Println("Running golangci-lint...")
 	cmd := exec.Command("golangci-lint", "run",
 		"--enable-all",
-		"--disable=exhaustivestruct,exhaustruct,varnamelen,ireturn,wrapcheck,nlreturn,gochecknoglobals,gomnd,mnd,depguard,tagalign",
+		"--disable=exhaustruct,varnamelen,ireturn,wrapcheck,nlreturn,gochecknoglobals,mnd,depguard,tagalign,tenv",
 		"--timeout=5m",
 		"./...")
 	cmd.Stdout = os.Stdout
@@ -107,12 +107,12 @@ func LintGolangci() error {
 	return nil
 }
 
-// LintGolangciFix runs golangci-lint with auto-fixes
+// LintGolangciFix runs golangci-lint with auto-fixes.
 func LintGolangciFix() error {
 	fmt.Println("Running golangci-lint with auto-fix...")
 	cmd := exec.Command("golangci-lint", "run", "--fix",
 		"--enable-all",
-		"--disable=exhaustivestruct,exhaustruct,varnamelen,ireturn,wrapcheck,nlreturn,gochecknoglobals,gomnd,mnd,depguard,tagalign",
+		"--disable=exhaustruct,varnamelen,ireturn,wrapcheck,nlreturn,gochecknoglobals,mnd,depguard,tagalign,tenv",
 		"--timeout=5m",
 		"./...")
 	cmd.Stdout = os.Stdout
@@ -127,7 +127,7 @@ func LintGolangciFix() error {
 	return nil
 }
 
-// isCommandNotFound checks if the error indicates the command was not found
+// isCommandNotFound checks if the error indicates the command was not found.
 func isCommandNotFound(err error) bool {
 	if errors.Is(err, exec.ErrNotFound) {
 		return true

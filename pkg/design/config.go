@@ -177,10 +177,10 @@ type Config struct {
 		Default    CognitiveLoadContext `yaml:"default"`
 	} `yaml:"cognitive_load"`
 	ComplexityThresholds struct {
-		VeryHigh           int `yaml:"very_high"`             // Output lines threshold for complexity level 5
-		High               int `yaml:"high"`                  // Output lines threshold for complexity level 4
-		Medium             int `yaml:"medium"`                // Output lines threshold for complexity level 3
-		ErrorCountHigh     int `yaml:"error_count_high"`      // Error count threshold for high cognitive load
+		VeryHigh           int `yaml:"very_high"`            // Output lines threshold for complexity level 5
+		High               int `yaml:"high"`                 // Output lines threshold for complexity level 4
+		Medium             int `yaml:"medium"`               // Output lines threshold for complexity level 3
+		ErrorCountHigh     int `yaml:"error_count_high"`     // Error count threshold for high cognitive load
 		WarningCountMedium int `yaml:"warning_count_medium"` // Warning count threshold for medium cognitive load
 	} `yaml:"complexity_thresholds"`
 }
