@@ -176,6 +176,13 @@ type Config struct {
 		AutoDetect bool                 `yaml:"auto_detect"`
 		Default    CognitiveLoadContext `yaml:"default"`
 	} `yaml:"cognitive_load"`
+	ComplexityThresholds struct {
+		VeryHigh           int `yaml:"very_high"`             // Output lines threshold for complexity level 5
+		High               int `yaml:"high"`                  // Output lines threshold for complexity level 4
+		Medium             int `yaml:"medium"`                // Output lines threshold for complexity level 3
+		ErrorCountHigh     int `yaml:"error_count_high"`      // Error count threshold for high cognitive load
+		WarningCountMedium int `yaml:"warning_count_medium"` // Warning count threshold for medium cognitive load
+	} `yaml:"complexity_thresholds"`
 }
 
 type PatternsRepo struct {
@@ -294,6 +301,11 @@ func ASCIIMinimalTheme() *Config {
 	cfg.Tools = make(map[string]*ToolConfig)
 	cfg.CognitiveLoad.AutoDetect = false
 	cfg.CognitiveLoad.Default = LoadLow
+	cfg.ComplexityThresholds.VeryHigh = 100
+	cfg.ComplexityThresholds.High = 50
+	cfg.ComplexityThresholds.Medium = 20
+	cfg.ComplexityThresholds.ErrorCountHigh = 5
+	cfg.ComplexityThresholds.WarningCountMedium = 2
 
 	return cfg
 }
@@ -366,6 +378,11 @@ func UnicodeVibrantTheme() *Config {
 	cfg.Tools = make(map[string]*ToolConfig)
 	cfg.CognitiveLoad.AutoDetect = true
 	cfg.CognitiveLoad.Default = LoadMedium
+	cfg.ComplexityThresholds.VeryHigh = 100
+	cfg.ComplexityThresholds.High = 50
+	cfg.ComplexityThresholds.Medium = 20
+	cfg.ComplexityThresholds.ErrorCountHigh = 5
+	cfg.ComplexityThresholds.WarningCountMedium = 2
 	return cfg
 }
 
