@@ -1,0 +1,16 @@
+# Decisions Log
+
+Rolling log for minor-to-medium implementation changes that don't warrant a full ADR.
+
+Format: `YYYY-MM-DD: Brief decision summary`
+
+---
+
+2025-11-23: Initialized decisions.log for tracking implementation choices
+- Copied from orca project structure
+- Use this for daily implementation decisions
+- Escalate to ADR if decision affects 3+ modules
+
+2025-11-23: Created ADR directory structure
+- Added ADR-001 documenting pattern-based architecture
+- Established ADR numbering convention (ADR-NNN-title.md)

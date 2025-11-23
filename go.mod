@@ -5,6 +5,7 @@ go 1.24.0
 toolchain go1.24.7
 
 require (
+	github.com/magefile/mage v1.15.0
 	github.com/mattn/go-runewidth v0.0.19
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/term v0.37.0
