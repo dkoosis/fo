@@ -203,13 +203,35 @@ func (t *Task) UpdateTaskContext() {
 
 	outputSize := len(t.OutputLines) // Safely read length while holding the lock.
 
-	// Adjust complexity based on output size.
+	// Get configurable thresholds (with sensible defaults if not set)
+	veryHighThreshold := t.Config.ComplexityThresholds.VeryHigh
+	if veryHighThreshold == 0 {
+		veryHighThreshold = 100
+	}
+	highThreshold := t.Config.ComplexityThresholds.High
+	if highThreshold == 0 {
+		highThreshold = 50
+	}
+	mediumThreshold := t.Config.ComplexityThresholds.Medium
+	if mediumThreshold == 0 {
+		mediumThreshold = 20
+	}
+	errorCountHighThreshold := t.Config.ComplexityThresholds.ErrorCountHigh
+	if errorCountHighThreshold == 0 {
+		errorCountHighThreshold = 5
+	}
+	warningCountMediumThreshold := t.Config.ComplexityThresholds.WarningCountMedium
+	if warningCountMediumThreshold == 0 {
+		warningCountMediumThreshold = 2
+	}
+
+	// Adjust complexity based on output size using configurable thresholds.
 	switch {
-	case outputSize > 100:
+	case outputSize > veryHighThreshold:
 		t.Context.Complexity = 5
-	case outputSize > 50:
+	case outputSize > highThreshold:
 		t.Context.Complexity = 4
-	case outputSize > 20:
+	case outputSize > mediumThreshold:
 		t.Context.Complexity = 3
 	default:
 		t.Context.Complexity = 2 // Default/low complexity.
@@ -218,9 +240,9 @@ func (t *Task) UpdateTaskContext() {
 	// Adjust cognitive load based on errors, warnings, and complexity.
 	// These heuristics can be refined based on user feedback and research.
 	switch {
-	case errorCount > 5 || t.Context.Complexity >= 4:
+	case errorCount > errorCountHighThreshold || t.Context.Complexity >= 4:
 		t.Context.CognitiveLoad = LoadHigh
-	case errorCount > 0 || warningCount > 2 || t.Context.Complexity == 3:
+	case errorCount > 0 || warningCount > warningCountMediumThreshold || t.Context.Complexity == 3:
 		t.Context.CognitiveLoad = LoadMedium
 	default:
 		t.Context.CognitiveLoad = LoadLow

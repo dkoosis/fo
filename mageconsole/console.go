@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dkoosis/fo/internal/design"
+	"github.com/dkoosis/fo/pkg/design"
 	"golang.org/x/term"
 )
 

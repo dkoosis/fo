@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	config "github.com/dkoosis/fo/internal/config"
-	"github.com/dkoosis/fo/internal/design"
 	"github.com/dkoosis/fo/internal/version"
 	"github.com/dkoosis/fo/mageconsole"
+	"github.com/dkoosis/fo/pkg/design"
 )
 
 // LocalAppConfig holds behavioral settings derived from AppConfig and CLI flags.
