@@ -295,8 +295,6 @@ func TestRenderDirectMessage_When_WarningType(t *testing.T) {
 }
 
 func TestRenderDirectMessage_When_CustomIcon(t *testing.T) {
-	t.Parallel()
-
 	cfg := UnicodeVibrantTheme()
 	// Use TypeInfo constant instead of string literal to avoid titler panic
 	output := RenderDirectMessage(cfg, TypeInfo, "🎯", "Custom message", 0)

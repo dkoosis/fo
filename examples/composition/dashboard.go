@@ -14,7 +14,8 @@ func main() {
 
 	fmt.Println("╔════════════════════════════════════════════════════════════════╗")
 	fmt.Println("║           Build Dashboard - Composition Example               ║")
-	fmt.Println("╚════════════════════════════════════════════════════════════════╝\n")
+	fmt.Println("╚════════════════════════════════════════════════════════════════╝")
+	fmt.Println()
 
 	// 1. Summary - Overall Status (what happened?)
 	summary := &design.Summary{
