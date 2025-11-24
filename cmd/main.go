@@ -12,6 +12,16 @@ import (
 	"github.com/dkoosis/fo/pkg/design"
 )
 
+// validPatterns defines the supported pattern names for the --pattern flag
+var validPatterns = map[string]bool{
+	"test-table":  true,
+	"sparkline":   true,
+	"leaderboard": true,
+	"inventory":   true,
+	"summary":     true,
+	"comparison":  true,
+}
+
 // LocalAppConfig holds behavioral settings derived from AppConfig and CLI flags.
 type LocalAppConfig struct {
 	Label         string
@@ -310,6 +320,14 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 		validValues := map[string]bool{"on-fail": true, "always": true, "never": true}
 		if !validValues[cliFlags.ShowOutput] {
 			fmt.Fprintf(os.Stderr, "Error: Invalid value for --show-output: %s\nValid values are: on-fail, always, never\n", cliFlags.ShowOutput)
+			flag.Usage()
+			os.Exit(1)
+		}
+	}
+
+	if cliFlags.Pattern != "" {
+		if !validPatterns[cliFlags.Pattern] {
+			fmt.Fprintf(os.Stderr, "Error: Invalid value for --pattern: %s\nValid values are: test-table, sparkline, leaderboard, inventory, summary, comparison\n", cliFlags.Pattern)
 			flag.Usage()
 			os.Exit(1)
 		}
