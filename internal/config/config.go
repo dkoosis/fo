@@ -16,6 +16,7 @@ type CliFlags struct {
 	Label         string
 	Stream        bool
 	ShowOutput    string
+	Pattern       string // Manual pattern selection (e.g., "test-table", "sparkline", "leaderboard")
 	NoTimer       bool
 	NoColor       bool
 	CI            bool
@@ -27,6 +28,7 @@ type CliFlags struct {
 	// Flags to track if they were explicitly set by the user
 	StreamSet     bool
 	ShowOutputSet bool
+	PatternSet    bool
 	NoTimerSet    bool
 	NoColorSet    bool
 	CISet         bool

@@ -30,6 +30,8 @@ type ConsoleConfig struct {
 	ShowTimerSet   bool
 	ShowOutputMode string
 	Stream         bool
+	Pattern        string // Manual pattern selection hint (e.g., "test-table", "sparkline", "leaderboard")
+	                      // TODO: Implement pattern-specific execution mode to use this hint
 	Debug          bool
 	MaxBufferSize  int64
 	MaxLineLength  int

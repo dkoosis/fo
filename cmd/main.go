@@ -125,6 +125,7 @@ func run(args []string) int {
 		ShowTimerSet:   true,
 		ShowOutputMode: behavioralSettings.ShowOutput,
 		Stream:         behavioralSettings.Stream,
+		Pattern:        cliFlags.Pattern,
 		Debug:          behavioralSettings.Debug,
 		MaxBufferSize:  behavioralSettings.MaxBufferSize,
 		MaxLineLength:  behavioralSettings.MaxLineLength,
@@ -265,6 +266,7 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 	flag.BoolVar(&cliFlags.Stream, "s", false, "Stream mode - print command's stdout/stderr live.")
 	flag.BoolVar(&cliFlags.Stream, "stream", false, "Stream mode.")
 	flag.StringVar(&cliFlags.ShowOutput, "show-output", "", "When to show captured output: on-fail, always, never.")
+	flag.StringVar(&cliFlags.Pattern, "pattern", "", "Force specific visualization pattern (test-table, sparkline, leaderboard, inventory, summary, comparison).")
 	flag.BoolVar(&cliFlags.NoTimer, "no-timer", false, "Disable showing the duration.")
 
 	var maxBufferSizeMB int
@@ -284,6 +286,8 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 			cliFlags.StreamSet = true
 		case "show-output":
 			cliFlags.ShowOutputSet = true
+		case "pattern":
+			cliFlags.PatternSet = true
 		case "no-timer":
 			cliFlags.NoTimerSet = true
 		case "no-color":
