@@ -1,132 +1,197 @@
 # Pattern Composition Examples
 
-This directory demonstrates how to compose multiple patterns to create comprehensive build dashboards.
+This directory demonstrates how to compose multiple visualization patterns together to create comprehensive dashboards for build processes and quality monitoring.
 
 ## Philosophy
 
-Individual patterns are useful, but **composition** tells a complete story. A well-designed dashboard guides the viewer through:
-
-1. **Summary** - What happened? (overall status)
-2. **Trends** - How are we doing over time? (sparklines)
-3. **Changes** - What improved or regressed? (comparison)
-4. **Hotspots** - What needs attention? (leaderboard)
-5. **Details** - Show me the data (test table)
-6. **Outputs** - What was produced? (inventory)
-
-This follows cognitive load principles: start with high-level overview, then drill into details.
+The `fo` design system is based on **composable patterns**. Each pattern (Sparkline, Leaderboard, Summary, etc.) is independent and can be combined with others to create rich, information-dense dashboards that guide attention and reduce cognitive load.
 
 ## Examples
 
-### Dashboard Example (`dashboard.go`)
+### Build Dashboard (`dashboard.go`)
 
-A complete build dashboard that combines 6 different patterns:
+Demonstrates composing 5 patterns to create a complete build overview:
 
 ```bash
 go run dashboard.go
 ```
 
-This demonstrates:
-- **Layered information**: Summary → Trends → Changes → Hotspots → Details → Artifacts
-- **Space efficiency**: Using balanced density (2 columns) for test table
-- **Actionable insights**: Leaderboard highlights optimization targets
-- **Trend awareness**: Sparklines show progress over time
-- **Change tracking**: Comparison shows improvements vs previous build
+**Patterns Used:**
+- **Summary** - High-level build metrics (packages, tests, coverage, time)
+- **Sparkline** - Trends over time (build performance, coverage progression)
+- **Leaderboard** - Ranked optimization targets (slowest tests)
+- **Comparison** - Before/after sprint metrics with deltas
+- **Inventory** - Build artifacts produced
 
-## Composition Strategies
-
-### Small Multiples
-Show the same pattern type with different data side-by-side:
-```go
-// Multiple sparklines for different metrics
-fmt.Println(buildTimeTrend.Render(cfg))
-fmt.Println(coverageTrend.Render(cfg))
-fmt.Println(binarySizeTrend.Render(cfg))
-```
-
-### Progressive Disclosure
-Start general, get specific:
-```go
-// High-level first
-summary.Render(cfg)      // Overall numbers
-
-// Mid-level context
-comparison.Render(cfg)   // What changed
-sparkline.Render(cfg)    // Trends
-
-// Detailed last
-testTable.Render(cfg)    // All data
-leaderboard.Render(cfg)  // Specific hotspots
-```
-
-### Consistent Visual Language
-Use the same theme across all patterns for cohesion:
-```go
-cfg := design.UnicodeVibrantTheme()
-// All patterns use same colors, icons, spacing
-```
-
-## Density Considerations
-
-When composing multiple patterns, density modes help fit more on screen:
-
-- **Detailed mode**: Use for primary focus (e.g., failed test details)
-- **Balanced mode**: Use for secondary data (e.g., all test results)
-- **Compact mode**: Use when space is constrained (e.g., CI logs)
-
-```go
-primaryData := &design.TestTable{
-    Results: failedTests,
-    Density: design.DensityDetailed, // Show details
-}
-
-allData := &design.TestTable{
-    Results: allTests,
-    Density: design.DensityCompact, // Fit more on screen
-}
-```
-
-## Use Cases
-
-### CI/CD Pipelines
-```go
-// Build summary dashboard
-summary.Render(cfg)
-comparison.Render(cfg)  // vs main branch
-testTable.Render(cfg)   // compact mode
-inventory.Render(cfg)   // artifacts
-```
-
-### Local Development
-```go
-// Quick feedback dashboard
-summary.Render(cfg)
-leaderboard.Render(cfg) // slowest tests to optimize
-sparkline.Render(cfg)   // coverage trend
-```
-
-### Quality Reports
-```go
-// Quality metrics dashboard
-comparison.Render(cfg)   // coverage change
-leaderboard.Render(cfg)  // files with most warnings
-testTable.Render(cfg)    // test results
-sparkline.Render(cfg)    // quality trend
-```
-
-## Design Principles
-
-1. **Information Scent**: Each pattern should lead naturally to the next
-2. **Data-Ink Ratio**: Every element should convey meaning (Tufte)
-3. **Cognitive Load**: Order patterns from simple (summary) to complex (details)
-4. **Actionability**: Include patterns that suggest next actions (leaderboard)
-5. **Context**: Provide enough context to understand what you're looking at
+**Key Concepts:**
+- Each pattern renders independently
+- Patterns share a common theme configuration
+- Visual hierarchy guides attention (headers, indentation, colors)
+- Data-ink ratio maximized (minimal decoration, maximum information)
 
 ## Running the Examples
 
+### Prerequisites
+
+```bash
+# From repository root
+go mod download
+```
+
+### Execute
+
 ```bash
 cd examples/composition
-go mod init github.com/dkoosis/fo/examples/composition
-go mod edit -replace github.com/dkoosis/fo=../..
-go mod tidy
 go run dashboard.go
 ```
+
+## Creating Your Own Dashboards
+
+### 1. Choose Your Patterns
+
+Select patterns based on what information you need to convey:
+
+| Pattern | Use Case |
+|---------|----------|
+| `Summary` | Overall metrics, key-value pairs |
+| `Sparkline` | Trends over time (build time, coverage, errors) |
+| `Leaderboard` | Ranked lists (slowest tests, largest binaries, most warnings) |
+| `Comparison` | Before/after comparisons with deltas |
+| `Inventory` | Lists of artifacts, files, packages |
+| `TestTable` | Comprehensive test results |
+
+### 2. Initialize Theme
+
+```go
+cfg := design.UnicodeVibrantTheme()  // Rich Unicode
+// or
+cfg := design.ASCIIMinimalTheme()    // Plain ASCII for compatibility
+```
+
+### 3. Create and Render Patterns
+
+```go
+// Create pattern instance
+sparkline := &design.Sparkline{
+    Label:  "Build time trend",
+    Values: buildTimes,
+    Unit:   "s",
+}
+
+// Render with theme
+output := sparkline.Render(cfg)
+fmt.Println(output)
+```
+
+### 4. Compose Together
+
+Stack patterns vertically with section headers:
+
+```go
+fmt.Println("## Performance Metrics")
+fmt.Println(sparkline.Render(cfg))
+fmt.Println()
+
+fmt.Println("## Optimization Targets")
+fmt.Println(leaderboard.Render(cfg))
+```
+
+## Design Principles Applied
+
+### Data-Ink Ratio (Tufte)
+
+Every character conveys information. No decorative elements that don't serve a purpose.
+
+### Cognitive Load Awareness
+
+Visual hierarchy (headers, spacing, color) guides attention to important information first.
+
+### Small Multiples
+
+Multiple instances of the same pattern type (e.g., two sparklines for different metrics) allow easy comparison.
+
+### Layering
+
+Section headers create layers of information - scan headers first, dive into details as needed.
+
+## Integration Examples
+
+### In Makefile
+
+```makefile
+.PHONY: dashboard
+dashboard:
+	@go run examples/composition/dashboard.go
+```
+
+### In CI Pipeline
+
+```yaml
+# .github/workflows/build.yml
+- name: Build Dashboard
+  run: |
+    go run examples/composition/dashboard.go > dashboard.txt
+    cat dashboard.txt
+```
+
+### As Library
+
+Example integration (note: `BuildResults`, `createSummary()`, `createTrends()`, and `createHotspots()` are placeholders - implement these based on your specific build system):
+
+```go
+import "github.com/dkoosis/fo/pkg/design"
+
+func BuildDashboard(buildResults BuildResults) string {
+    cfg := design.UnicodeVibrantTheme()
+
+    summary := createSummary(buildResults)
+    sparkline := createTrends(buildResults)
+    leaderboard := createHotspots(buildResults)
+
+    return summary.Render(cfg) + "\n" +
+           sparkline.Render(cfg) + "\n" +
+           leaderboard.Render(cfg)
+}
+```
+
+## Advanced Composition
+
+### Conditional Patterns
+
+Show different patterns based on build state:
+
+```go
+if buildFailed {
+    // Emphasize errors
+    fmt.Println(errorSummary.Render(cfg))
+    fmt.Println(failedTestsTable.Render(cfg))
+} else {
+    // Show comprehensive dashboard
+    fmt.Println(summary.Render(cfg))
+    fmt.Println(trends.Render(cfg))
+}
+```
+
+### Density Modes
+
+Adjust pattern density for different contexts:
+
+```go
+// CI logs - compact
+testTable := &design.TestTable{
+    Results: results,
+    Density: design.DensityCompact,  // 3 columns
+}
+
+// Local development - detailed
+testTable := &design.TestTable{
+    Results: results,
+    Density: design.DensityDetailed,  // 1 column, full context
+}
+```
+
+## References
+
+- [Pattern API Documentation](../../pkg/design/patterns.go)
+- [Theme Configuration](../../pkg/design/config.go)
+- [Design Philosophy](../../README.md#design-philosophy)
