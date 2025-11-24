@@ -60,8 +60,8 @@ type TaskResult struct {
 }
 
 type Console struct {
-	cfg            ConsoleConfig
-	designConf     *design.Config
+	cfg             ConsoleConfig
+	designConf      *design.Config
 	adapterRegistry *adapter.Registry
 }
 

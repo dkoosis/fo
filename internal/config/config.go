@@ -21,8 +21,8 @@ type CliFlags struct {
 	NoColor       bool
 	CI            bool
 	Debug         bool
-	MaxBufferSize int64  // In bytes, passed from main after parsing
-	MaxLineLength int    // In bytes, passed from main after parsing
+	MaxBufferSize int64 // In bytes, passed from main after parsing
+	MaxLineLength int   // In bytes, passed from main after parsing
 	ThemeName     string
 	ThemeFile     string // Path to custom theme YAML file
 
