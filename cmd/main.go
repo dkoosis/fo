@@ -72,8 +72,8 @@ func run(args []string) int {
 	// Find the command and arguments to be executed (must be after "--")
 	cmdArgs := findCommandArgs()
 	if len(cmdArgs) == 0 {
-		fmt.Fprintln(os.Stderr, "Error: No command specified after --")
-		fmt.Fprintln(os.Stderr, "Usage: fo [flags] -- <COMMAND> [ARGS...]")
+		fmt.Fprintln(os.Stderr, "[fo] Error: No command specified after --")
+		fmt.Fprintln(os.Stderr, "[fo] Usage: fo [flags] -- <COMMAND> [ARGS...]")
 		return 1 // Exit if no command is provided
 	}
 
@@ -206,14 +206,14 @@ func handlePrintCommand(args []string) {
 	// Parse print-specific flags
 	err := printFlagSet.Parse(args)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing 'print' flags: %v\n", err)
+		fmt.Fprintf(os.Stderr, "[fo] Error parsing 'print' flags: %v\n", err)
 		os.Exit(1)
 	}
 	messageParts := printFlagSet.Args()
 	message := strings.Join(messageParts, " ")
 
 	if message == "" && *typeFlag != "raw" { // Allow empty raw for just printing newline or control chars
-		fmt.Fprintln(os.Stderr, "Error: No message provided for 'fo print'.")
+		fmt.Fprintln(os.Stderr, "[fo] Error: No message provided for 'fo print'.")
 		printFlagSet.Usage()
 		os.Exit(1)
 	}
@@ -321,7 +321,7 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 	if cliFlags.ShowOutput != "" {
 		validValues := map[string]bool{"on-fail": true, "always": true, "never": true}
 		if !validValues[cliFlags.ShowOutput] {
-			fmt.Fprintf(os.Stderr, "Error: Invalid value for --show-output: %s\nValid values are: on-fail, always, never\n", cliFlags.ShowOutput)
+			fmt.Fprintf(os.Stderr, "[fo] Error: Invalid value for --show-output: %s\n[fo] Valid values are: on-fail, always, never\n", cliFlags.ShowOutput)
 			flag.Usage()
 			os.Exit(1)
 		}
@@ -330,7 +330,7 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 	if cliFlags.Pattern != "" {
 		if !validPatterns[cliFlags.Pattern] {
 			fmt.Fprintf(os.Stderr,
-				"Error: Invalid value for --pattern: %s\nValid values are: test-table, sparkline, leaderboard, inventory, summary, comparison\n",
+				"[fo] Error: Invalid value for --pattern: %s\n[fo] Valid values are: test-table, sparkline, leaderboard, inventory, summary, comparison\n",
 				cliFlags.Pattern)
 			flag.Usage()
 			os.Exit(1)
