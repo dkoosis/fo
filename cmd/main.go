@@ -12,7 +12,7 @@ import (
 	"github.com/dkoosis/fo/pkg/design"
 )
 
-// validPatterns defines the supported pattern names for the --pattern flag
+// validPatterns defines the supported pattern names for the --pattern flag.
 var validPatterns = map[string]bool{
 	"test-table":  true,
 	"sparkline":   true,
@@ -276,7 +276,8 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 	flag.BoolVar(&cliFlags.Stream, "s", false, "Stream mode - print command's stdout/stderr live.")
 	flag.BoolVar(&cliFlags.Stream, "stream", false, "Stream mode.")
 	flag.StringVar(&cliFlags.ShowOutput, "show-output", "", "When to show captured output: on-fail, always, never.")
-	flag.StringVar(&cliFlags.Pattern, "pattern", "", "Force specific visualization pattern (test-table, sparkline, leaderboard, inventory, summary, comparison).")
+	flag.StringVar(&cliFlags.Pattern, "pattern", "",
+		"Force specific visualization pattern (test-table, sparkline, leaderboard, inventory, summary, comparison).")
 	flag.BoolVar(&cliFlags.NoTimer, "no-timer", false, "Disable showing the duration.")
 
 	var maxBufferSizeMB int
@@ -327,7 +328,9 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 
 	if cliFlags.Pattern != "" {
 		if !validPatterns[cliFlags.Pattern] {
-			fmt.Fprintf(os.Stderr, "Error: Invalid value for --pattern: %s\nValid values are: test-table, sparkline, leaderboard, inventory, summary, comparison\n", cliFlags.Pattern)
+			fmt.Fprintf(os.Stderr,
+				"Error: Invalid value for --pattern: %s\nValid values are: test-table, sparkline, leaderboard, inventory, summary, comparison\n",
+				cliFlags.Pattern)
 			flag.Usage()
 			os.Exit(1)
 		}

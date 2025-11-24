@@ -14,20 +14,30 @@ import (
 	"golang.org/x/text/language"
 )
 
+// caserWrapper wraps a cases.Caser to allow pointer storage in sync.Pool.
+type caserWrapper struct {
+	caser cases.Caser
+}
+
 // titleCaserPool provides a pool of cases.Title instances for concurrent use.
 // cases.Title is not safe for concurrent use, so we pool instances to avoid
 // creating a new one on every call while maintaining thread safety.
 var titleCaserPool = sync.Pool{
 	New: func() interface{} {
-		return cases.Title(language.English)
+		return &caserWrapper{caser: cases.Title(language.English)}
 	},
 }
 
 // threadSafeTitle converts a string to title case using a thread-safe pool of casers.
 func threadSafeTitle(s string) string {
-	caser := titleCaserPool.Get().(cases.Caser)
-	defer titleCaserPool.Put(caser)
-	return caser.String(s)
+	wrapper, ok := titleCaserPool.Get().(*caserWrapper)
+	if !ok || wrapper == nil {
+		// Fallback: create new caser if pool returns unexpected type
+		caser := cases.Title(language.English)
+		return caser.String(s)
+	}
+	defer titleCaserPool.Put(wrapper)
+	return wrapper.caser.String(s)
 }
 
 // safeTitle converts a string to title case safely without panicking.
