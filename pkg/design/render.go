@@ -5,11 +5,30 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
 	"github.com/mattn/go-runewidth"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
+
+// titleCaserPool provides a pool of cases.Title instances for concurrent use.
+// cases.Title is not safe for concurrent use, so we pool instances to avoid
+// creating a new one on every call while maintaining thread safety.
+var titleCaserPool = sync.Pool{
+	New: func() interface{} {
+		return cases.Title(language.English)
+	},
+}
+
+// threadSafeTitle converts a string to title case using a thread-safe pool of casers.
+func threadSafeTitle(s string) string {
+	caser := titleCaserPool.Get().(cases.Caser)
+	defer titleCaserPool.Put(caser)
+	return caser.String(s)
+}
 
 // safeTitle converts a string to title case safely without panicking.
 // This is a simple implementation that capitalizes the first letter of each word
@@ -629,9 +648,6 @@ func getProcessLabel(intent string) string {
 	return strings.ToUpper(string(intent[0])) + strings.ToLower(intent[1:])
 }
 
-// cmd/internal/design/render.go
-// ... (imports and titler definition) ...
-
 // RenderDirectMessage creates the formatted status line.
 func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, indentLevel int) string {
 	var sb strings.Builder
@@ -647,7 +663,7 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 	switch lowerMessageType {
 	case MessageTypeH1, MessageTypeH2, MessageTypeH3, StatusSuccess, StatusWarning, StatusError, TypeInfo:
 		// Direct mapping from type to element style key (properly capitalized)
-		styleKey = safeTitle(lowerMessageType)
+		styleKey = threadSafeTitle(lowerMessageType)
 	case MessageTypeHeader: // Legacy support for MessageTypeHeader type
 		styleKey = "H1"
 	}
@@ -728,7 +744,7 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 	if !cfg.IsMonochrome && elementStyle.TextStyle != nil {
 		var styleParts []string
 		for _, styleName := range elementStyle.TextStyle {
-			stylePart := cfg.GetColor(safeTitle(strings.ToLower(styleName)))
+			stylePart := cfg.GetColor(threadSafeTitle(strings.ToLower(styleName)))
 			if stylePart != "" {
 				styleParts = append(styleParts, stylePart)
 			}
