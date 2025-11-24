@@ -395,7 +395,7 @@ func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task, cmdDone ch
 		close(cmdDone) // Signal that command has finished
 		errCtx := design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true}
 		task.AddOutputLine(
-			fmt.Sprintf("[fo] Error setting up stderr pipe for stream mode: %v", err),
+			formatInternalError("Error setting up stderr pipe for stream mode: %v", err),
 			design.TypeError, errCtx)
 		exitCode := getExitCode(runErr, c.cfg.Debug)
 		var exitErr *exec.ExitError
@@ -440,7 +440,7 @@ func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task, cmdDone ch
 					CognitiveLoad: design.LoadMedium, Importance: 3, IsInternal: true,
 				}
 				task.AddOutputLine(
-					fmt.Sprintf("[fo] Error reading stderr in stream mode: %v", scanErr),
+					formatInternalError("Error reading stderr in stream mode: %v", scanErr),
 					design.TypeError, errCtx)
 			}
 		} else if c.cfg.Debug {
@@ -485,7 +485,7 @@ func (c *Console) executeCaptureMode(
 
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
-		errMsg := fmt.Sprintf("[fo] Error creating stdout pipe: %v", err)
+		errMsg := formatInternalError("Error creating stdout pipe: %v", err)
 		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true})
 		fmt.Fprintln(c.cfg.Err, errMsg)
 		return 1, err
@@ -493,7 +493,7 @@ func (c *Console) executeCaptureMode(
 
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil {
-		errMsg := fmt.Sprintf("[fo] Error creating stderr pipe: %v", err)
+		errMsg := formatInternalError("Error creating stderr pipe: %v", err)
 		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true})
 		fmt.Fprintln(c.cfg.Err, errMsg)
 		_ = stdoutPipe.Close()
@@ -501,7 +501,7 @@ func (c *Console) executeCaptureMode(
 	}
 
 	if err := cmd.Start(); err != nil {
-		errMsg := fmt.Sprintf("Error starting command '%s': %v", strings.Join(cmd.Args, " "), err)
+		errMsg := formatInternalError("Error starting command '%s': %v", strings.Join(cmd.Args, " "), err)
 		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true})
 		fmt.Fprintln(c.cfg.Err, errMsg)
 		_ = stdoutPipe.Close()
@@ -649,12 +649,12 @@ func (c *Console) tryAdapterMode(
 	errCtx := design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true}
 	if errStdoutCopy != nil {
 		task.AddOutputLine(
-			fmt.Sprintf("[fo] Error reading stdout: %v", errStdoutCopy),
+			formatInternalError("Error reading stdout: %v", errStdoutCopy),
 			design.TypeError, errCtx)
 	}
 	if errStderrCopy != nil {
 		task.AddOutputLine(
-			fmt.Sprintf("[fo] Error reading stderr: %v", errStderrCopy),
+			formatInternalError("Error reading stderr: %v", errStderrCopy),
 			design.TypeError, errCtx)
 	}
 
@@ -697,6 +697,13 @@ func (c *Console) processBufferedOutputLineByLine(
 	if c.cfg.Debug {
 		fmt.Fprintf(os.Stderr, "[DEBUG processBufferedOutput] Processed %d lines with line-by-line classification\n", lineCount)
 	}
+}
+
+// formatInternalError formats an internal fo error message with consistent prefix.
+// All internal fo errors should use this function to ensure clear distinction
+// from command output errors.
+func formatInternalError(format string, args ...interface{}) string {
+	return fmt.Sprintf("[fo] "+format, args...)
 }
 
 func getExitCode(err error, debug bool) int {
