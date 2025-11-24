@@ -3,6 +3,7 @@ package design
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -51,7 +52,7 @@ func TestInlineProgress_WritesWithNewline_When_NotTerminal(t *testing.T) {
 
 	output := buffer.String()
 	assert.Contains(t, output, "[OK]")
-	assert.True(t, bytes.HasSuffix([]byte(output), []byte("\n")))
+	assert.True(t, strings.HasSuffix(output, "\n"))
 }
 
 func TestInlineProgress_StartsTracking_When_SpinnerDisabled(t *testing.T) {

@@ -31,7 +31,6 @@ func TestColor_SprintsWithReset_When_CodeIsProvided(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -70,7 +69,6 @@ func TestNormalizeANSIEscape_ReturnsNormalizedSequence_When_ProvidedVariousInput
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -122,7 +120,6 @@ func TestConfig_ResolvesColors_When_UsingElementOverrides(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -177,23 +174,12 @@ func TestConfig_UsesAsciiDefaults_When_NoColorPresetRequested(t *testing.T) {
 func TestDefaultConfig_ReturnsVibrantTheme_When_NoOverridesProvided(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name string
-	}{{name: "returns unicode vibrant theme"}}
+	cfg := DefaultConfig()
 
-	for _, tc := range tests {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			cfg := DefaultConfig()
-
-			require.NotNil(t, cfg)
-			assert.False(t, cfg.IsMonochrome)
-			assert.Equal(t, "unicode_vibrant", cfg.ThemeName)
-			assert.Equal(t, BorderLeftDouble, cfg.Border.TaskStyle)
-		})
-	}
+	require.NotNil(t, cfg)
+	assert.False(t, cfg.IsMonochrome)
+	assert.Equal(t, "unicode_vibrant", cfg.ThemeName)
+	assert.Equal(t, BorderLeftDouble, cfg.Border.TaskStyle)
 }
 
 func TestDeepCopyConfig_CreatesIndependentCopy_When_ConfigContainsNestedStructs(t *testing.T) {
@@ -214,7 +200,6 @@ func TestDeepCopyConfig_CreatesIndependentCopy_When_ConfigContainsNestedStructs(
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -223,18 +208,18 @@ func TestDeepCopyConfig_CreatesIndependentCopy_When_ConfigContainsNestedStructs(
 				tc.source.Elements["Custom"] = ElementStyleDef{Text: "original"}
 			}
 
-			copy := DeepCopyConfig(tc.source)
+			cfgCopy := DeepCopyConfig(tc.source)
 
 			if tc.source == nil {
-				assert.Nil(t, copy)
+				assert.Nil(t, cfgCopy)
 				return
 			}
 
-			require.NotNil(t, copy)
+			require.NotNil(t, cfgCopy)
 
 			// Mutate copy to ensure original is unaffected.
-			copy.Patterns.Intent["deploy"][0] = "green"
-			copy.Elements["Custom"] = ElementStyleDef{Text: "modified"}
+			cfgCopy.Patterns.Intent["deploy"][0] = "green"
+			cfgCopy.Elements["Custom"] = ElementStyleDef{Text: "modified"}
 
 			assert.Equal(t, []string{"blue"}, tc.source.Patterns.Intent["deploy"])
 			assert.Equal(t, ElementStyleDef{Text: "original"}, tc.source.Elements["Custom"])
@@ -263,7 +248,6 @@ func TestApplyMonochromeDefaults_ClearsColorStyling_When_ConfigHasExistingColors
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 

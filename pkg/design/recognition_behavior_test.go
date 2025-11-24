@@ -37,7 +37,6 @@ func TestAdjustCategoryImportance_UpdatesContext_When_CategoryProvided(t *testin
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -90,7 +89,6 @@ func TestPatternMatcher_ExtractsPatternKey_When_ContentContainsFileReference(t *
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
