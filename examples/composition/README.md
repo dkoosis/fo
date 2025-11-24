@@ -29,6 +29,43 @@ go run dashboard.go
 - Visual hierarchy guides attention (headers, indentation, colors)
 - Data-ink ratio maximized (minimal decoration, maximum information)
 
+### Quality Dashboard (`quality.go`)
+
+Demonstrates composing patterns to create a quality metrics dashboard:
+
+```bash
+go run quality.go
+```
+
+**Patterns Used:**
+- **Comparison** - Coverage changes by package over time
+- **Leaderboard** - Slowest tests (optimization targets)
+- **Sparkline** - Coverage trend progression
+- **Leaderboard** - Largest binaries (size analysis)
+- **Summary** - Overall quality metrics
+
+**Use Cases:**
+- Sprint retrospectives
+- Code quality reviews
+- Performance optimization planning
+- Binary size analysis
+
+### Makefile Integration (`Makefile`)
+
+Real-world Makefile example showing pattern composition in build workflows:
+
+```bash
+make build-dashboard    # Generate build metrics dashboard
+make quality-dashboard  # Generate quality metrics dashboard
+make all                # Run full pipeline with formatted output
+```
+
+**Features:**
+- Integrates fo formatting into build steps
+- Composes dashboards from multiple patterns
+- Demonstrates CI/CD pipeline integration
+- Shows practical workflow patterns
+
 ## Running the Examples
 
 ### Prerequisites
