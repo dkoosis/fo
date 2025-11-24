@@ -150,37 +150,12 @@ func run(args []string) int {
 		Design:         finalDesignConfig,
 	}
 
-	// Initialize telemetry if enabled
-	var tel *telemetry.Telemetry
-	if cliFlags.Telemetry {
-		var telErr error
-		tel, telErr = telemetry.NewTelemetry(true)
-		if telErr != nil {
-			fmt.Fprintf(os.Stderr, "[fo] Warning: Failed to initialize telemetry: %v\n", telErr)
-		} else {
-			defer tel.Close()
-		}
-	}
-
 	console := mageconsole.NewConsole(consoleCfg)
 	result, err := console.Run(behavioralSettings.Label, cmdArgs[0], cmdArgs[1:]...)
 
 	exitCode := 0
 	if result != nil {
 		exitCode = result.ExitCode
-
-		// Record telemetry event if enabled
-		if tel != nil {
-			_ = tel.RecordEvent(telemetry.Event{
-				Timestamp:    time.Now(),
-				Command:      cmdArgs[0],
-				PatternType:  result.Intent, // Use intent as pattern type approximation
-				PatternMatch: result.Status == "success",
-				Theme:        finalDesignConfig.ThemeName,
-				Duration:     result.Duration,
-				ExitCode:     result.ExitCode,
-			})
-		}
 	}
 	if err != nil && result == nil {
 		exitCode = 1
@@ -333,7 +308,6 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 	flag.BoolVar(&cliFlags.Profile, "profile", false, "Enable performance profiling.")
 	flag.StringVar(&cliFlags.ProfileOutput, "profile-output", "stderr",
 		"Profile output destination: 'stderr' (default) or file path.")
-	flag.BoolVar(&cliFlags.Telemetry, "telemetry", false, "Enable telemetry for learning system (stored locally in SQLite).")
 	flag.BoolVar(&cliFlags.NoTimer, "no-timer", false, "Disable showing the duration.")
 
 	var maxBufferSizeMB int

@@ -78,4 +78,3 @@ func TestTaskResult_ToJSON_WithError(t *testing.T) {
 		t.Error("error field should be present when Err is set")
 	}
 }
-

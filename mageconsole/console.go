@@ -71,15 +71,15 @@ func (r *TaskResult) ToJSON() ([]byte, error) {
 	}
 
 	type JSONOutput struct {
-		Version   string      `json:"version"`
-		Label     string      `json:"label"`
-		Intent    string      `json:"intent"`
-		Status    string      `json:"status"`
-		ExitCode  int         `json:"exit_code"`
-		Duration  string      `json:"duration"`
+		Version    string     `json:"version"`
+		Label      string     `json:"label"`
+		Intent     string     `json:"intent"`
+		Status     string     `json:"status"`
+		ExitCode   int        `json:"exit_code"`
+		Duration   string     `json:"duration"`
 		DurationMs int64      `json:"duration_ms"`
-		Lines     []JSONLine  `json:"lines"`
-		Error     string      `json:"error,omitempty"`
+		Lines      []JSONLine `json:"lines"`
+		Error      string     `json:"error,omitempty"`
 	}
 
 	jsonLines := make([]JSONLine, len(r.Lines))
@@ -584,6 +584,7 @@ func (c *Console) tryAdapterMode(
 	patternMatcher *design.PatternMatcher,
 	cmdDone chan struct{},
 ) (int, error) {
+	captureStart := c.profiler.StartStage("capture")
 	const detectionLineCount = 15 // Buffer first 15 lines for adapter detection
 
 	// Buffer output from both streams
@@ -704,7 +705,7 @@ func (c *Console) tryAdapterMode(
 	processStart := c.profiler.StartStage("process")
 	c.processBufferedOutputLineByLine(task, string(combinedOutput), patternMatcher)
 	c.profiler.EndStage("process", processStart, map[string]interface{}{
-		"line_count": len(strings.Split(string(combinedOutput), "\n")),
+		"line_count":  len(strings.Split(string(combinedOutput), "\n")),
 		"buffer_size": int64(len(combinedOutput)),
 	})
 

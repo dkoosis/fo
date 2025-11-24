@@ -17,15 +17,15 @@ type JSONOutput struct {
 
 // JSONMetadata contains metadata about the command execution and pattern.
 type JSONMetadata struct {
-	ExitCode    int           `json:"exit_code"`
-	Duration    string        `json:"duration"`
-	DurationMs  int64         `json:"duration_ms"`
-	StartTime   time.Time     `json:"start_time"`
-	EndTime     time.Time     `json:"end_time"`
-	Command     string        `json:"command,omitempty"`
-	Args        []string      `json:"args,omitempty"`
-	Label       string        `json:"label,omitempty"`
-	Classification string     `json:"classification,omitempty"`
+	ExitCode       int       `json:"exit_code"`
+	Duration       string    `json:"duration"`
+	DurationMs     int64     `json:"duration_ms"`
+	StartTime      time.Time `json:"start_time"`
+	EndTime        time.Time `json:"end_time"`
+	Command        string    `json:"command,omitempty"`
+	Args           []string  `json:"args,omitempty"`
+	Label          string    `json:"label,omitempty"`
+	Classification string    `json:"classification,omitempty"`
 }
 
 // ToJSON converts a Pattern to JSON output format.
@@ -78,9 +78,9 @@ func ToJSON(p Pattern, metadata JSONMetadata) ([]byte, error) {
 			}
 		}
 		output.Data = map[string]interface{}{
-			"label":    pattern.Label,
-			"density":  string(pattern.Density),
-			"results":  results,
+			"label":   pattern.Label,
+			"density": string(pattern.Density),
+			"results": results,
 		}
 	case *Summary:
 		metrics := make([]map[string]interface{}, len(pattern.Metrics))
@@ -107,8 +107,8 @@ func ToJSON(p Pattern, metadata JSONMetadata) ([]byte, error) {
 			}
 		}
 		output.Data = map[string]interface{}{
-			"label":    pattern.Label,
-			"changes":  changes,
+			"label":   pattern.Label,
+			"changes": changes,
 		}
 	case *Inventory:
 		items := make([]map[string]interface{}, len(pattern.Items))
@@ -129,4 +129,3 @@ func ToJSON(p Pattern, metadata JSONMetadata) ([]byte, error) {
 
 	return json.MarshalIndent(output, "", "  ")
 }
-

@@ -177,4 +177,3 @@ func (t *Telemetry) Close() error {
 	}
 	return t.db.Close()
 }
-

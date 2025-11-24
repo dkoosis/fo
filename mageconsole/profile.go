@@ -8,14 +8,14 @@ import (
 
 // ProfileData tracks performance metrics for each pipeline stage.
 type ProfileData struct {
-	Stage           string        `json:"stage"`
-	Duration        time.Duration `json:"duration"`
-	DurationMs      int64         `json:"duration_ms"`
-	PatternMatches  int           `json:"pattern_matches,omitempty"`
-	PatternSuccess  int           `json:"pattern_success,omitempty"`
-	BufferSize      int64         `json:"buffer_size,omitempty"`
-	LineCount       int           `json:"line_count,omitempty"`
-	MemoryAlloc     int64         `json:"memory_alloc,omitempty"`
+	Stage          string        `json:"stage"`
+	Duration       time.Duration `json:"duration"`
+	DurationMs     int64         `json:"duration_ms"`
+	PatternMatches int           `json:"pattern_matches,omitempty"`
+	PatternSuccess int           `json:"pattern_success,omitempty"`
+	BufferSize     int64         `json:"buffer_size,omitempty"`
+	LineCount      int           `json:"line_count,omitempty"`
+	MemoryAlloc    int64         `json:"memory_alloc,omitempty"`
 }
 
 // Profiler tracks performance metrics throughout command execution.
@@ -111,4 +111,3 @@ func (p *Profiler) Write() error {
 
 	return nil
 }
-

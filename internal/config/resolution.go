@@ -13,10 +13,10 @@ import (
 // Higher priority sources override lower priority sources.
 //
 // Priority Order (highest to lowest):
-//   1. CLI Flags (--theme-file, --theme, --no-color, --ci, --no-timer)
-//   2. Environment Variables (FO_THEME, FO_NO_COLOR, FO_CI, CI, NO_COLOR)
-//   3. .fo.yaml Configuration File (active_theme, no_color, ci, no_timer)
-//   4. Design Package Defaults (UnicodeVibrantTheme, ASCIIMinimalTheme)
+//  1. CLI Flags (--theme-file, --theme, --no-color, --ci, --no-timer)
+//  2. Environment Variables (FO_THEME, FO_NO_COLOR, FO_CI, CI, NO_COLOR)
+//  3. .fo.yaml Configuration File (active_theme, no_color, ci, no_timer)
+//  4. Design Package Defaults (UnicodeVibrantTheme, ASCIIMinimalTheme)
 //
 // This ensures predictable behavior: user intent (CLI) > environment > file > defaults.
 const (
@@ -39,11 +39,11 @@ type ResolvedConfig struct {
 	Theme *design.Config
 
 	// Behavioral settings
-	NoColor   bool
-	CI        bool
-	NoTimer   bool
-	Debug     bool
-	Stream    bool
+	NoColor    bool
+	CI         bool
+	NoTimer    bool
+	Debug      bool
+	Stream     bool
 	ShowOutput string
 
 	// Resource limits
@@ -51,33 +51,33 @@ type ResolvedConfig struct {
 	MaxLineLength int
 
 	// Resolution metadata (for debugging)
-	ThemeSource      string // "cli-file", "cli-name", "env", "file", "default"
-	NoColorSource    string // "cli", "env", "file", "default"
-	CISource         string // "cli", "env", "file", "default"
-	NoTimerSource    string // "cli", "file", "default"
+	ThemeSource   string // "cli-file", "cli-name", "env", "file", "default"
+	NoColorSource string // "cli", "env", "file", "default"
+	CISource      string // "cli", "env", "file", "default"
+	NoTimerSource string // "cli", "file", "default"
 }
 
 // ResolveConfig resolves configuration from all sources with explicit priority order.
 // This is the single source of truth for config resolution.
 //
 // Resolution order:
-//   1. Load base config from .fo.yaml (or defaults)
-//   2. Apply CLI flags (highest priority)
-//   3. Apply environment variables (if not set by CLI)
-//   4. Apply file config (if not set by CLI/env)
-//   5. Apply defaults (if nothing else set)
+//  1. Load base config from .fo.yaml (or defaults)
+//  2. Apply CLI flags (highest priority)
+//  3. Apply environment variables (if not set by CLI)
+//  4. Apply file config (if not set by CLI/env)
+//  5. Apply defaults (if nothing else set)
 func ResolveConfig(cliFlags CliFlags) (*ResolvedConfig, error) {
 	// Load base configuration from file (or defaults)
 	appCfg := LoadConfig()
 
 	// Start with file-based defaults
 	resolved := &ResolvedConfig{
-		NoColor:      appCfg.NoColor,
-		CI:           appCfg.CI,
-		NoTimer:      appCfg.NoTimer,
-		Debug:        appCfg.Debug,
-		Stream:       appCfg.Stream,
-		ShowOutput:   appCfg.ShowOutput,
+		NoColor:       appCfg.NoColor,
+		CI:            appCfg.CI,
+		NoTimer:       appCfg.NoTimer,
+		Debug:         appCfg.Debug,
+		Stream:        appCfg.Stream,
+		ShowOutput:    appCfg.ShowOutput,
 		MaxBufferSize: appCfg.MaxBufferSize,
 		MaxLineLength: appCfg.MaxLineLength,
 		NoColorSource: "file",
@@ -245,4 +245,3 @@ func validateResolvedConfig(cfg *ResolvedConfig) error {
 
 	return nil
 }
-
