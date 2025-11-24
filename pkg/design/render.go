@@ -6,13 +6,33 @@ import (
 	"os"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/mattn/go-runewidth"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 )
 
-var titler = cases.Title(language.English)
+// safeTitle converts a string to title case safely without panicking.
+// This is a simple implementation that capitalizes the first letter of each word
+// without relying on external libraries that may panic on certain inputs.
+func safeTitle(s string) string {
+	if s == "" {
+		return s
+	}
+
+	words := strings.Fields(s)
+	for i, word := range words {
+		if len(word) > 0 {
+			// Convert first rune to upper case, rest to lower
+			runes := []rune(word)
+			runes[0] = unicode.ToUpper(runes[0])
+			for j := 1; j < len(runes); j++ {
+				runes[j] = unicode.ToLower(runes[j])
+			}
+			words[i] = string(runes)
+		}
+	}
+	return strings.Join(words, " ")
+}
 
 // visualWidth returns the display width of a string in terminal cells.
 // Uses go-runewidth for accurate handling of East Asian Wide characters,
@@ -546,8 +566,8 @@ func applyTextCase(text, caseType string) string {
 		return strings.ToUpper(text)
 	case "lower":
 		return strings.ToLower(text)
-	case "title": // Corrected to use golang.org/x/text/cases
-		return titler.String(text)
+	case "title":
+		return safeTitle(text)
 	default:
 		return text
 	}
@@ -627,7 +647,7 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 	switch lowerMessageType {
 	case MessageTypeH1, MessageTypeH2, MessageTypeH3, StatusSuccess, StatusWarning, StatusError, TypeInfo:
 		// Direct mapping from type to element style key (properly capitalized)
-		styleKey = titler.String(lowerMessageType)
+		styleKey = safeTitle(lowerMessageType)
 	case MessageTypeHeader: // Legacy support for MessageTypeHeader type
 		styleKey = "H1"
 	}
@@ -708,7 +728,7 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 	if !cfg.IsMonochrome && elementStyle.TextStyle != nil {
 		var styleParts []string
 		for _, styleName := range elementStyle.TextStyle {
-			stylePart := cfg.GetColor(titler.String(strings.ToLower(styleName)))
+			stylePart := cfg.GetColor(safeTitle(strings.ToLower(styleName)))
 			if stylePart != "" {
 				styleParts = append(styleParts, stylePart)
 			}

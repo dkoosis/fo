@@ -282,11 +282,6 @@ func TestRenderDirectMessage_When_ErrorType(t *testing.T) {
 func TestRenderDirectMessage_When_WarningType(t *testing.T) {
 	t.Parallel()
 
-	// Skip test due to known issue with titler.String() handling "warning"
-	// See: RenderDirectMessage uses titler.String() which panics on certain inputs
-	// This is a production code bug that should be fixed separately
-	t.Skip("Known bug: titler.String() panics on 'warning' input")
-
 	cfg := UnicodeVibrantTheme()
 	output := RenderDirectMessage(cfg, StatusWarning, "", "Be careful", 0)
 
