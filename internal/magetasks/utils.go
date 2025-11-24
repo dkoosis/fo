@@ -9,6 +9,9 @@ import (
 // IsCommandNotFound checks if the error indicates the command was not found.
 // This handles exec.ErrNotFound and platform-specific string fallbacks.
 func IsCommandNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
 	if errors.Is(err, exec.ErrNotFound) {
 		return true
 	}
