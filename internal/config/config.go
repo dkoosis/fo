@@ -18,6 +18,8 @@ type CliFlags struct {
 	ShowOutput    string
 	Pattern       string // Manual pattern selection (e.g., "test-table", "sparkline", "leaderboard")
 	Format        string // Output format: "text" (default) or "json"
+	Profile       bool   // Enable performance profiling
+	ProfileOutput string // Profile output destination: "stderr" or file path
 	NoTimer       bool
 	NoColor       bool
 	CI            bool

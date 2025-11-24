@@ -35,6 +35,8 @@ type ConsoleConfig struct {
 	Stream         bool
 	Pattern        string // Manual pattern selection hint (e.g., "test-table", "sparkline", "leaderboard")
 	Debug          bool
+	Profile        bool   // Enable performance profiling
+	ProfileOutput  string // Profile output destination
 	MaxBufferSize  int64
 	MaxLineLength  int
 	Design         *design.Config
@@ -111,6 +113,7 @@ type Console struct {
 	cfg             ConsoleConfig
 	designConf      *design.Config
 	adapterRegistry *adapter.Registry
+	profiler        *Profiler
 }
 
 func DefaultConsole() *Console {
@@ -119,10 +122,12 @@ func DefaultConsole() *Console {
 
 func NewConsole(cfg ConsoleConfig) *Console {
 	normalized := normalizeConfig(cfg)
+	profiler := NewProfiler(normalized.Profile, normalized.ProfileOutput)
 	return &Console{
 		cfg:             normalized,
 		designConf:      resolveDesignConfig(normalized),
 		adapterRegistry: adapter.NewRegistry(),
+		profiler:        profiler,
 	}
 }
 
@@ -326,6 +331,11 @@ func (c *Console) runContext(
 	<-signalHandlerDone
 
 	task.Complete(exitCode)
+
+	// Write profile data if enabled
+	if c.profiler != nil {
+		_ = c.profiler.Write()
+	}
 
 	if c.cfg.Debug {
 		fmt.Fprintf(os.Stderr,
@@ -691,7 +701,12 @@ func (c *Console) tryAdapterMode(
 	}
 
 	// Fall back to line-by-line classification
+	processStart := c.profiler.StartStage("process")
 	c.processBufferedOutputLineByLine(task, string(combinedOutput), patternMatcher)
+	c.profiler.EndStage("process", processStart, map[string]interface{}{
+		"line_count": len(strings.Split(string(combinedOutput), "\n")),
+		"buffer_size": int64(len(combinedOutput)),
+	})
 
 	// Report any capture errors
 	errCtx := design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true}
@@ -705,6 +720,10 @@ func (c *Console) tryAdapterMode(
 			formatInternalError("Error reading stderr: %v", errStderrCopy),
 			design.TypeError, errCtx)
 	}
+
+	c.profiler.EndStage("capture", captureStart, map[string]interface{}{
+		"buffer_size": int64(len(combinedOutput)),
+	})
 
 	exitCode := getExitCode(runErr, c.cfg.Debug)
 	task.UpdateTaskContext()
