@@ -61,7 +61,7 @@ const (
 
 // LoadConfig loads the .fo.yaml configuration.
 func LoadConfig() *AppConfig {
-	// Initialize with hardcoded default themes first.
+	// Initialize with default themes from pkg/design (single source of truth).
 	appCfg := &AppConfig{
 		Stream:          false,
 		ShowOutput:      DefaultShowOutput,
@@ -72,11 +72,8 @@ func LoadConfig() *AppConfig {
 		MaxBufferSize:   DefaultMaxBufferSize,
 		MaxLineLength:   DefaultMaxLineLength,
 		ActiveThemeName: DefaultActiveThemeName,
-		Themes: map[string]*design.Config{
-			"unicode_vibrant": design.UnicodeVibrantTheme(), // Hardcoded default
-			"ascii_minimal":   design.ASCIIMinimalTheme(),   // Hardcoded default
-		},
-		Presets: make(map[string]*design.ToolConfig),
+		Themes:          design.DefaultThemes(), // Single source of truth for default themes
+		Presets:         make(map[string]*design.ToolConfig),
 	}
 
 	initialDebug := os.Getenv("FO_DEBUG") != ""

@@ -637,6 +637,15 @@ func DeepCopyConfig(original *Config) *Config {
 	return &copied
 }
 
+// DefaultThemes returns a map of all built-in themes.
+// This is the single source of truth for default theme definitions.
+func DefaultThemes() map[string]*Config {
+	return map[string]*Config{
+		"unicode_vibrant": UnicodeVibrantTheme(),
+		"ascii_minimal":   ASCIIMinimalTheme(),
+	}
+}
+
 func ApplyMonochromeDefaults(cfg *Config) {
 	if cfg == nil {
 		return
