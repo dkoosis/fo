@@ -418,3 +418,83 @@ func TestPattern_Interface(t *testing.T) {
 		}
 	}
 }
+
+func TestPatternType_AllPatternTypes(t *testing.T) {
+	types := AllPatternTypes()
+	expectedCount := 6
+	if len(types) != expectedCount {
+		t.Errorf("AllPatternTypes() returned %d types, want %d", len(types), expectedCount)
+	}
+
+	// Verify all expected types are present
+	expectedTypes := map[PatternType]bool{
+		PatternTypeSparkline:   true,
+		PatternTypeLeaderboard: true,
+		PatternTypeTestTable:   true,
+		PatternTypeSummary:     true,
+		PatternTypeComparison:  true,
+		PatternTypeInventory:   true,
+	}
+
+	for _, pt := range types {
+		if !expectedTypes[pt] {
+			t.Errorf("AllPatternTypes() returned unexpected type: %s", pt)
+		}
+		delete(expectedTypes, pt)
+	}
+
+	if len(expectedTypes) > 0 {
+		t.Errorf("AllPatternTypes() missing types: %v", expectedTypes)
+	}
+}
+
+func TestPatternType_IsValidPatternType(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{"valid sparkline", "sparkline", true},
+		{"valid leaderboard", "leaderboard", true},
+		{"valid test-table", "test-table", true},
+		{"valid summary", "summary", true},
+		{"valid comparison", "comparison", true},
+		{"valid inventory", "inventory", true},
+		{"invalid type", "invalid", false},
+		{"empty string", "", false},
+		{"case sensitive", "Sparkline", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsValidPatternType(tt.input)
+			if got != tt.expected {
+				t.Errorf("IsValidPatternType(%q) = %v, want %v", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestPattern_PatternType(t *testing.T) {
+	tests := []struct {
+		name     string
+		pattern  Pattern
+		expected PatternType
+	}{
+		{"Sparkline", &Sparkline{}, PatternTypeSparkline},
+		{"Leaderboard", &Leaderboard{}, PatternTypeLeaderboard},
+		{"TestTable", &TestTable{}, PatternTypeTestTable},
+		{"Summary", &Summary{}, PatternTypeSummary},
+		{"Comparison", &Comparison{}, PatternTypeComparison},
+		{"Inventory", &Inventory{}, PatternTypeInventory},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.pattern.PatternType()
+			if got != tt.expected {
+				t.Errorf("%s.PatternType() = %v, want %v", tt.name, got, tt.expected)
+			}
+		})
+	}
+}
