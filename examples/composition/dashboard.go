@@ -15,9 +15,9 @@ func main() {
 	// Use the vibrant Unicode theme for rich visualization
 	cfg := design.UnicodeVibrantTheme()
 
-	fmt.Println("╔══════════════════════════════════════════════════════════╗")
-	fmt.Println("║           BUILD DASHBOARD - Multi-Pattern Demo          ║")
-	fmt.Println("╚══════════════════════════════════════════════════════════╝")
+	fmt.Println("╔════════════════════════════════════════════════════════════════╗")
+	fmt.Println("║           Build Dashboard - Composition Example               ║")
+	fmt.Println("╚════════════════════════════════════════════════════════════════╝")
 	fmt.Println()
 
 	// Pattern 1: Summary - Overall build metrics

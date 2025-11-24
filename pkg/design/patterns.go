@@ -4,6 +4,7 @@ package design
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 )
 
@@ -12,13 +13,13 @@ import (
 type DensityMode string
 
 const (
-	// DensityDetailed shows one item per line with full context (current default)
+	// DensityDetailed shows one item per line with full context (current default).
 	DensityDetailed DensityMode = "detailed"
 
-	// DensityBalanced shows 2 columns where appropriate
+	// DensityBalanced shows 2 columns where appropriate.
 	DensityBalanced DensityMode = "balanced"
 
-	// DensityCompact shows 3 columns with minimal spacing
+	// DensityCompact shows 3 columns with minimal spacing.
 	DensityCompact DensityMode = "compact"
 )
 
@@ -55,22 +56,22 @@ func (s *Sparkline) Render(cfg *Config) string {
 	var sb strings.Builder
 
 	// Determine scale
-	min, max := s.Min, s.Max
-	if min == 0 && max == 0 {
+	minVal, maxVal := s.Min, s.Max
+	if minVal == 0 && maxVal == 0 {
 		// Auto-detect range
-		min, max = s.Values[0], s.Values[0]
+		minVal, maxVal = s.Values[0], s.Values[0]
 		for _, v := range s.Values {
-			if v < min {
-				min = v
+			if v < minVal {
+				minVal = v
 			}
-			if v > max {
-				max = v
+			if v > maxVal {
+				maxVal = v
 			}
 		}
 	}
 
 	// Handle edge case where all values are the same
-	valueRange := max - min
+	valueRange := maxVal - minVal
 	if valueRange == 0 {
 		valueRange = 1 // Prevent division by zero
 	}
@@ -107,7 +108,7 @@ func (s *Sparkline) Render(cfg *Config) string {
 	}
 	for _, value := range s.Values {
 		// Normalize value to 0-1 range
-		normalized := (value - min) / valueRange
+		normalized := (value - minVal) / valueRange
 		// Map to block index (0-7)
 		blockIndex := int(normalized * 7)
 		if blockIndex < 0 {
@@ -212,7 +213,7 @@ func (l *Leaderboard) Render(cfg *Config) string {
 	}
 
 	// Calculate column widths for alignment
-	maxRankWidth := len(fmt.Sprintf("%d", len(l.Items)))
+	maxRankWidth := len(strconv.Itoa(len(l.Items)))
 	maxNameWidth := 0
 	maxMetricWidth := 0
 	for _, item := range l.Items {
@@ -299,11 +300,11 @@ type TestTable struct {
 
 // TestTableItem represents a single test result entry.
 type TestTableItem struct {
-	Name     string  // Test or package name
-	Status   string  // "pass", "fail", "skip"
-	Duration string  // Formatted duration
-	Count    int     // Number of tests (for package-level results)
-	Details  string  // Additional details or error message
+	Name     string // Test or package name
+	Status   string // "pass", "fail", "skip"
+	Duration string // Formatted duration
+	Count    int    // Number of tests (for package-level results)
+	Details  string // Additional details or error message
 }
 
 // Render creates the test table visualization.
@@ -702,13 +703,14 @@ func (c *Comparison) Render(cfg *Config) string {
 		sb.WriteString(" ")
 		var changeIcon string
 		var changeColor string
-		if item.Change > 0 {
+		switch {
+		case item.Change > 0:
 			changeIcon = "↑"
 			changeColor = cfg.GetColor("Warning") // Increase might be bad (e.g., build time)
-		} else if item.Change < 0 {
+		case item.Change < 0:
 			changeIcon = "↓"
 			changeColor = cfg.GetColor("Success") // Decrease might be good (e.g., build time)
-		} else {
+		default:
 			changeIcon = "="
 			changeColor = cfg.GetColor("Process")
 		}
