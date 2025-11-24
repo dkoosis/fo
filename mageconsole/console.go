@@ -2,6 +2,7 @@ package mageconsole
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dkoosis/fo/pkg/adapter"
 	"github.com/dkoosis/fo/pkg/design"
 	"golang.org/x/term"
 )
@@ -58,8 +60,9 @@ type TaskResult struct {
 }
 
 type Console struct {
-	cfg        ConsoleConfig
-	designConf *design.Config
+	cfg            ConsoleConfig
+	designConf     *design.Config
+	adapterRegistry *adapter.Registry
 }
 
 func DefaultConsole() *Console {
@@ -68,7 +71,11 @@ func DefaultConsole() *Console {
 
 func NewConsole(cfg ConsoleConfig) *Console {
 	normalized := normalizeConfig(cfg)
-	return &Console{cfg: normalized, designConf: resolveDesignConfig(normalized)}
+	return &Console{
+		cfg:             normalized,
+		designConf:      resolveDesignConfig(normalized),
+		adapterRegistry: adapter.NewRegistry(),
+	}
 }
 
 // Run executes a command and returns the result.
@@ -493,123 +500,203 @@ func (c *Console) executeCaptureMode(
 		return 1, err
 	}
 
-	var wgRead sync.WaitGroup
-	wgRead.Add(2)
-
-	var errStdoutCopy, errStderrCopy error
-	var totalBytesRead int64
-	maxTotalBytes := c.cfg.MaxBufferSize * 2 // Shared budget: 2x MaxBufferSize across both streams
-	var bytesMutex sync.Mutex
-
-	// Helper function to process a pipe line-by-line with classification
-	processPipe := func(pipe io.ReadCloser, streamName string, errVar *error) {
-		defer wgRead.Done()
-		if c.cfg.Debug {
-			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Reading %s line-by-line\n", streamName)
-		}
-		scanner := bufio.NewScanner(pipe)
-		buf := make([]byte, 0, bufio.MaxScanTokenSize)
-		scanner.Buffer(buf, c.cfg.MaxLineLength)
-
-		truncated := false
-		for scanner.Scan() {
-			line := scanner.Text()
-			lineBytes := int64(len(line))
-
-			// Enforce MaxBufferSize limit (thread-safe check and update)
-			// Important: We must continue draining the pipe even after limit is reached
-			// to prevent deadlock (child process blocking on write to full pipe buffer)
-			bytesMutex.Lock()
-			overLimit := totalBytesRead+lineBytes > maxTotalBytes
-			if !overLimit {
-				totalBytesRead += lineBytes
-			}
-			bytesMutex.Unlock()
-
-			if overLimit {
-				if !truncated && c.cfg.Debug {
-					fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] MaxBufferSize limit reached on %s, discarding remaining output\n", streamName)
-				}
-				truncated = true
-				continue // Keep scanning to drain pipe, but don't store
-			}
-
-			// Classify and add line immediately (streaming classification)
-			lineType, lineContext := patternMatcher.ClassifyOutputLine(line, task.Command, task.Args)
-			if c.cfg.Debug {
-				fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Line classified as %s: %s\n", lineType, line)
-			}
-			task.AddOutputLine(line, lineType, lineContext)
-		}
-
-		if scanErr := scanner.Err(); scanErr != nil {
-			isIgnorable := errors.Is(scanErr, io.EOF) ||
-				strings.Contains(scanErr.Error(), "file already closed") ||
-				strings.Contains(scanErr.Error(), "broken pipe")
-			if !isIgnorable {
-				*errVar = scanErr
-				if c.cfg.Debug {
-					fmt.Fprintf(os.Stderr,
-						"[DEBUG executeCaptureMode] Error scanning %s: %v\n", streamName, scanErr)
-				}
-			}
-		} else if c.cfg.Debug {
-			fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Goroutine: Finished reading %s\n", streamName)
-		}
-	}
-
-	// Stream line-by-line classification for real-time processing
-	go processPipe(stdoutPipe, "stdoutPipe", &errStdoutCopy)
-	go processPipe(stderrPipe, "stderrPipe", &errStderrCopy)
-
 	if err := cmd.Start(); err != nil {
 		errMsg := fmt.Sprintf("Error starting command '%s': %v", strings.Join(cmd.Args, " "), err)
 		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true})
 		fmt.Fprintln(c.cfg.Err, errMsg)
 		_ = stdoutPipe.Close()
 		_ = stderrPipe.Close()
-		wgRead.Wait()
 		close(cmdDone) // Signal that command has finished (failed to start)
 		return getExitCode(err, c.cfg.Debug), err
 	}
 
+	// Try adapter-based parsing first
+	exitCode, runErr := c.tryAdapterMode(cmd, task, stdoutPipe, stderrPipe, patternMatcher, cmdDone)
+
+	return exitCode, runErr
+}
+
+// tryAdapterMode attempts to use a stream adapter to parse structured output.
+// If no adapter is detected or adapter parsing fails, falls back to line-by-line classification.
+func (c *Console) tryAdapterMode(
+	cmd *exec.Cmd,
+	task *design.Task,
+	stdoutPipe io.ReadCloser,
+	stderrPipe io.ReadCloser,
+	patternMatcher *design.PatternMatcher,
+	cmdDone chan struct{},
+) (int, error) {
+	const detectionLineCount = 15 // Buffer first 15 lines for adapter detection
+
+	// Buffer output from both streams
+	var stdoutBuffer bytes.Buffer
+	var stderrBuffer bytes.Buffer
+	var wgRead sync.WaitGroup
+	wgRead.Add(2)
+
+	var errStdoutCopy, errStderrCopy error
+	var totalBytesRead int64
+	maxTotalBytes := c.cfg.MaxBufferSize * 2
+	var bytesMutex sync.Mutex
+
+	// Goroutine to capture stdout
+	go func() {
+		defer wgRead.Done()
+		buf := make([]byte, 4096)
+		for {
+			n, readErr := stdoutPipe.Read(buf)
+			if n > 0 {
+				bytesMutex.Lock()
+				if totalBytesRead+int64(n) <= maxTotalBytes {
+					stdoutBuffer.Write(buf[:n])
+					totalBytesRead += int64(n)
+				}
+				bytesMutex.Unlock()
+			}
+			if readErr != nil {
+				if readErr != io.EOF &&
+					!strings.Contains(readErr.Error(), "file already closed") &&
+					!strings.Contains(readErr.Error(), "broken pipe") {
+					errStdoutCopy = readErr
+				}
+				break
+			}
+		}
+	}()
+
+	// Goroutine to capture stderr
+	go func() {
+		defer wgRead.Done()
+		buf := make([]byte, 4096)
+		for {
+			n, readErr := stderrPipe.Read(buf)
+			if n > 0 {
+				bytesMutex.Lock()
+				if totalBytesRead+int64(n) <= maxTotalBytes {
+					stderrBuffer.Write(buf[:n])
+					totalBytesRead += int64(n)
+				}
+				bytesMutex.Unlock()
+			}
+			if readErr != nil {
+				if readErr != io.EOF &&
+					!strings.Contains(readErr.Error(), "file already closed") &&
+					!strings.Contains(readErr.Error(), "broken pipe") {
+					errStderrCopy = readErr
+				}
+				break
+			}
+		}
+	}()
+
+	// Wait for command and output capture to complete
 	runErr := cmd.Wait()
 	wgRead.Wait()
-	close(cmdDone) // Signal that command has finished
+	close(cmdDone)
 
-	// Note: Output was already classified line-by-line during capture above
-	// Report any scanning errors
-	isIgnorableErr := func(err error) bool {
-		return errors.Is(err, io.EOF) ||
-			strings.Contains(err.Error(), "file already closed") ||
-			strings.Contains(err.Error(), "broken pipe")
+	// Get combined output for detection
+	combinedOutput := append(stdoutBuffer.Bytes(), stderrBuffer.Bytes()...)
+
+	// Extract first N lines for adapter detection
+	firstLines := extractFirstLines(string(combinedOutput), detectionLineCount)
+
+	if c.cfg.Debug {
+		fmt.Fprintf(os.Stderr, "[DEBUG tryAdapterMode] Captured %d bytes, first %d lines for detection\n",
+			len(combinedOutput), len(firstLines))
 	}
+
+	// Try to detect a suitable adapter
+	detectedAdapter := c.adapterRegistry.Detect(firstLines)
+
+	if detectedAdapter != nil {
+		if c.cfg.Debug {
+			fmt.Fprintf(os.Stderr, "[DEBUG tryAdapterMode] Detected adapter: %s\n", detectedAdapter.Name())
+		}
+
+		// Parse with adapter
+		pattern, parseErr := detectedAdapter.Parse(bytes.NewReader(combinedOutput))
+		if parseErr == nil && pattern != nil {
+			if c.cfg.Debug {
+				fmt.Fprintf(os.Stderr, "[DEBUG tryAdapterMode] Successfully parsed with adapter: %s\n", detectedAdapter.Name())
+			}
+
+			// Render the pattern using the design config
+			rendered := pattern.Render(task.Config)
+			if rendered != "" {
+				// Add the rendered pattern as output
+				task.AddOutputLine(rendered, design.TypeDetail, design.LineContext{
+					CognitiveLoad: design.LoadLow,
+					Importance:    4,
+					IsInternal:    false,
+				})
+			}
+
+			exitCode := getExitCode(runErr, c.cfg.Debug)
+			return exitCode, runErr
+		}
+
+		if c.cfg.Debug {
+			fmt.Fprintf(os.Stderr, "[DEBUG tryAdapterMode] Adapter parsing failed: %v, falling back to line-by-line\n", parseErr)
+		}
+	} else if c.cfg.Debug {
+		fmt.Fprintf(os.Stderr, "[DEBUG tryAdapterMode] No adapter detected, using line-by-line classification\n")
+	}
+
+	// Fall back to line-by-line classification
+	c.processBufferedOutputLineByLine(task, string(combinedOutput), patternMatcher)
+
+	// Report any capture errors
 	errCtx := design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true}
-	if errStdoutCopy != nil && !isIgnorableErr(errStdoutCopy) {
+	if errStdoutCopy != nil {
 		task.AddOutputLine(
 			fmt.Sprintf("[fo] Error reading stdout: %v", errStdoutCopy),
 			design.TypeError, errCtx)
 	}
-	if errStderrCopy != nil && !isIgnorableErr(errStderrCopy) {
+	if errStderrCopy != nil {
 		task.AddOutputLine(
 			fmt.Sprintf("[fo] Error reading stderr: %v", errStderrCopy),
 			design.TypeError, errCtx)
 	}
 
 	exitCode := getExitCode(runErr, c.cfg.Debug)
-
 	task.UpdateTaskContext()
 
-	// Note: Classification already happened line-by-line during capture above
-	// No need to re-scan and classify here
-	if c.cfg.Debug {
-		task.OutputLinesLock()
-		lineCount := len(task.OutputLines)
-		task.OutputLinesUnlock()
-		fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Processed %d lines with streaming classification\n", lineCount)
+	return exitCode, runErr
+}
+
+// extractFirstLines extracts the first N lines from the output for adapter detection.
+func extractFirstLines(output string, count int) []string {
+	lines := strings.Split(output, "\n")
+	if len(lines) > count {
+		lines = lines[:count]
+	}
+	return lines
+}
+
+// processBufferedOutputLineByLine processes buffered output with line-by-line classification.
+func (c *Console) processBufferedOutputLineByLine(
+	task *design.Task,
+	output string,
+	patternMatcher *design.PatternMatcher,
+) {
+	scanner := bufio.NewScanner(strings.NewReader(output))
+	buf := make([]byte, 0, bufio.MaxScanTokenSize)
+	scanner.Buffer(buf, c.cfg.MaxLineLength)
+
+	lineCount := 0
+	for scanner.Scan() {
+		line := scanner.Text()
+		lineType, lineContext := patternMatcher.ClassifyOutputLine(line, task.Command, task.Args)
+		if c.cfg.Debug && lineCount < 5 {
+			fmt.Fprintf(os.Stderr, "[DEBUG processBufferedOutput] Line classified as %s: %s\n", lineType, line)
+		}
+		task.AddOutputLine(line, lineType, lineContext)
+		lineCount++
 	}
 
-	return exitCode, runErr
+	if c.cfg.Debug {
+		fmt.Fprintf(os.Stderr, "[DEBUG processBufferedOutput] Processed %d lines with line-by-line classification\n", lineCount)
+	}
 }
 
 func getExitCode(err error, debug bool) int {
