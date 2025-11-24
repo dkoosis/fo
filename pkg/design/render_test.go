@@ -260,8 +260,6 @@ func TestTask_RenderSummary_When_IgnoresFoInternalErrors(t *testing.T) {
 }
 
 func TestRenderDirectMessage_When_SuccessType(t *testing.T) {
-	t.Parallel()
-
 	cfg := UnicodeVibrantTheme()
 	output := RenderDirectMessage(cfg, StatusSuccess, "", "Operation completed", 0)
 
@@ -270,8 +268,6 @@ func TestRenderDirectMessage_When_SuccessType(t *testing.T) {
 }
 
 func TestRenderDirectMessage_When_ErrorType(t *testing.T) {
-	t.Parallel()
-
 	cfg := UnicodeVibrantTheme()
 	output := RenderDirectMessage(cfg, StatusError, "", "Something went wrong", 0)
 
@@ -280,8 +276,6 @@ func TestRenderDirectMessage_When_ErrorType(t *testing.T) {
 }
 
 func TestRenderDirectMessage_When_WarningType(t *testing.T) {
-	t.Parallel()
-
 	cfg := UnicodeVibrantTheme()
 	output := RenderDirectMessage(cfg, StatusWarning, "", "Be careful", 0)
 
@@ -290,8 +284,6 @@ func TestRenderDirectMessage_When_WarningType(t *testing.T) {
 }
 
 func TestRenderDirectMessage_When_CustomIcon(t *testing.T) {
-	t.Parallel()
-
 	cfg := UnicodeVibrantTheme()
 	output := RenderDirectMessage(cfg, TypeInfo, "🎯", "Custom message", 0)
 
@@ -300,8 +292,6 @@ func TestRenderDirectMessage_When_CustomIcon(t *testing.T) {
 }
 
 func TestRenderDirectMessage_When_RawType(t *testing.T) {
-	t.Parallel()
-
 	cfg := UnicodeVibrantTheme()
 	output := RenderDirectMessage(cfg, "raw", "", "Raw output\nwith newlines", 0)
 
@@ -312,8 +302,6 @@ func TestRenderDirectMessage_When_RawType(t *testing.T) {
 }
 
 func TestRenderDirectMessage_When_WithIndent(t *testing.T) {
-	t.Parallel()
-
 	cfg := UnicodeVibrantTheme()
 	output := RenderDirectMessage(cfg, "info", "", "Indented", 2)
 
@@ -322,8 +310,6 @@ func TestRenderDirectMessage_When_WithIndent(t *testing.T) {
 }
 
 func TestRenderDirectMessage_When_Monochrome(t *testing.T) {
-	t.Parallel()
-
 	cfg := ASCIIMinimalTheme()
 	output := RenderDirectMessage(cfg, "success", "", "Message", 0)
 

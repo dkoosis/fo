@@ -83,8 +83,8 @@ func (a *GoTestJSONAdapter) Detect(firstLines []string) bool {
 			continue
 		}
 		// Go test JSON has "Action" and either "Package" or "Test" fields
-		if (strings.Contains(line, `"Action"`) &&
-			(strings.Contains(line, `"Package"`) || strings.Contains(line, `"Test"`))) {
+		if strings.Contains(line, `"Action"`) &&
+			(strings.Contains(line, `"Package"`) || strings.Contains(line, `"Test"`)) {
 			return true
 		}
 		// If we see a non-JSON line early, it's probably not pure JSON output
