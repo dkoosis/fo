@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -57,6 +58,53 @@ type TaskResult struct {
 	ExitCode int
 	Lines    []Line
 	Err      error
+}
+
+// ToJSON converts TaskResult to JSON format for structured output.
+func (r *TaskResult) ToJSON() ([]byte, error) {
+	type JSONLine struct {
+		Content   string    `json:"content"`
+		Type      string    `json:"type"`
+		Timestamp time.Time `json:"timestamp"`
+	}
+
+	type JSONOutput struct {
+		Version   string      `json:"version"`
+		Label     string      `json:"label"`
+		Intent    string      `json:"intent"`
+		Status    string      `json:"status"`
+		ExitCode  int         `json:"exit_code"`
+		Duration  string      `json:"duration"`
+		DurationMs int64      `json:"duration_ms"`
+		Lines     []JSONLine  `json:"lines"`
+		Error     string      `json:"error,omitempty"`
+	}
+
+	jsonLines := make([]JSONLine, len(r.Lines))
+	for i, line := range r.Lines {
+		jsonLines[i] = JSONLine{
+			Content:   line.Content,
+			Type:      line.Type,
+			Timestamp: line.Timestamp,
+		}
+	}
+
+	output := JSONOutput{
+		Version:    "1.0",
+		Label:      r.Label,
+		Intent:     r.Intent,
+		Status:     r.Status,
+		ExitCode:   r.ExitCode,
+		Duration:   r.Duration.String(),
+		DurationMs: r.Duration.Milliseconds(),
+		Lines:      jsonLines,
+	}
+
+	if r.Err != nil {
+		output.Error = r.Err.Error()
+	}
+
+	return json.MarshalIndent(output, "", "  ")
 }
 
 type Console struct {

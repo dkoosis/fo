@@ -161,6 +161,17 @@ func run(args []string) int {
 		exitCode = 1
 	}
 
+	// Output JSON format if requested
+	if cliFlags.Format == "json" && result != nil {
+		jsonOutput, jsonErr := result.ToJSON()
+		if jsonErr != nil {
+			fmt.Fprintf(os.Stderr, "[fo] Error generating JSON output: %v\n", jsonErr)
+			return 1
+		}
+		fmt.Println(string(jsonOutput))
+		return exitCode
+	}
+
 	if behavioralSettings.Debug {
 		fmt.Fprintf(os.Stderr, "[DEBUG run()] returning exit code %d.\nBehavioral Config: %+v\n", exitCode, behavioralSettings)
 	}
@@ -292,6 +303,8 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 	flag.StringVar(&cliFlags.ShowOutput, "show-output", "", "When to show captured output: on-fail, always, never.")
 	flag.StringVar(&cliFlags.Pattern, "pattern", "",
 		"Force specific visualization pattern (test-table, sparkline, leaderboard, inventory, summary, comparison).")
+	flag.StringVar(&cliFlags.Format, "format", "text",
+		"Output format: 'text' (default) or 'json' (structured output for AI/automation).")
 	flag.BoolVar(&cliFlags.NoTimer, "no-timer", false, "Disable showing the duration.")
 
 	var maxBufferSizeMB int
@@ -335,6 +348,15 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 		validValues := map[string]bool{"on-fail": true, "always": true, "never": true}
 		if !validValues[cliFlags.ShowOutput] {
 			fmt.Fprintf(os.Stderr, "[fo] Error: Invalid value for --show-output: %s\n[fo] Valid values are: on-fail, always, never\n", cliFlags.ShowOutput)
+			flag.Usage()
+			os.Exit(1)
+		}
+	}
+
+	if cliFlags.Format != "" {
+		validFormats := map[string]bool{"text": true, "json": true}
+		if !validFormats[cliFlags.Format] {
+			fmt.Fprintf(os.Stderr, "[fo] Error: Invalid value for --format: %s\n[fo] Valid values are: text, json\n", cliFlags.Format)
 			flag.Usage()
 			os.Exit(1)
 		}
