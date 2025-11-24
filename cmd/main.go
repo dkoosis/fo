@@ -267,6 +267,7 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 	flag.BoolVar(&cliFlags.Debug, "debug", false, "Enable debug output.")
 	flag.BoolVar(&cliFlags.Debug, "d", false, "Enable debug output (shorthand).")
 	flag.StringVar(&cliFlags.ThemeName, "theme", "", "Select visual theme (e.g., 'ascii_minimal', 'unicode_vibrant').")
+	flag.StringVar(&cliFlags.ThemeFile, "theme-file", "", "Load custom theme from YAML file.")
 	flag.BoolVar(&cliFlags.NoColor, "no-color", false, "Disable ANSI color/styling output.")
 	flag.BoolVar(&cliFlags.CI, "ci", false, "Enable CI-friendly, plain-text output.")
 

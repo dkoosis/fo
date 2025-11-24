@@ -21,9 +21,10 @@ type CliFlags struct {
 	NoColor       bool
 	CI            bool
 	Debug         bool
-	MaxBufferSize int64 // In bytes, passed from main after parsing
-	MaxLineLength int   // In bytes, passed from main after parsing
+	MaxBufferSize int64  // In bytes, passed from main after parsing
+	MaxLineLength int    // In bytes, passed from main after parsing
 	ThemeName     string
+	ThemeFile     string // Path to custom theme YAML file
 
 	// Flags to track if they were explicitly set by the user
 	StreamSet     bool
@@ -245,28 +246,77 @@ func normalizeThemeColors(cfg *design.Config) {
 	cfg.Colors.Italic = design.NormalizeANSIEscape(cfg.Colors.Italic)
 }
 
+// LoadThemeFromFile loads a custom theme from a YAML file.
+func LoadThemeFromFile(filePath string) (*design.Config, error) {
+	// #nosec G304 -- filePath is from user-provided --theme-file flag
+	yamlFile, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("error reading theme file %s: %w", filePath, err)
+	}
+
+	var themeConfig design.Config
+	err = yaml.Unmarshal(yamlFile, &themeConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshalling theme file %s: %w", filePath, err)
+	}
+
+	// Set theme name based on file name
+	baseName := filepath.Base(filePath)
+	themeConfig.ThemeName = baseName
+
+	// Normalize color strings after YAML unmarshal
+	normalizeThemeColors(&themeConfig)
+
+	return &themeConfig, nil
+}
+
 // MergeWithFlags takes the application config (post-YAML and presets) and CLI flags,
 // and returns the final design.Config to be used for rendering.
 func MergeWithFlags(appCfg *AppConfig, cliFlags CliFlags) *design.Config {
-	effectiveThemeName := appCfg.ActiveThemeName
-	if cliFlags.ThemeName != "" {
-		effectiveThemeName = cliFlags.ThemeName
-	}
 	envDebug := os.Getenv("FO_DEBUG") != ""
 
-	finalDesignConfig, themeExists := appCfg.Themes[effectiveThemeName]
-	if !themeExists {
-		if appCfg.Debug || envDebug {
-			fmt.Fprintf(os.Stderr,
-				"[DEBUG MergeWithFlags] Theme '%s' not found. Falling back to '%s'.\n",
-				effectiveThemeName, DefaultActiveThemeName)
-		}
-		finalDesignConfig = appCfg.Themes[DefaultActiveThemeName]
-		if finalDesignConfig == nil {
+	// Priority: --theme-file > --theme > config active_theme > default
+	var finalDesignConfig *design.Config
+	effectiveThemeName := appCfg.ActiveThemeName
+
+	// 1. Check for --theme-file flag (highest priority)
+	if cliFlags.ThemeFile != "" {
+		loadedTheme, err := LoadThemeFromFile(cliFlags.ThemeFile)
+		if err != nil {
 			if appCfg.Debug || envDebug {
-				fmt.Fprintln(os.Stderr, "[DEBUG MergeWithFlags] Default theme also missing. Using coded UnicodeVibrant as fallback.")
+				fmt.Fprintf(os.Stderr, "[DEBUG MergeWithFlags] Error loading theme file: %v. Falling back to default.\n", err)
 			}
 			finalDesignConfig = design.UnicodeVibrantTheme()
+		} else {
+			if appCfg.Debug || envDebug {
+				fmt.Fprintf(os.Stderr, "[DEBUG MergeWithFlags] Loaded theme from file: %s\n", cliFlags.ThemeFile)
+			}
+			finalDesignConfig = loadedTheme
+			effectiveThemeName = loadedTheme.ThemeName
+		}
+	}
+
+	// 2. If no theme file, check --theme flag or config
+	if finalDesignConfig == nil {
+		if cliFlags.ThemeName != "" {
+			effectiveThemeName = cliFlags.ThemeName
+		}
+
+		var themeExists bool
+		finalDesignConfig, themeExists = appCfg.Themes[effectiveThemeName]
+		if !themeExists {
+			if appCfg.Debug || envDebug {
+				fmt.Fprintf(os.Stderr,
+					"[DEBUG MergeWithFlags] Theme '%s' not found. Falling back to '%s'.\n",
+					effectiveThemeName, DefaultActiveThemeName)
+			}
+			finalDesignConfig = appCfg.Themes[DefaultActiveThemeName]
+			if finalDesignConfig == nil {
+				if appCfg.Debug || envDebug {
+					fmt.Fprintln(os.Stderr, "[DEBUG MergeWithFlags] Default theme also missing. Using coded UnicodeVibrant as fallback.")
+				}
+				finalDesignConfig = design.UnicodeVibrantTheme()
+			}
 		}
 	}
 
