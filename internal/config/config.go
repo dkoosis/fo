@@ -270,8 +270,9 @@ func LoadThemeFromFile(filePath string) (*design.Config, error) {
 	return &themeConfig, nil
 }
 
-// MergeWithFlags takes the application config (post-YAML and presets) and CLI flags,
-// and returns the final design.Config to be used for rendering.
+// MergeWithFlags is deprecated. Use ResolveConfig instead for explicit priority order.
+// This function is kept for backward compatibility with existing tests.
+// Deprecated: Use ResolveConfig for new code.
 func MergeWithFlags(appCfg *AppConfig, cliFlags CliFlags) *design.Config {
 	envDebug := os.Getenv("FO_DEBUG") != ""
 

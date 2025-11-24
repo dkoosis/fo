@@ -113,16 +113,24 @@ func run(args []string) int {
 		behavioralSettings.MaxLineLength = cliFlags.MaxLineLength
 	}
 
-	// Get the final design configuration (styling, icons, colors) by merging
-	// the file configuration with CLI flags related to presentation
-	finalDesignConfig := config.MergeWithFlags(fileAppConfig, cliFlags)
+	// Resolve configuration from all sources with explicit priority order
+	// Priority: CLI flags > Environment variables > .fo.yaml > Defaults
+	resolvedCfg, err := config.ResolveConfig(cliFlags)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[fo] Error resolving configuration: %v\n", err)
+		return 1
+	}
+	finalDesignConfig := resolvedCfg.Theme
 
-	// Update behavioralSettings with final decisions on NoTimer, NoColor, CI from finalDesignConfig
-	behavioralSettings.NoTimer = finalDesignConfig.Style.NoTimer
-	behavioralSettings.NoColor = finalDesignConfig.IsMonochrome
-	behavioralSettings.CI = finalDesignConfig.IsMonochrome && finalDesignConfig.Style.NoTimer
-	// Ensure debug is still controlled only by explicit --debug flag
-	behavioralSettings.Debug = cliFlags.DebugSet && cliFlags.Debug
+	// Update behavioralSettings from resolved config
+	behavioralSettings.NoTimer = resolvedCfg.NoTimer
+	behavioralSettings.NoColor = resolvedCfg.NoColor
+	behavioralSettings.CI = resolvedCfg.CI
+	behavioralSettings.Debug = resolvedCfg.Debug
+	behavioralSettings.Stream = resolvedCfg.Stream
+	behavioralSettings.ShowOutput = resolvedCfg.ShowOutput
+	behavioralSettings.MaxBufferSize = resolvedCfg.MaxBufferSize
+	behavioralSettings.MaxLineLength = resolvedCfg.MaxLineLength
 
 	consoleCfg := mageconsole.ConsoleConfig{
 		ThemeName:      finalDesignConfig.ThemeName,
@@ -239,8 +247,13 @@ func handlePrintCommand(args []string) {
 	// Get the debug mode flag for local use
 	debug := globalCliFlagsForPrint.Debug
 
-	fileAppConfig := config.LoadConfig() // Load base config
-	finalDesignConfig := config.MergeWithFlags(fileAppConfig, globalCliFlagsForPrint)
+	// Resolve configuration with priority order
+	resolvedCfg, err := config.ResolveConfig(globalCliFlagsForPrint)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[fo] Error resolving configuration: %v\n", err)
+		os.Exit(1)
+	}
+	finalDesignConfig := resolvedCfg.Theme
 
 	if debug {
 		fmt.Fprintf(os.Stderr, "[DEBUG handlePrintCommand] Type: %s, Icon: %s, Indent: %d, Message: '%s'\n",
