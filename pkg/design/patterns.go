@@ -23,11 +23,76 @@ const (
 	DensityCompact DensityMode = "compact"
 )
 
+// PatternType represents the six standard semantic pattern types in the design system.
+// These types map semantic meaning (what to show) to visual presentation (how to show it).
+type PatternType string
+
+const (
+	// PatternTypeSparkline represents word-sized trend graphics using Unicode blocks.
+	// Use for: test duration trends, coverage changes, build size progression, error count trends.
+	PatternTypeSparkline PatternType = "sparkline"
+
+	// PatternTypeLeaderboard represents ranked lists showing top/bottom N items by metric.
+	// Use for: slowest tests, largest binaries, files with most warnings, packages with lowest coverage.
+	PatternTypeLeaderboard PatternType = "leaderboard"
+
+	// PatternTypeTestTable represents comprehensive test results with status and timing.
+	// Use for: complete test suite results, package-level test summaries.
+	PatternTypeTestTable PatternType = "test-table"
+
+	// PatternTypeSummary represents high-level summaries with key metrics and counts.
+	// Use for: at-a-glance understanding of overall results, rollup statistics.
+	PatternTypeSummary PatternType = "summary"
+
+	// PatternTypeComparison represents before/after comparisons of metrics.
+	// Use for: showing changes over time, version comparisons, delta analysis.
+	PatternTypeComparison PatternType = "comparison"
+
+	// PatternTypeInventory represents lists of generated artifacts or files.
+	// Use for: build outputs, generated files, deployment artifacts, file listings.
+	PatternTypeInventory PatternType = "inventory"
+)
+
+// AllPatternTypes returns all six standard pattern types.
+func AllPatternTypes() []PatternType {
+	return []PatternType{
+		PatternTypeSparkline,
+		PatternTypeLeaderboard,
+		PatternTypeTestTable,
+		PatternTypeSummary,
+		PatternTypeComparison,
+		PatternTypeInventory,
+	}
+}
+
+// IsValidPatternType checks if a string represents a valid pattern type.
+func IsValidPatternType(s string) bool {
+	for _, pt := range AllPatternTypes() {
+		if string(pt) == s {
+			return true
+		}
+	}
+	return false
+}
+
 // Pattern is the interface that all output patterns implement.
 // Patterns represent different ways of visualizing command output data.
+//
+// Contract:
+//   - Patterns are semantic: they represent what to show, not how to show it
+//   - Patterns are theme-independent: the same pattern can be rendered with different themes
+//   - Patterns are composable: multiple patterns can be combined to create dashboards
+//   - Patterns implement Render() which takes a Config (theme) and returns formatted output
 type Pattern interface {
 	// Render returns the formatted string representation of the pattern
+	// using the provided theme configuration.
+	// The Config parameter controls visual presentation (colors, icons, density, etc.)
+	// while the pattern itself controls semantic content (data, structure, meaning).
 	Render(cfg *Config) string
+
+	// PatternType returns the standard type identifier for this pattern.
+	// This enables type-based routing, validation, and theme selection.
+	PatternType() PatternType
 }
 
 // Sparkline represents a word-sized graphic showing trends using Unicode blocks.
@@ -44,6 +109,11 @@ type Sparkline struct {
 	Min    float64   // Optional: explicit minimum for scale (0 = auto-detect)
 	Max    float64   // Optional: explicit maximum for scale (0 = auto-detect)
 	Unit   string    // Optional: unit suffix (e.g., "ms", "%", "MB")
+}
+
+// PatternType implements the Pattern interface.
+func (s *Sparkline) PatternType() PatternType {
+	return PatternTypeSparkline
 }
 
 // Render creates the sparkline visualization using Unicode block elements.
@@ -164,6 +234,11 @@ type LeaderboardItem struct {
 	Value   float64 // Numeric value for ranking/comparison
 	Rank    int     // Position in ranking (1-based)
 	Context string  // Additional context or details
+}
+
+// PatternType implements the Pattern interface.
+func (l *Leaderboard) PatternType() PatternType {
+	return PatternTypeLeaderboard
 }
 
 // Render creates the leaderboard visualization.
@@ -305,6 +380,11 @@ type TestTableItem struct {
 	Duration string // Formatted duration
 	Count    int    // Number of tests (for package-level results)
 	Details  string // Additional details or error message
+}
+
+// PatternType implements the Pattern interface.
+func (t *TestTable) PatternType() PatternType {
+	return PatternTypeTestTable
 }
 
 // Render creates the test table visualization.
@@ -574,6 +654,11 @@ type SummaryItem struct {
 	Type  string // "success", "error", "warning", "info" - affects coloring
 }
 
+// PatternType implements the Pattern interface.
+func (s *Summary) PatternType() PatternType {
+	return PatternTypeSummary
+}
+
 // Render creates the summary visualization.
 func (s *Summary) Render(cfg *Config) string {
 	if len(s.Metrics) == 0 {
@@ -654,6 +739,11 @@ type ComparisonItem struct {
 	After  string  // After value (formatted)
 	Change float64 // Numeric change (positive or negative)
 	Unit   string  // Unit for the change (e.g., "%", "MB", "ms")
+}
+
+// PatternType implements the Pattern interface.
+func (c *Comparison) PatternType() PatternType {
+	return PatternTypeComparison
 }
 
 // Render creates the comparison visualization.
@@ -746,6 +836,11 @@ type InventoryItem struct {
 	Name string // File or artifact name
 	Size string // Formatted size (e.g., "2.3MB", "450KB")
 	Path string // Optional: full path or additional context
+}
+
+// PatternType implements the Pattern interface.
+func (i *Inventory) PatternType() PatternType {
+	return PatternTypeInventory
 }
 
 // Render creates the inventory visualization.
