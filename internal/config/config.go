@@ -17,6 +17,7 @@ type CliFlags struct {
 	Stream        bool
 	ShowOutput    string
 	Pattern       string // Manual pattern selection (e.g., "test-table", "sparkline", "leaderboard")
+	Format        string // Output format: "text" (default) or "json"
 	NoTimer       bool
 	NoColor       bool
 	CI            bool
