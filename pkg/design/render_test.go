@@ -276,11 +276,6 @@ func TestRenderDirectMessage_When_ErrorType(t *testing.T) {
 }
 
 func TestRenderDirectMessage_When_WarningType(t *testing.T) {
-	// Skip test due to known issue with titler.String() handling "warning"
-	// See: RenderDirectMessage uses titler.String() which panics on certain inputs
-	// This is a production code bug that should be fixed separately
-	t.Skip("Known bug: titler.String() panics on 'warning' input")
-
 	cfg := UnicodeVibrantTheme()
 	output := RenderDirectMessage(cfg, StatusWarning, "", "Be careful", 0)
 
@@ -290,7 +285,6 @@ func TestRenderDirectMessage_When_WarningType(t *testing.T) {
 
 func TestRenderDirectMessage_When_CustomIcon(t *testing.T) {
 	cfg := UnicodeVibrantTheme()
-	// Use TypeInfo constant instead of string literal to avoid titler panic
 	output := RenderDirectMessage(cfg, TypeInfo, "🎯", "Custom message", 0)
 
 	assert.Contains(t, output, "🎯")
