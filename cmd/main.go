@@ -305,6 +305,9 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 		"Force specific visualization pattern (test-table, sparkline, leaderboard, inventory, summary, comparison).")
 	flag.StringVar(&cliFlags.Format, "format", "text",
 		"Output format: 'text' (default) or 'json' (structured output for AI/automation).")
+	flag.BoolVar(&cliFlags.Profile, "profile", false, "Enable performance profiling.")
+	flag.StringVar(&cliFlags.ProfileOutput, "profile-output", "stderr",
+		"Profile output destination: 'stderr' (default) or file path.")
 	flag.BoolVar(&cliFlags.NoTimer, "no-timer", false, "Disable showing the duration.")
 
 	var maxBufferSizeMB int
