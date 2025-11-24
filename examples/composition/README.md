@@ -136,16 +136,18 @@ dashboard:
 
 ### As Library
 
+Example integration (note: `BuildResults`, `createSummary()`, `createTrends()`, and `createHotspots()` are placeholders - implement these based on your specific build system):
+
 ```go
 import "github.com/dkoosis/fo/pkg/design"
 
 func BuildDashboard(buildResults BuildResults) string {
     cfg := design.UnicodeVibrantTheme()
-    
+
     summary := createSummary(buildResults)
     sparkline := createTrends(buildResults)
     leaderboard := createHotspots(buildResults)
-    
+
     return summary.Render(cfg) + "\n" +
            sparkline.Render(cfg) + "\n" +
            leaderboard.Render(cfg)
