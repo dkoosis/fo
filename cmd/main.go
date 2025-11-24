@@ -12,6 +12,16 @@ import (
 	"github.com/dkoosis/fo/pkg/design"
 )
 
+// validPatterns defines the supported pattern names for the --pattern flag
+var validPatterns = map[string]bool{
+	"test-table":  true,
+	"sparkline":   true,
+	"leaderboard": true,
+	"inventory":   true,
+	"summary":     true,
+	"comparison":  true,
+}
+
 // LocalAppConfig holds behavioral settings derived from AppConfig and CLI flags.
 type LocalAppConfig struct {
 	Label         string
@@ -125,6 +135,7 @@ func run(args []string) int {
 		ShowTimerSet:   true,
 		ShowOutputMode: behavioralSettings.ShowOutput,
 		Stream:         behavioralSettings.Stream,
+		Pattern:        cliFlags.Pattern,
 		Debug:          behavioralSettings.Debug,
 		MaxBufferSize:  behavioralSettings.MaxBufferSize,
 		MaxLineLength:  behavioralSettings.MaxLineLength,
@@ -265,6 +276,7 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 	flag.BoolVar(&cliFlags.Stream, "s", false, "Stream mode - print command's stdout/stderr live.")
 	flag.BoolVar(&cliFlags.Stream, "stream", false, "Stream mode.")
 	flag.StringVar(&cliFlags.ShowOutput, "show-output", "", "When to show captured output: on-fail, always, never.")
+	flag.StringVar(&cliFlags.Pattern, "pattern", "", "Force specific visualization pattern (test-table, sparkline, leaderboard, inventory, summary, comparison).")
 	flag.BoolVar(&cliFlags.NoTimer, "no-timer", false, "Disable showing the duration.")
 
 	var maxBufferSizeMB int
@@ -284,6 +296,8 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 			cliFlags.StreamSet = true
 		case "show-output":
 			cliFlags.ShowOutputSet = true
+		case "pattern":
+			cliFlags.PatternSet = true
 		case "no-timer":
 			cliFlags.NoTimerSet = true
 		case "no-color":
@@ -306,6 +320,14 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 		validValues := map[string]bool{"on-fail": true, "always": true, "never": true}
 		if !validValues[cliFlags.ShowOutput] {
 			fmt.Fprintf(os.Stderr, "Error: Invalid value for --show-output: %s\nValid values are: on-fail, always, never\n", cliFlags.ShowOutput)
+			flag.Usage()
+			os.Exit(1)
+		}
+	}
+
+	if cliFlags.Pattern != "" {
+		if !validPatterns[cliFlags.Pattern] {
+			fmt.Fprintf(os.Stderr, "Error: Invalid value for --pattern: %s\nValid values are: test-table, sparkline, leaderboard, inventory, summary, comparison\n", cliFlags.Pattern)
 			flag.Usage()
 			os.Exit(1)
 		}
