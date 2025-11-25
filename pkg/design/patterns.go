@@ -292,11 +292,11 @@ func (l *Leaderboard) Render(cfg *Config) string {
 	maxNameWidth := 0
 	maxMetricWidth := 0
 	for _, item := range l.Items {
-		nameWidth := len(item.Name)
+		nameWidth := VisualWidth(item.Name)
 		if nameWidth > maxNameWidth {
 			maxNameWidth = nameWidth
 		}
-		metricWidth := len(item.Metric)
+		metricWidth := VisualWidth(item.Metric)
 		if metricWidth > maxMetricWidth {
 			maxMetricWidth = metricWidth
 		}
@@ -326,13 +326,15 @@ func (l *Leaderboard) Render(cfg *Config) string {
 
 		// Name (truncated if needed)
 		displayName := item.Name
-		if len(displayName) > maxNameWidth {
-			displayName = displayName[:maxNameWidth-3] + "..."
+		if VisualWidth(displayName) > maxNameWidth {
+			// Truncate preserving visual width
+			truncated := truncateToWidth(displayName, maxNameWidth-3)
+			displayName = truncated + "..."
 		}
 		if nameColor != "" {
 			sb.WriteString(nameColor)
 		}
-		sb.WriteString(fmt.Sprintf("%-*s", maxNameWidth, displayName))
+		sb.WriteString(PadRight(displayName, maxNameWidth))
 		if nameColor != "" {
 			sb.WriteString(cfg.ResetColor())
 		}
@@ -342,7 +344,7 @@ func (l *Leaderboard) Render(cfg *Config) string {
 		if metricColor != "" {
 			sb.WriteString(metricColor)
 		}
-		sb.WriteString(fmt.Sprintf("%*s", maxMetricWidth, item.Metric))
+		sb.WriteString(PadLeft(item.Metric, maxMetricWidth))
 		if metricColor != "" {
 			sb.WriteString(cfg.ResetColor())
 		}
@@ -450,11 +452,13 @@ func (t *TestTable) Render(cfg *Config) string {
 	maxNameWidth := 0
 	maxDurationWidth := 0
 	for _, result := range t.Results {
-		if len(result.Name) > maxNameWidth {
-			maxNameWidth = len(result.Name)
+		nameWidth := VisualWidth(result.Name)
+		if nameWidth > maxNameWidth {
+			maxNameWidth = nameWidth
 		}
-		if len(result.Duration) > maxDurationWidth {
-			maxDurationWidth = len(result.Duration)
+		durationWidth := VisualWidth(result.Duration)
+		if durationWidth > maxDurationWidth {
+			maxDurationWidth = durationWidth
 		}
 	}
 
@@ -497,10 +501,12 @@ func (t *TestTable) Render(cfg *Config) string {
 
 		// Name
 		displayName := result.Name
-		if len(displayName) > maxNameWidth {
-			displayName = displayName[:maxNameWidth-3] + "..."
+		if VisualWidth(displayName) > maxNameWidth {
+			// Truncate preserving visual width
+			truncated := truncateToWidth(displayName, maxNameWidth-3)
+			displayName = truncated + "..."
 		}
-		sb.WriteString(fmt.Sprintf("%-*s", maxNameWidth, displayName))
+		sb.WriteString(PadRight(displayName, maxNameWidth))
 
 		// Count (if applicable)
 		if result.Count > 0 {
@@ -512,7 +518,7 @@ func (t *TestTable) Render(cfg *Config) string {
 		if durationColor != "" {
 			sb.WriteString(durationColor)
 		}
-		sb.WriteString(fmt.Sprintf("%*s", maxDurationWidth, result.Duration))
+		sb.WriteString(PadLeft(result.Duration, maxDurationWidth))
 		if durationColor != "" {
 			sb.WriteString(cfg.ResetColor())
 		}
@@ -618,10 +624,12 @@ func (t *TestTable) renderCompact(cfg *Config, columns int) string {
 			// Name (truncated to fit column)
 			maxNameLen := colWidth - 10 // Reserve space for duration
 			displayName := result.Name
-			if len(displayName) > maxNameLen {
-				displayName = displayName[:maxNameLen-3] + "..."
+			if VisualWidth(displayName) > maxNameLen {
+				// Truncate preserving visual width
+				truncated := truncateToWidth(displayName, maxNameLen-3)
+				displayName = truncated + "..."
 			}
-			sb.WriteString(fmt.Sprintf("%-*s", maxNameLen, displayName))
+			sb.WriteString(PadRight(displayName, maxNameLen))
 
 			// Duration (compact format)
 			sb.WriteString(" ")
@@ -868,8 +876,9 @@ func (i *Inventory) Render(cfg *Config) string {
 	// Calculate column width
 	maxNameWidth := 0
 	for _, item := range i.Items {
-		if len(item.Name) > maxNameWidth {
-			maxNameWidth = len(item.Name)
+		nameWidth := VisualWidth(item.Name)
+		if nameWidth > maxNameWidth {
+			maxNameWidth = nameWidth
 		}
 	}
 
@@ -890,14 +899,16 @@ func (i *Inventory) Render(cfg *Config) string {
 
 		// Name
 		displayName := item.Name
-		if len(displayName) > maxNameWidth {
-			displayName = displayName[:maxNameWidth-3] + "..."
+		if VisualWidth(displayName) > maxNameWidth {
+			// Truncate preserving visual width
+			truncated := truncateToWidth(displayName, maxNameWidth-3)
+			displayName = truncated + "..."
 		}
 		nameColor := cfg.GetColor("Detail")
 		if nameColor != "" && !cfg.IsMonochrome {
 			sb.WriteString(nameColor)
 		}
-		sb.WriteString(fmt.Sprintf("%-*s", maxNameWidth, displayName))
+		sb.WriteString(PadRight(displayName, maxNameWidth))
 		if nameColor != "" && !cfg.IsMonochrome {
 			sb.WriteString(cfg.ResetColor())
 		}

@@ -9,7 +9,6 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/mattn/go-runewidth"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -64,10 +63,12 @@ func safeTitle(s string) string {
 }
 
 // visualWidth returns the display width of a string in terminal cells.
-// Uses go-runewidth for accurate handling of East Asian Wide characters,
+// Uses lipgloss for accurate handling of East Asian Wide characters,
 // emojis, and other Unicode characters that occupy multiple cells.
+// This function is kept for backward compatibility but now uses
+// the VisualWidth function from style.go which wraps lipgloss.
 func visualWidth(s string) int {
-	return runewidth.StringWidth(s)
+	return VisualWidth(s)
 }
 
 // RenderStartLine returns the formatted start line for the task.
