@@ -1352,6 +1352,7 @@ func (c *Console) executeCaptureMode(
 		errMsg := formatInternalError("Error creating stdout pipe: %v", err)
 		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true})
 		fmt.Fprintln(c.cfg.Err, errMsg)
+		close(cmdDone) // Signal that command has finished (failed to create pipe)
 		return 1, err
 	}
 
@@ -1363,6 +1364,7 @@ func (c *Console) executeCaptureMode(
 		if closeErr := stdoutPipe.Close(); closeErr != nil && c.cfg.Debug {
 			fmt.Fprintf(c.cfg.Err, "[DEBUG] Error closing stdout pipe: %v\n", closeErr)
 		}
+		close(cmdDone) // Signal that command has finished (failed to create pipe)
 		return 1, err
 	}
 
