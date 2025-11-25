@@ -7,6 +7,8 @@ import (
 	"os" // For debug prints to stderr
 	"reflect"
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 // ToolConfig defines specific settings for a command/tool preset for design purposes.
@@ -128,30 +130,37 @@ type ElementStyleDef struct {
 // DesignTokens centralizes all design values with semantic naming.
 // This provides a single source of truth for design values and enables
 // extensibility without code changes.
+// Uses Lip Gloss types for proper color/style handling.
 type DesignTokens struct {
 	Colors struct {
-		// Status colors
-		Process string `yaml:"process"` // Primary process/task color
-		Success string `yaml:"success"` // Success state
-		Warning string `yaml:"warning"` // Warning state
-		Error   string `yaml:"error"`   // Error state
-		Detail  string `yaml:"detail"`  // Detail text
-		Muted   string `yaml:"muted"`   // Muted/secondary text
-		Reset   string `yaml:"reset"`   // Reset/clear formatting
+		// Status colors (semantic naming)
+		Process lipgloss.Color `yaml:"process"` // Primary process/task color
+		Success lipgloss.Color `yaml:"success"` // Success state
+		Warning lipgloss.Color `yaml:"warning"` // Warning state
+		Error   lipgloss.Color `yaml:"error"`   // Error state
+		Detail  lipgloss.Color `yaml:"detail"`  // Detail text
+		Muted   lipgloss.Color `yaml:"muted"`   // Muted/secondary text
+		Reset   lipgloss.Color `yaml:"reset"`   // Reset/clear formatting
 
 		// Base colors
-		White   string `yaml:"white,omitempty"`
-		GreenFg string `yaml:"green_fg,omitempty"`
-		BlueFg  string `yaml:"blue_fg,omitempty"`
-		BlueBg  string `yaml:"blue_bg,omitempty"`
+		White   lipgloss.Color `yaml:"white,omitempty"`
+		GreenFg lipgloss.Color `yaml:"green_fg,omitempty"`
+		BlueFg  lipgloss.Color `yaml:"blue_fg,omitempty"`
+		BlueBg  lipgloss.Color `yaml:"blue_bg,omitempty"`
 
 		// Component-specific colors (semantic naming)
-		Spinner string `yaml:"spinner,omitempty"` // Spinner active state (was PaleBlue)
+		Spinner lipgloss.Color `yaml:"spinner,omitempty"` // Spinner active state (was PaleBlue)
 
 		// Text styling
-		Bold   string `yaml:"bold,omitempty"`
-		Italic string `yaml:"italic,omitempty"`
+		Bold   lipgloss.Color `yaml:"bold,omitempty"`
+		Italic lipgloss.Color `yaml:"italic,omitempty"`
 	} `yaml:"colors"`
+
+	Styles struct {
+		Box    lipgloss.Style `yaml:"-"` // Pre-configured box style
+		Header lipgloss.Style `yaml:"-"` // Pre-configured header style
+		Content lipgloss.Style `yaml:"-"` // Pre-configured content style
+	} `yaml:"styles"`
 
 	Spacing struct {
 		Progress int `yaml:"progress,omitempty"` // Progress indicator spacing
@@ -163,16 +172,31 @@ type DesignTokens struct {
 	} `yaml:"typography"`
 }
 
-// Get returns the ANSI color code for a color token.
+// GetColor returns the lipgloss.Color for a color token by name.
 // This provides type-safe access to color values.
-func (dt *DesignTokens) GetColor(name string) string {
+func (dt *DesignTokens) GetColor(name string) lipgloss.Color {
 	// Use reflection to access color fields dynamically
 	colorsValue := reflect.ValueOf(dt.Colors)
 	field := colorsValue.FieldByName(name)
 	if !field.IsValid() {
+		return lipgloss.Color("")
+	}
+	if color, ok := field.Interface().(lipgloss.Color); ok {
+		return color
+	}
+	return lipgloss.Color("")
+}
+
+// GetColorString returns the ANSI color code string for a color token.
+// This is a convenience method for backwards compatibility.
+func (dt *DesignTokens) GetColorString(name string) string {
+	color := dt.GetColor(name)
+	if color == "" {
 		return ""
 	}
-	return field.String()
+	// Convert lipgloss.Color to ANSI string
+	// lipgloss.Color is a string type, so we can cast it
+	return string(color)
 }
 
 // Config holds all resolved design system settings for rendering.
@@ -427,21 +451,23 @@ func UnicodeVibrantTheme() *Config {
 	cfg.Icons.Bullet = "•"
 
 	// Initialize Design Tokens (Phase 1: centralized, semantic values)
+	// Using Lip Gloss Color types for proper color handling
+	// Note: lipgloss.Color accepts ANSI codes as strings, so we store full ANSI sequences
 	cfg.Tokens = &DesignTokens{}
-	cfg.Tokens.Colors.Process = ANSIBrightWhite
-	cfg.Tokens.Colors.Success = ANSIBrightWhite
-	cfg.Tokens.Colors.Warning = "\033[0;33m"
-	cfg.Tokens.Colors.Error = "\033[0;31m"
-	cfg.Tokens.Colors.Detail = "\033[0m"
-	cfg.Tokens.Colors.Muted = "\033[2m"
-	cfg.Tokens.Colors.Reset = "\033[0m"
-	cfg.Tokens.Colors.White = "\033[0;97m"
-	cfg.Tokens.Colors.GreenFg = "\033[38;5;120m"
-	cfg.Tokens.Colors.BlueFg = "\033[0;34m"
-	cfg.Tokens.Colors.BlueBg = "\033[44m"
-	cfg.Tokens.Colors.Spinner = "\033[38;5;111m" // Semantic: Spinner (was PaleBlue)
-	cfg.Tokens.Colors.Bold = "\033[1m"
-	cfg.Tokens.Colors.Italic = "\033[3m"
+	cfg.Tokens.Colors.Process = lipgloss.Color(ANSIBrightWhite) // Bright white
+	cfg.Tokens.Colors.Success = lipgloss.Color(ANSIBrightWhite) // Bright white
+	cfg.Tokens.Colors.Warning = lipgloss.Color("\033[0;33m")    // Yellow
+	cfg.Tokens.Colors.Error = lipgloss.Color("\033[0;31m")     // Red
+	cfg.Tokens.Colors.Detail = lipgloss.Color("\033[0m")       // Reset
+	cfg.Tokens.Colors.Muted = lipgloss.Color("\033[2m")        // Dim
+	cfg.Tokens.Colors.Reset = lipgloss.Color("\033[0m")        // Reset
+	cfg.Tokens.Colors.White = lipgloss.Color("\033[0;97m")     // Bright white
+	cfg.Tokens.Colors.GreenFg = lipgloss.Color("\033[38;5;120m") // Light green
+	cfg.Tokens.Colors.BlueFg = lipgloss.Color("\033[0;34m")    // Blue
+	cfg.Tokens.Colors.BlueBg = lipgloss.Color("\033[44m")     // Blue background
+	cfg.Tokens.Colors.Spinner = lipgloss.Color("\033[38;5;111m") // Pale blue (semantic: Spinner, was PaleBlue)
+	cfg.Tokens.Colors.Bold = lipgloss.Color("\033[1m")        // Bold
+	cfg.Tokens.Colors.Italic = lipgloss.Color("\033[3m")      // Italic
 	cfg.Tokens.Spacing.Progress = 0
 	cfg.Tokens.Spacing.Indent = 2
 	cfg.Tokens.Typography.HeaderWidth = 40
@@ -526,21 +552,23 @@ func OrcaTheme() *Config {
 	cfg.Icons.Bullet = "•"
 
 	// Initialize Design Tokens (Phase 1: centralized, semantic values)
+	// Using Lip Gloss Color types for proper color handling
+	// Note: lipgloss.Color accepts ANSI codes as strings, so we store full ANSI sequences
 	cfg.Tokens = &DesignTokens{}
-	cfg.Tokens.Colors.Process = "\033[38;5;111m" // Pale blue for process/task/headings
-	cfg.Tokens.Colors.Success = "\033[38;5;120m" // Pale green for success
-	cfg.Tokens.Colors.Warning = "\033[0;33m"     // Yellow for warnings
-	cfg.Tokens.Colors.Error = "\033[0;31m"       // Red for errors
-	cfg.Tokens.Colors.Detail = "\033[0m"         // Reset for detail text
-	cfg.Tokens.Colors.Muted = "\033[2m"          // Dim for muted text
-	cfg.Tokens.Colors.Reset = "\033[0m"          // Reset
-	cfg.Tokens.Colors.White = "\033[0;97m"       // Bright white
-	cfg.Tokens.Colors.GreenFg = "\033[38;5;120m" // Light green
-	cfg.Tokens.Colors.BlueFg = "\033[38;5;39m"   // Bright blue (ocean-like)
-	cfg.Tokens.Colors.BlueBg = "\033[44m"        // Blue background
-	cfg.Tokens.Colors.Spinner = "\033[38;5;111m" // Pale blue for spinner
-	cfg.Tokens.Colors.Bold = "\033[1m"
-	cfg.Tokens.Colors.Italic = "\033[3m"
+	cfg.Tokens.Colors.Process = lipgloss.Color("\033[38;5;111m") // Pale blue for process/task/headings
+	cfg.Tokens.Colors.Success = lipgloss.Color("\033[38;5;120m") // Pale green for success
+	cfg.Tokens.Colors.Warning = lipgloss.Color("\033[0;33m")    // Yellow for warnings
+	cfg.Tokens.Colors.Error = lipgloss.Color("\033[0;31m")      // Red for errors
+	cfg.Tokens.Colors.Detail = lipgloss.Color("\033[0m")        // Reset for detail text
+	cfg.Tokens.Colors.Muted = lipgloss.Color("\033[2m")         // Dim for muted text
+	cfg.Tokens.Colors.Reset = lipgloss.Color("\033[0m")        // Reset
+	cfg.Tokens.Colors.White = lipgloss.Color("\033[0;97m")     // Bright white
+	cfg.Tokens.Colors.GreenFg = lipgloss.Color("\033[38;5;120m") // Light green
+	cfg.Tokens.Colors.BlueFg = lipgloss.Color("\033[38;5;39m")  // Bright blue (ocean-like)
+	cfg.Tokens.Colors.BlueBg = lipgloss.Color("\033[44m")       // Blue background
+	cfg.Tokens.Colors.Spinner = lipgloss.Color("\033[38;5;111m") // Pale blue for spinner (semantic naming)
+	cfg.Tokens.Colors.Bold = lipgloss.Color("\033[1m")          // Bold
+	cfg.Tokens.Colors.Italic = lipgloss.Color("\033[3m")       // Italic
 	cfg.Tokens.Spacing.Progress = 0
 	cfg.Tokens.Spacing.Indent = 2
 	cfg.Tokens.Typography.HeaderWidth = 50
@@ -965,26 +993,26 @@ func (c *Config) resolveColorNameByReflection(name string) string {
 
 // syncTokensToColors syncs DesignTokens to the old Colors struct for backwards compatibility.
 // This allows code using the old Colors struct to continue working during the migration.
-// Will be removed in Phase 5.
+// Converts lipgloss.Color (which is a string type) to ANSI string format.
 func (c *Config) syncTokensToColors() {
 	if c.Tokens == nil {
 		return
 	}
-	// Sync color values from Tokens to Colors
-	c.Colors.Process = c.Tokens.Colors.Process
-	c.Colors.Success = c.Tokens.Colors.Success
-	c.Colors.Warning = c.Tokens.Colors.Warning
-	c.Colors.Error = c.Tokens.Colors.Error
-	c.Colors.Detail = c.Tokens.Colors.Detail
-	c.Colors.Muted = c.Tokens.Colors.Muted
-	c.Colors.Reset = c.Tokens.Colors.Reset
-	c.Colors.White = c.Tokens.Colors.White
-	c.Colors.GreenFg = c.Tokens.Colors.GreenFg
-	c.Colors.BlueFg = c.Tokens.Colors.BlueFg
-	c.Colors.BlueBg = c.Tokens.Colors.BlueBg
-	c.Colors.PaleBlue = c.Tokens.Colors.Spinner // Map Spinner token to PaleBlue for compatibility
-	c.Colors.Bold = c.Tokens.Colors.Bold
-	c.Colors.Italic = c.Tokens.Colors.Italic
+	// lipgloss.Color is a string type, so we can convert directly
+	c.Colors.Process = string(c.Tokens.Colors.Process)
+	c.Colors.Success = string(c.Tokens.Colors.Success)
+	c.Colors.Warning = string(c.Tokens.Colors.Warning)
+	c.Colors.Error = string(c.Tokens.Colors.Error)
+	c.Colors.Detail = string(c.Tokens.Colors.Detail)
+	c.Colors.Muted = string(c.Tokens.Colors.Muted)
+	c.Colors.Reset = string(c.Tokens.Colors.Reset)
+	c.Colors.White = string(c.Tokens.Colors.White)
+	c.Colors.GreenFg = string(c.Tokens.Colors.GreenFg)
+	c.Colors.BlueFg = string(c.Tokens.Colors.BlueFg)
+	c.Colors.BlueBg = string(c.Tokens.Colors.BlueBg)
+	c.Colors.PaleBlue = string(c.Tokens.Colors.Spinner) // Map Spinner token to PaleBlue for compatibility
+	c.Colors.Bold = string(c.Tokens.Colors.Bold)
+	c.Colors.Italic = string(c.Tokens.Colors.Italic)
 }
 
 // GetColorObj returns a Color wrapper for the given color key.
