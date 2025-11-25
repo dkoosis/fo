@@ -38,8 +38,12 @@ func TestTaskResult_ToJSON(t *testing.T) {
 	if parsed["label"] != "Test Command" {
 		t.Errorf("label = %v, want 'Test Command'", parsed["label"])
 	}
-	if parsed["exit_code"].(float64) != 0 {
-		t.Errorf("exit_code = %v, want 0", parsed["exit_code"])
+	exitCode, ok := parsed["exit_code"].(float64)
+	if !ok {
+		t.Fatalf("exit_code is not a float64, got %T", parsed["exit_code"])
+	}
+	if exitCode != 0 {
+		t.Errorf("exit_code = %v, want 0", exitCode)
 	}
 	if parsed["status"] != "success" {
 		t.Errorf("status = %v, want 'success'", parsed["status"])

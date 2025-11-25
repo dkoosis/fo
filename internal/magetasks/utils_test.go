@@ -18,23 +18,24 @@ func TestIsCommandNotFound(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "wrapped exec.ErrNotFound",
-			err:      errors.New("wrapped: " + exec.ErrNotFound.Error()),
-			expected: true, // String matching will catch "executable file not found" in the error message
+			name: "wrapped exec.ErrNotFound",
+			err:  errors.New("wrapped: " + exec.ErrNotFound.Error()), //nolint:err113 // Test helper needs dynamic error
+			// String matching will catch "executable file not found" in the error message
+			expected: true,
 		},
 		{
 			name:     "executable file not found",
-			err:      errors.New("executable file not found"),
+			err:      errors.New("executable file not found"), //nolint:err113 // Test helper needs dynamic error
 			expected: true,
 		},
 		{
 			name:     "no such file or directory",
-			err:      errors.New("no such file or directory"),
+			err:      errors.New("no such file or directory"), //nolint:err113 // Test helper needs dynamic error
 			expected: true,
 		},
 		{
 			name:     "other error",
-			err:      errors.New("some other error"),
+			err:      errors.New("some other error"), //nolint:err113 // Test helper needs dynamic error
 			expected: false,
 		},
 	}

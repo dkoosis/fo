@@ -168,7 +168,7 @@ func run(args []string) int {
 			fmt.Fprintf(os.Stderr, "[fo] Error generating JSON output: %v\n", jsonErr)
 			return 1
 		}
-		fmt.Println(string(jsonOutput))
+		fmt.Fprintf(os.Stdout, "%s\n", string(jsonOutput))
 		return exitCode
 	}
 
@@ -350,7 +350,9 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 	if cliFlags.ShowOutput != "" {
 		validValues := map[string]bool{"on-fail": true, "always": true, "never": true}
 		if !validValues[cliFlags.ShowOutput] {
-			fmt.Fprintf(os.Stderr, "[fo] Error: Invalid value for --show-output: %s\n[fo] Valid values are: on-fail, always, never\n", cliFlags.ShowOutput)
+			fmt.Fprintf(os.Stderr,
+				"[fo] Error: Invalid value for --show-output: %s\n[fo] Valid values are: on-fail, always, never\n",
+				cliFlags.ShowOutput)
 			flag.Usage()
 			os.Exit(1)
 		}
@@ -368,7 +370,8 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 	if cliFlags.Pattern != "" {
 		if !validPatterns[cliFlags.Pattern] {
 			fmt.Fprintf(os.Stderr,
-				"[fo] Error: Invalid value for --pattern: %s\n[fo] Valid values are: test-table, sparkline, leaderboard, inventory, summary, comparison\n",
+				"[fo] Error: Invalid value for --pattern: %s\n"+
+					"[fo] Valid values are: test-table, sparkline, leaderboard, inventory, summary, comparison\n",
 				cliFlags.Pattern)
 			flag.Usage()
 			os.Exit(1)

@@ -37,7 +37,7 @@ func NewProfiler(enabled bool, output string) *Profiler {
 }
 
 // StartStage marks the start of a performance stage.
-func (p *Profiler) StartStage(name string) time.Time {
+func (p *Profiler) StartStage(_ string) time.Time {
 	if !p.enabled {
 		return time.Now()
 	}
@@ -84,10 +84,10 @@ func (p *Profiler) Write() error {
 	}
 
 	totalDuration := time.Since(p.startTime)
-	output := fmt.Sprintf("# fo Performance Profile\n")
+	output := "# fo Performance Profile\n"
 	output += fmt.Sprintf("Total Duration: %s (%d ms)\n\n", totalDuration, totalDuration.Milliseconds())
-	output += fmt.Sprintf("Stage\tDuration\tDuration(ms)\tMatches\tSuccess\tBuffer\tLines\tMemory\n")
-	output += fmt.Sprintf("-----\t--------\t------------\t-------\t-------\t------\t-----\t------\n")
+	output += "Stage\tDuration\tDuration(ms)\tMatches\tSuccess\tBuffer\tLines\tMemory\n"
+	output += "-----\t--------\t------------\t-------\t-------\t------\t-----\t------\n"
 
 	for _, stage := range p.stages {
 		output += fmt.Sprintf("%s\t%s\t%d\t%d\t%d\t%d\t%d\t%d\n",
@@ -106,7 +106,7 @@ func (p *Profiler) Write() error {
 		fmt.Fprintf(os.Stderr, "\n%s\n", output)
 	} else {
 		// Write to file
-		return os.WriteFile(p.output, []byte(output), 0644)
+		return os.WriteFile(p.output, []byte(output), 0o600)
 	}
 
 	return nil

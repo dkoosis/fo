@@ -124,7 +124,7 @@ func ToJSON(p Pattern, metadata JSONMetadata) ([]byte, error) {
 			"items": items,
 		}
 	default:
-		return nil, fmt.Errorf("unsupported pattern type for JSON: %T", p)
+		return nil, fmt.Errorf("unsupported pattern type for JSON: %T", p) //nolint:err113 // Dynamic error needed for type information
 	}
 
 	return json.MarshalIndent(output, "", "  ")
