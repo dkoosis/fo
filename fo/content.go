@@ -15,10 +15,10 @@ import (
 // MetricLine represents a key-value metric with optional trend indicator.
 // Example: "Total files:     367 ↑"
 type MetricLine struct {
-	Label string  // e.g., "Total files"
-	Value string  // e.g., "367"
-	Trend string  // e.g., "↑", "↓", "" (empty for no trend)
-	Color string  // Optional color for the value (e.g., "success", "warning", "error")
+	Label string // e.g., "Total files"
+	Value string // e.g., "367"
+	Trend string // e.g., "↑", "↓", "" (empty for no trend)
+	Color string // Optional color for the value (e.g., "success", "warning", "error")
 }
 
 // BulletItem represents a bulleted list item.
@@ -29,15 +29,15 @@ type BulletItem struct {
 
 // RankedItem represents an item in a ranked/numbered list.
 type RankedItem struct {
-	Rank   int    // 1-based rank
-	Value  string // The metric value (e.g., "2562")
-	Label  string // Description (e.g., "internal/server/handler.go")
-	Color  string // Optional color for the value
+	Rank  int    // 1-based rank
+	Value string // The metric value (e.g., "2562")
+	Label string // Description (e.g., "internal/server/handler.go")
+	Color string // Optional color for the value
 }
 
 // SparklineData represents data for a sparkline chart.
 type SparklineData struct {
-	Label    string  // Row label (e.g., "Week -1")
+	Label    string // Row label (e.g., "Week -1")
 	Segments []SparklineSegment
 }
 
@@ -135,8 +135,8 @@ func (c *Console) PrintBulletItem(item BulletItem) {
 // PrintRankedList renders a numbered list of ranked items.
 // Example:
 //
-//	1. 2562  internal/server/handler.go
-//	2. 1841  internal/client/client.go
+//  1. 2562  internal/server/handler.go
+//  2. 1841  internal/client/client.go
 func (c *Console) PrintRankedList(title string, items []RankedItem) {
 	// Print header
 	c.PrintBulletHeader(title)
@@ -233,33 +233,15 @@ func (c *Console) PrintText(text string) {
 }
 
 // printBoxLine renders a single line with box borders.
+// Content is expected to already include left padding/indentation (typically "      ").
+// This uses the unified renderBoxLine function for consistent border rendering.
 func (c *Console) printBoxLine(box *BoxLayout, content string) {
-	cfg := c.designConf
-	reset := cfg.ResetColor()
-
 	// Calculate visual width of content (excluding ANSI codes)
 	// Use runewidth for accurate Unicode character width calculation
 	visualWidth := runewidth.StringWidth(stripANSICodes(content))
 
-	// Build the line with borders
-	var sb strings.Builder
-	sb.WriteString(box.BorderColor)
-	sb.WriteString(box.BorderChars.Vertical)
-	sb.WriteString(reset)
-	sb.WriteString(content)
-
-	// Pad to fill the box width
-	padding := box.TotalWidth - visualWidth
-	if padding > 0 {
-		sb.WriteString(strings.Repeat(" ", padding))
-	}
-
-	sb.WriteString(box.BorderColor)
-	sb.WriteString(box.BorderChars.Vertical)
-	sb.WriteString(reset)
-	sb.WriteString("\n")
-
-	_, _ = c.cfg.Out.Write([]byte(sb.String()))
+	// Use unified rendering function
+	c.renderBoxLine(box, content, visualWidth)
 }
 
 // FormatTrend returns a trend indicator string based on current vs average.
@@ -301,4 +283,3 @@ func FormatCount(count int, singular, plural string) string {
 	}
 	return fmt.Sprintf("%d %s", count, plural)
 }
-

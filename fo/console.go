@@ -137,7 +137,7 @@ type Console struct {
 	adapterRegistry *adapter.Registry
 	profiler        *Profiler
 	currentSummary  string // Summary message for current section being executed
-	inSection       bool    // Whether we're currently executing a section (suppresses individual Run() outputs)
+	inSection       bool   // Whether we're currently executing a section (suppresses individual Run() outputs)
 }
 
 func DefaultConsole() *Console {
@@ -358,6 +358,39 @@ func (c *Console) PrintSectionHeader(name string) {
 	_, _ = c.cfg.Out.Write([]byte(sb.String()))
 }
 
+// renderBoxLine is the unified function for rendering a line with box borders.
+// It handles the border characters, padding, and content alignment consistently.
+// The contentWidth parameter is the total visual width of the content including any left padding.
+// The content string may include ANSI codes and should already have left padding if needed.
+func (c *Console) renderBoxLine(box *BoxLayout, content string, contentWidth int) {
+	cfg := c.designConf
+	reset := cfg.ResetColor()
+
+	// Calculate right padding to fill the box
+	// TotalWidth is the total rendered width including border chars (terminal width - 3)
+	// Total rendered = left border (1) + left padding (2) + content + right padding + right border (1) = TotalWidth
+	// So: left padding (2) + content + right padding = TotalWidth - 2 (for the two border chars)
+	// Therefore: right padding = (TotalWidth - 2) - contentWidth
+	// where contentWidth already includes the left padding
+	rightPadding := (box.TotalWidth - 2) - contentWidth
+	if rightPadding < 0 {
+		rightPadding = 0
+	}
+
+	var sb strings.Builder
+	sb.WriteString(box.BorderColor)
+	sb.WriteString(box.BorderChars.Vertical)
+	sb.WriteString(reset)
+	sb.WriteString(content)
+	sb.WriteString(strings.Repeat(" ", rightPadding))
+	sb.WriteString(box.BorderColor)
+	sb.WriteString(box.BorderChars.Vertical)
+	sb.WriteString(reset)
+	sb.WriteString("\n")
+
+	_, _ = c.cfg.Out.Write([]byte(sb.String()))
+}
+
 // PrintSectionLine prints a line of section content with side borders.
 // Uses BoxLayout for consistent dimensions. Supports both plain strings and structured ContentLine.
 func (c *Console) PrintSectionLine(line string) {
@@ -392,25 +425,12 @@ func (c *Console) PrintSectionLine(line string) {
 		}
 	}
 
+	// Prepare content with left padding
 	visualWidth := runewidth.StringWidth(stripANSICodes(line))
-	padding := box.TotalWidth - visualWidth - box.RightPadding
-	if padding < 0 {
-		padding = 0
-	}
+	contentWithPadding := strings.Repeat(" ", box.LeftPadding) + line
 
-	var sb strings.Builder
-	sb.WriteString(box.BorderColor)
-	sb.WriteString(box.BorderChars.Vertical)
-	sb.WriteString(reset)
-	sb.WriteString(strings.Repeat(" ", box.LeftPadding))
-	sb.WriteString(line)
-	sb.WriteString(strings.Repeat(" ", padding))
-	sb.WriteString(box.BorderColor)
-	sb.WriteString(box.BorderChars.Vertical)
-	sb.WriteString(reset)
-	sb.WriteString("\n")
-
-	_, _ = c.cfg.Out.Write([]byte(sb.String()))
+	// Use unified rendering function
+	c.renderBoxLine(box, contentWithPadding, box.LeftPadding+visualWidth)
 }
 
 // PrintSectionContentLine renders a structured content line with guaranteed icon alignment.
@@ -572,7 +592,7 @@ func (c *Console) RunSection(s Section) SectionResult {
 	wasInSection := c.inSection
 	c.inSection = true
 	c.currentSummary = "" // Clear any previous summary
-	
+
 	if c.cfg.Debug {
 		fmt.Fprintf(os.Stderr, "[DEBUG RunSection] Starting section '%s', inSection=%v\n", s.Name, c.inSection)
 	}
@@ -582,7 +602,7 @@ func (c *Console) RunSection(s Section) SectionResult {
 
 	// Restore previous section state
 	c.inSection = wasInSection
-	
+
 	if c.cfg.Debug {
 		fmt.Fprintf(os.Stderr, "[DEBUG RunSection] Completed section '%s', restoring inSection=%v\n", s.Name, wasInSection)
 	}
@@ -1664,7 +1684,7 @@ func resolveDesignConfig(cfg ConsoleConfig) *design.Config {
 	}
 
 	var base *design.Config
-	
+
 	// Check if theme name is provided and exists in default themes
 	if cfg.ThemeName != "" {
 		themes := design.DefaultThemes()
