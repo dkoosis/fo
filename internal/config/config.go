@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"github.com/dkoosis/fo/pkg/design"
 	"gopkg.in/yaml.v3"
@@ -271,123 +270,6 @@ func LoadThemeFromFile(filePath string) (*design.Config, error) {
 	normalizeThemeColors(&themeConfig)
 
 	return &themeConfig, nil
-}
-
-// MergeWithFlags is deprecated. Use ResolveConfig instead for explicit priority order.
-// This function is kept for backward compatibility with existing tests.
-// Deprecated: Use ResolveConfig for new code.
-func MergeWithFlags(appCfg *AppConfig, cliFlags CliFlags) *design.Config {
-	envDebug := os.Getenv("FO_DEBUG") != ""
-
-	// Priority: --theme-file > --theme > config active_theme > default
-	var finalDesignConfig *design.Config
-	effectiveThemeName := appCfg.ActiveThemeName
-
-	// 1. Check for --theme-file flag (highest priority)
-	if cliFlags.ThemeFile != "" {
-		loadedTheme, err := LoadThemeFromFile(cliFlags.ThemeFile)
-		if err != nil {
-			if appCfg.Debug || envDebug {
-				fmt.Fprintf(os.Stderr, "[DEBUG MergeWithFlags] Error loading theme file: %v. Falling back to default.\n", err)
-			}
-			finalDesignConfig = design.UnicodeVibrantTheme()
-		} else {
-			if appCfg.Debug || envDebug {
-				fmt.Fprintf(os.Stderr, "[DEBUG MergeWithFlags] Loaded theme from file: %s\n", cliFlags.ThemeFile)
-			}
-			finalDesignConfig = loadedTheme
-			effectiveThemeName = loadedTheme.ThemeName
-		}
-	}
-
-	// 2. If no theme file, check --theme flag or config
-	if finalDesignConfig == nil {
-		if cliFlags.ThemeName != "" {
-			effectiveThemeName = cliFlags.ThemeName
-		}
-
-		var themeExists bool
-		finalDesignConfig, themeExists = appCfg.Themes[effectiveThemeName]
-		if !themeExists {
-			if appCfg.Debug || envDebug {
-				fmt.Fprintf(os.Stderr,
-					"[DEBUG MergeWithFlags] Theme '%s' not found. Falling back to '%s'.\n",
-					effectiveThemeName, DefaultActiveThemeName)
-			}
-			finalDesignConfig = appCfg.Themes[DefaultActiveThemeName]
-			if finalDesignConfig == nil {
-				if appCfg.Debug || envDebug {
-					fmt.Fprintln(os.Stderr, "[DEBUG MergeWithFlags] Default theme also missing. Using coded UnicodeVibrant as fallback.")
-				}
-				finalDesignConfig = design.UnicodeVibrantTheme()
-			}
-		}
-	}
-
-	finalDesignConfig = design.DeepCopyConfig(finalDesignConfig)
-	if finalDesignConfig == nil {
-		if appCfg.Debug || envDebug {
-			fmt.Fprintln(os.Stderr, "[DEBUG MergeWithFlags] Failed to copy design config. Falling back to default theme.")
-		}
-		finalDesignConfig = design.DeepCopyConfig(appCfg.Themes[DefaultActiveThemeName])
-		if finalDesignConfig == nil {
-			finalDesignConfig = design.UnicodeVibrantTheme()
-		}
-	}
-	finalDesignConfig.ThemeName = effectiveThemeName
-
-	effectiveNoColor := appCfg.NoColor
-	effectiveCI := appCfg.CI
-	effectiveNoTimer := appCfg.NoTimer
-
-	envNoColorStr := os.Getenv("FO_NO_COLOR")
-	if envNoColorStr == "" {
-		envNoColorStr = os.Getenv("NO_COLOR")
-	}
-	if envNoColorStr != "" {
-		if bVal, err := strconv.ParseBool(envNoColorStr); err == nil {
-			effectiveNoColor = bVal
-		}
-	}
-	envCIStr := os.Getenv("FO_CI")
-	if envCIStr == "" {
-		envCIStr = os.Getenv("CI")
-	}
-	if envCIStr != "" {
-		if bVal, err := strconv.ParseBool(envCIStr); err == nil {
-			effectiveCI = bVal
-		}
-	}
-
-	if cliFlags.NoColorSet {
-		effectiveNoColor = cliFlags.NoColor
-	}
-	if cliFlags.CISet {
-		effectiveCI = cliFlags.CI
-	}
-	if cliFlags.NoTimerSet {
-		effectiveNoTimer = cliFlags.NoTimer
-	}
-
-	if effectiveCI {
-		design.ApplyMonochromeDefaults(finalDesignConfig)
-		finalDesignConfig.Style.NoTimer = true
-		finalDesignConfig.Style.UseBoxes = false
-		finalDesignConfig.CI = true // Set explicit CI flag
-	} else if effectiveNoColor {
-		design.ApplyMonochromeDefaults(finalDesignConfig)
-	}
-
-	if effectiveNoTimer {
-		finalDesignConfig.Style.NoTimer = true
-	}
-
-	if appCfg.Debug || envDebug {
-		fmt.Fprintf(os.Stderr, "[DEBUG MergeWithFlags] Final Design for theme '%s': IsMonochrome=%t, NoTimer=%t\n",
-			finalDesignConfig.ThemeName, finalDesignConfig.IsMonochrome, finalDesignConfig.Style.NoTimer)
-	}
-
-	return finalDesignConfig
 }
 
 // ApplyCommandPreset modifies the AppConfig based on a preset matching the commandName.

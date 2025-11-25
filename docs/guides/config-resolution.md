@@ -108,9 +108,9 @@ This shows:
 - Theme resolution source
 - Final resolved values
 
-## Migration from MergeWithFlags
+## Configuration Resolution
 
-The old `MergeWithFlags()` function is deprecated but still available for backward compatibility. New code should use `ResolveConfig()` which provides:
+The `ResolveConfig()` function provides:
 - Explicit priority order
 - Better error messages
 - Validation

@@ -15,11 +15,33 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/dkoosis/fo/pkg/adapter"
 	"github.com/dkoosis/fo/pkg/design"
 	"golang.org/x/term"
+)
+
+// Constants for buffer sizes and limits
+const (
+	// DefaultTerminalWidth is the fallback terminal width when detection fails
+	DefaultTerminalWidth = 80
+
+	// DefaultHeaderWidth is the default header width when not specified in theme
+	DefaultHeaderWidth = 60
+
+	// ReadBufferSize is the buffer size for reading from pipes (4KB)
+	ReadBufferSize = 4096
+
+	// AdapterDetectionLineCount is the number of lines to buffer for adapter detection
+	AdapterDetectionLineCount = 15
+
+	// SignalTimeout is the timeout for graceful process termination before force kill
+	SignalTimeout = 2 * time.Second
+
+	// StreamCount is the number of output streams (stdout and stderr)
+	StreamCount = 2
 )
 
 type ConsoleConfig struct {
@@ -145,7 +167,7 @@ func (c *Console) getFaintDarkGrayColor() string {
 func (c *Console) getTerminalWidth() int {
 	width, _, err := term.GetSize(int(os.Stdout.Fd()))
 	if err != nil || width <= 0 {
-		return 80
+		return DefaultTerminalWidth
 	}
 	return width - 2
 }
@@ -451,7 +473,7 @@ func (c *Console) GetBorderChars() (topCorner, bottomCorner, headerChar, vertica
 func (c *Console) GetHeaderWidth() int {
 	width := c.designConf.Style.HeaderWidth
 	if width <= 0 {
-		return 60
+		return DefaultHeaderWidth
 	}
 	return width
 }
@@ -605,7 +627,7 @@ func (c *Console) runContext(
 				if c.cfg.Debug {
 					fmt.Fprintln(os.Stderr, "[DEBUG sigChan] cmdDone received after signal forwarding.")
 				}
-			case <-time.After(2 * time.Second):
+			case <-time.After(SignalTimeout):
 				if c.cfg.Debug {
 					fmt.Fprintln(os.Stderr, "[DEBUG sigChan] Timeout after signal, ensuring process is killed.")
 				}
@@ -879,7 +901,9 @@ func (c *Console) executeCaptureMode(
 		errMsg := formatInternalError("Error creating stderr pipe: %v", err)
 		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true})
 		fmt.Fprintln(c.cfg.Err, errMsg)
-		_ = stdoutPipe.Close()
+		if closeErr := stdoutPipe.Close(); closeErr != nil && c.cfg.Debug {
+			fmt.Fprintf(c.cfg.Err, "[DEBUG] Error closing stdout pipe: %v\n", closeErr)
+		}
 		return 1, err
 	}
 
@@ -887,8 +911,12 @@ func (c *Console) executeCaptureMode(
 		errMsg := formatInternalError("Error starting command '%s': %v", strings.Join(cmd.Args, " "), err)
 		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true})
 		fmt.Fprintln(c.cfg.Err, errMsg)
-		_ = stdoutPipe.Close()
-		_ = stderrPipe.Close()
+		if closeErr := stdoutPipe.Close(); closeErr != nil && c.cfg.Debug {
+			fmt.Fprintf(c.cfg.Err, "[DEBUG] Error closing stdout pipe: %v\n", closeErr)
+		}
+		if closeErr := stderrPipe.Close(); closeErr != nil && c.cfg.Debug {
+			fmt.Fprintf(c.cfg.Err, "[DEBUG] Error closing stderr pipe: %v\n", closeErr)
+		}
 		close(cmdDone) // Signal that command has finished (failed to start)
 		return getExitCode(err, c.cfg.Debug), err
 	}
@@ -910,32 +938,37 @@ func (c *Console) tryAdapterMode(
 	cmdDone chan struct{},
 ) (int, error) {
 	captureStart := c.profiler.StartStage("capture")
-	const detectionLineCount = 15 // Buffer first 15 lines for adapter detection
 
 	// Buffer output from both streams
 	var stdoutBuffer bytes.Buffer
 	var stderrBuffer bytes.Buffer
 	var wgRead sync.WaitGroup
-	wgRead.Add(2)
+	wgRead.Add(StreamCount)
 
 	var errStdoutCopy, errStderrCopy error
-	var totalBytesRead int64
+	var totalBytesRead int64 // Use atomic operations for thread-safe access
 	maxTotalBytes := c.cfg.MaxBufferSize * 2
-	var bytesMutex sync.Mutex
 
 	// Goroutine to capture stdout
 	go func() {
 		defer wgRead.Done()
-		buf := make([]byte, 4096)
+		buf := make([]byte, ReadBufferSize)
 		for {
 			n, readErr := stdoutPipe.Read(buf)
 			if n > 0 {
-				bytesMutex.Lock()
-				if totalBytesRead+int64(n) <= maxTotalBytes {
+				// Atomically check and update buffer size to prevent race conditions
+				for {
+					current := atomic.LoadInt64(&totalBytesRead)
+					newTotal := current + int64(n)
+					if newTotal > maxTotalBytes {
+						break // Exceeded limit, skip this chunk
+					}
+					if atomic.CompareAndSwapInt64(&totalBytesRead, current, newTotal) {
 					stdoutBuffer.Write(buf[:n])
-					totalBytesRead += int64(n)
+						break
 				}
-				bytesMutex.Unlock()
+					// CAS failed, retry (another goroutine updated totalBytesRead)
+				}
 			}
 			if readErr != nil {
 				if readErr != io.EOF &&
@@ -951,16 +984,23 @@ func (c *Console) tryAdapterMode(
 	// Goroutine to capture stderr
 	go func() {
 		defer wgRead.Done()
-		buf := make([]byte, 4096)
+		buf := make([]byte, ReadBufferSize)
 		for {
 			n, readErr := stderrPipe.Read(buf)
 			if n > 0 {
-				bytesMutex.Lock()
-				if totalBytesRead+int64(n) <= maxTotalBytes {
+				// Atomically check and update buffer size to prevent race conditions
+				for {
+					current := atomic.LoadInt64(&totalBytesRead)
+					newTotal := current + int64(n)
+					if newTotal > maxTotalBytes {
+						break // Exceeded limit, skip this chunk
+					}
+					if atomic.CompareAndSwapInt64(&totalBytesRead, current, newTotal) {
 					stderrBuffer.Write(buf[:n])
-					totalBytesRead += int64(n)
+						break
 				}
-				bytesMutex.Unlock()
+					// CAS failed, retry (another goroutine updated totalBytesRead)
+				}
 			}
 			if readErr != nil {
 				if readErr != io.EOF &&
@@ -982,7 +1022,7 @@ func (c *Console) tryAdapterMode(
 	combinedOutput := append(stdoutBuffer.Bytes(), stderrBuffer.Bytes()...)
 
 	// Extract first N lines for adapter detection
-	firstLines := extractFirstLines(string(combinedOutput), detectionLineCount)
+	firstLines := extractFirstLines(string(combinedOutput), AdapterDetectionLineCount)
 
 	if c.cfg.Debug {
 		fmt.Fprintf(os.Stderr, "[DEBUG tryAdapterMode] Captured %d bytes, first %d lines for detection\n",

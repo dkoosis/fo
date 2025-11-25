@@ -99,7 +99,7 @@ func run(args []string) int {
 	// Debug is ONLY enabled by explicit --debug flag
 	if cliFlags.DebugSet {
 		behavioralSettings.Debug = cliFlags.Debug
-		fileAppConfig.Debug = cliFlags.Debug // Ensure this is passed to MergeWithFlags
+		fileAppConfig.Debug = cliFlags.Debug
 	} else {
 		// Force debug off unless explicitly enabled by flag
 		behavioralSettings.Debug = false
