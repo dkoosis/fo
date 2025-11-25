@@ -837,8 +837,10 @@ func (c *Config) resolveColorNameByReflection(name string) string {
 	// Handle special cases and status constants
 	var fieldName string
 	switch lowerName {
-	case colorNameProcess, colorNameSuccess:
+	case colorNameProcess:
 		fieldName = "Process"
+	case colorNameSuccess:
+		fieldName = "Success"
 	case colorNameWarning:
 		fieldName = "Warning"
 	case colorNameError:
