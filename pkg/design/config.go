@@ -202,7 +202,9 @@ type Config struct {
 		HeaderChar             string      `yaml:"header_char"`
 		VerticalChar           string      `yaml:"vertical_char"`
 		TopCornerChar          string      `yaml:"top_corner_char"`
+		TopRightChar           string      `yaml:"top_right_char"`
 		BottomCornerChar       string      `yaml:"bottom_corner_char"`
+		BottomRightChar        string      `yaml:"bottom_right_char"`
 		FooterContinuationChar string      `yaml:"footer_continuation_char"`
 		TableHChar             string      `yaml:"table_h_char"`
 		TableVChar             string      `yaml:"table_v_char"`
@@ -451,7 +453,9 @@ func UnicodeVibrantTheme() *Config {
 	cfg.Border.HeaderChar = "═"
 	cfg.Border.VerticalChar = "│"
 	cfg.Border.TopCornerChar = "╒"
+	cfg.Border.TopRightChar = "╕"
 	cfg.Border.BottomCornerChar = "└"
+	cfg.Border.BottomRightChar = "╛"
 	cfg.Border.FooterContinuationChar = "─"
 
 	cfg.Elements = make(map[string]ElementStyleDef)
@@ -548,7 +552,9 @@ func OrcaTheme() *Config {
 	cfg.Border.HeaderChar = "─"
 	cfg.Border.VerticalChar = "│"
 	cfg.Border.TopCornerChar = "╭"
+	cfg.Border.TopRightChar = "╮"
 	cfg.Border.BottomCornerChar = "╰"
+	cfg.Border.BottomRightChar = "╯"
 	cfg.Border.FooterContinuationChar = "─"
 
 	cfg.Elements = make(map[string]ElementStyleDef)

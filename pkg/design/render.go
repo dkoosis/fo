@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -71,6 +72,159 @@ func visualWidth(s string) int {
 	return VisualWidth(s)
 }
 
+// BoxLayout is the single source of truth for box dimensions.
+// It centralizes all box-related calculations to eliminate magic numbers
+// and ensure consistent rendering across all box functions.
+type BoxLayout struct {
+	TotalWidth   int              // Total terminal width
+	ContentWidth int              // Available width for content (TotalWidth - borders - padding)
+	LeftPadding  int              // Left padding inside box
+	RightPadding int              // Right padding inside box
+	BorderStyle  lipgloss.Style   // Lip Gloss style for borders
+	Config       *Config          // Reference to config for border chars
+}
+
+// NewBoxLayout creates a BoxLayout with single-point dimension calculation.
+// termWidth is the terminal width. If 0 or negative, defaults to 80.
+func (c *Config) NewBoxLayout(termWidth int) *BoxLayout {
+	if termWidth <= 0 {
+		termWidth = 80 // Default fallback
+	}
+
+	leftPad := 1
+	rightPad := 1
+	borderWidth := 2 // left + right border chars
+
+	contentWidth := termWidth - borderWidth - leftPad - rightPad
+	if contentWidth < 0 {
+		contentWidth = 0
+	}
+
+	// Create Lip Gloss border style
+	border := lipgloss.Border{
+		Top:         c.Border.HeaderChar,
+		Bottom:      c.Border.FooterContinuationChar,
+		Left:        c.Border.VerticalChar,
+		Right:       c.Border.VerticalChar,
+		TopLeft:     c.Border.TopCornerChar,
+		TopRight:    c.Border.TopRightChar,
+		BottomLeft:  c.Border.BottomCornerChar,
+		BottomRight: c.Border.BottomRightChar,
+	}
+
+	style := lipgloss.NewStyle().Border(border)
+
+	return &BoxLayout{
+		TotalWidth:   termWidth,
+		ContentWidth: contentWidth,
+		LeftPadding:  leftPad,
+		RightPadding: rightPad,
+		BorderStyle:  style,
+		Config:       c,
+	}
+}
+
+// RenderTopBorder renders the top border line with optional title.
+func (b *BoxLayout) RenderTopBorder(title string) string {
+	if !b.Config.Style.UseBoxes {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString(b.Config.Border.TopCornerChar)
+	sb.WriteString(b.Config.Border.HeaderChar)
+
+	if title != "" {
+		// Add title with padding
+		titleWidth := VisualWidth(title)
+		desiredWidth := b.Config.Style.HeaderWidth
+		if desiredWidth <= 0 {
+			desiredWidth = 40
+		}
+		repeatCount := desiredWidth - titleWidth - 1 // -1 for space after title
+		if repeatCount < 0 {
+			repeatCount = 0
+		}
+		sb.WriteString(" ")
+		sb.WriteString(title)
+		sb.WriteString(strings.Repeat(b.Config.Border.HeaderChar, repeatCount))
+	} else {
+		// Fill header line
+		headerWidth := b.TotalWidth - 2 // -2 for corner chars
+		if headerWidth > 0 {
+			sb.WriteString(strings.Repeat(b.Config.Border.HeaderChar, headerWidth))
+		}
+	}
+
+	// Add top right corner if configured
+	if b.Config.Border.TopRightChar != "" {
+		sb.WriteString(b.Config.Border.TopRightChar)
+	} else {
+		// Fallback: use header char
+		sb.WriteString(b.Config.Border.HeaderChar)
+	}
+
+	return sb.String()
+}
+
+// RenderContentLine renders a single content line with proper padding and borders.
+func (b *BoxLayout) RenderContentLine(content string) string {
+	if !b.Config.Style.UseBoxes {
+		return content
+	}
+
+	var sb strings.Builder
+	sb.WriteString(b.Config.Border.VerticalChar)
+	sb.WriteString(strings.Repeat(" ", b.LeftPadding))
+	sb.WriteString(content)
+	// Pad to content width
+	contentWidth := VisualWidth(content)
+	if contentWidth < b.ContentWidth {
+		sb.WriteString(strings.Repeat(" ", b.ContentWidth-contentWidth))
+	}
+	sb.WriteString(strings.Repeat(" ", b.RightPadding))
+	sb.WriteString(b.Config.Border.VerticalChar)
+
+	return sb.String()
+}
+
+// RenderBottomBorder renders the bottom border line.
+func (b *BoxLayout) RenderBottomBorder() string {
+	if !b.Config.Style.UseBoxes {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString(b.Config.Border.BottomCornerChar)
+	footerChar := b.Config.Border.FooterContinuationChar
+	if footerChar == "" {
+		footerChar = b.Config.Border.HeaderChar
+	}
+	if footerChar == "" {
+		footerChar = "─"
+	}
+	footerWidth := b.TotalWidth - 2 // -2 for corner chars
+	if footerWidth > 0 {
+		sb.WriteString(strings.Repeat(footerChar, footerWidth))
+	}
+	// Add bottom right corner if configured
+	if b.Config.Border.BottomRightChar != "" {
+		sb.WriteString(b.Config.Border.BottomRightChar)
+	} else {
+		// Fallback: use footer char
+		sb.WriteString(footerChar)
+	}
+
+	return sb.String()
+}
+
+// getTerminalWidth returns the terminal width, defaulting to 80 if unavailable.
+func getTerminalWidth() int {
+	// TODO: Use golang.org/x/term to detect actual terminal width
+	// For now, default to 80
+	return 80
+}
+
 // RenderStartLine returns the formatted start line for the task.
 func (t *Task) RenderStartLine() string {
 	var sb strings.Builder
@@ -87,31 +241,24 @@ func (t *Task) RenderStartLine() string {
 		startIndicatorStyle := t.Config.GetElementStyle("Task_StartIndicator_Line")
 
 		if t.Config.Style.UseBoxes {
-			sb.WriteString(t.Config.Border.TopCornerChar)
-			sb.WriteString(t.Config.Border.HeaderChar)
+			// Use BoxLayout for consistent dimension calculations
+			box := t.Config.NewBoxLayout(getTerminalWidth())
+			
+			// Render top border with label
 			labelColor := t.Config.GetColor(headerStyle.ColorFG, "Task_Label_Header")
-			sb.WriteString(" ")
-			sb.WriteString(labelColor)
+			var styledLabel strings.Builder
+			styledLabel.WriteString(labelColor)
 			if contains(headerStyle.TextStyle, "bold") {
-				sb.WriteString(t.Config.GetColor("Bold"))
+				styledLabel.WriteString(t.Config.GetColor("Bold"))
 			}
-			sb.WriteString(applyTextCase(t.Label, headerStyle.TextCase))
-			sb.WriteString(t.Config.ResetColor())
-			sb.WriteString(" ")
-
-			labelRenderedLength := visualWidth(t.Label) + 2
-			desiredHeaderContentVisualWidth := t.Config.Style.HeaderWidth
-			if desiredHeaderContentVisualWidth <= 0 {
-				desiredHeaderContentVisualWidth = 40 // Default fallback
-			}
-			repeatCount := desiredHeaderContentVisualWidth - labelRenderedLength
-			if repeatCount < 0 {
-				repeatCount = 0
-			}
-			sb.WriteString(strings.Repeat(t.Config.Border.HeaderChar, repeatCount))
+			styledLabel.WriteString(applyTextCase(t.Label, headerStyle.TextCase))
+			styledLabel.WriteString(t.Config.ResetColor())
+			
+			topBorder := box.RenderTopBorder(styledLabel.String())
+			sb.WriteString(topBorder)
 			sb.WriteString("\n")
-			sb.WriteString(t.Config.Border.VerticalChar + "\n")
-			sb.WriteString(t.Config.Border.VerticalChar + " ")
+			sb.WriteString(box.Config.Border.VerticalChar + "\n")
+			sb.WriteString(box.Config.Border.VerticalChar + " ")
 			sb.WriteString(t.Config.GetIndentation(1))
 		} else {
 			h2Style := t.Config.GetElementStyle("H2_Target_Title")
@@ -319,15 +466,10 @@ func (t *Task) RenderEndLine() string {
 		sb.WriteString("\n")
 
 		if t.Config.Style.UseBoxes {
-			footerChar := t.Config.Border.FooterContinuationChar
-			if footerChar == "" {
-				footerChar = t.Config.Border.HeaderChar
-			}
-			if footerChar == "" {
-				footerChar = "─"
-			}
-			sb.WriteString(t.Config.Border.BottomCornerChar)
-			sb.WriteString(footerChar)
+			// Use BoxLayout for consistent bottom border rendering
+			box := t.Config.NewBoxLayout(getTerminalWidth())
+			bottomBorder := box.RenderBottomBorder()
+			sb.WriteString(bottomBorder)
 			sb.WriteString("\n")
 		} else {
 			footerStyle := t.Config.GetElementStyle("H2_Target_Footer_Line")
@@ -380,8 +522,11 @@ func (t *Task) RenderOutputLine(line OutputLine) string {
 			sb.WriteString(line.Content)
 		}
 	} else {
+		// Use BoxLayout for consistent border character access
+		var box *BoxLayout
 		if t.Config.Style.UseBoxes {
-			sb.WriteString(t.Config.Border.VerticalChar + " ")
+			box = t.Config.NewBoxLayout(getTerminalWidth())
+			sb.WriteString(box.Config.Border.VerticalChar + " ")
 		}
 		sb.WriteString(t.Config.GetIndentation(1))
 		if line.Indentation > 0 {
