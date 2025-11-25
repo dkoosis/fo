@@ -135,6 +135,7 @@ type Console struct {
 	designConf      *design.Config
 	adapterRegistry *adapter.Registry
 	profiler        *Profiler
+	currentSummary  string // Summary message for current section being executed
 }
 
 func DefaultConsole() *Console {
@@ -597,12 +598,17 @@ func (c *Console) RunSection(s Section) SectionResult {
 	}
 
 	// Determine what text to show
-	// Priority: error message > summary > description > name
+	// Priority: error message > section summary > current summary > description > name
+	summary := s.Summary
+	if summary == "" {
+		summary = c.currentSummary
+		c.currentSummary = "" // Clear after use
+	}
 	switch {
 	case displayErr != nil:
 		content.Text = fmt.Sprintf("%s %s: %v", s.Name, durationStr, displayErr)
-	case s.Summary != "":
-		content.Text = fmt.Sprintf("%s %s", s.Summary, durationStr)
+	case summary != "":
+		content.Text = fmt.Sprintf("%s %s", summary, durationStr)
 	case s.Description != "":
 		content.Text = fmt.Sprintf("%s %s", s.Description, durationStr)
 	default:
@@ -640,6 +646,13 @@ func (c *Console) RunSections(sections ...Section) ([]SectionResult, error) {
 	}
 
 	return results, errors.Join(errs...)
+}
+
+// SetSectionSummary sets a summary message for the current section being executed.
+// This should be called by section work functions to provide a summary message
+// that will be shown instead of the section name on success.
+func (c *Console) SetSectionSummary(summary string) {
+	c.currentSummary = summary
 }
 
 // getStatusIcon returns the icon and color for a section status from the theme.
