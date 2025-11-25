@@ -891,8 +891,10 @@ func (c *Config) resolveColorNameByReflection(name string) string {
 		// Field not found, try fallback defaults
 		escChar := string([]byte{27})
 		switch lowerName {
-		case "process", "success", "white":
+		case "process", "white":
 			return escChar + "[0;97m"
+		case "success":
+			return escChar + "[0;32m" // Default green
 		case "warning":
 			return escChar + "[0;33m"
 		case "error":
