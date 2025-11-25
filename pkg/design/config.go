@@ -746,8 +746,10 @@ func (c *Config) resolveColorName(name string) string {
 	lowerName := strings.ToLower(name)
 
 	switch lowerName {
-	case colorNameProcess, colorNameSuccess:
+	case colorNameProcess:
 		codeToProcess = c.Colors.Process
+	case colorNameSuccess:
+		codeToProcess = c.Colors.Success
 	case colorNameWarning:
 		codeToProcess = c.Colors.Warning
 	case colorNameError:
@@ -784,8 +786,10 @@ func (c *Config) resolveColorName(name string) string {
 	escChar := string([]byte{27})
 	if codeToProcess == "" {
 		switch lowerName {
-		case colorNameProcess, colorNameSuccess, colorNameWhite:
+		case colorNameProcess, colorNameWhite:
 			codeToProcess = escChar + "[0;97m"
+		case colorNameSuccess:
+			codeToProcess = escChar + "[0;32m" // Default green
 		case colorNameWarning:
 			codeToProcess = escChar + "[0;33m"
 		case colorNameError:
