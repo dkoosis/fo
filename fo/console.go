@@ -220,10 +220,16 @@ func (c *Console) PrintSectionHeader(name string) {
 		topCorner := cfg.Border.TopCornerChar
 		headerChar := cfg.Border.HeaderChar
 		closingCorner := "╮"
-		if topCorner == BorderCornerDouble {
+		// Determine closing corner based on the top corner character
+		switch topCorner {
+		case "╔": // Double-line square corner
 			closingCorner = "╗"
-		} else if topCorner == "╭" {
-			closingCorner = "╮" // Rounded single-line corner
+		case "╒": // Double-line rounded corner
+			closingCorner = "╗"
+		case "╭": // Single-line rounded corner
+			closingCorner = "╮"
+		default:
+			closingCorner = "╮" // Default to rounded single-line
 		}
 		// Use very pale gray for orca theme, faint dark gray for others
 		borderColor := faintGray
