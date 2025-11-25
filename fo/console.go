@@ -1150,6 +1150,22 @@ func (c *Console) runContext(
 	}, cmdRunError
 }
 
+// RunCapture executes a command and returns the combined output as a string.
+// This is useful when you need to parse command output.
+func (c *Console) RunCapture(label, command string, args ...string) (string, error) {
+	result, err := c.Run(label, command, args...)
+	if err != nil {
+		return "", err
+	}
+
+	var output strings.Builder
+	for _, line := range result.Lines {
+		output.WriteString(line.Content)
+		output.WriteString("\n")
+	}
+	return output.String(), nil
+}
+
 func (c *Console) renderCapturedOutput(task *design.Task, exitCode int, isActualFoStartupFailure bool) {
 	showCaptured := false
 	switch c.cfg.ShowOutputMode {
