@@ -270,7 +270,7 @@ func (c *Console) getTerminalWidth() int {
 	if err != nil || width <= 0 {
 		return DefaultTerminalWidth
 	}
-	return width - 2
+	return width - 3
 }
 
 // contains checks if a slice contains a string.
