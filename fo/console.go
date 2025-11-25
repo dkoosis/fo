@@ -46,6 +46,11 @@ const (
 
 	// BorderCornerDouble is the double-line box drawing corner character.
 	BorderCornerDouble = "╔"
+
+	// Box drawing corner characters.
+	BoxCornerTopRightSingle    = "╮"
+	BoxCornerTopRightDouble    = "╗"
+	BoxCornerBottomRightSingle = "╯"
 )
 
 type ConsoleConfig struct {
@@ -236,22 +241,22 @@ func (c *Console) getBorderChars(cfg *design.Config) BorderChars {
 	verticalChar := cfg.Border.VerticalChar
 
 	// Determine closing corners based on opening corners
-	topRight := "╮"
+	topRight := BoxCornerTopRightSingle
 	switch topCorner {
 	case "╔": // Double-line square corner
-		topRight = "╗"
+		topRight = BoxCornerTopRightDouble
 	case "╒": // Double-line rounded corner
-		topRight = "╗"
+		topRight = BoxCornerTopRightDouble
 	case "╭": // Single-line rounded corner
-		topRight = "╮"
+		topRight = BoxCornerTopRightSingle
 	}
 
-	bottomRight := "╯"
+	bottomRight := BoxCornerBottomRightSingle
 	switch bottomCorner {
 	case "╚": // Double-line square corner
 		bottomRight = "╝"
 	case "╰": // Single-line rounded corner
-		bottomRight = "╯"
+		bottomRight = BoxCornerBottomRightSingle
 	}
 
 	return BorderChars{
@@ -712,10 +717,13 @@ func (c *Console) getStatusIcon(status SectionStatus) (string, string) {
 		icon := cfg.GetIcon("Warning")
 		color := cfg.GetColor("Warning")
 		return icon, color
-	default: // SectionError
+	case SectionError:
 		icon := cfg.GetIcon("Error")
 		color := cfg.GetColor("Error")
 		return icon, color
+	default:
+		// Fallback for unknown status
+		return "", ""
 	}
 }
 
@@ -743,9 +751,9 @@ func (c *Console) PrintH1Header(name string) {
 
 		topCorner := cfg.Border.TopCornerChar
 		headerChar := cfg.Border.HeaderChar
-		closingCorner := "╮"
+		closingCorner := BoxCornerTopRightSingle
 		if topCorner == BorderCornerDouble {
-			closingCorner = "╗"
+			closingCorner = BoxCornerTopRightDouble
 		}
 		sb.WriteString(paleGray)
 		sb.WriteString(topCorner)
@@ -776,7 +784,7 @@ func (c *Console) PrintH1Header(name string) {
 		sb.WriteString("\n")
 
 		bottomCorner := cfg.Border.BottomCornerChar
-		bottomClosingCorner := "╯"
+		bottomClosingCorner := BoxCornerBottomRightSingle
 		if bottomCorner == "╚" {
 			bottomClosingCorner = "╝"
 		}
@@ -982,7 +990,7 @@ func (c *Console) RunSimple(command string, args ...string) error {
 	return err // Infrastructure error, pass through
 }
 
-//nolint:funlen // Complex function handling command execution, signal handling, and output rendering
+//nolint:funlen,gocognit // Complex function handling command execution, signal handling, and output rendering
 func (c *Console) runContext(
 	ctx context.Context, cancel context.CancelFunc, sigChan chan os.Signal,
 	label, command string, args []string,
@@ -1013,11 +1021,9 @@ func (c *Console) runContext(
 			}()
 		}
 		progress.Start(ctx, enableSpinner)
-	} else {
+	} else if !c.inSection {
 		// Suppress start line when in a section - section header already shows context
-		if !c.inSection {
-			_, _ = c.cfg.Out.Write([]byte(task.RenderStartLine() + "\n"))
-		}
+		_, _ = c.cfg.Out.Write([]byte(task.RenderStartLine() + "\n"))
 	}
 
 	cmd := exec.CommandContext(ctx, command, args...)

@@ -194,6 +194,7 @@ func TestTruncateToWidth(t *testing.T) {
 			input:    "hello world",
 			maxWidth: 5,
 			check: func(t *testing.T, result string) {
+				t.Helper()
 				if VisualWidth(result) > 5 {
 					t.Errorf("truncateToWidth result width %d exceeds maxWidth 5", VisualWidth(result))
 				}
@@ -204,6 +205,7 @@ func TestTruncateToWidth(t *testing.T) {
 			input:    "✓ pass ✓ pass",
 			maxWidth: 5,
 			check: func(t *testing.T, result string) {
+				t.Helper()
 				if VisualWidth(result) > 5 {
 					t.Errorf("truncateToWidth result width %d exceeds maxWidth 5", VisualWidth(result))
 				}
@@ -214,6 +216,7 @@ func TestTruncateToWidth(t *testing.T) {
 			input:    "日本語日本語",
 			maxWidth: 5,
 			check: func(t *testing.T, result string) {
+				t.Helper()
 				if VisualWidth(result) > 5 {
 					t.Errorf("truncateToWidth result width %d exceeds maxWidth 5", VisualWidth(result))
 				}
@@ -224,6 +227,7 @@ func TestTruncateToWidth(t *testing.T) {
 			input:    "hi",
 			maxWidth: 10,
 			check: func(t *testing.T, result string) {
+				t.Helper()
 				if result != "hi" {
 					t.Errorf("truncateToWidth(%q, 10) = %q, want %q", "hi", result, "hi")
 				}
@@ -238,4 +242,3 @@ func TestTruncateToWidth(t *testing.T) {
 		})
 	}
 }
-

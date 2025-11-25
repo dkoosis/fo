@@ -150,4 +150,3 @@ func NewConsoleFromProject() *Console {
 		ThemeName: cfg.Theme,
 	})
 }
-

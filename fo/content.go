@@ -13,7 +13,7 @@ import (
 )
 
 // MetricLine represents a key-value metric with optional trend indicator.
-// Example: "Total files:     367 ↑"
+// Example: "Total files:     367 ↑".
 type MetricLine struct {
 	Label string // e.g., "Total files"
 	Value string // e.g., "367"
@@ -90,7 +90,7 @@ func (c *Console) PrintMetricLine(m MetricLine) {
 }
 
 // PrintBulletHeader renders a bulleted section header inside a section box.
-// Example: "   ◉ File Metrics (Non-Test Files)"
+// Example: "   ◉ File Metrics (Non-Test Files)".
 func (c *Console) PrintBulletHeader(text string) {
 	cfg := c.designConf
 	box := c.calculateBoxLayout()

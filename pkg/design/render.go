@@ -10,6 +10,7 @@ import (
 	"unicode"
 
 	"github.com/charmbracelet/lipgloss"
+	"golang.org/x/term"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -76,12 +77,12 @@ func visualWidth(s string) int {
 // It centralizes all box-related calculations to eliminate magic numbers
 // and ensure consistent rendering across all box functions.
 type BoxLayout struct {
-	TotalWidth   int              // Total terminal width
-	ContentWidth int              // Available width for content (TotalWidth - borders - padding)
-	LeftPadding  int              // Left padding inside box
-	RightPadding int              // Right padding inside box
-	BorderStyle  lipgloss.Style   // Lip Gloss style for borders
-	Config       *Config          // Reference to config for border chars
+	TotalWidth   int            // Total terminal width
+	ContentWidth int            // Available width for content (TotalWidth - borders - padding)
+	LeftPadding  int            // Left padding inside box
+	RightPadding int            // Right padding inside box
+	BorderStyle  lipgloss.Style // Lip Gloss style for borders
+	Config       *Config        // Reference to config for border chars
 }
 
 // NewBoxLayout creates a BoxLayout with single-point dimension calculation.
@@ -220,9 +221,11 @@ func (b *BoxLayout) RenderBottomBorder() string {
 
 // getTerminalWidth returns the terminal width, defaulting to 80 if unavailable.
 func getTerminalWidth() int {
-	// TODO: Use golang.org/x/term to detect actual terminal width
-	// For now, default to 80
-	return 80
+	width, _, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		return 80
+	}
+	return width
 }
 
 // RenderStartLine returns the formatted start line for the task.
@@ -243,7 +246,7 @@ func (t *Task) RenderStartLine() string {
 		if t.Config.Style.UseBoxes {
 			// Use BoxLayout for consistent dimension calculations
 			box := t.Config.NewBoxLayout(getTerminalWidth())
-			
+
 			// Render top border with label
 			labelColor := t.Config.GetColor(headerStyle.ColorFG, "Task_Label_Header")
 			var styledLabel strings.Builder
@@ -253,7 +256,7 @@ func (t *Task) RenderStartLine() string {
 			}
 			styledLabel.WriteString(applyTextCase(t.Label, headerStyle.TextCase))
 			styledLabel.WriteString(t.Config.ResetColor())
-			
+
 			topBorder := box.RenderTopBorder(styledLabel.String())
 			sb.WriteString(topBorder)
 			sb.WriteString("\n")

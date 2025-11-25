@@ -107,6 +107,13 @@ const MessageTypeHeader = "header"
 // ANSI color code constant.
 const ANSIBrightWhite = "\033[0;97m"
 
+// Icon character constants.
+const (
+	IconCharError   = "✗"
+	IconCharWarning = "⚠"
+	BorderCharDash  = "─"
+)
+
 // ElementStyleDef defines visual styling properties for a specific UI element.
 type ElementStyleDef struct {
 	Text             string   `yaml:"text,omitempty"`
@@ -157,8 +164,8 @@ type DesignTokens struct {
 	} `yaml:"colors"`
 
 	Styles struct {
-		Box    lipgloss.Style `yaml:"-"` // Pre-configured box style
-		Header lipgloss.Style `yaml:"-"` // Pre-configured header style
+		Box     lipgloss.Style `yaml:"-"` // Pre-configured box style
+		Header  lipgloss.Style `yaml:"-"` // Pre-configured header style
 		Content lipgloss.Style `yaml:"-"` // Pre-configured content style
 	} `yaml:"styles"`
 
@@ -454,20 +461,20 @@ func UnicodeVibrantTheme() *Config {
 	// Using Lip Gloss Color types for proper color handling
 	// Note: lipgloss.Color accepts ANSI codes as strings, so we store full ANSI sequences
 	cfg.Tokens = &DesignTokens{}
-	cfg.Tokens.Colors.Process = lipgloss.Color(ANSIBrightWhite) // Bright white
-	cfg.Tokens.Colors.Success = lipgloss.Color(ANSIBrightWhite) // Bright white
-	cfg.Tokens.Colors.Warning = lipgloss.Color("\033[0;33m")    // Yellow
-	cfg.Tokens.Colors.Error = lipgloss.Color("\033[0;31m")     // Red
-	cfg.Tokens.Colors.Detail = lipgloss.Color("\033[0m")       // Reset
-	cfg.Tokens.Colors.Muted = lipgloss.Color("\033[2m")        // Dim
-	cfg.Tokens.Colors.Reset = lipgloss.Color("\033[0m")        // Reset
-	cfg.Tokens.Colors.White = lipgloss.Color("\033[0;97m")     // Bright white
+	cfg.Tokens.Colors.Process = lipgloss.Color(ANSIBrightWhite)  // Bright white
+	cfg.Tokens.Colors.Success = lipgloss.Color(ANSIBrightWhite)  // Bright white
+	cfg.Tokens.Colors.Warning = lipgloss.Color("\033[0;33m")     // Yellow
+	cfg.Tokens.Colors.Error = lipgloss.Color("\033[0;31m")       // Red
+	cfg.Tokens.Colors.Detail = lipgloss.Color("\033[0m")         // Reset
+	cfg.Tokens.Colors.Muted = lipgloss.Color("\033[2m")          // Dim
+	cfg.Tokens.Colors.Reset = lipgloss.Color("\033[0m")          // Reset
+	cfg.Tokens.Colors.White = lipgloss.Color("\033[0;97m")       // Bright white
 	cfg.Tokens.Colors.GreenFg = lipgloss.Color("\033[38;5;120m") // Light green
-	cfg.Tokens.Colors.BlueFg = lipgloss.Color("\033[0;34m")    // Blue
-	cfg.Tokens.Colors.BlueBg = lipgloss.Color("\033[44m")     // Blue background
+	cfg.Tokens.Colors.BlueFg = lipgloss.Color("\033[0;34m")      // Blue
+	cfg.Tokens.Colors.BlueBg = lipgloss.Color("\033[44m")        // Blue background
 	cfg.Tokens.Colors.Spinner = lipgloss.Color("\033[38;5;111m") // Pale blue (semantic: Spinner, was PaleBlue)
-	cfg.Tokens.Colors.Bold = lipgloss.Color("\033[1m")        // Bold
-	cfg.Tokens.Colors.Italic = lipgloss.Color("\033[3m")      // Italic
+	cfg.Tokens.Colors.Bold = lipgloss.Color("\033[1m")           // Bold
+	cfg.Tokens.Colors.Italic = lipgloss.Color("\033[3m")         // Italic
 	cfg.Tokens.Spacing.Progress = 0
 	cfg.Tokens.Spacing.Indent = 2
 	cfg.Tokens.Typography.HeaderWidth = 40
@@ -482,7 +489,7 @@ func UnicodeVibrantTheme() *Config {
 	cfg.Border.TopRightChar = "╕"
 	cfg.Border.BottomCornerChar = "└"
 	cfg.Border.BottomRightChar = "╛"
-	cfg.Border.FooterContinuationChar = "─"
+	cfg.Border.FooterContinuationChar = BorderCharDash
 
 	cfg.Elements = make(map[string]ElementStyleDef)
 	initBaseElementStyles(cfg.Elements)
@@ -546,8 +553,8 @@ func OrcaTheme() *Config {
 
 	cfg.Icons.Start = "▶"
 	cfg.Icons.Success = "✓"
-	cfg.Icons.Warning = "⚠"
-	cfg.Icons.Error = "✗"
+	cfg.Icons.Warning = IconCharWarning
+	cfg.Icons.Error = IconCharError
 	cfg.Icons.Info = "ℹ"
 	cfg.Icons.Bullet = "•"
 
@@ -557,18 +564,18 @@ func OrcaTheme() *Config {
 	cfg.Tokens = &DesignTokens{}
 	cfg.Tokens.Colors.Process = lipgloss.Color("\033[38;5;111m") // Pale blue for process/task/headings
 	cfg.Tokens.Colors.Success = lipgloss.Color("\033[38;5;120m") // Pale green for success
-	cfg.Tokens.Colors.Warning = lipgloss.Color("\033[0;33m")    // Yellow for warnings
-	cfg.Tokens.Colors.Error = lipgloss.Color("\033[0;31m")      // Red for errors
-	cfg.Tokens.Colors.Detail = lipgloss.Color("\033[0m")        // Reset for detail text
-	cfg.Tokens.Colors.Muted = lipgloss.Color("\033[2m")         // Dim for muted text
-	cfg.Tokens.Colors.Reset = lipgloss.Color("\033[0m")        // Reset
-	cfg.Tokens.Colors.White = lipgloss.Color("\033[0;97m")     // Bright white
+	cfg.Tokens.Colors.Warning = lipgloss.Color("\033[0;33m")     // Yellow for warnings
+	cfg.Tokens.Colors.Error = lipgloss.Color("\033[0;31m")       // Red for errors
+	cfg.Tokens.Colors.Detail = lipgloss.Color("\033[0m")         // Reset for detail text
+	cfg.Tokens.Colors.Muted = lipgloss.Color("\033[2m")          // Dim for muted text
+	cfg.Tokens.Colors.Reset = lipgloss.Color("\033[0m")          // Reset
+	cfg.Tokens.Colors.White = lipgloss.Color("\033[0;97m")       // Bright white
 	cfg.Tokens.Colors.GreenFg = lipgloss.Color("\033[38;5;120m") // Light green
-	cfg.Tokens.Colors.BlueFg = lipgloss.Color("\033[38;5;39m")  // Bright blue (ocean-like)
-	cfg.Tokens.Colors.BlueBg = lipgloss.Color("\033[44m")       // Blue background
+	cfg.Tokens.Colors.BlueFg = lipgloss.Color("\033[38;5;39m")   // Bright blue (ocean-like)
+	cfg.Tokens.Colors.BlueBg = lipgloss.Color("\033[44m")        // Blue background
 	cfg.Tokens.Colors.Spinner = lipgloss.Color("\033[38;5;111m") // Pale blue for spinner (semantic naming)
-	cfg.Tokens.Colors.Bold = lipgloss.Color("\033[1m")          // Bold
-	cfg.Tokens.Colors.Italic = lipgloss.Color("\033[3m")       // Italic
+	cfg.Tokens.Colors.Bold = lipgloss.Color("\033[1m")           // Bold
+	cfg.Tokens.Colors.Italic = lipgloss.Color("\033[3m")         // Italic
 	cfg.Tokens.Spacing.Progress = 0
 	cfg.Tokens.Spacing.Indent = 2
 	cfg.Tokens.Typography.HeaderWidth = 50
@@ -577,13 +584,13 @@ func OrcaTheme() *Config {
 	cfg.syncTokensToColors()
 
 	cfg.Border.TaskStyle = BorderHeaderBox
-	cfg.Border.HeaderChar = "─"
+	cfg.Border.HeaderChar = BorderCharDash
 	cfg.Border.VerticalChar = "│"
 	cfg.Border.TopCornerChar = "╭"
 	cfg.Border.TopRightChar = "╮"
 	cfg.Border.BottomCornerChar = "╰"
 	cfg.Border.BottomRightChar = "╯"
-	cfg.Border.FooterContinuationChar = "─"
+	cfg.Border.FooterContinuationChar = BorderCharDash
 
 	cfg.Elements = make(map[string]ElementStyleDef)
 	initBaseElementStyles(cfg.Elements)

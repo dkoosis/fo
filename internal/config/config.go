@@ -277,19 +277,19 @@ func LoadThemeFromFile(filePath string) (*design.Config, error) {
 // Only fields that are set will override the base theme.
 type ThemeOverrides struct {
 	Colors struct {
-		Process  *string `yaml:"process,omitempty"`
-		Success  *string `yaml:"success,omitempty"`
-		Warning  *string `yaml:"warning,omitempty"`
-		Error    *string `yaml:"error,omitempty"`
-		Detail   *string `yaml:"detail,omitempty"`
-		Muted    *string `yaml:"muted,omitempty"`
-		Spinner  *string `yaml:"spinner,omitempty"`
-		White    *string `yaml:"white,omitempty"`
-		GreenFg  *string `yaml:"green_fg,omitempty"`
-		BlueFg   *string `yaml:"blue_fg,omitempty"`
-		BlueBg   *string `yaml:"blue_bg,omitempty"`
-		Bold     *string `yaml:"bold,omitempty"`
-		Italic   *string `yaml:"italic,omitempty"`
+		Process *string `yaml:"process,omitempty"`
+		Success *string `yaml:"success,omitempty"`
+		Warning *string `yaml:"warning,omitempty"`
+		Error   *string `yaml:"error,omitempty"`
+		Detail  *string `yaml:"detail,omitempty"`
+		Muted   *string `yaml:"muted,omitempty"`
+		Spinner *string `yaml:"spinner,omitempty"`
+		White   *string `yaml:"white,omitempty"`
+		GreenFg *string `yaml:"green_fg,omitempty"`
+		BlueFg  *string `yaml:"blue_fg,omitempty"`
+		BlueBg  *string `yaml:"blue_bg,omitempty"`
+		Bold    *string `yaml:"bold,omitempty"`
+		Italic  *string `yaml:"italic,omitempty"`
 	} `yaml:"colors,omitempty"`
 	Style struct {
 		UseBoxes          *bool   `yaml:"use_boxes,omitempty"`

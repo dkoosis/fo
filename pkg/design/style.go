@@ -47,10 +47,9 @@ func truncateToWidth(s string, maxWidth int) string {
 		return s
 	}
 	// Truncate character by character until we fit
-	runes := []rune(s)
 	result := strings.Builder{}
 	currentWidth := 0
-	for _, r := range runes {
+	for _, r := range s {
 		runeStr := string(r)
 		runeWidth := VisualWidth(runeStr)
 		if currentWidth+runeWidth > maxWidth {
@@ -61,4 +60,3 @@ func truncateToWidth(s string, maxWidth int) string {
 	}
 	return result.String()
 }
-

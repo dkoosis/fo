@@ -7,13 +7,18 @@ package fo
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 )
+
+// ErrFormattingNeeded indicates that files need formatting.
+var ErrFormattingNeeded = errors.New("files need formatting: run 'go fmt ./...'")
 
 // ================================
 // DEPENDENCY TASKS
@@ -141,11 +146,12 @@ func parseTestOutput(result *TaskResult) *TestSummary {
 
 	for _, line := range result.Lines {
 		content := line.Content
-		if strings.Contains(content, "--- PASS:") {
+		switch {
+		case strings.Contains(content, "--- PASS:"):
 			summary.Passed++
-		} else if strings.Contains(content, "--- FAIL:") {
+		case strings.Contains(content, "--- FAIL:"):
 			summary.Failed++
-		} else if strings.Contains(content, "--- SKIP:") {
+		case strings.Contains(content, "--- SKIP:"):
 			summary.Skipped++
 		}
 	}
@@ -186,7 +192,7 @@ func (c *Console) LintFormat() error {
 	// gofmt -l returns files that need formatting
 	for _, line := range result.Lines {
 		if strings.TrimSpace(line.Content) != "" {
-			return fmt.Errorf("files need formatting: run 'go fmt ./...'")
+			return ErrFormattingNeeded
 		}
 	}
 
@@ -239,9 +245,9 @@ type FileSizeAnalysis struct {
 	Over500Count  int
 	Over750Count  int
 	Over1000Count int
-	GreenCount    int  // Files < 500 LOC
-	YellowCount   int  // Files 500-999 LOC
-	RedCount      int  // Files >= 1000 LOC
+	GreenCount    int // Files < 500 LOC
+	YellowCount   int // Files 500-999 LOC
+	RedCount      int // Files >= 1000 LOC
 }
 
 // AnalyzeFileSizes performs file size analysis on the repository.
@@ -333,7 +339,6 @@ func (c *Console) AnalyzeFileSizes(root string, cfg FileSizeConfig) (*FileSizeAn
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("walk repository: %w", err)
 	}
@@ -356,10 +361,10 @@ func (c *Console) RenderFileSizeReport(analysis *FileSizeAnalysis, cfg FileSizeC
 	// File Metrics section
 	c.PrintBulletHeader("File Metrics (Non-Test Files)")
 
-	c.PrintMetricLine(MetricLine{Label: "Total files", Value: fmt.Sprintf("%d", analysis.TotalFiles)})
-	c.PrintMetricLine(MetricLine{Label: ">500 LOC count", Value: fmt.Sprintf("%d", analysis.Over500Count)})
-	c.PrintMetricLine(MetricLine{Label: ">750 LOC count", Value: fmt.Sprintf("%d", analysis.Over750Count)})
-	c.PrintMetricLine(MetricLine{Label: ">1000 LOC count", Value: fmt.Sprintf("%d", analysis.Over1000Count)})
+	c.PrintMetricLine(MetricLine{Label: "Total files", Value: strconv.Itoa(analysis.TotalFiles)})
+	c.PrintMetricLine(MetricLine{Label: ">500 LOC count", Value: strconv.Itoa(analysis.Over500Count)})
+	c.PrintMetricLine(MetricLine{Label: ">750 LOC count", Value: strconv.Itoa(analysis.Over750Count)})
+	c.PrintMetricLine(MetricLine{Label: ">1000 LOC count", Value: strconv.Itoa(analysis.Over1000Count)})
 
 	c.PrintBlankLine()
 
@@ -370,11 +375,11 @@ func (c *Console) RenderFileSizeReport(analysis *FileSizeAnalysis, cfg FileSizeC
 	}
 
 	items := make([]RankedItem, topCount)
-	for i := 0; i < topCount; i++ {
+	for i := range topCount {
 		f := analysis.NonTestFiles[i]
 		items[i] = RankedItem{
 			Rank:  i + 1,
-			Value: fmt.Sprintf("%d", f.LineCount),
+			Value: strconv.Itoa(f.LineCount),
 			Label: c.FormatPath(f.Path),
 		}
 	}
@@ -411,4 +416,3 @@ func countFileLines(path string) (int, error) {
 
 	return count, scanner.Err()
 }
-
