@@ -15,7 +15,7 @@ import (
 )
 
 // TestHelperProcess is used as a subprocess target for tests that expect os.Exit.
-func TestHelperProcess(t *testing.T) {
+func TestHelperProcess(_ *testing.T) {
 	if os.Getenv("FO_TEST_HELPER") == "" {
 		return
 	}
@@ -95,7 +95,6 @@ func TestFindCommandArgs_ReturnsExpected_When_DelimiterScenariosVary(t *testing.
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			// Global os.Args use makes tests unsafe for parallel execution.
 			originalArgs := os.Args
@@ -116,8 +115,14 @@ func TestParseGlobalFlags_SetsCliFields_When_ValidInputsProvided(t *testing.T) {
 	}{
 		{
 			name: "ParsesAllFlags_When_ValuesAreValid",
-			args: []string{"fo", "--label", "task", "--stream", "--show-output", "always", "--pattern", "sparkline", "--format", "json", "--no-timer", "--no-color", "--ci", "--debug", "--max-buffer-size", "2", "--max-line-length", "1"},
+			args: []string{
+				"fo", "--label", "task", "--stream", "--show-output", "always",
+				"--pattern", "sparkline", "--format", "json", "--no-timer",
+				"--no-color", "--ci", "--debug", "--max-buffer-size", "2",
+				"--max-line-length", "1",
+			},
 			assertFunc: func(t *testing.T, flags config.CliFlags, version bool) {
+				t.Helper()
 				require.False(t, version)
 				assert.Equal(t, "task", flags.Label)
 				assert.True(t, flags.Stream)
@@ -142,7 +147,6 @@ func TestParseGlobalFlags_SetsCliFields_When_ValidInputsProvided(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			// parseGlobalFlags mutates global flag state; isolate per subtest.
 			originalArgs := os.Args
@@ -185,6 +189,7 @@ func TestRun_ManagesExecutionFlow_When_DifferentInputsProvided(t *testing.T) {
 			args:     []string{"fo", "--version"},
 			wantExit: 0,
 			checkStdout: func(t *testing.T, stdout string) {
+				t.Helper()
 				assert.Contains(t, stdout, "fo version")
 			},
 		},
@@ -193,6 +198,7 @@ func TestRun_ManagesExecutionFlow_When_DifferentInputsProvided(t *testing.T) {
 			args:     []string{"fo", "--"},
 			wantExit: 1,
 			checkStderr: func(t *testing.T, stderr string) {
+				t.Helper()
 				assert.Contains(t, stderr, "No command specified")
 			},
 		},
@@ -201,6 +207,7 @@ func TestRun_ManagesExecutionFlow_When_DifferentInputsProvided(t *testing.T) {
 			args:     []string{"fo", "--", "echo", "ok"},
 			wantExit: 0,
 			checkStdout: func(t *testing.T, stdout string) {
+				t.Helper()
 				// Check for success indicator (could be [SUCCESS] or Complete depending on theme)
 				assert.True(t, strings.Contains(stdout, "[SUCCESS]") || strings.Contains(stdout, "Complete"),
 					"Expected success indicator, got: %s", stdout)
@@ -211,6 +218,7 @@ func TestRun_ManagesExecutionFlow_When_DifferentInputsProvided(t *testing.T) {
 			args:     []string{"fo", "--format", "json", "--", "echo", "ok"},
 			wantExit: 0,
 			checkStdout: func(t *testing.T, stdout string) {
+				t.Helper()
 				assert.Contains(t, stdout, "\"exit_code\": 0")
 			},
 		},
@@ -219,13 +227,13 @@ func TestRun_ManagesExecutionFlow_When_DifferentInputsProvided(t *testing.T) {
 			args:     []string{"fo", "--debug", "--", "echo", "test"},
 			wantExit: 0,
 			checkStderr: func(t *testing.T, stderr string) {
+				t.Helper()
 				assert.Contains(t, stderr, "[DEBUG run()]")
 			},
 		},
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			// run() relies on os.Args and global flags; isolate state.
 			originalArgs := os.Args
