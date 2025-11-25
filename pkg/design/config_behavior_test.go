@@ -334,6 +334,8 @@ func TestConfig_UsesReflection_When_FeatureFlagEnabled(t *testing.T) {
 }
 
 func TestConfig_ReflectionMatchesSwitch_When_AllColors(t *testing.T) {
+	t.Parallel()
+
 	// Save original env value
 	originalEnv := os.Getenv("FO_USE_REFLECTION_COLORS")
 	t.Cleanup(func() {
@@ -360,7 +362,8 @@ func TestConfig_ReflectionMatchesSwitch_When_AllColors(t *testing.T) {
 	}
 
 	// Test with reflection-based
-	os.Setenv("FO_USE_REFLECTION_COLORS", "1")
+	// Cannot use t.Setenv() with t.Parallel() - they are incompatible
+	os.Setenv("FO_USE_REFLECTION_COLORS", "1") //nolint:tenv
 	cfgReflection := UnicodeVibrantTheme()
 	reflectionResults := make(map[string]string)
 	for _, color := range colorsToTest {
