@@ -1223,10 +1223,17 @@ func resolveDesignConfig(cfg ConsoleConfig) *design.Config {
 	}
 
 	var base *design.Config
-	switch cfg.ThemeName {
-	case "ascii_minimal":
-		base = design.ASCIIMinimalTheme()
-	default:
+	
+	// Check if theme name is provided and exists in default themes
+	if cfg.ThemeName != "" {
+		if theme, ok := design.DefaultThemes()[cfg.ThemeName]; ok {
+			base = design.DeepCopyConfig(theme)
+		} else {
+			// Theme not found in defaults, fall back to unicode_vibrant
+			base = design.UnicodeVibrantTheme()
+		}
+	} else {
+		// No theme name specified, use default
 		base = design.UnicodeVibrantTheme()
 	}
 

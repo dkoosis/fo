@@ -501,6 +501,102 @@ func UnicodeVibrantTheme() *Config {
 	return cfg
 }
 
+func OrcaTheme() *Config {
+	cfg := &Config{
+		ThemeName:    "orca",
+		IsMonochrome: false,
+	}
+	cfg.Style.UseBoxes = true
+	cfg.Style.Indentation = "  "
+	cfg.Style.ShowTimestamps = false
+	cfg.Style.Density = "balanced"
+	cfg.Style.NoTimer = false
+	cfg.Style.HeaderWidth = 50
+
+	cfg.Icons.Start = "▶"
+	cfg.Icons.Success = "✓"
+	cfg.Icons.Warning = "⚠"
+	cfg.Icons.Error = "✗"
+	cfg.Icons.Info = "ℹ"
+	cfg.Icons.Bullet = "•"
+
+	// Initialize Design Tokens (Phase 1: centralized, semantic values)
+	cfg.Tokens = &DesignTokens{}
+	cfg.Tokens.Colors.Process = "\033[0;36m"     // Cyan for process/task
+	cfg.Tokens.Colors.Success = "\033[0;32m"     // Green for success
+	cfg.Tokens.Colors.Warning = "\033[0;33m"     // Yellow for warnings
+	cfg.Tokens.Colors.Error = "\033[0;31m"       // Red for errors
+	cfg.Tokens.Colors.Detail = "\033[0m"         // Reset for detail text
+	cfg.Tokens.Colors.Muted = "\033[2m"          // Dim for muted text
+	cfg.Tokens.Colors.Reset = "\033[0m"          // Reset
+	cfg.Tokens.Colors.White = "\033[0;97m"       // Bright white
+	cfg.Tokens.Colors.GreenFg = "\033[38;5;120m" // Light green
+	cfg.Tokens.Colors.BlueFg = "\033[38;5;39m"   // Bright blue (ocean-like)
+	cfg.Tokens.Colors.BlueBg = "\033[44m"        // Blue background
+	cfg.Tokens.Colors.Spinner = "\033[38;5;39m"  // Bright blue for spinner
+	cfg.Tokens.Colors.Bold = "\033[1m"
+	cfg.Tokens.Colors.Italic = "\033[3m"
+	cfg.Tokens.Spacing.Progress = 0
+	cfg.Tokens.Spacing.Indent = 2
+	cfg.Tokens.Typography.HeaderWidth = 50
+
+	// Sync Tokens to old Colors struct for backwards compatibility
+	cfg.syncTokensToColors()
+
+	cfg.Border.TaskStyle = BorderLeftDouble
+	cfg.Border.HeaderChar = "═"
+	cfg.Border.VerticalChar = "│"
+	cfg.Border.TopCornerChar = "╔"
+	cfg.Border.BottomCornerChar = "└"
+	cfg.Border.FooterContinuationChar = "─"
+
+	cfg.Elements = make(map[string]ElementStyleDef)
+	initBaseElementStyles(cfg.Elements)
+	cfg.Elements["Fo_Banner_Top"] = ElementStyleDef{LineChar: "═", Prefix: "ORCA: ", TextStyle: []string{"bold"}, ColorFG: "Process"}
+	cfg.Elements["Fo_Banner_Bottom"] = ElementStyleDef{LineChar: "═", Prefix: "ORCA: ", TextStyle: []string{"bold"}, ColorFG: "Process"}
+	cfg.Elements["Task_Label_Header"] = ElementStyleDef{TextCase: "upper", TextStyle: []string{"bold"}, ColorFG: "Process"}
+	cfg.Elements["Task_StartIndicator_Line"] = ElementStyleDef{IconKey: "Start", ColorFG: "Process"}
+	cfg.Elements["Stdout_Line_Prefix"] = ElementStyleDef{AdditionalChars: "  "}
+	cfg.Elements["Stderr_Warning_Line_Prefix"] = ElementStyleDef{IconKey: "Warning", AdditionalChars: "  ", ColorFG: "Warning"}
+	cfg.Elements["Stderr_Error_Line_Prefix"] = ElementStyleDef{IconKey: "Error", AdditionalChars: "  ", ColorFG: "Error"}
+	cfg.Elements["Make_Info_Line_Prefix"] = ElementStyleDef{IconKey: "Info", Text: " "}
+	cfg.Elements["Task_Content_Stderr_Warning_Text"] = ElementStyleDef{ColorFG: "Warning"}
+	cfg.Elements["Task_Content_Stderr_Error_Text"] = ElementStyleDef{ColorFG: "Error"}
+	cfg.Elements["Task_Status_Success_Block"] = ElementStyleDef{IconKey: "Success", TextContent: "Complete", ColorFG: "Success"}
+	cfg.Elements["Task_Status_Failed_Block"] = ElementStyleDef{IconKey: "Error", TextContent: "Failed", ColorFG: "Error"}
+	cfg.Elements["Task_Status_Warning_Block"] = ElementStyleDef{IconKey: "Warning", TextContent: "Completed with warnings", ColorFG: "Warning"}
+	cfg.Elements["Task_Status_Duration"] = ElementStyleDef{Prefix: "(", Suffix: ")", ColorFG: "Muted"}
+	cfg.Elements["Task_Content_Summary_Heading"] = ElementStyleDef{TextContent: "SUMMARY:", TextStyle: []string{"bold"}, ColorFG: "Process"}
+	cfg.Elements["Task_Content_Summary_Item_Error"] = ElementStyleDef{BulletChar: "•", ColorFG: "Error"}
+	cfg.Elements["Task_Content_Summary_Item_Warning"] = ElementStyleDef{BulletChar: "•", ColorFG: "Warning"}
+	cfg.Elements["Table_Header_Cell_Text"] = ElementStyleDef{TextStyle: []string{"bold"}, ColorFG: "Process"}
+	cfg.Elements["Print_Header_Highlight"] = ElementStyleDef{
+		TextCase: "none", TextStyle: []string{"bold"}, ColorFG: "White", ColorBG: "BlueBg",
+	}
+	cfg.Elements["Print_Success_Style"] = ElementStyleDef{ColorFG: "Success"}
+
+	cfg.Patterns = defaultPatterns()
+	cfg.Tools = make(map[string]*ToolConfig)
+	cfg.CognitiveLoad.AutoDetect = true
+	cfg.CognitiveLoad.Default = LoadMedium
+	cfg.ComplexityThresholds.VeryHigh = 100
+	cfg.ComplexityThresholds.High = 50
+	cfg.ComplexityThresholds.Medium = 20
+	cfg.ComplexityThresholds.ErrorCountHigh = 5
+	cfg.ComplexityThresholds.WarningCountMedium = 2
+
+	cfg.Tests.SparkbarFilled = "▮"
+	cfg.Tests.SparkbarEmpty = "▯"
+	cfg.Tests.SparkbarLength = 10
+	cfg.Tests.ShowPercentage = false
+	cfg.Tests.NoTestIcon = "○"
+	cfg.Tests.NoTestColor = ColorKeyWarning
+	cfg.Tests.CoverageGoodMin = 70
+	cfg.Tests.CoverageWarningMin = 40
+
+	return cfg
+}
+
 func initBaseElementStyles(elements map[string]ElementStyleDef) {
 	knownElements := []string{
 		"Fo_Banner_Top", "Fo_Banner_Top_Line_FoProcessing", "Fo_Timestamp_Start",
@@ -928,6 +1024,7 @@ func DefaultThemes() map[string]*Config {
 	return map[string]*Config{
 		"unicode_vibrant": UnicodeVibrantTheme(),
 		"ascii_minimal":   ASCIIMinimalTheme(),
+		"orca":            OrcaTheme(),
 	}
 }
 
