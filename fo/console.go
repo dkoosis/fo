@@ -265,6 +265,8 @@ func (c *Console) getBorderChars(cfg *design.Config) BorderChars {
 }
 
 // getTerminalWidth returns the terminal width, or a default if unavailable.
+// This represents the total box width including corners.
+// The horizontal line length will be this value minus 2 (for the corner characters).
 func (c *Console) getTerminalWidth() int {
 	width, _, err := term.GetSize(int(os.Stdout.Fd()))
 	if err != nil || width <= 0 {
@@ -321,9 +323,11 @@ func (c *Console) PrintSectionHeader(name string) {
 		labelColor := cfg.GetColor(headerStyle.ColorFG, "Task_Label_Header")
 
 		// Top border line
+		// TotalWidth includes corners, so subtract 2 for the corner chars
+		horizontalWidth := box.TotalWidth - 2
 		sb.WriteString(box.BorderColor)
 		sb.WriteString(box.BorderChars.TopLeft)
-		sb.WriteString(strings.Repeat(box.BorderChars.Horizontal, box.TotalWidth))
+		sb.WriteString(strings.Repeat(box.BorderChars.Horizontal, horizontalWidth))
 		sb.WriteString(box.BorderChars.TopRight)
 		sb.WriteString(reset)
 		sb.WriteString("\n")
@@ -486,9 +490,11 @@ func (c *Console) PrintSectionFooter() {
 	reset := cfg.ResetColor()
 
 	var sb strings.Builder
+	// TotalWidth includes corners, so subtract 2 for the corner chars
+	horizontalWidth := box.TotalWidth - 2
 	sb.WriteString(box.BorderColor)
 	sb.WriteString(box.BorderChars.BottomLeft)
-	sb.WriteString(strings.Repeat(box.BorderChars.Horizontal, box.TotalWidth))
+	sb.WriteString(strings.Repeat(box.BorderChars.Horizontal, horizontalWidth))
 	sb.WriteString(box.BorderChars.BottomRight)
 	sb.WriteString(reset)
 	sb.WriteString("\n\n")
