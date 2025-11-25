@@ -537,6 +537,7 @@ type SectionFunc func() error
 type Section struct {
 	Name        string      // Human-readable section name, shown in header
 	Description string      // Optional description
+	Summary     string      // Optional summary message (shown instead of name/description on success)
 	Run         SectionFunc // Work to perform for this section
 }
 
