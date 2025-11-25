@@ -3,6 +3,8 @@ package fo
 import (
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -52,6 +54,8 @@ type TestTableConfig struct {
 	ShowAllTests bool
 	// SubtestConfig controls subtest hierarchy rendering
 	SubtestConfig SubtestConfig
+	// ProjectLayout configures how to extract group names from package paths
+	ProjectLayout ProjectLayout
 }
 
 // SubtestConfig configures how subtests are rendered.
@@ -64,6 +68,17 @@ type SubtestConfig struct {
 	ShowParentStatus bool
 	// HumanizeNames applies HumanizeTestName to subtest names
 	HumanizeNames bool
+}
+
+// ProjectLayout configures how to extract group names from package paths for test grouping.
+type ProjectLayout struct {
+	// TopDirs are directories to recognize as top-level groups (e.g., ["internal", "cmd", "pkg", "examples"])
+	TopDirs []string
+	// ModulePrefix is the module prefix to strip (auto-detected from go.mod if empty)
+	ModulePrefix string
+	// GroupFunc is an optional custom grouping function that overrides default behavior
+	// If provided, this function takes a package path and returns a group name
+	GroupFunc func(pkgPath string) string
 }
 
 // CoverageThreshold defines a coverage range and its associated color.
@@ -142,6 +157,10 @@ func buildTestTableConfig(console *Console) TestTableConfig {
 			IndentSize:       4,
 			ShowParentStatus: false,
 			HumanizeNames:    true,
+		},
+		ProjectLayout: ProjectLayout{
+			TopDirs:      []string{"internal", "cmd", "pkg", "examples"},
+			ModulePrefix: detectModulePrefix(),
 		},
 	}
 }
@@ -512,6 +531,85 @@ func (r *TestRenderer) formatAlignedDuration(d time.Duration) string {
 	}
 	// For m:ss format, calculate total width dynamically
 	return fmt.Sprintf("%dm%ds", minutes, remainingSeconds)
+}
+
+// detectModulePrefix attempts to detect the module prefix from go.mod.
+// Returns empty string if detection fails.
+func detectModulePrefix() string {
+	// Look for go.mod in current directory and parent directories
+	dir, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+
+	for {
+		modPath := filepath.Join(dir, "go.mod")
+		if _, err := os.Stat(modPath); err == nil {
+			// Read go.mod to extract module name
+			content, err := os.ReadFile(modPath)
+			if err != nil {
+				return ""
+			}
+
+			lines := strings.Split(string(content), "\n")
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if strings.HasPrefix(line, "module ") {
+					moduleName := strings.TrimSpace(strings.TrimPrefix(line, "module"))
+					return moduleName
+				}
+			}
+			return ""
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// Reached root
+			break
+		}
+		dir = parent
+	}
+
+	return ""
+}
+
+// GetGroupName extracts a group name from a package path using the ProjectLayout configuration.
+// This allows consumers to group test packages by directory structure.
+func (r *TestRenderer) GetGroupName(pkgPath string) string {
+	layout := r.config.ProjectLayout
+
+	// Use custom grouping function if provided
+	if layout.GroupFunc != nil {
+		return layout.GroupFunc(pkgPath)
+	}
+
+	// Strip module prefix if configured
+	path := pkgPath
+	if layout.ModulePrefix != "" {
+		prefix := layout.ModulePrefix + "/"
+		path = strings.TrimPrefix(path, prefix)
+	}
+
+	// Check for top-level directories
+	for _, topDir := range layout.TopDirs {
+		pattern := "/" + topDir + "/"
+		if strings.Contains(path, pattern) {
+			return topDir
+		}
+		// Also check if path starts with topDir
+		if strings.HasPrefix(path, topDir+"/") {
+			return topDir
+		}
+	}
+
+	// If no top-level directory matches, return the first path component
+	parts := strings.Split(path, "/")
+	if len(parts) > 0 && parts[0] != "" {
+		return parts[0]
+	}
+
+	// Fallback: return empty string (no grouping)
+	return ""
 }
 
 // HumanizeTestName converts Go test names to human-friendly format.
