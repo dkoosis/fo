@@ -493,6 +493,174 @@ func (c *Console) PrintSectionFooter() {
 	_, _ = c.cfg.Out.Write([]byte(sb.String()))
 }
 
+// SectionStatus represents the outcome status of a section execution.
+type SectionStatus string
+
+const (
+	// SectionOK indicates the section completed successfully.
+	SectionOK SectionStatus = "ok"
+	// SectionWarning indicates the section completed with warnings.
+	SectionWarning SectionStatus = "warning"
+	// SectionError indicates the section failed.
+	SectionError SectionStatus = "error"
+)
+
+// SectionWarningError is a special error type that signals a section completed
+// with warnings but should not be treated as a fatal error.
+type SectionWarningError struct {
+	Err error
+}
+
+// Error implements the error interface.
+func (e *SectionWarningError) Error() string {
+	return e.Err.Error()
+}
+
+// Unwrap returns the underlying error for error wrapping compatibility.
+func (e *SectionWarningError) Unwrap() error {
+	return e.Err
+}
+
+// NewSectionWarning wraps an error as a warning that should be displayed
+// but not fail the section execution.
+func NewSectionWarning(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &SectionWarningError{Err: err}
+}
+
+// SectionFunc is a function that performs work for a section.
+type SectionFunc func() error
+
+// Section represents a unit of orchestration with a name and work function.
+type Section struct {
+	Name        string      // Human-readable section name, shown in header
+	Description string      // Optional description
+	Run         SectionFunc // Work to perform for this section
+}
+
+// SectionResult contains the outcome of running a section.
+type SectionResult struct {
+	Name     string
+	Status   SectionStatus
+	Duration time.Duration
+	Err      error
+	Summary  string // Optional summary message from the section
+}
+
+// RunSection executes a single section and returns its result.
+// It prints a section header, runs the work function, and prints
+// a one-line summary with status icon and duration.
+func (c *Console) RunSection(s Section) SectionResult {
+	start := time.Now()
+
+	// 1) Section header
+	c.PrintSectionHeader(s.Name)
+
+	// 2) Run the actual work
+	err := s.Run()
+
+	// 3) Derive status from error type
+	status := SectionOK
+	var displayErr error
+	if err != nil {
+		var warningErr *SectionWarningError
+		if errors.As(err, &warningErr) {
+			status = SectionWarning
+			displayErr = warningErr.Err
+		} else {
+			status = SectionError
+			displayErr = err
+		}
+	}
+
+	// 4) Timing + trailing summary line
+	duration := time.Since(start)
+	roundedDuration := duration.Round(time.Second)
+	seconds := int(roundedDuration.Seconds())
+
+	// Format duration with muted color
+	mutedColor := c.GetMutedColor()
+	resetColor := c.designConf.ResetColor()
+	durationStr := fmt.Sprintf("%s(%ds)%s", mutedColor, seconds, resetColor)
+
+	// Get status icon and color from theme
+	icon, iconColor := c.getStatusIcon(status)
+
+	// Render status line with structured content
+	content := ContentLine{
+		Icon:      icon,
+		IconColor: iconColor,
+		TextColor: "", // Use default text color
+	}
+
+	// Determine what text to show
+	// Priority: error message > summary > description > name
+	switch {
+	case displayErr != nil:
+		content.Text = fmt.Sprintf("%s %s: %v", s.Name, durationStr, displayErr)
+	case s.Summary != "":
+		content.Text = fmt.Sprintf("%s %s", s.Summary, durationStr)
+	case s.Description != "":
+		content.Text = fmt.Sprintf("%s %s", s.Description, durationStr)
+	default:
+		content.Text = fmt.Sprintf("%s %s", s.Name, durationStr)
+	}
+
+	c.PrintSectionContentLine(content)
+
+	// Close the section box
+	c.PrintSectionFooter()
+
+	return SectionResult{
+		Name:     s.Name,
+		Status:   status,
+		Duration: duration,
+		Err:      displayErr,
+	}
+}
+
+// RunSections executes multiple sections in sequence and returns all results
+// plus an aggregated error. If any section fails (SectionError), the aggregated
+// error will be non-nil, but all sections will still be executed. Warnings
+// (SectionWarning) are displayed but do not contribute to the aggregated error.
+func (c *Console) RunSections(sections ...Section) ([]SectionResult, error) {
+	results := make([]SectionResult, 0, len(sections))
+	var errs []error
+
+	for _, s := range sections {
+		res := c.RunSection(s)
+		results = append(results, res)
+		// Only aggregate actual errors, not warnings
+		if res.Status == SectionError && res.Err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", res.Name, res.Err))
+		}
+	}
+
+	return results, errors.Join(errs...)
+}
+
+// getStatusIcon returns the icon and color for a section status from the theme.
+// Returns (icon, color) where color is empty string if no color should be applied.
+func (c *Console) getStatusIcon(status SectionStatus) (string, string) {
+	cfg := c.designConf
+	switch status {
+	case SectionOK:
+		icon := cfg.GetIcon("Success")
+		color := cfg.GetColor("Success")
+		return icon, color
+	case SectionWarning:
+		icon := cfg.GetIcon("Warning")
+		color := cfg.GetColor("Warning")
+		return icon, color
+	default: // SectionError
+		icon := cfg.GetIcon("Error")
+		color := cfg.GetColor("Error")
+		return icon, color
+	}
+}
+
 // PrintH1Header prints a major headline (H1) using the console's theme.
 func (c *Console) PrintH1Header(name string) {
 	cfg := c.designConf
