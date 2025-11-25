@@ -222,15 +222,22 @@ func (c *Console) PrintSectionHeader(name string) {
 		closingCorner := "╮"
 		if topCorner == BorderCornerDouble {
 			closingCorner = "╗"
+		} else if topCorner == "╭" {
+			closingCorner = "╮" // Rounded single-line corner
 		}
-		sb.WriteString(faintGray)
+		// Use very pale gray for orca theme, faint dark gray for others
+		borderColor := faintGray
+		if cfg.ThemeName == "orca" {
+			borderColor = c.getPaleGrayColor()
+		}
+		sb.WriteString(borderColor)
 		sb.WriteString(topCorner)
 		sb.WriteString(strings.Repeat(headerChar, headerWidth))
 		sb.WriteString(closingCorner)
 		sb.WriteString(reset)
 		sb.WriteString("\n")
 
-		sb.WriteString(faintGray)
+		sb.WriteString(borderColor)
 		sb.WriteString(cfg.Border.VerticalChar)
 		sb.WriteString(reset)
 		sb.WriteString("  ")
@@ -246,7 +253,7 @@ func (c *Console) PrintSectionHeader(name string) {
 			remainingWidth = 0
 		}
 		sb.WriteString(strings.Repeat(" ", remainingWidth))
-		sb.WriteString(faintGray)
+		sb.WriteString(borderColor)
 		sb.WriteString(cfg.Border.VerticalChar)
 		sb.WriteString(reset)
 		sb.WriteString("\n")
@@ -263,7 +270,11 @@ func (c *Console) PrintSectionLine(line string) {
 		return
 	}
 
-	faintGray := c.getFaintDarkGrayColor()
+	// Use very pale gray for orca theme, faint dark gray for others
+	borderColor := c.getFaintDarkGrayColor()
+	if cfg.ThemeName == "orca" {
+		borderColor = c.getPaleGrayColor()
+	}
 	reset := cfg.ResetColor()
 	headerWidth := c.getTerminalWidth()
 
@@ -300,13 +311,13 @@ func (c *Console) PrintSectionLine(line string) {
 	}
 
 	var sb strings.Builder
-	sb.WriteString(faintGray)
+	sb.WriteString(borderColor)
 	sb.WriteString(cfg.Border.VerticalChar)
 	sb.WriteString(reset)
 	sb.WriteString("  ")
 	sb.WriteString(line)
 	sb.WriteString(strings.Repeat(" ", padding))
-	sb.WriteString(faintGray)
+	sb.WriteString(borderColor)
 	sb.WriteString(cfg.Border.VerticalChar)
 	sb.WriteString(reset)
 	sb.WriteString("\n")
@@ -322,7 +333,11 @@ func (c *Console) PrintSectionFooter() {
 		return
 	}
 
-	faintGray := c.getFaintDarkGrayColor()
+	// Use very pale gray for orca theme, faint dark gray for others
+	borderColor := c.getFaintDarkGrayColor()
+	if cfg.ThemeName == "orca" {
+		borderColor = c.getPaleGrayColor()
+	}
 	reset := cfg.ResetColor()
 	headerWidth := c.getTerminalWidth()
 
@@ -331,10 +346,12 @@ func (c *Console) PrintSectionFooter() {
 	bottomClosingCorner := "╯"
 	if bottomCorner == "╚" {
 		bottomClosingCorner = "╝"
+	} else if bottomCorner == "╰" {
+		bottomClosingCorner = "╯" // Rounded single-line corner
 	}
 
 	var sb strings.Builder
-	sb.WriteString(faintGray)
+	sb.WriteString(borderColor)
 	sb.WriteString(bottomCorner)
 	sb.WriteString(strings.Repeat(headerChar, headerWidth))
 	sb.WriteString(bottomClosingCorner)

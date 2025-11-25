@@ -522,7 +522,7 @@ func OrcaTheme() *Config {
 
 	// Initialize Design Tokens (Phase 1: centralized, semantic values)
 	cfg.Tokens = &DesignTokens{}
-	cfg.Tokens.Colors.Process = "\033[0;36m"     // Cyan for process/task
+	cfg.Tokens.Colors.Process = "\033[38;5;111m" // Pale blue for process/task/headings
 	cfg.Tokens.Colors.Success = "\033[0;32m"     // Green for success
 	cfg.Tokens.Colors.Warning = "\033[0;33m"     // Yellow for warnings
 	cfg.Tokens.Colors.Error = "\033[0;31m"       // Red for errors
@@ -533,7 +533,7 @@ func OrcaTheme() *Config {
 	cfg.Tokens.Colors.GreenFg = "\033[38;5;120m" // Light green
 	cfg.Tokens.Colors.BlueFg = "\033[38;5;39m"   // Bright blue (ocean-like)
 	cfg.Tokens.Colors.BlueBg = "\033[44m"        // Blue background
-	cfg.Tokens.Colors.Spinner = "\033[38;5;39m"  // Bright blue for spinner
+	cfg.Tokens.Colors.Spinner = "\033[38;5;111m" // Pale blue for spinner
 	cfg.Tokens.Colors.Bold = "\033[1m"
 	cfg.Tokens.Colors.Italic = "\033[3m"
 	cfg.Tokens.Spacing.Progress = 0
@@ -543,11 +543,11 @@ func OrcaTheme() *Config {
 	// Sync Tokens to old Colors struct for backwards compatibility
 	cfg.syncTokensToColors()
 
-	cfg.Border.TaskStyle = BorderLeftDouble
-	cfg.Border.HeaderChar = "═"
+	cfg.Border.TaskStyle = BorderHeaderBox
+	cfg.Border.HeaderChar = "─"
 	cfg.Border.VerticalChar = "│"
-	cfg.Border.TopCornerChar = "╔"
-	cfg.Border.BottomCornerChar = "└"
+	cfg.Border.TopCornerChar = "╭"
+	cfg.Border.BottomCornerChar = "╰"
 	cfg.Border.FooterContinuationChar = "─"
 
 	cfg.Elements = make(map[string]ElementStyleDef)
