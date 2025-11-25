@@ -8,6 +8,9 @@ import (
 	"time"
 )
 
+// Default success icon fallback.
+const defaultSuccessIcon = "✓"
+
 // TestResult represents a single test with its status.
 type TestResult struct {
 	Name   string
@@ -207,7 +210,7 @@ func (r *TestRenderer) RenderPackageLine(pkg TestPackageResult) {
 	default:
 		statusIcon = r.console.GetIcon("Success")
 		if statusIcon == "" {
-			statusIcon = "✓"
+			statusIcon = defaultSuccessIcon
 		}
 		statusColor = r.console.GetGreenFgColor()
 	}
@@ -258,7 +261,7 @@ func (r *TestRenderer) RenderPackageLine(pkg TestPackageResult) {
 				testColor = r.console.GetGreenFgColor()
 				testIcon = r.console.GetIcon("Success")
 				if testIcon == "" {
-					testIcon = "✓"
+					testIcon = defaultSuccessIcon
 				}
 			case "FAIL":
 				testColor = r.console.GetErrorColor()
