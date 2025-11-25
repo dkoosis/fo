@@ -588,11 +588,11 @@ func (c *Config) GetIcon(iconKey string) string {
 		switch strings.ToLower(iconKey) {
 		case "start":
 			return IconStart
-		case "success":
+		case MessageTypeSuccess:
 			return IconSuccess
-		case "warning":
+		case MessageTypeWarning:
 			return IconWarning
-		case "error":
+		case MessageTypeError:
 			return IconFailed
 		case "info":
 			return IconInfo
@@ -605,11 +605,11 @@ func (c *Config) GetIcon(iconKey string) string {
 	switch strings.ToLower(iconKey) {
 	case "start":
 		return c.Icons.Start
-	case "success":
+	case MessageTypeSuccess:
 		return c.Icons.Success
-	case "warning":
+	case MessageTypeWarning:
 		return c.Icons.Warning
-	case "error":
+	case MessageTypeError:
 		return c.Icons.Error
 	case "info":
 		return c.Icons.Info
