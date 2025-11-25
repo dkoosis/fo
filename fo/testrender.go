@@ -193,26 +193,22 @@ func (r *TestRenderer) RenderGroupHeader(dirName string) {
 func (r *TestRenderer) RenderPackageLine(pkg TestPackageResult) {
 	total := pkg.Passed + pkg.Failed + pkg.Skipped
 
-	// Determine status icon and color
+	// Determine status icon and color using semantic methods
 	var statusIcon string
 	var statusColor string
 	switch {
 	case pkg.Failed > 0:
-		statusIcon = r.console.GetIcon("Error")
-		if statusIcon == "" {
-			statusIcon = "✗"
-		}
+		statusIcon = r.console.FormatStatusIcon("FAIL")
+		// Extract color for manual formatting (since we need to style package name separately)
 		statusColor = r.console.GetErrorColor()
 	case total == 0:
 		// Use configured icon and color for packages with no tests
 		statusIcon = r.config.NoTestIcon
 		statusColor = r.console.GetColor(r.config.NoTestColor)
 	default:
-		statusIcon = r.console.GetIcon("Success")
-		if statusIcon == "" {
-			statusIcon = defaultSuccessIcon
-		}
-		statusColor = r.console.GetGreenFgColor()
+		statusIcon = r.console.FormatStatusIcon("PASS")
+		// Extract color for manual formatting
+		statusColor = r.console.GetSuccessColor()
 	}
 	reset := r.console.ResetColor()
 
@@ -254,33 +250,14 @@ func (r *TestRenderer) RenderPackageLine(pkg TestPackageResult) {
 	if r.config.ShowAllTests && len(pkg.AllTests) > 0 {
 		// Show all tests with their status
 		for _, test := range pkg.AllTests {
-			var testColor string
-			var testIcon string
-			switch strings.ToUpper(test.Status) {
-			case "PASS":
-				testColor = r.console.GetGreenFgColor()
-				testIcon = r.console.GetIcon("Success")
-				if testIcon == "" {
-					testIcon = defaultSuccessIcon
-				}
-			case "FAIL":
-				testColor = r.console.GetErrorColor()
-				testIcon = r.console.GetIcon("Error")
-				if testIcon == "" {
-					testIcon = "✗"
-				}
-			case "SKIP":
-				testColor = r.console.GetMutedColor()
-				testIcon = "⚠"
-			default:
-				testColor = r.console.GetMutedColor()
-				testIcon = "▫"
-			}
-			humanName := HumanizeTestName(test.Name)
+			// Use semantic formatting for test names
+			statusUpper := strings.ToUpper(test.Status)
+			styledTestName := r.console.FormatTestName(test.Name, statusUpper)
+			statusText := r.console.FormatStatusText(fmt.Sprintf("(%s)", statusUpper), statusUpper)
 			if r.inGroupBox {
 				paleGray := r.getPaleGrayColor()
 				cfg := r.console.designConf
-				lineContent := fmt.Sprintf("        %s%s%s %s (%s)", testColor, testIcon, reset, humanName, strings.ToUpper(test.Status))
+				lineContent := fmt.Sprintf("        %s %s", styledTestName, statusText)
 				visualWidth := len(stripANSI(lineContent))
 				padding := r.boxWidth - visualWidth
 				if padding < 0 {
@@ -292,22 +269,17 @@ func (r *TestRenderer) RenderPackageLine(pkg TestPackageResult) {
 					strings.Repeat(" ", padding),
 					paleGray, cfg.Border.VerticalChar, reset)
 			} else {
-				fmt.Fprintf(r.writer, "        %s%s%s %s (%s)\n", testColor, testIcon, reset, humanName, strings.ToUpper(test.Status))
+				fmt.Fprintf(r.writer, "        %s %s\n", styledTestName, statusText)
 			}
 		}
 	} else if len(pkg.FailedTests) > 0 {
-		// Show only failed tests (default behavior)
-		errorColor := r.console.GetErrorColor()
-		errorIcon := r.console.GetIcon("Error")
-		if errorIcon == "" {
-			errorIcon = "✗"
-		}
+		// Show only failed tests (default behavior) - use semantic formatting
 		for _, test := range pkg.FailedTests {
-			humanName := HumanizeTestName(test)
+			styledTestName := r.console.FormatTestName(test, "FAIL")
 			if r.inGroupBox {
 				paleGray := r.getPaleGrayColor()
 				cfg := r.console.designConf
-				lineContent := fmt.Sprintf("        %s%s%s %s", errorColor, errorIcon, reset, humanName)
+				lineContent := "        " + styledTestName
 				visualWidth := len(stripANSI(lineContent))
 				padding := r.boxWidth - visualWidth
 				if padding < 0 {
@@ -319,7 +291,7 @@ func (r *TestRenderer) RenderPackageLine(pkg TestPackageResult) {
 					strings.Repeat(" ", padding),
 					paleGray, cfg.Border.VerticalChar, reset)
 			} else {
-				fmt.Fprintf(r.writer, "        %s%s%s %s\n", errorColor, errorIcon, reset, humanName)
+				fmt.Fprintf(r.writer, "        %s\n", styledTestName)
 			}
 		}
 	}

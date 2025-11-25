@@ -846,6 +846,83 @@ func (c *Console) GetColor(colorKey string) string {
 	return c.designConf.GetColor(colorKey)
 }
 
+// FormatStatusIcon returns a fully styled icon string for the given status.
+// Status can be "PASS", "FAIL", "SKIP", "SUCCESS", "ERROR", "WARNING", or "MUTED".
+// Returns the icon with appropriate color and reset code.
+func (c *Console) FormatStatusIcon(status string) string {
+	statusUpper := strings.ToUpper(status)
+	var icon string
+	var color string
+
+	switch statusUpper {
+	case "PASS", "SUCCESS":
+		icon = c.GetIcon("Success")
+		if icon == "" {
+			icon = defaultSuccessIcon
+		}
+		color = c.GetSuccessColor()
+	case "FAIL", "ERROR":
+		icon = c.GetIcon("Error")
+		if icon == "" {
+			icon = "✗"
+		}
+		color = c.GetErrorColor()
+	case "WARNING":
+		icon = c.GetIcon("Warning")
+		if icon == "" {
+			icon = "⚠"
+		}
+		color = c.GetWarningColor()
+	case "SKIP", "MUTED":
+		icon = "▫"
+		color = c.GetMutedColor()
+	default:
+		icon = "▫"
+		color = c.GetMutedColor()
+	}
+
+	if color == "" {
+		return icon
+	}
+	return color + icon + c.ResetColor()
+}
+
+// FormatStatusText returns a fully styled text string for the given status.
+// Status can be "PASS", "FAIL", "SKIP", "SUCCESS", "ERROR", "WARNING", or "MUTED".
+// Returns the text with appropriate color and reset code.
+func (c *Console) FormatStatusText(text, status string) string {
+	statusUpper := strings.ToUpper(status)
+	var color string
+
+	switch statusUpper {
+	case "PASS", "SUCCESS":
+		color = c.GetSuccessColor()
+	case "FAIL", "ERROR":
+		color = c.GetErrorColor()
+	case "WARNING":
+		color = c.GetWarningColor()
+	case "SKIP", "MUTED":
+		color = c.GetMutedColor()
+	default:
+		color = c.GetMutedColor()
+	}
+
+	if color == "" {
+		return text
+	}
+	return color + text + c.ResetColor()
+}
+
+// FormatTestName returns a fully styled test name for the given status.
+// This is a convenience method that combines FormatStatusIcon and FormatStatusText
+// for common test rendering patterns.
+func (c *Console) FormatTestName(name, status string) string {
+	icon := c.FormatStatusIcon(status)
+	humanName := HumanizeTestName(name)
+	text := c.FormatStatusText(humanName, status)
+	return icon + " " + text
+}
+
 // SuccessMsg returns a themed success message with icon and color.
 func (c *Console) SuccessMsg(msg string) string {
 	icon := c.GetIcon("Success")
