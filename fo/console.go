@@ -476,19 +476,21 @@ func (c *Console) PrintSectionContentLine(content ContentLine) {
 		sb.WriteString(reset)
 	}
 
-	// Calculate padding: icon (if present) + space + text
+	// Calculate padding: left padding + icon (if present) + space + text + right padding
 	iconWidth := 0
 	if content.Icon != "" {
 		iconWidth = runewidth.StringWidth(content.Icon) + 1 // Icon + space
 	}
 	textWidth := runewidth.StringWidth(stripANSICodes(content.Text))
 	totalContentWidth := iconWidth + textWidth
-	padding := box.TotalWidth - totalContentWidth - box.RightPadding
-	if padding < 0 {
-		padding = 0
+
+	minRightPadding := box.RightPadding
+	dynamicPadding := (box.TotalWidth - 2) - box.LeftPadding - totalContentWidth - minRightPadding
+	if dynamicPadding < 0 {
+		dynamicPadding = 0
 	}
 
-	sb.WriteString(strings.Repeat(" ", padding))
+	sb.WriteString(strings.Repeat(" ", minRightPadding+dynamicPadding))
 	sb.WriteString(box.BorderColor)
 	sb.WriteString(box.BorderChars.Vertical)
 	sb.WriteString(reset)
