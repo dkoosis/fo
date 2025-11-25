@@ -1,0 +1,7 @@
+ok  	github.com/dkoosis/fo/cmd	2.423s
+ok  	github.com/dkoosis/fo/fo	1.205s
+ok  	github.com/dkoosis/fo/internal/config	1.147s
+ok  	github.com/dkoosis/fo/internal/magetasks	1.067s
+?   	github.com/dkoosis/fo/internal/version	[no test files]
+ok  	github.com/dkoosis/fo/pkg/adapter	1.081s
+ok  	github.com/dkoosis/fo/pkg/design	1.223s
