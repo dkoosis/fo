@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/dkoosis/fo/pkg/design"
 	"gopkg.in/yaml.v3"
 )
@@ -270,6 +271,195 @@ func LoadThemeFromFile(filePath string) (*design.Config, error) {
 	normalizeThemeColors(&themeConfig)
 
 	return &themeConfig, nil
+}
+
+// ThemeOverrides represents partial theme configuration for composition.
+// Only fields that are set will override the base theme.
+type ThemeOverrides struct {
+	Colors struct {
+		Process  *string `yaml:"process,omitempty"`
+		Success  *string `yaml:"success,omitempty"`
+		Warning  *string `yaml:"warning,omitempty"`
+		Error    *string `yaml:"error,omitempty"`
+		Detail   *string `yaml:"detail,omitempty"`
+		Muted    *string `yaml:"muted,omitempty"`
+		Spinner  *string `yaml:"spinner,omitempty"`
+		White    *string `yaml:"white,omitempty"`
+		GreenFg  *string `yaml:"green_fg,omitempty"`
+		BlueFg   *string `yaml:"blue_fg,omitempty"`
+		BlueBg   *string `yaml:"blue_bg,omitempty"`
+		Bold     *string `yaml:"bold,omitempty"`
+		Italic   *string `yaml:"italic,omitempty"`
+	} `yaml:"colors,omitempty"`
+	Style struct {
+		UseBoxes          *bool   `yaml:"use_boxes,omitempty"`
+		Indentation       *string `yaml:"indentation,omitempty"`
+		ShowTimestamps    *bool   `yaml:"show_timestamps,omitempty"`
+		NoTimer           *bool   `yaml:"no_timer,omitempty"`
+		Density           *string `yaml:"density,omitempty"`
+		UseInlineProgress *bool   `yaml:"use_inline_progress,omitempty"`
+		HeaderWidth       *int    `yaml:"header_width,omitempty"`
+	} `yaml:"style,omitempty"`
+	Border struct {
+		HeaderChar             *string `yaml:"header_char,omitempty"`
+		VerticalChar           *string `yaml:"vertical_char,omitempty"`
+		TopCornerChar          *string `yaml:"top_corner_char,omitempty"`
+		TopRightChar           *string `yaml:"top_right_char,omitempty"`
+		BottomCornerChar       *string `yaml:"bottom_corner_char,omitempty"`
+		BottomRightChar        *string `yaml:"bottom_right_char,omitempty"`
+		FooterContinuationChar *string `yaml:"footer_continuation_char,omitempty"`
+	} `yaml:"border,omitempty"`
+}
+
+// LoadThemeOverrides loads theme overrides from a YAML file.
+// Returns a ThemeOverrides struct that can be merged with a base theme.
+func LoadThemeOverrides(filePath string) (*ThemeOverrides, error) {
+	// #nosec G304 -- filePath is from user-provided path
+	yamlFile, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("error reading theme override file %s: %w", filePath, err)
+	}
+
+	var overrides ThemeOverrides
+	err = yaml.Unmarshal(yamlFile, &overrides)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshalling theme override file %s: %w", filePath, err)
+	}
+
+	return &overrides, nil
+}
+
+// MergeThemes merges a base theme with overrides using Lip Gloss inheritance.
+// Base theme provides defaults, overrides selectively override specific values.
+// Returns a new Config with merged values.
+func MergeThemes(base *design.Config, overrides *ThemeOverrides) *design.Config {
+	if overrides == nil {
+		return design.DeepCopyConfig(base)
+	}
+
+	merged := design.DeepCopyConfig(base)
+	if merged == nil {
+		return base
+	}
+
+	// Merge colors (simple field override, convert to lipgloss.Color)
+	if overrides.Colors.Process != nil {
+		merged.Tokens.Colors.Process = lipgloss.Color(*overrides.Colors.Process)
+	}
+	if overrides.Colors.Success != nil {
+		merged.Tokens.Colors.Success = lipgloss.Color(*overrides.Colors.Success)
+	}
+	if overrides.Colors.Warning != nil {
+		merged.Tokens.Colors.Warning = lipgloss.Color(*overrides.Colors.Warning)
+	}
+	if overrides.Colors.Error != nil {
+		merged.Tokens.Colors.Error = lipgloss.Color(*overrides.Colors.Error)
+	}
+	if overrides.Colors.Detail != nil {
+		merged.Tokens.Colors.Detail = lipgloss.Color(*overrides.Colors.Detail)
+	}
+	if overrides.Colors.Muted != nil {
+		merged.Tokens.Colors.Muted = lipgloss.Color(*overrides.Colors.Muted)
+	}
+	if overrides.Colors.Spinner != nil {
+		merged.Tokens.Colors.Spinner = lipgloss.Color(*overrides.Colors.Spinner)
+	}
+	if overrides.Colors.White != nil {
+		merged.Tokens.Colors.White = lipgloss.Color(*overrides.Colors.White)
+	}
+	if overrides.Colors.GreenFg != nil {
+		merged.Tokens.Colors.GreenFg = lipgloss.Color(*overrides.Colors.GreenFg)
+	}
+	if overrides.Colors.BlueFg != nil {
+		merged.Tokens.Colors.BlueFg = lipgloss.Color(*overrides.Colors.BlueFg)
+	}
+	if overrides.Colors.BlueBg != nil {
+		merged.Tokens.Colors.BlueBg = lipgloss.Color(*overrides.Colors.BlueBg)
+	}
+	if overrides.Colors.Bold != nil {
+		merged.Tokens.Colors.Bold = lipgloss.Color(*overrides.Colors.Bold)
+	}
+	if overrides.Colors.Italic != nil {
+		merged.Tokens.Colors.Italic = lipgloss.Color(*overrides.Colors.Italic)
+	}
+
+	// Merge style settings
+	if overrides.Style.UseBoxes != nil {
+		merged.Style.UseBoxes = *overrides.Style.UseBoxes
+	}
+	if overrides.Style.Indentation != nil {
+		merged.Style.Indentation = *overrides.Style.Indentation
+	}
+	if overrides.Style.ShowTimestamps != nil {
+		merged.Style.ShowTimestamps = *overrides.Style.ShowTimestamps
+	}
+	if overrides.Style.NoTimer != nil {
+		merged.Style.NoTimer = *overrides.Style.NoTimer
+	}
+	if overrides.Style.Density != nil {
+		merged.Style.Density = *overrides.Style.Density
+	}
+	if overrides.Style.UseInlineProgress != nil {
+		merged.Style.UseInlineProgress = *overrides.Style.UseInlineProgress
+	}
+	if overrides.Style.HeaderWidth != nil {
+		merged.Style.HeaderWidth = *overrides.Style.HeaderWidth
+	}
+
+	// Merge border settings
+	if overrides.Border.HeaderChar != nil {
+		merged.Border.HeaderChar = *overrides.Border.HeaderChar
+	}
+	if overrides.Border.VerticalChar != nil {
+		merged.Border.VerticalChar = *overrides.Border.VerticalChar
+	}
+	if overrides.Border.TopCornerChar != nil {
+		merged.Border.TopCornerChar = *overrides.Border.TopCornerChar
+	}
+	// Note: TopRightChar and BottomRightChar will be available after #122 is merged
+	// For now, skip these fields
+	if overrides.Border.BottomCornerChar != nil {
+		merged.Border.BottomCornerChar = *overrides.Border.BottomCornerChar
+	}
+	if overrides.Border.FooterContinuationChar != nil {
+		merged.Border.FooterContinuationChar = *overrides.Border.FooterContinuationChar
+	}
+
+	// Sync tokens to colors for backwards compatibility
+	// Note: syncTokensToColors is unexported, but it's called automatically
+	// when Config is used. We'll rely on that behavior.
+
+	// Use Lip Gloss style inheritance for Styles struct
+	// Base styles inherit from base theme, overrides inherit from base
+	if merged.Tokens != nil {
+		// Box style: inherit border settings
+		if merged.Border.TopCornerChar != "" {
+			border := lipgloss.Border{
+				Top:        merged.Border.HeaderChar,
+				Bottom:     merged.Border.FooterContinuationChar,
+				Left:       merged.Border.VerticalChar,
+				Right:      merged.Border.VerticalChar,
+				TopLeft:    merged.Border.TopCornerChar,
+				BottomLeft: merged.Border.BottomCornerChar,
+				// TopRight and BottomRight will be added after #122 is merged
+			}
+			baseBoxStyle := lipgloss.NewStyle().Border(border)
+			merged.Tokens.Styles.Box = baseBoxStyle.Inherit(merged.Tokens.Styles.Box)
+		}
+
+		// Header style: inherit from Process color
+		headerStyle := lipgloss.NewStyle().
+			Foreground(merged.Tokens.Colors.Process).
+			Bold(true)
+		merged.Tokens.Styles.Header = headerStyle.Inherit(merged.Tokens.Styles.Header)
+
+		// Content style: inherit from Detail color
+		contentStyle := lipgloss.NewStyle().
+			Foreground(merged.Tokens.Colors.Detail)
+		merged.Tokens.Styles.Content = contentStyle.Inherit(merged.Tokens.Styles.Content)
+	}
+
+	return merged
 }
 
 // ApplyCommandPreset modifies the AppConfig based on a preset matching the commandName.
