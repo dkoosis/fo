@@ -154,6 +154,7 @@ type Config struct {
 		Muted   string `yaml:"muted"`
 		Reset   string `yaml:"reset"`
 		White   string `yaml:"white,omitempty"`
+		GreenFg string `yaml:"green_fg,omitempty"`
 		BlueFg  string `yaml:"blue_fg,omitempty"`
 		BlueBg  string `yaml:"blue_bg,omitempty"`
 		Bold    string `yaml:"bold,omitempty"`
@@ -183,6 +184,16 @@ type Config struct {
 		ErrorCountHigh     int `yaml:"error_count_high"`     // Error count threshold for high cognitive load
 		WarningCountMedium int `yaml:"warning_count_medium"` // Warning count threshold for medium cognitive load
 	} `yaml:"complexity_thresholds"`
+	Tests struct {
+		SparkbarFilled     string  `yaml:"sparkbar_filled"`
+		SparkbarEmpty      string  `yaml:"sparkbar_empty"`
+		SparkbarLength     int     `yaml:"sparkbar_length"`
+		ShowPercentage     bool    `yaml:"show_percentage"`
+		NoTestIcon         string  `yaml:"no_test_icon"`
+		NoTestColor        string  `yaml:"no_test_color"`
+		CoverageGoodMin    float64 `yaml:"coverage_good_min"`    // Minimum coverage for "good" (green)
+		CoverageWarningMin float64 `yaml:"coverage_warning_min"` // Minimum coverage for "warning" (yellow)
+	} `yaml:"tests"`
 }
 
 type PatternsRepo struct {
@@ -270,6 +281,7 @@ func ASCIIMinimalTheme() *Config {
 		Muted   string `yaml:"muted"`
 		Reset   string `yaml:"reset"`
 		White   string `yaml:"white,omitempty"`
+		GreenFg string `yaml:"green_fg,omitempty"`
 		BlueFg  string `yaml:"blue_fg,omitempty"`
 		BlueBg  string `yaml:"blue_bg,omitempty"`
 		Bold    string `yaml:"bold,omitempty"`
@@ -307,6 +319,15 @@ func ASCIIMinimalTheme() *Config {
 	cfg.ComplexityThresholds.ErrorCountHigh = 5
 	cfg.ComplexityThresholds.WarningCountMedium = 2
 
+	cfg.Tests.SparkbarFilled = "▮"
+	cfg.Tests.SparkbarEmpty = "▯"
+	cfg.Tests.SparkbarLength = 10
+	cfg.Tests.ShowPercentage = false
+	cfg.Tests.NoTestIcon = "○"
+	cfg.Tests.NoTestColor = "Warning"
+	cfg.Tests.CoverageGoodMin = 70
+	cfg.Tests.CoverageWarningMin = 40
+
 	return cfg
 }
 
@@ -337,6 +358,7 @@ func UnicodeVibrantTheme() *Config {
 	cfg.Colors.Muted = "\033[2m"
 	cfg.Colors.Reset = "\033[0m"
 	cfg.Colors.White = "\033[0;97m"
+	cfg.Colors.GreenFg = "\033[38;5;120m"
 	cfg.Colors.BlueFg = "\033[0;34m"
 	cfg.Colors.BlueBg = "\033[44m"
 	cfg.Colors.Bold = "\033[1m"
@@ -383,6 +405,16 @@ func UnicodeVibrantTheme() *Config {
 	cfg.ComplexityThresholds.Medium = 20
 	cfg.ComplexityThresholds.ErrorCountHigh = 5
 	cfg.ComplexityThresholds.WarningCountMedium = 2
+
+	cfg.Tests.SparkbarFilled = "▮"
+	cfg.Tests.SparkbarEmpty = "▯"
+	cfg.Tests.SparkbarLength = 10
+	cfg.Tests.ShowPercentage = false
+	cfg.Tests.NoTestIcon = "○"
+	cfg.Tests.NoTestColor = "Warning"
+	cfg.Tests.CoverageGoodMin = 70
+	cfg.Tests.CoverageWarningMin = 40
+
 	return cfg
 }
 
@@ -543,6 +575,8 @@ func (c *Config) resolveColorName(name string) string {
 		codeToProcess = c.Colors.Reset
 	case "white":
 		codeToProcess = c.Colors.White
+	case "greenfg":
+		codeToProcess = c.Colors.GreenFg
 	case "bluefg":
 		codeToProcess = c.Colors.BlueFg
 	case "bluebg":
@@ -573,6 +607,8 @@ func (c *Config) resolveColorName(name string) string {
 			codeToProcess = escChar + "[0m"
 		case "muted":
 			codeToProcess = escChar + "[2m"
+		case "greenfg":
+			codeToProcess = escChar + "[38;5;120m"
 		case "bluefg":
 			codeToProcess = escChar + "[0;34m"
 		case "bluebg":
@@ -662,6 +698,7 @@ func ApplyMonochromeDefaults(cfg *Config) {
 		Muted   string `yaml:"muted"`
 		Reset   string `yaml:"reset"`
 		White   string `yaml:"white,omitempty"`
+		GreenFg string `yaml:"green_fg,omitempty"`
 		BlueFg  string `yaml:"blue_fg,omitempty"`
 		BlueBg  string `yaml:"blue_bg,omitempty"`
 		Bold    string `yaml:"bold,omitempty"`

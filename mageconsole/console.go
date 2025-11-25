@@ -131,6 +131,331 @@ func NewConsole(cfg ConsoleConfig) *Console {
 	}
 }
 
+// getPaleGrayColor returns a very pale gray ANSI color code.
+func (c *Console) getPaleGrayColor() string {
+	return "\033[38;5;252m"
+}
+
+// getFaintDarkGrayColor returns a very faint darkish gray ANSI color code.
+func (c *Console) getFaintDarkGrayColor() string {
+	return "\033[38;5;238m"
+}
+
+// getTerminalWidth returns the terminal width, or a default if unavailable.
+func (c *Console) getTerminalWidth() int {
+	width, _, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil || width <= 0 {
+		return 80
+	}
+	return width - 2
+}
+
+// contains checks if a slice contains a string.
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
+// stripANSICodes removes ANSI escape sequences from a string to calculate visual width.
+func stripANSICodes(s string) string {
+	var result strings.Builder
+	inEscape := false
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\033' {
+			inEscape = true
+		} else if inEscape && s[i] == 'm' {
+			inEscape = false
+		} else if !inEscape {
+			result.WriteByte(s[i])
+		}
+	}
+	return result.String()
+}
+
+// PrintSectionHeader prints a section header and starts a section box.
+func (c *Console) PrintSectionHeader(name string) {
+	cfg := c.designConf
+	headerWidth := c.getTerminalWidth()
+	title := strings.ToUpper(name)
+	faintGray := c.getFaintDarkGrayColor()
+	reset := cfg.ResetColor()
+
+	var sb strings.Builder
+	sb.WriteString("\n")
+
+	if cfg.IsMonochrome {
+		sb.WriteString("--- ")
+		sb.WriteString(title)
+		sb.WriteString(" ---\n")
+	} else {
+		headerStyle := cfg.GetElementStyle("Task_Label_Header")
+		labelColor := cfg.GetColor(headerStyle.ColorFG, "Task_Label_Header")
+
+		topCorner := cfg.Border.TopCornerChar
+		headerChar := cfg.Border.HeaderChar
+		closingCorner := "╮"
+		if topCorner == "╔" {
+			closingCorner = "╗"
+		}
+		sb.WriteString(faintGray)
+		sb.WriteString(topCorner)
+		sb.WriteString(strings.Repeat(headerChar, headerWidth))
+		sb.WriteString(closingCorner)
+		sb.WriteString(reset)
+		sb.WriteString("\n")
+
+		sb.WriteString(faintGray)
+		sb.WriteString(cfg.Border.VerticalChar)
+		sb.WriteString(reset)
+		sb.WriteString("  ")
+		sb.WriteString(labelColor)
+		if contains(headerStyle.TextStyle, "bold") {
+			sb.WriteString(cfg.GetColor("Bold"))
+		}
+		sb.WriteString(title)
+		sb.WriteString(reset)
+		titleLen := len(title) + 3
+		remainingWidth := headerWidth + 2 - titleLen - 1
+		if remainingWidth < 0 {
+			remainingWidth = 0
+		}
+		sb.WriteString(strings.Repeat(" ", remainingWidth))
+		sb.WriteString(faintGray)
+		sb.WriteString(cfg.Border.VerticalChar)
+		sb.WriteString(reset)
+		sb.WriteString("\n")
+	}
+
+	_, _ = c.cfg.Out.Write([]byte(sb.String()))
+}
+
+// PrintSectionLine prints a line of section content with side borders.
+func (c *Console) PrintSectionLine(line string) {
+	cfg := c.designConf
+	if cfg.IsMonochrome {
+		_, _ = c.cfg.Out.Write([]byte(line + "\n"))
+		return
+	}
+
+	faintGray := c.getFaintDarkGrayColor()
+	reset := cfg.ResetColor()
+	headerWidth := c.getTerminalWidth()
+
+	maxContentWidth := headerWidth - 3
+	if maxContentWidth < 0 {
+		maxContentWidth = 0
+	}
+
+	visualLine := stripANSICodes(line)
+	if len(visualLine) > maxContentWidth {
+		clippedVisual := visualLine[:maxContentWidth]
+		ansiEnd := 0
+		for i := 0; i < len(line); i++ {
+			if line[i] == '\033' {
+				for i < len(line) && line[i] != 'm' {
+					i++
+				}
+				ansiEnd = i + 1
+			} else {
+				break
+			}
+		}
+		if ansiEnd > 0 {
+			line = line[:ansiEnd] + clippedVisual + reset
+		} else {
+			line = clippedVisual
+		}
+	}
+
+	visualWidth := len(stripANSICodes(line))
+	padding := headerWidth - visualWidth - 3
+	if padding < 0 {
+		padding = 0
+	}
+
+	var sb strings.Builder
+	sb.WriteString(faintGray)
+	sb.WriteString(cfg.Border.VerticalChar)
+	sb.WriteString(reset)
+	sb.WriteString("  ")
+	sb.WriteString(line)
+	sb.WriteString(strings.Repeat(" ", padding))
+	sb.WriteString(faintGray)
+	sb.WriteString(cfg.Border.VerticalChar)
+	sb.WriteString(reset)
+	sb.WriteString("\n")
+
+	_, _ = c.cfg.Out.Write([]byte(sb.String()))
+}
+
+// PrintSectionFooter closes the section box with a bottom border.
+func (c *Console) PrintSectionFooter() {
+	cfg := c.designConf
+	if cfg.IsMonochrome {
+		_, _ = c.cfg.Out.Write([]byte("\n"))
+		return
+	}
+
+	faintGray := c.getFaintDarkGrayColor()
+	reset := cfg.ResetColor()
+	headerWidth := c.getTerminalWidth()
+
+	bottomCorner := cfg.Border.BottomCornerChar
+	headerChar := cfg.Border.HeaderChar
+	bottomClosingCorner := "╯"
+	if bottomCorner == "╚" {
+		bottomClosingCorner = "╝"
+	}
+
+	var sb strings.Builder
+	sb.WriteString(faintGray)
+	sb.WriteString(bottomCorner)
+	sb.WriteString(strings.Repeat(headerChar, headerWidth))
+	sb.WriteString(bottomClosingCorner)
+	sb.WriteString(reset)
+	sb.WriteString("\n\n")
+
+	_, _ = c.cfg.Out.Write([]byte(sb.String()))
+}
+
+// PrintH1Header prints a major headline (H1) using the console's theme.
+func (c *Console) PrintH1Header(name string) {
+	cfg := c.designConf
+	headerWidth := cfg.Style.HeaderWidth
+	if headerWidth <= 0 {
+		headerWidth = 70
+	}
+
+	title := strings.ToUpper(name)
+	paleGray := c.getPaleGrayColor()
+	reset := cfg.ResetColor()
+
+	var sb strings.Builder
+
+	if cfg.IsMonochrome {
+		sb.WriteString("=== ")
+		sb.WriteString(title)
+		sb.WriteString(" ===\n")
+	} else {
+		headerStyle := cfg.GetElementStyle("H1_Major_Header")
+		labelColor := cfg.GetColor(headerStyle.ColorFG, "H1_Major_Header")
+
+		topCorner := cfg.Border.TopCornerChar
+		headerChar := cfg.Border.HeaderChar
+		closingCorner := "╮"
+		if topCorner == "╔" {
+			closingCorner = "╗"
+		}
+		sb.WriteString(paleGray)
+		sb.WriteString(topCorner)
+		sb.WriteString(strings.Repeat(headerChar, headerWidth))
+		sb.WriteString(closingCorner)
+		sb.WriteString(reset)
+		sb.WriteString("\n")
+
+		sb.WriteString(paleGray)
+		sb.WriteString(cfg.Border.VerticalChar)
+		sb.WriteString(reset)
+		sb.WriteString("  ")
+		sb.WriteString(labelColor)
+		if contains(headerStyle.TextStyle, "bold") {
+			sb.WriteString(cfg.GetColor("Bold"))
+		}
+		sb.WriteString(title)
+		sb.WriteString(reset)
+		titleLen := len(title) + 3
+		remainingWidth := headerWidth + 2 - titleLen - 1
+		if remainingWidth < 0 {
+			remainingWidth = 0
+		}
+		sb.WriteString(strings.Repeat(" ", remainingWidth))
+		sb.WriteString(paleGray)
+		sb.WriteString(cfg.Border.VerticalChar)
+		sb.WriteString(reset)
+		sb.WriteString("\n")
+
+		bottomCorner := cfg.Border.BottomCornerChar
+		bottomClosingCorner := "╯"
+		if bottomCorner == "╚" {
+			bottomClosingCorner = "╝"
+		}
+		sb.WriteString(paleGray)
+		sb.WriteString(bottomCorner)
+		sb.WriteString(strings.Repeat(headerChar, headerWidth))
+		sb.WriteString(bottomClosingCorner)
+		sb.WriteString(reset)
+		sb.WriteString("\n")
+	}
+
+	_, _ = c.cfg.Out.Write([]byte(sb.String()))
+}
+
+// GetMutedColor returns the Muted color code from the theme.
+func (c *Console) GetMutedColor() string {
+	return c.designConf.GetColor("Muted")
+}
+
+// ResetColor returns the reset color code from the theme.
+func (c *Console) ResetColor() string {
+	return c.designConf.ResetColor()
+}
+
+// GetSuccessColor returns the Success color code from the theme.
+func (c *Console) GetSuccessColor() string {
+	return c.designConf.GetColor("Success")
+}
+
+// GetGreenFgColor returns the light green color code from the theme.
+func (c *Console) GetGreenFgColor() string {
+	return c.designConf.GetColor("GreenFg")
+}
+
+// GetBlueFgColor returns the light blue color code from the theme.
+func (c *Console) GetBlueFgColor() string {
+	return c.designConf.GetColor("BlueFg")
+}
+
+// GetWarningColor returns the Warning color code from the theme.
+func (c *Console) GetWarningColor() string {
+	return c.designConf.GetColor("Warning")
+}
+
+// GetErrorColor returns the Error color code from the theme.
+func (c *Console) GetErrorColor() string {
+	return c.designConf.GetColor("Error")
+}
+
+// GetIcon returns an icon from the theme by key.
+func (c *Console) GetIcon(iconKey string) string {
+	return c.designConf.GetIcon(iconKey)
+}
+
+// GetColor returns a color code from the theme by key.
+func (c *Console) GetColor(colorKey string) string {
+	return c.designConf.GetColor(colorKey)
+}
+
+// GetBorderChars returns the border characters from the theme.
+func (c *Console) GetBorderChars() (topCorner, bottomCorner, headerChar, verticalChar string) {
+	return c.designConf.Border.TopCornerChar,
+		c.designConf.Border.BottomCornerChar,
+		c.designConf.Border.HeaderChar,
+		c.designConf.Border.VerticalChar
+}
+
+// GetHeaderWidth returns the header width from the theme.
+func (c *Console) GetHeaderWidth() int {
+	width := c.designConf.Style.HeaderWidth
+	if width <= 0 {
+		return 60
+	}
+	return width
+}
+
 // Run executes a command and returns the result.
 //
 // Error semantics:
