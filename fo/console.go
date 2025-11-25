@@ -1106,10 +1106,9 @@ func (c *Console) runContext(
 	}
 
 	if !useInlineProgress {
-		// Suppress individual task end lines when we're in a section and have a summary
-		// The section summary will be printed instead
-		shouldSuppress := c.inSection && c.currentSummary != ""
-		if !shouldSuppress {
+		// Suppress individual task end lines when we're in a section
+		// The section summary will be printed instead at the end of RunSection()
+		if !c.inSection {
 			_, _ = c.cfg.Out.Write([]byte(task.RenderEndLine() + "\n"))
 		}
 	}
