@@ -792,6 +792,61 @@ func (c *Console) GetColor(colorKey string) string {
 	return c.designConf.GetColor(colorKey)
 }
 
+// SuccessMsg returns a themed success message with icon and color.
+func (c *Console) SuccessMsg(msg string) string {
+	icon := c.GetIcon("Success")
+	color := c.GetColor("Success")
+	reset := c.designConf.ResetColor()
+	return fmt.Sprintf("%s%s%s %s", color, icon, reset, msg)
+}
+
+// InfoMsg returns a themed info message with icon and color.
+func (c *Console) InfoMsg(msg string) string {
+	icon := c.GetIcon("Info")
+	color := c.GetColor("BlueFg")
+	reset := c.designConf.ResetColor()
+	return fmt.Sprintf("%s%s%s %s", color, icon, reset, msg)
+}
+
+// WarnMsg returns a themed warning message with icon and color.
+func (c *Console) WarnMsg(msg string) string {
+	icon := c.GetIcon("Warning")
+	color := c.GetColor("Warning")
+	reset := c.designConf.ResetColor()
+	return fmt.Sprintf("%s%s%s %s", color, icon, reset, msg)
+}
+
+// ErrorMsg returns a themed error message with icon and color.
+func (c *Console) ErrorMsg(msg string) string {
+	icon := c.GetIcon("Error")
+	color := c.GetColor("Error")
+	reset := c.designConf.ResetColor()
+	return fmt.Sprintf("%s%s%s %s", color, icon, reset, msg)
+}
+
+// FormatPath formats a file path with directory in muted color and filename in white.
+func (c *Console) FormatPath(path string) string {
+	if path == "" {
+		return path
+	}
+
+	// Split path into directory and filename
+	dir := filepath.Dir(path)
+	filename := filepath.Base(path)
+
+	mutedColor := c.GetMutedColor()
+	whiteColor := c.GetColor("White")
+	reset := c.designConf.ResetColor()
+
+	if dir == "." || dir == "" {
+		// No directory, just filename
+		return fmt.Sprintf("%s%s%s", whiteColor, filename, reset)
+	}
+
+	// Directory in muted color, filename in white
+	return fmt.Sprintf("%s%s%s%s%s%s", mutedColor, dir+string(filepath.Separator), reset, whiteColor, filename, reset)
+}
+
 // GetBorderChars returns the border characters from the theme.
 func (c *Console) GetBorderChars() (string, string, string, string) {
 	return c.designConf.Border.TopCornerChar,
