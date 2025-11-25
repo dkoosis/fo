@@ -987,7 +987,10 @@ func (c *Console) runContext(
 		}
 		progress.Start(ctx, enableSpinner)
 	} else {
-		_, _ = c.cfg.Out.Write([]byte(task.RenderStartLine() + "\n"))
+		// Suppress start line when in a section - section header already shows context
+		if !c.inSection {
+			_, _ = c.cfg.Out.Write([]byte(task.RenderStartLine() + "\n"))
+		}
 	}
 
 	cmd := exec.CommandContext(ctx, command, args...)
