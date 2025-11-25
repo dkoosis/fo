@@ -511,6 +511,7 @@ func OrcaTheme() *Config {
 	cfg.Style.ShowTimestamps = false
 	cfg.Style.Density = "balanced"
 	cfg.Style.NoTimer = false
+	cfg.Style.UseInlineProgress = false // Disable inline progress for sections
 	cfg.Style.HeaderWidth = 50
 
 	cfg.Icons.Start = "▶"
