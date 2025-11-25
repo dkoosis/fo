@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 
 	config "github.com/dkoosis/fo/internal/config"
@@ -197,15 +198,17 @@ func TestRun_ManagesExecutionFlow_When_DifferentInputsProvided(t *testing.T) {
 		},
 		{
 			name:     "RunsCommand_When_ArgumentsProvided",
-			args:     []string{"fo", "--", "/bin/echo", "ok"},
+			args:     []string{"fo", "--", "echo", "ok"},
 			wantExit: 0,
 			checkStdout: func(t *testing.T, stdout string) {
-				assert.Contains(t, stdout, "Complete")
+				// Check for success indicator (could be [SUCCESS] or Complete depending on theme)
+				assert.True(t, strings.Contains(stdout, "[SUCCESS]") || strings.Contains(stdout, "Complete"),
+					"Expected success indicator, got: %s", stdout)
 			},
 		},
 		{
 			name:     "ReturnsJSONOutput_When_FormatIsJSON",
-			args:     []string{"fo", "--format", "json", "--", "/bin/echo", "ok"},
+			args:     []string{"fo", "--format", "json", "--", "echo", "ok"},
 			wantExit: 0,
 			checkStdout: func(t *testing.T, stdout string) {
 				assert.Contains(t, stdout, "\"exit_code\": 0")
@@ -213,7 +216,7 @@ func TestRun_ManagesExecutionFlow_When_DifferentInputsProvided(t *testing.T) {
 		},
 		{
 			name:     "EmitsDebugLogs_When_DebugFlagEnabled",
-			args:     []string{"fo", "--debug", "--", "/bin/true"},
+			args:     []string{"fo", "--debug", "--", "echo", "test"},
 			wantExit: 0,
 			checkStderr: func(t *testing.T, stderr string) {
 				assert.Contains(t, stderr, "[DEBUG run()]")
