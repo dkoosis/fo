@@ -1242,6 +1242,9 @@ func normalizeConfig(cfg ConsoleConfig) ConsoleConfig {
 
 func resolveDesignConfig(cfg ConsoleConfig) *design.Config {
 	if cfg.Design != nil {
+		if os.Getenv("FO_DEBUG") != "" {
+			fmt.Fprintf(os.Stderr, "[DEBUG resolveDesignConfig] Using provided Design config (ThemeName: %s)\n", cfg.Design.ThemeName)
+		}
 		return design.DeepCopyConfig(cfg.Design)
 	}
 
@@ -1249,14 +1252,29 @@ func resolveDesignConfig(cfg ConsoleConfig) *design.Config {
 	
 	// Check if theme name is provided and exists in default themes
 	if cfg.ThemeName != "" {
-		if theme, ok := design.DefaultThemes()[cfg.ThemeName]; ok {
+		themes := design.DefaultThemes()
+		if os.Getenv("FO_DEBUG") != "" {
+			fmt.Fprintf(os.Stderr, "[DEBUG resolveDesignConfig] Requested theme: %q\n", cfg.ThemeName)
+			fmt.Fprintf(os.Stderr, "[DEBUG resolveDesignConfig] Available themes: %v\n", getThemeNames(themes))
+		}
+		if theme, ok := themes[cfg.ThemeName]; ok {
 			base = design.DeepCopyConfig(theme)
+			if os.Getenv("FO_DEBUG") != "" {
+				fmt.Fprintf(os.Stderr, "[DEBUG resolveDesignConfig] ✓ Found theme %q: TopCorner=%q, HeaderChar=%q, ProcessColor=%q\n",
+					cfg.ThemeName, base.Border.TopCornerChar, base.Border.HeaderChar, base.GetColor("Process"))
+			}
 		} else {
 			// Theme not found in defaults, fall back to unicode_vibrant
+			if os.Getenv("FO_DEBUG") != "" {
+				fmt.Fprintf(os.Stderr, "[DEBUG resolveDesignConfig] ✗ Theme %q not found, falling back to unicode_vibrant\n", cfg.ThemeName)
+			}
 			base = design.UnicodeVibrantTheme()
 		}
 	} else {
 		// No theme name specified, use default
+		if os.Getenv("FO_DEBUG") != "" {
+			fmt.Fprintf(os.Stderr, "[DEBUG resolveDesignConfig] No theme name specified, using default unicode_vibrant\n")
+		}
 		base = design.UnicodeVibrantTheme()
 	}
 
@@ -1272,5 +1290,18 @@ func resolveDesignConfig(cfg ConsoleConfig) *design.Config {
 		base.Style.NoTimer = !cfg.ShowTimer
 	}
 
+	if os.Getenv("FO_DEBUG") != "" {
+		fmt.Fprintf(os.Stderr, "[DEBUG resolveDesignConfig] Final theme: %s (TopCorner=%q, HeaderChar=%q)\n",
+			base.ThemeName, base.Border.TopCornerChar, base.Border.HeaderChar)
+	}
 	return base
+}
+
+// getThemeNames returns a slice of theme names from the themes map.
+func getThemeNames(themes map[string]*design.Config) []string {
+	names := make([]string, 0, len(themes))
+	for name := range themes {
+		names = append(names, name)
+	}
+	return names
 }
