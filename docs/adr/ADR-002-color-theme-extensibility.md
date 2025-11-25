@@ -1,7 +1,8 @@
 # ADR-002: Refactor Color and Theme System for Extensibility
 
-**Status**: Proposed
+**Status**: Revised (Superseded by Lip Gloss Integration)
 **Date**: 2025-11-24
+**Revised**: 2025-01-XX
 **Deciders**: fo project team
 
 ## Context
@@ -82,8 +83,9 @@ tokens.Colors.Spinner.Get() // Returns ANSI code
 
 #### 2. Reflection-Based Color Resolution
 
-Replace switch statement with reflection:
+~~Replace switch statement with reflection~~ **SUPERSEDED**: Lip Gloss provides style system
 
+**Original Plan**:
 ```go
 func (c *Config) GetColor(name string) string {
     // Use reflection instead of hardcoded switch
@@ -91,30 +93,24 @@ func (c *Config) GetColor(name string) string {
 }
 ```
 
-**Benefits**:
-- No switch statement maintenance
-- Works for any color automatically
-- Extensible without code changes
+**New Approach**: Use Lip Gloss `lipgloss.Color` and `lipgloss.Style` types directly. Design Tokens (#114) will provide semantic naming layer on top of Lip Gloss.
 
 #### 3. Style Sheet Pattern
 
-Separate style definitions from rendering:
+~~Separate style definitions from rendering~~ **SUPERSEDED**: Lip Gloss IS a style sheet system
 
+**Original Plan**: Custom style sheet pattern
+
+**New Approach**: Lip Gloss provides `lipgloss.Style` which acts as a style sheet:
 ```go
-// Style sheet (declarative)
-Styles["Task_Progress_Line"] = Style{
-    Spinner: StyleComponent{
-        Chars: "·✻✽✶✳✢",
-        Color: "Spinner", // References token
-    },
-    Text: StyleComponent{
-        Color: "Process",
-    },
-}
-
-// Renderer applies styles
-renderer.ApplyStyle(element, Styles["Task_Progress_Line"])
+style := lipgloss.NewStyle().
+    Border(lipgloss.RoundedBorder()).
+    BorderForeground(lipgloss.Color("111")).
+    Padding(1, 2)
+content := style.Render(innerContent)
 ```
+
+Design Tokens (#114) will provide semantic naming on top of Lip Gloss styles.
 
 #### 4. Theme Composition
 
@@ -128,20 +124,18 @@ finalTheme := MergeThemes(baseTheme, override)
 
 #### 5. Style Context Inheritance
 
-Context-based styling with inheritance:
+~~Context-based styling with inheritance~~ **SUPERSEDED**: Lip Gloss handles inheritance
 
+**Original Plan**: Custom context inheritance system
+
+**New Approach**: Lip Gloss provides `lipgloss.Style.Inherit()` for style inheritance:
 ```go
-type StyleContext struct {
-    Tokens *DesignTokens
-    Overrides map[string]interface{}
-}
-
-func Render(element Element, ctx StyleContext) {
-    // Element can override ctx for children
-    childCtx := ctx.WithOverride(element.Style)
-    Render(child, childCtx)
-}
+baseStyle := lipgloss.NewStyle().Border(lipgloss.RoundedBorder())
+overrideStyle := lipgloss.NewStyle().BorderForeground(lipgloss.Color("111"))
+finalStyle := baseStyle.Inherit(overrideStyle)
 ```
+
+Theme composition (#115) will use this for YAML override merging.
 
 ## Consequences
 
@@ -256,9 +250,74 @@ This refactoring supports fo's core principles:
 - React/Vue Component Architecture
 - Qt Stylesheets Pattern
 
+## Revision: Lip Gloss Integration
+
+**Date**: 2025-01-XX
+**Decision**: Integrate [Lip Gloss](https://github.com/charmbracelet/lipgloss) library instead of custom implementation
+
+### Why Lip Gloss?
+
+After initial implementation planning, we discovered Lip Gloss provides all the core functionality we need:
+
+1. **Correct Rune Width Handling**: `lipgloss.Width()` correctly handles Unicode, emojis, CJK characters
+2. **Border Rendering**: Built-in border system with proper corners and styling
+3. **Style System**: CSS-like styling with inheritance via `lipgloss.Style.Inherit()`
+4. **Composition**: `JoinHorizontal()` / `JoinVertical()` for layout composition
+5. **Mature Library**: Well-tested, actively maintained, used by popular CLI tools
+
+### Impact on Original Phases
+
+| Original Phase | New Status | Reason |
+|----------------|------------|--------|
+| Phase 0: Reflection | Closed #118 | Lip Gloss handles color/style access |
+| Phase 1: Design Tokens | Keep #114 | Still needed for semantic naming layer |
+| Phase 2: Theme Composition | Keep #115 | Still needed, uses `lipgloss.Inherit()` |
+| Phase 3: Style Sheets | Closed #119 | Lip Gloss IS a style sheet system |
+| Phase 4: Style Context | Closed #116 | Lip Gloss handles inheritance |
+| Phase 5: Cleanup | Closed #120 | Deferred until integration complete |
+
+### Revised Implementation Phases
+
+1. **#121 - Lip Gloss Integration + Width Utilities** ✅
+   - Add `lipgloss` dependency
+   - Create `PadRight`, `PadLeft`, `VisualWidth` utilities
+   - Fix all width specifiers in patterns/render
+
+2. **#122 - BoxLayout Refactor with Lip Gloss** ✅
+   - Create `BoxLayout` struct for single-point dimension calculation
+   - Integrate Lip Gloss `Border` struct
+   - Refactor render functions to use BoxLayout
+
+3. **#114 - Design Tokens (Semantic Layer on Lip Gloss)**
+   - Create `DesignTokens` struct using `lipgloss.Color` and `lipgloss.Style`
+   - Semantic naming (Spinner not PaleBlue)
+   - Theme functions return `*DesignTokens`
+
+4. **#115 - Theme Composition (YAML Overrides)**
+   - YAML override schema
+   - `LoadThemeOverrides()` function
+   - `MergeThemes()` using `lipgloss.Inherit()`
+
+### Benefits of Lip Gloss Approach
+
+- **Faster Implementation**: No need to build custom reflection/style system
+- **Proven Solution**: Battle-tested in production CLI tools
+- **Better Unicode Support**: Correct handling of wide characters out of the box
+- **Less Code**: Leverage existing library instead of custom implementation
+- **Community Support**: Active maintenance and community
+
+### Migration Notes
+
+- Original ADR phases 0, 3, 4, 5 are no longer needed
+- Phases 1 and 2 remain but adapted to use Lip Gloss types
+- All width calculations now use Lip Gloss for correctness
+- Box rendering uses Lip Gloss border system
+
 ## Next Steps
 
-1. Create implementation issues for each phase
-2. Begin Phase 0: Reflection-based color access
-3. Document learnings and adjust approach as needed
+1. ✅ Complete #121: Lip Gloss integration + width utilities
+2. ✅ Complete #122: BoxLayout refactor with Lip Gloss
+3. Implement #114: Design Tokens system
+4. Implement #115: Theme composition/merging
+5. Document final architecture
 
