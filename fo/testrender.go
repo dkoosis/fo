@@ -50,6 +50,20 @@ type TestTableConfig struct {
 	NoTestColor string
 	// ShowAllTests controls whether to show all tests (including passed) with their status
 	ShowAllTests bool
+	// SubtestConfig controls subtest hierarchy rendering
+	SubtestConfig SubtestConfig
+}
+
+// SubtestConfig configures how subtests are rendered.
+type SubtestConfig struct {
+	// GroupByParent groups subtests under their parent test
+	GroupByParent bool
+	// IndentSize is the number of spaces to indent nested subtests
+	IndentSize int
+	// ShowParentStatus shows parent test status (if false, parent is just a header)
+	ShowParentStatus bool
+	// HumanizeNames applies HumanizeTestName to subtest names
+	HumanizeNames bool
 }
 
 // CoverageThreshold defines a coverage range and its associated color.
@@ -123,6 +137,12 @@ func buildTestTableConfig(console *Console) TestTableConfig {
 		UseTreeChars:       false,
 		NoTestIcon:         cfg.Tests.NoTestIcon,
 		NoTestColor:        cfg.Tests.NoTestColor,
+		SubtestConfig: SubtestConfig{
+			GroupByParent:    true,
+			IndentSize:       4,
+			ShowParentStatus: false,
+			HumanizeNames:    true,
+		},
 	}
 }
 
@@ -248,38 +268,113 @@ func (r *TestRenderer) RenderPackageLine(pkg TestPackageResult) {
 
 	// Print tests based on configuration
 	if r.config.ShowAllTests && len(pkg.AllTests) > 0 {
-		// Show all tests with their status
-		for _, test := range pkg.AllTests {
-			// Use semantic formatting for test names
-			statusUpper := strings.ToUpper(test.Status)
-			styledTestName := r.console.FormatTestName(test.Name, statusUpper)
-			statusText := r.console.FormatStatusText(fmt.Sprintf("(%s)", statusUpper), statusUpper)
-			if r.inGroupBox {
-				paleGray := r.getPaleGrayColor()
-				cfg := r.console.designConf
-				lineContent := fmt.Sprintf("        %s %s", styledTestName, statusText)
-				visualWidth := len(stripANSI(lineContent))
-				padding := r.boxWidth - visualWidth
-				if padding < 0 {
-					padding = 0
-				}
-				fmt.Fprintf(r.writer, "%s%s%s%s%s%s%s%s\n",
-					paleGray, cfg.Border.VerticalChar, reset,
-					lineContent,
-					strings.Repeat(" ", padding),
-					paleGray, cfg.Border.VerticalChar, reset)
-			} else {
-				fmt.Fprintf(r.writer, "        %s %s\n", styledTestName, statusText)
+		if r.config.SubtestConfig.GroupByParent {
+			r.renderTestsWithHierarchy(pkg.AllTests)
+		} else {
+			// Show all tests with their status (flat list)
+			for _, test := range pkg.AllTests {
+				r.renderTestLine(test, test.Status)
 			}
 		}
 	} else if len(pkg.FailedTests) > 0 {
-		// Show only failed tests (default behavior) - use semantic formatting
-		for _, test := range pkg.FailedTests {
-			styledTestName := r.console.FormatTestName(test, "FAIL")
+		// Show only failed tests (default behavior)
+		if r.config.SubtestConfig.GroupByParent {
+			// Convert failed test names to TestResult format for hierarchy rendering
+			failedTestResults := make([]TestResult, len(pkg.FailedTests))
+			for i, name := range pkg.FailedTests {
+				failedTestResults[i] = TestResult{Name: name, Status: "FAIL"}
+			}
+			r.renderTestsWithHierarchy(failedTestResults)
+		} else {
+			// Flat list of failed tests
+			for _, testName := range pkg.FailedTests {
+				r.renderTestLine(TestResult{Name: testName, Status: "FAIL"}, "FAIL")
+			}
+		}
+	}
+}
+
+// renderTestLine renders a single test line with appropriate styling.
+func (r *TestRenderer) renderTestLine(test TestResult, status string) {
+	statusUpper := strings.ToUpper(status)
+	styledTestName := r.console.FormatTestName(test.Name, statusUpper)
+	statusText := r.console.FormatStatusText(fmt.Sprintf("(%s)", statusUpper), statusUpper)
+
+	if r.inGroupBox {
+		paleGray := r.getPaleGrayColor()
+		cfg := r.console.designConf
+		reset := r.console.ResetColor()
+		lineContent := fmt.Sprintf("        %s %s", styledTestName, statusText)
+		visualWidth := len(stripANSI(lineContent))
+		padding := r.boxWidth - visualWidth
+		if padding < 0 {
+			padding = 0
+		}
+		fmt.Fprintf(r.writer, "%s%s%s%s%s%s%s%s\n",
+			paleGray, cfg.Border.VerticalChar, reset,
+			lineContent,
+			strings.Repeat(" ", padding),
+			paleGray, cfg.Border.VerticalChar, reset)
+	} else {
+		fmt.Fprintf(r.writer, "        %s %s\n", styledTestName, statusText)
+	}
+}
+
+// renderTestsWithHierarchy renders tests grouped by parent with proper indentation.
+func (r *TestRenderer) renderTestsWithHierarchy(tests []TestResult) {
+	// Group tests by parent prefix
+	parentMap := make(map[string][]TestResult) // parent -> children
+	standaloneTests := []TestResult{}
+	parentTests := make(map[string]bool) // track which tests are parents
+
+	for _, test := range tests {
+		lastSlash := strings.LastIndex(test.Name, "/")
+		if lastSlash == -1 {
+			// Standalone test (no subtest)
+			standaloneTests = append(standaloneTests, test)
+		} else {
+			// Subtest - extract parent
+			parent := test.Name[:lastSlash]
+			parentMap[parent] = append(parentMap[parent], test)
+			parentTests[parent] = true
+		}
+	}
+
+	// Render standalone tests first
+	for _, test := range standaloneTests {
+		// Skip if this test is a parent (has subtests)
+		if !parentTests[test.Name] {
+			r.renderTestLine(test, test.Status)
+		}
+	}
+
+	// Render parent tests with their subtests
+	for parent, children := range parentMap {
+		// Find parent test status (if it exists in the test list)
+		parentStatus := "PASS" // default
+		for _, test := range tests {
+			if test.Name == parent {
+				parentStatus = test.Status
+				break
+			}
+		}
+
+		// Render parent as header (or with status if configured)
+		parentName := parent
+		if r.config.SubtestConfig.HumanizeNames {
+			parentName = HumanizeTestName(parent)
+		}
+
+		if r.config.SubtestConfig.ShowParentStatus {
+			// Render parent with status
+			r.renderTestLine(TestResult{Name: parent, Status: parentStatus}, parentStatus)
+		} else {
+			// Render parent as plain header
 			if r.inGroupBox {
 				paleGray := r.getPaleGrayColor()
 				cfg := r.console.designConf
-				lineContent := "        " + styledTestName
+				reset := r.console.ResetColor()
+				lineContent := "        " + parentName
 				visualWidth := len(stripANSI(lineContent))
 				padding := r.boxWidth - visualWidth
 				if padding < 0 {
@@ -291,7 +386,50 @@ func (r *TestRenderer) RenderPackageLine(pkg TestPackageResult) {
 					strings.Repeat(" ", padding),
 					paleGray, cfg.Border.VerticalChar, reset)
 			} else {
-				fmt.Fprintf(r.writer, "        %s\n", styledTestName)
+				fmt.Fprintf(r.writer, "        %s\n", parentName)
+			}
+		}
+
+		// Render children with indentation
+		for _, child := range children {
+			childName := child.Name
+			if r.config.SubtestConfig.HumanizeNames {
+				// Extract just the subtest name (after last '/')
+				lastSlash := strings.LastIndex(child.Name, "/")
+				subtestName := child.Name[lastSlash+1:]
+				childName = HumanizeTestName(subtestName)
+			}
+
+			// Create a modified test result with just the subtest name for display
+			displayTest := TestResult{
+				Name:   childName,
+				Status: child.Status,
+			}
+
+			// Render with additional indentation
+			originalIndent := "        "
+			extraIndent := strings.Repeat(" ", r.config.SubtestConfig.IndentSize)
+			statusUpper := strings.ToUpper(child.Status)
+			styledTestName := r.console.FormatTestName(displayTest.Name, statusUpper)
+			statusText := r.console.FormatStatusText(fmt.Sprintf("(%s)", statusUpper), statusUpper)
+
+			if r.inGroupBox {
+				paleGray := r.getPaleGrayColor()
+				cfg := r.console.designConf
+				reset := r.console.ResetColor()
+				lineContent := originalIndent + extraIndent + styledTestName + " " + statusText
+				visualWidth := len(stripANSI(lineContent))
+				padding := r.boxWidth - visualWidth
+				if padding < 0 {
+					padding = 0
+				}
+				fmt.Fprintf(r.writer, "%s%s%s%s%s%s%s%s\n",
+					paleGray, cfg.Border.VerticalChar, reset,
+					lineContent,
+					strings.Repeat(" ", padding),
+					paleGray, cfg.Border.VerticalChar, reset)
+			} else {
+				fmt.Fprintf(r.writer, "%s%s%s %s\n", originalIndent, extraIndent, styledTestName, statusText)
 			}
 		}
 	}
