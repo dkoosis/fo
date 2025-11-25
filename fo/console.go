@@ -20,6 +20,7 @@ import (
 
 	"github.com/dkoosis/fo/pkg/adapter"
 	"github.com/dkoosis/fo/pkg/design"
+	"github.com/mattn/go-runewidth"
 	"golang.org/x/term"
 )
 
@@ -338,7 +339,7 @@ func (c *Console) PrintSectionHeader(name string) {
 		}
 		sb.WriteString(title)
 		sb.WriteString(reset)
-		titleVisualLen := len(stripANSICodes(title))
+		titleVisualLen := runewidth.StringWidth(stripANSICodes(title))
 		remainingWidth := box.TotalWidth - titleVisualLen - box.RightPadding
 		if remainingWidth < 0 {
 			remainingWidth = 0
@@ -387,7 +388,7 @@ func (c *Console) PrintSectionLine(line string) {
 		}
 	}
 
-	visualWidth := len(stripANSICodes(line))
+	visualWidth := runewidth.StringWidth(stripANSICodes(line))
 	padding := box.TotalWidth - visualWidth - box.RightPadding
 	if padding < 0 {
 		padding = 0
@@ -454,9 +455,9 @@ func (c *Console) PrintSectionContentLine(content ContentLine) {
 	// Calculate padding: icon (if present) + space + text
 	iconWidth := 0
 	if content.Icon != "" {
-		iconWidth = len([]rune(content.Icon)) + 1 // Icon + space
+		iconWidth = runewidth.StringWidth(content.Icon) + 1 // Icon + space
 	}
-	textWidth := len(stripANSICodes(content.Text))
+	textWidth := runewidth.StringWidth(stripANSICodes(content.Text))
 	totalContentWidth := iconWidth + textWidth
 	padding := box.TotalWidth - totalContentWidth - box.RightPadding
 	if padding < 0 {

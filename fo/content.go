@@ -8,6 +8,8 @@ package fo
 import (
 	"fmt"
 	"strings"
+
+	"github.com/mattn/go-runewidth"
 )
 
 // MetricLine represents a key-value metric with optional trend indicator.
@@ -236,7 +238,8 @@ func (c *Console) printBoxLine(box *BoxLayout, content string) {
 	reset := cfg.ResetColor()
 
 	// Calculate visual width of content (excluding ANSI codes)
-	visualWidth := len(stripANSICodes(content))
+	// Use runewidth for accurate Unicode character width calculation
+	visualWidth := runewidth.StringWidth(stripANSICodes(content))
 
 	// Build the line with borders
 	var sb strings.Builder
