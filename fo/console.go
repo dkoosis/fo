@@ -561,16 +561,24 @@ func (c *Console) RunSection(s Section) SectionResult {
 	// 1) Section header
 	c.PrintSectionHeader(s.Name)
 
-	// 2) Mark that we're in a section (suppresses individual Run() outputs when summary is set)
+	// 2) Mark that we're in a section (suppresses individual Run() outputs)
 	wasInSection := c.inSection
 	c.inSection = true
 	c.currentSummary = "" // Clear any previous summary
+	
+	if c.cfg.Debug {
+		fmt.Fprintf(os.Stderr, "[DEBUG RunSection] Starting section '%s', inSection=%v\n", s.Name, c.inSection)
+	}
 
 	// 3) Run the actual work
 	err := s.Run()
 
 	// Restore previous section state
 	c.inSection = wasInSection
+	
+	if c.cfg.Debug {
+		fmt.Fprintf(os.Stderr, "[DEBUG RunSection] Completed section '%s', restoring inSection=%v\n", s.Name, wasInSection)
+	}
 
 	// 3) Derive status from error type
 	status := SectionOK
@@ -1108,7 +1116,12 @@ func (c *Console) runContext(
 	if !useInlineProgress {
 		// Suppress individual task end lines when we're in a section
 		// The section summary will be printed instead at the end of RunSection()
-		if !c.inSection {
+		if c.inSection {
+			if c.cfg.Debug {
+				fmt.Fprintf(os.Stderr, "[DEBUG] Suppressing RenderEndLine for '%s' (inSection=true)\n", task.Label)
+			}
+			// Don't render - section summary will be shown instead
+		} else {
 			_, _ = c.cfg.Out.Write([]byte(task.RenderEndLine() + "\n"))
 		}
 	}
