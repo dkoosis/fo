@@ -69,7 +69,7 @@ func IsInteractiveTerminal() bool {
 
 // Start begins progress tracking and renders initial state.
 // Note: Cursor hiding is now handled at the console level for better
-// restoration guarantees (see mageconsole/console.go runContext).
+// restoration guarantees (see fo/console.go runContext).
 func (p *InlineProgress) Start(ctx context.Context, enableSpinner bool) {
 	p.mutex.Lock()
 	p.IsActive = true
@@ -87,7 +87,7 @@ func (p *InlineProgress) Start(ctx context.Context, enableSpinner bool) {
 
 // Complete marks the progress as complete and renders final state.
 // Note: Cursor restoration is now handled at the console level via defer
-// for better crash recovery (see mageconsole/console.go runContext).
+// for better crash recovery (see fo/console.go runContext).
 func (p *InlineProgress) Complete(status string) {
 	p.mutex.Lock()
 	p.IsActive = false

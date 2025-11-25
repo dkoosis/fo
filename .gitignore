@@ -16,7 +16,7 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
-fo
+/fo$
 fo_test_binary_generated_by_TestMain
 termtest
 

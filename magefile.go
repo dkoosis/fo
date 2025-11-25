@@ -7,12 +7,12 @@ import (
 	"os"
 
 	"github.com/dkoosis/fo/internal/magetasks"
-	"github.com/dkoosis/fo/mageconsole"
+	"github.com/dkoosis/fo/fo"
 	"github.com/magefile/mage/mg"
 )
 
 var (
-	console = mageconsole.DefaultConsole()
+	console = fo.DefaultConsole()
 )
 
 // Default target - build the binary
@@ -35,7 +35,7 @@ func Clean() error {
 	return magetasks.Clean()
 }
 
-// QA runs all quality assurance checks (uses mageconsole for better output)
+// QA runs all quality assurance checks (uses fo library for better output)
 func QA() error {
 	magetasks.PrintH1Header("fo Quality Assurance")
 

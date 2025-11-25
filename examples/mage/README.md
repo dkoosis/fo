@@ -1,6 +1,6 @@
-# Mage + mageconsole Example
+# Mage + fo Example
 
-This directory demonstrates how to use the `mageconsole` library in a Magefile for consistent, beautiful task output.
+This directory demonstrates how to use the `fo` library in a Magefile for consistent, beautiful task output.
 
 ## Prerequisites
 
@@ -64,7 +64,7 @@ When you run `mage qa`, you'll see beautifully formatted output like:
 
 ## Key Features
 
-- **Consistent UX**: All commands use the same beautiful output format via `mageconsole`
+- **Consistent UX**: All commands use the same beautiful output format via `fo`
 - **No STDIO Conflicts**: Unlike wrapping commands with `fo`, the library approach means no conflicts with make or other tools
 - **Type-Safe**: Full Go type safety for your build tasks
 - **Composable**: Easy to create complex workflows by composing simple tasks
@@ -77,9 +77,9 @@ When you run `mage qa`, you'll see beautifully formatted output like:
 
 package main
 
-import "github.com/dkoosis/fo/mageconsole"
+import "github.com/dkoosis/fo/fo"
 
-var console = mageconsole.DefaultConsole()
+var console = fo.DefaultConsole()
 
 func Build() error {
     _, err := console.Run("My Task", "go", "build", "./...")
@@ -87,4 +87,4 @@ func Build() error {
 }
 ```
 
-That's it! The `mageconsole` library handles all the formatting, timing, progress indicators, and output classification automatically.
+That's it! The `fo` library handles all the formatting, timing, progress indicators, and output classification automatically.

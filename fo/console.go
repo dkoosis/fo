@@ -1,4 +1,4 @@
-package mageconsole
+package fo
 
 import (
 	"bufio"
@@ -530,7 +530,7 @@ func (e ExitCodeError) Error() string {
 // To check for non-zero exit and extract the code:
 //
 //	if errors.Is(err, ErrNonZeroExit) {
-//	    var exitErr mageconsole.ExitCodeError
+//	    var exitErr ExitCodeError
 //	    if errors.As(err, &exitErr) {
 //	        fmt.Printf("Exit code: %d\n", exitErr.Code)
 //	    }
@@ -714,7 +714,7 @@ func (c *Console) runContext(
 		_, _ = c.cfg.Out.Write([]byte(task.RenderEndLine() + "\n"))
 	}
 
-	// Convert design.OutputLine to mageconsole.Line
+	// Convert design.OutputLine to Line
 	lines := make([]Line, len(task.OutputLines))
 	for i, ol := range task.OutputLines {
 		lines[i] = Line{

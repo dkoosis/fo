@@ -26,7 +26,7 @@ All issues listed in `docs/issues.json` have been verified and are **COMPLETE**.
 - `pkg/adapter/stream.go` - StreamAdapter interface and Registry
 - `pkg/adapter/stream_test.go` - Comprehensive tests
 - `GoTestJSONAdapter` - Parses Go test JSON output into TestTable pattern
-- Integrated into `mageconsole/console.go` via `tryAdapterMode()`
+- Integrated into `fo/console.go` via `tryAdapterMode()`
 - Example usage in `examples/adapter/`
 
 **Features**:

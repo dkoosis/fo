@@ -1,6 +1,6 @@
 //go:build !unix
 
-package mageconsole
+package fo
 
 import (
 	"os"

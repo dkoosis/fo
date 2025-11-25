@@ -1,4 +1,4 @@
-# mageconsole
+# fo
 
 A Go library for running shell commands with formatted, colorful console output. Designed for use in build scripts, particularly with [Mage](https://magefile.org/).
 
@@ -7,7 +7,7 @@ A Go library for running shell commands with formatted, colorful console output.
 ## Installation
 
 ```bash
-go get github.com/dkoosis/fo/mageconsole
+go get github.com/dkoosis/fo/fo
 ```
 
 ## Quick Start
@@ -16,11 +16,11 @@ go get github.com/dkoosis/fo/mageconsole
 package main
 
 import (
-    "github.com/dkoosis/fo/mageconsole"
+    "github.com/dkoosis/fo/fo"
 )
 
 func main() {
-    console := mageconsole.DefaultConsole()
+    console := fo.DefaultConsole()
 
     result, err := console.Run("Build", "go", "build", "./...")
     if err != nil {
@@ -45,7 +45,7 @@ The main type for running commands.
 Creates a new Console with the specified configuration.
 
 ```go
-console := mageconsole.NewConsole(mageconsole.ConsoleConfig{
+console := fo.NewConsole(fo.ConsoleConfig{
     Stream:         true,        // Stream output live
     ShowOutputMode: "on-fail",   // Show captured output: "always", "on-fail", "never"
     Monochrome:     false,       // Disable colors
@@ -57,7 +57,7 @@ console := mageconsole.NewConsole(mageconsole.ConsoleConfig{
 Creates a Console with sensible defaults.
 
 ```go
-console := mageconsole.DefaultConsole()
+console := fo.DefaultConsole()
 ```
 
 ### Running Commands
@@ -105,7 +105,7 @@ The library exports `ErrNonZeroExit` for checking exit code errors:
 
 ```go
 result, err := console.Run("Test", "go", "test", "./...")
-if errors.Is(err, mageconsole.ErrNonZeroExit) {
+if errors.Is(err, fo.ErrNonZeroExit) {
     fmt.Printf("Tests failed with exit code %d\n", result.ExitCode)
 }
 ```
@@ -127,8 +127,8 @@ For `RunSimple`, you can extract the exit code from errors:
 
 ```go
 err := console.RunSimple("go", "test", "./...")
-if errors.Is(err, mageconsole.ErrNonZeroExit) {
-    var exitErr mageconsole.ExitCodeError
+if errors.Is(err, fo.ErrNonZeroExit) {
+    var exitErr fo.ExitCodeError
     if errors.As(err, &exitErr) {
         fmt.Printf("Exit code: %d\n", exitErr.Code)
     }
@@ -159,7 +159,7 @@ if errors.Is(err, mageconsole.ErrNonZeroExit) {
 **CI Mode (no colors, no timer):**
 
 ```go
-console := mageconsole.NewConsole(mageconsole.ConsoleConfig{
+console := fo.NewConsole(fo.ConsoleConfig{
     Monochrome: true,
     ShowTimer:  false,
 })
@@ -168,7 +168,7 @@ console := mageconsole.NewConsole(mageconsole.ConsoleConfig{
 **Streaming Mode:**
 
 ```go
-console := mageconsole.NewConsole(mageconsole.ConsoleConfig{
+console := fo.NewConsole(fo.ConsoleConfig{
     Stream: true,
 })
 ```
@@ -177,7 +177,7 @@ console := mageconsole.NewConsole(mageconsole.ConsoleConfig{
 
 ```go
 var stdout, stderr bytes.Buffer
-console := mageconsole.NewConsole(mageconsole.ConsoleConfig{
+console := fo.NewConsole(fo.ConsoleConfig{
     Out: &stdout,
     Err: &stderr,
 })
@@ -192,9 +192,9 @@ console := mageconsole.NewConsole(mageconsole.ConsoleConfig{
 
 package main
 
-import "github.com/dkoosis/fo/mageconsole"
+import "github.com/dkoosis/fo/fo"
 
-var console = mageconsole.DefaultConsole()
+var console = fo.DefaultConsole()
 
 func Build() error {
     _, err := console.Run("Go Build", "go", "build", "./...")
@@ -246,7 +246,7 @@ func VerboseBuild(verbose bool) error {
         mode = "always"
     }
 
-    console := mageconsole.NewConsole(mageconsole.ConsoleConfig{
+    console := fo.NewConsole(fo.ConsoleConfig{
         ShowOutputMode: mode,
     })
 

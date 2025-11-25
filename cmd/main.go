@@ -8,7 +8,7 @@ import (
 
 	config "github.com/dkoosis/fo/internal/config"
 	"github.com/dkoosis/fo/internal/version"
-	"github.com/dkoosis/fo/mageconsole"
+	"github.com/dkoosis/fo/fo"
 	"github.com/dkoosis/fo/pkg/design"
 )
 
@@ -132,7 +132,7 @@ func run(args []string) int {
 	behavioralSettings.MaxBufferSize = resolvedCfg.MaxBufferSize
 	behavioralSettings.MaxLineLength = resolvedCfg.MaxLineLength
 
-	consoleCfg := mageconsole.ConsoleConfig{
+	consoleCfg := fo.ConsoleConfig{
 		ThemeName:      finalDesignConfig.ThemeName,
 		UseBoxes:       finalDesignConfig.Style.UseBoxes,
 		UseBoxesSet:    true,
@@ -150,7 +150,7 @@ func run(args []string) int {
 		Design:         finalDesignConfig,
 	}
 
-	console := mageconsole.NewConsole(consoleCfg)
+	console := fo.NewConsole(consoleCfg)
 	result, err := console.Run(behavioralSettings.Label, cmdArgs[0], cmdArgs[1:]...)
 
 	exitCode := 0

@@ -1,4 +1,4 @@
-package mageconsole
+package fo
 
 import (
 	"encoding/json"

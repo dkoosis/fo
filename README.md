@@ -236,7 +236,7 @@ go test ./...
 
 ## Related Projects
 
-- [mageconsole](mageconsole/README.md): Go API for programmatic use
+- [fo](fo/README.md): Go API for programmatic use
 - [examples/patterns](examples/patterns/): Pattern demonstrations
 
 ## License

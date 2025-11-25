@@ -2,6 +2,6 @@ github.com/dkoosis/fo/cmd
 github.com/dkoosis/fo/internal/config
 github.com/dkoosis/fo/internal/magetasks
 github.com/dkoosis/fo/internal/version
-github.com/dkoosis/fo/mageconsole
+github.com/dkoosis/fo/fo
 github.com/dkoosis/fo/pkg/adapter
 github.com/dkoosis/fo/pkg/design

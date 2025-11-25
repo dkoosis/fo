@@ -31,7 +31,7 @@ fo [flags] -- <command>
 **Relevant Files/Components:**
 - Primary file(s): `path/to/file.go`
 - Related functions: `FunctionName()` around line X
-- Dependencies: [any related packages like `internal/design`, `mageconsole`, `internal/config`]
+- Dependencies: [any related packages like `internal/design`, `fo`, `internal/config`]
 
 **Configuration (if applicable):**
 ```yaml
@@ -54,7 +54,7 @@ fo [flags] -- <command>
 When describing issues, reference these areas:
 
 - **Entry point**: `cmd/main.go` - CLI argument parsing, command dispatch
-- **Command execution**: `mageconsole/console.go` - Core command wrapping logic
+- **Command execution**: `fo/console.go` - Core command wrapping logic
 - **Output rendering**: `internal/design/render.go` - Formatting and display logic
 - **Themes/config**: `internal/design/config.go` - Theme definitions and styling
 - **Recognition**: `internal/design/recognition.go` - Output parsing and classification
@@ -115,7 +115,7 @@ fo --ci -- go test ./internal/design/...
 **Relevant Files/Components:**
 - `internal/config/config.go` - CI flag handling
 - `internal/design/config.go` - IsMonochrome logic
-- `mageconsole/console.go` - Output generation
+- `fo/console.go` - Output generation
 
 **Test Cases:**
 - Should work with `--ci` flag

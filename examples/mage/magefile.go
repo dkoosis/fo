@@ -7,10 +7,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dkoosis/fo/mageconsole"
+	"github.com/dkoosis/fo/fo"
 )
 
-var console = mageconsole.DefaultConsole()
+var console = fo.DefaultConsole()
 
 func init() {
 	// Change to project root (two levels up from examples/mage)
