@@ -12,7 +12,11 @@ func TestInitialize(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get working directory: %v", err)
 	}
-	defer os.Chdir(originalDir)
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Errorf("Failed to restore working directory: %v", err)
+		}
+	}()
 
 	// Create a temporary directory for testing
 	tmpDir := t.TempDir()

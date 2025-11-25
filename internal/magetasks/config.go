@@ -27,7 +27,7 @@ func Initialize() error {
 
 	// Ensure bin directory exists
 	binDir := filepath.Join(ProjectRoot, "bin")
-	if err := os.MkdirAll(binDir, 0o755); err != nil {
+	if err := os.MkdirAll(binDir, 0o750); err != nil {
 		return err
 	}
 

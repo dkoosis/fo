@@ -19,7 +19,9 @@ func TestPrintH1Header(t *testing.T) {
 	os.Stdout = oldStdout
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf("Failed to read from pipe: %v", err)
+	}
 	output := buf.String()
 
 	if !strings.Contains(output, "Test Title") {
@@ -42,7 +44,9 @@ func TestPrintH2Header(t *testing.T) {
 	os.Stdout = oldStdout
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf("Failed to read from pipe: %v", err)
+	}
 	output := buf.String()
 
 	if !strings.Contains(output, "=== Test Section ===") {
@@ -62,7 +66,9 @@ func TestPrintSuccess(t *testing.T) {
 	os.Stdout = oldStdout
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf("Failed to read from pipe: %v", err)
+	}
 	output := buf.String()
 
 	if !strings.Contains(output, "Operation completed") {
@@ -82,7 +88,9 @@ func TestPrintWarning(t *testing.T) {
 	os.Stdout = oldStdout
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf("Failed to read from pipe: %v", err)
+	}
 	output := buf.String()
 
 	if !strings.Contains(output, "Warning message") {
@@ -102,7 +110,9 @@ func TestPrintError(t *testing.T) {
 	os.Stdout = oldStdout
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf("Failed to read from pipe: %v", err)
+	}
 	output := buf.String()
 
 	if !strings.Contains(output, "Error message") {
@@ -122,7 +132,9 @@ func TestPrintInfo(t *testing.T) {
 	os.Stdout = oldStdout
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf("Failed to read from pipe: %v", err)
+	}
 	output := buf.String()
 
 	if !strings.Contains(output, "Info message") {

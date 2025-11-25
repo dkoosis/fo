@@ -76,12 +76,13 @@ func stripANSI(s string) string {
 	// Remove ANSI escape sequences (ESC [ ... m)
 	var result strings.Builder
 	inEscape := false
-	for i := 0; i < len(s); i++ {
-		if s[i] == '\033' {
+	for i := range len(s) {
+		switch {
+		case s[i] == '\033':
 			inEscape = true
-		} else if inEscape && s[i] == 'm' {
+		case inEscape && s[i] == 'm':
 			inEscape = false
-		} else if !inEscape {
+		case !inEscape:
 			result.WriteByte(s[i])
 		}
 	}
@@ -192,17 +193,18 @@ func (r *TestRenderer) RenderPackageLine(pkg TestPackageResult) {
 	// Determine status icon and color
 	var statusIcon string
 	var statusColor string
-	if pkg.Failed > 0 {
+	switch {
+	case pkg.Failed > 0:
 		statusIcon = r.console.GetIcon("Error")
 		if statusIcon == "" {
 			statusIcon = "✗"
 		}
 		statusColor = r.console.GetErrorColor()
-	} else if total == 0 {
+	case total == 0:
 		// Use configured icon and color for packages with no tests
 		statusIcon = r.config.NoTestIcon
 		statusColor = r.console.GetColor(r.config.NoTestColor)
-	} else {
+	default:
 		statusIcon = r.console.GetIcon("Success")
 		if statusIcon == "" {
 			statusIcon = "✓"
@@ -400,7 +402,7 @@ func (r *TestRenderer) formatAlignedDuration(d time.Duration) string {
 }
 
 // HumanizeTestName converts Go test names to human-friendly format.
-// Test<Component>_<Behavior>_When_<Condition> -> "Component: Behavior - When Condition"
+// Test<Component>_<Behavior>_When_<Condition> -> "Component: Behavior - When Condition".
 func HumanizeTestName(testName string) string {
 	// Remove "Test" prefix
 	name := strings.TrimPrefix(testName, "Test")

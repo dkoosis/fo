@@ -22,6 +22,7 @@ func BuildAll() error {
 	)
 
 	fmt.Println("Building fo...")
+	// #nosec G204 -- ldflags is a build-time constant, not user input
 	cmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", BinPath, "./cmd")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -38,7 +39,9 @@ func BuildAll() error {
 func Clean() error {
 	PrintH2Header("Clean")
 
-	os.RemoveAll("./bin")
+	if err := os.RemoveAll("./bin"); err != nil {
+		PrintWarning("Failed to remove bin directory: " + err.Error())
+	}
 	cmd := exec.Command("go", "clean", "-cache")
 	_ = cmd.Run() // Ignore error for cleanup command
 

@@ -23,25 +23,28 @@ import (
 	"golang.org/x/term"
 )
 
-// Constants for buffer sizes and limits
+// Constants for buffer sizes and limits.
 const (
-	// DefaultTerminalWidth is the fallback terminal width when detection fails
+	// DefaultTerminalWidth is the fallback terminal width when detection fails.
 	DefaultTerminalWidth = 80
 
-	// DefaultHeaderWidth is the default header width when not specified in theme
+	// DefaultHeaderWidth is the default header width when not specified in theme.
 	DefaultHeaderWidth = 60
 
-	// ReadBufferSize is the buffer size for reading from pipes (4KB)
+	// ReadBufferSize is the buffer size for reading from pipes (4KB).
 	ReadBufferSize = 4096
 
-	// AdapterDetectionLineCount is the number of lines to buffer for adapter detection
+	// AdapterDetectionLineCount is the number of lines to buffer for adapter detection.
 	AdapterDetectionLineCount = 15
 
-	// SignalTimeout is the timeout for graceful process termination before force kill
+	// SignalTimeout is the timeout for graceful process termination before force kill.
 	SignalTimeout = 2 * time.Second
 
-	// StreamCount is the number of output streams (stdout and stderr)
+	// StreamCount is the number of output streams (stdout and stderr).
 	StreamCount = 2
+
+	// BorderCornerDouble is the double-line box drawing corner character.
+	BorderCornerDouble = "╔"
 )
 
 type ConsoleConfig struct {
@@ -106,11 +109,7 @@ func (r *TaskResult) ToJSON() ([]byte, error) {
 
 	jsonLines := make([]JSONLine, len(r.Lines))
 	for i, line := range r.Lines {
-		jsonLines[i] = JSONLine{
-			Content:   line.Content,
-			Type:      line.Type,
-			Timestamp: line.Timestamp,
-		}
+		jsonLines[i] = JSONLine(line)
 	}
 
 	output := JSONOutput{
@@ -186,12 +185,13 @@ func contains(slice []string, item string) bool {
 func stripANSICodes(s string) string {
 	var result strings.Builder
 	inEscape := false
-	for i := 0; i < len(s); i++ {
-		if s[i] == '\033' {
+	for i := range len(s) {
+		switch {
+		case s[i] == '\033':
 			inEscape = true
-		} else if inEscape && s[i] == 'm' {
+		case inEscape && s[i] == 'm':
 			inEscape = false
-		} else if !inEscape {
+		case !inEscape:
 			result.WriteByte(s[i])
 		}
 	}
@@ -220,7 +220,7 @@ func (c *Console) PrintSectionHeader(name string) {
 		topCorner := cfg.Border.TopCornerChar
 		headerChar := cfg.Border.HeaderChar
 		closingCorner := "╮"
-		if topCorner == "╔" {
+		if topCorner == BorderCornerDouble {
 			closingCorner = "╗"
 		}
 		sb.WriteString(faintGray)
@@ -369,7 +369,7 @@ func (c *Console) PrintH1Header(name string) {
 		topCorner := cfg.Border.TopCornerChar
 		headerChar := cfg.Border.HeaderChar
 		closingCorner := "╮"
-		if topCorner == "╔" {
+		if topCorner == BorderCornerDouble {
 			closingCorner = "╗"
 		}
 		sb.WriteString(paleGray)
@@ -462,7 +462,7 @@ func (c *Console) GetColor(colorKey string) string {
 }
 
 // GetBorderChars returns the border characters from the theme.
-func (c *Console) GetBorderChars() (topCorner, bottomCorner, headerChar, verticalChar string) {
+func (c *Console) GetBorderChars() (string, string, string, string) {
 	return c.designConf.Border.TopCornerChar,
 		c.designConf.Border.BottomCornerChar,
 		c.designConf.Border.HeaderChar,
@@ -552,6 +552,7 @@ func (c *Console) RunSimple(command string, args ...string) error {
 	return err // Infrastructure error, pass through
 }
 
+//nolint:funlen // Complex function handling command execution, signal handling, and output rendering
 func (c *Console) runContext(
 	ctx context.Context, cancel context.CancelFunc, sigChan chan os.Signal,
 	label, command string, args []string,
@@ -964,9 +965,9 @@ func (c *Console) tryAdapterMode(
 						break // Exceeded limit, skip this chunk
 					}
 					if atomic.CompareAndSwapInt64(&totalBytesRead, current, newTotal) {
-					stdoutBuffer.Write(buf[:n])
+						stdoutBuffer.Write(buf[:n])
 						break
-				}
+					}
 					// CAS failed, retry (another goroutine updated totalBytesRead)
 				}
 			}
@@ -996,9 +997,9 @@ func (c *Console) tryAdapterMode(
 						break // Exceeded limit, skip this chunk
 					}
 					if atomic.CompareAndSwapInt64(&totalBytesRead, current, newTotal) {
-					stderrBuffer.Write(buf[:n])
+						stderrBuffer.Write(buf[:n])
 						break
-				}
+					}
 					// CAS failed, retry (another goroutine updated totalBytesRead)
 				}
 			}
