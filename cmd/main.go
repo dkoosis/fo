@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/dkoosis/fo/fo"
 	config "github.com/dkoosis/fo/internal/config"
 	"github.com/dkoosis/fo/internal/version"
-	"github.com/dkoosis/fo/fo"
 	"github.com/dkoosis/fo/pkg/design"
 )
 

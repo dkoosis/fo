@@ -579,7 +579,7 @@ func (c *Console) runContext(
 			// Hide cursor at start, restore on any exit path
 			_, _ = c.cfg.Out.Write([]byte("\033[?25l"))
 			defer func() {
-				_, _ = c.cfg.Out.Write([]byte("\033[?25h\n"))
+				_, _ = c.cfg.Out.Write([]byte("\033[?25h"))
 			}()
 		}
 		progress.Start(ctx, enableSpinner)

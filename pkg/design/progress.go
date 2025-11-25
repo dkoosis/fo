@@ -149,8 +149,21 @@ func (p *InlineProgress) formatProgressMessage(status string) string {
 		if spinnerChars == "" {
 			spinnerChars = DefaultSpinnerChars
 		}
-		spinnerIcon := string(spinnerChars[p.SpinnerIndex])
+		// Convert to runes for proper Unicode character indexing
+		spinnerRunes := []rune(spinnerChars)
+		if len(spinnerRunes) == 0 {
+			spinnerRunes = []rune(DefaultSpinnerChars)
+		}
+		spinnerIcon := string(spinnerRunes[p.SpinnerIndex%len(spinnerRunes)])
 		p.mutex.Unlock()
+
+		// Apply pale blue color to spinner icon
+		spinnerColor := p.Task.Config.GetColor("PaleBlue")
+		if spinnerColor == "" {
+			// Fallback to Process color if PaleBlue not available
+			spinnerColor = p.Task.Config.GetColor("Process")
+		}
+		coloredSpinner := spinnerColor + spinnerIcon + p.Task.Config.ResetColor()
 
 		runningColor := p.Task.Config.GetColor("Process")
 		runningDuration := formatDuration(time.Since(p.StartTime))
@@ -158,7 +171,7 @@ func (p *InlineProgress) formatProgressMessage(status string) string {
 		// Simplified format - no action phrase
 		return fmt.Sprintf("%s%s %s [%sWorking%s %s]",
 			indent,
-			spinnerIcon,
+			coloredSpinner,
 			toolLabel,
 			runningColor,
 			p.Task.Config.ResetColor(),
@@ -292,9 +305,13 @@ func (p *InlineProgress) runSpinner(ctx context.Context) {
 				return
 			}
 
-			// Update spinner index
+			// Update spinner index (convert to runes for proper Unicode handling)
 			p.mutex.Lock()
-			p.SpinnerIndex = (p.SpinnerIndex + 1) % len(spinnerChars)
+			spinnerRunes := []rune(spinnerChars)
+			if len(spinnerRunes) == 0 {
+				spinnerRunes = []rune(DefaultSpinnerChars)
+			}
+			p.SpinnerIndex = (p.SpinnerIndex + 1) % len(spinnerRunes)
 			p.mutex.Unlock()
 
 			// Re-render the progress line with the new spinner char and updated time

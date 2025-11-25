@@ -47,6 +47,23 @@ const (
 	ColorKeyMuted   = "Muted"
 )
 
+// Color name constants for string comparisons (lowercase).
+const (
+	colorNameProcess = "process"
+	colorNameSuccess = "success"
+	colorNameWarning = "warning"
+	colorNameError   = "error"
+	colorNameDetail  = "detail"
+	colorNameMuted   = "muted"
+	colorNameReset   = "reset"
+	colorNameWhite   = "white"
+	colorNameGreenFg = "greenfg"
+	colorNameBlueFg  = "bluefg"
+	colorNameBlueBg  = "bluebg"
+	colorNameBold    = "bold"
+	colorNameItalic  = "italic"
+)
+
 // Default spinner characters for ASCII mode.
 const DefaultSpinnerChars = "-\\|/"
 
@@ -108,11 +125,65 @@ type ElementStyleDef struct {
 	DateTimeFormat   string   `yaml:"date_time_format,omitempty"`
 }
 
+// DesignTokens centralizes all design values with semantic naming.
+// This provides a single source of truth for design values and enables
+// extensibility without code changes.
+type DesignTokens struct {
+	Colors struct {
+		// Status colors
+		Process string `yaml:"process"` // Primary process/task color
+		Success string `yaml:"success"` // Success state
+		Warning string `yaml:"warning"` // Warning state
+		Error   string `yaml:"error"`   // Error state
+		Detail  string `yaml:"detail"`  // Detail text
+		Muted   string `yaml:"muted"`   // Muted/secondary text
+		Reset   string `yaml:"reset"`   // Reset/clear formatting
+
+		// Base colors
+		White   string `yaml:"white,omitempty"`
+		GreenFg string `yaml:"green_fg,omitempty"`
+		BlueFg  string `yaml:"blue_fg,omitempty"`
+		BlueBg  string `yaml:"blue_bg,omitempty"`
+
+		// Component-specific colors (semantic naming)
+		Spinner string `yaml:"spinner,omitempty"` // Spinner active state (was PaleBlue)
+
+		// Text styling
+		Bold   string `yaml:"bold,omitempty"`
+		Italic string `yaml:"italic,omitempty"`
+	} `yaml:"colors"`
+
+	Spacing struct {
+		Progress int `yaml:"progress,omitempty"` // Progress indicator spacing
+		Indent   int `yaml:"indent,omitempty"`   // Indentation level spacing
+	} `yaml:"spacing"`
+
+	Typography struct {
+		HeaderWidth int `yaml:"header_width,omitempty"` // Visual width of headers
+	} `yaml:"typography"`
+}
+
+// Get returns the ANSI color code for a color token.
+// This provides type-safe access to color values.
+func (dt *DesignTokens) GetColor(name string) string {
+	// Use reflection to access color fields dynamically
+	colorsValue := reflect.ValueOf(dt.Colors)
+	field := colorsValue.FieldByName(name)
+	if !field.IsValid() {
+		return ""
+	}
+	return field.String()
+}
+
 // Config holds all resolved design system settings for rendering.
 type Config struct {
 	ThemeName    string `yaml:"-"`
 	IsMonochrome bool   `yaml:"-"`
 	CI           bool   `yaml:"-"` // Explicit CI mode flag (takes precedence over heuristics)
+
+	// DesignTokens provides centralized, semantic design values
+	// This is the new extensible system (Phase 1)
+	Tokens *DesignTokens `yaml:"-"`
 
 	Style struct {
 		UseBoxes          bool   `yaml:"use_boxes"`
@@ -327,7 +398,7 @@ func ASCIIMinimalTheme() *Config {
 	cfg.Tests.SparkbarLength = 10
 	cfg.Tests.ShowPercentage = false
 	cfg.Tests.NoTestIcon = "○"
-	cfg.Tests.NoTestColor = "Warning"
+	cfg.Tests.NoTestColor = ColorKeyWarning
 	cfg.Tests.CoverageGoodMin = 70
 	cfg.Tests.CoverageWarningMin = 40
 
@@ -353,20 +424,28 @@ func UnicodeVibrantTheme() *Config {
 	cfg.Icons.Info = "ℹ️"
 	cfg.Icons.Bullet = "•"
 
-	cfg.Colors.Process = ANSIBrightWhite
-	cfg.Colors.Success = ANSIBrightWhite
-	cfg.Colors.Warning = "\033[0;33m"
-	cfg.Colors.Error = "\033[0;31m"
-	cfg.Colors.Detail = "\033[0m"
-	cfg.Colors.Muted = "\033[2m"
-	cfg.Colors.Reset = "\033[0m"
-	cfg.Colors.White = "\033[0;97m"
-	cfg.Colors.GreenFg = "\033[38;5;120m"
-	cfg.Colors.BlueFg = "\033[0;34m"
-	cfg.Colors.BlueBg = "\033[44m"
-	cfg.Colors.PaleBlue = "\033[38;5;111m" // Pale blue for spinner
-	cfg.Colors.Bold = "\033[1m"
-	cfg.Colors.Italic = "\033[3m"
+	// Initialize Design Tokens (Phase 1: centralized, semantic values)
+	cfg.Tokens = &DesignTokens{}
+	cfg.Tokens.Colors.Process = ANSIBrightWhite
+	cfg.Tokens.Colors.Success = ANSIBrightWhite
+	cfg.Tokens.Colors.Warning = "\033[0;33m"
+	cfg.Tokens.Colors.Error = "\033[0;31m"
+	cfg.Tokens.Colors.Detail = "\033[0m"
+	cfg.Tokens.Colors.Muted = "\033[2m"
+	cfg.Tokens.Colors.Reset = "\033[0m"
+	cfg.Tokens.Colors.White = "\033[0;97m"
+	cfg.Tokens.Colors.GreenFg = "\033[38;5;120m"
+	cfg.Tokens.Colors.BlueFg = "\033[0;34m"
+	cfg.Tokens.Colors.BlueBg = "\033[44m"
+	cfg.Tokens.Colors.Spinner = "\033[38;5;111m" // Semantic: Spinner (was PaleBlue)
+	cfg.Tokens.Colors.Bold = "\033[1m"
+	cfg.Tokens.Colors.Italic = "\033[3m"
+	cfg.Tokens.Spacing.Progress = 0
+	cfg.Tokens.Spacing.Indent = 2
+	cfg.Tokens.Typography.HeaderWidth = 40
+
+	// Sync Tokens to old Colors struct for backwards compatibility
+	cfg.syncTokensToColors()
 
 	cfg.Border.TaskStyle = BorderLeftDouble
 	cfg.Border.HeaderChar = "═"
@@ -415,7 +494,7 @@ func UnicodeVibrantTheme() *Config {
 	cfg.Tests.SparkbarLength = 10
 	cfg.Tests.ShowPercentage = false
 	cfg.Tests.NoTestIcon = "○"
-	cfg.Tests.NoTestColor = "Warning"
+	cfg.Tests.NoTestColor = ColorKeyWarning
 	cfg.Tests.CoverageGoodMin = 70
 	cfg.Tests.CoverageWarningMin = 40
 
@@ -509,13 +588,13 @@ func (c *Config) GetIcon(iconKey string) string {
 		switch strings.ToLower(iconKey) {
 		case "start":
 			return IconStart
-		case StatusSuccess:
+		case "success":
 			return IconSuccess
-		case StatusWarning:
+		case "warning":
 			return IconWarning
-		case StatusError:
+		case "error":
 			return IconFailed
-		case TypeInfo:
+		case "info":
 			return IconInfo
 		case "bullet":
 			return IconBullet
@@ -526,13 +605,13 @@ func (c *Config) GetIcon(iconKey string) string {
 	switch strings.ToLower(iconKey) {
 	case "start":
 		return c.Icons.Start
-	case StatusSuccess:
+	case "success":
 		return c.Icons.Success
-	case StatusWarning:
+	case "warning":
 		return c.Icons.Warning
-	case StatusError:
+	case "error":
 		return c.Icons.Error
-	case TypeInfo:
+	case "info":
 		return c.Icons.Info
 	case "bullet":
 		return c.Icons.Bullet
@@ -571,31 +650,31 @@ func (c *Config) resolveColorName(name string) string {
 	lowerName := strings.ToLower(name)
 
 	switch lowerName {
-	case "process", StatusSuccess:
+	case colorNameProcess, colorNameSuccess:
 		codeToProcess = c.Colors.Process
-	case StatusWarning:
+	case colorNameWarning:
 		codeToProcess = c.Colors.Warning
-	case StatusError:
+	case colorNameError:
 		codeToProcess = c.Colors.Error
-	case "detail":
+	case colorNameDetail:
 		codeToProcess = c.Colors.Detail
-	case "muted":
+	case colorNameMuted:
 		codeToProcess = c.Colors.Muted
-	case "reset":
+	case colorNameReset:
 		codeToProcess = c.Colors.Reset
-	case "white":
+	case colorNameWhite:
 		codeToProcess = c.Colors.White
-	case "greenfg":
+	case colorNameGreenFg:
 		codeToProcess = c.Colors.GreenFg
-	case "bluefg":
+	case colorNameBlueFg:
 		codeToProcess = c.Colors.BlueFg
-	case "bluebg":
+	case colorNameBlueBg:
 		codeToProcess = c.Colors.BlueBg
 	case "paleblue":
 		codeToProcess = c.Colors.PaleBlue
-	case "bold":
+	case colorNameBold:
 		codeToProcess = c.Colors.Bold
-	case "italic":
+	case colorNameItalic:
 		codeToProcess = c.Colors.Italic
 	default:
 		// If name contains '[' and starts with an escape sequence, treat it as a raw ANSI code
@@ -609,25 +688,25 @@ func (c *Config) resolveColorName(name string) string {
 	escChar := string([]byte{27})
 	if codeToProcess == "" {
 		switch lowerName {
-		case "process", StatusSuccess, "white":
+		case colorNameProcess, colorNameSuccess, colorNameWhite:
 			codeToProcess = escChar + "[0;97m"
-		case StatusWarning:
+		case colorNameWarning:
 			codeToProcess = escChar + "[0;33m"
-		case StatusError:
+		case colorNameError:
 			codeToProcess = escChar + "[0;31m"
-		case "detail", "reset":
+		case colorNameDetail, colorNameReset:
 			codeToProcess = escChar + "[0m"
-		case "muted":
+		case colorNameMuted:
 			codeToProcess = escChar + "[2m"
-		case "greenfg":
+		case colorNameGreenFg:
 			codeToProcess = escChar + "[38;5;120m"
-		case "bluefg":
+		case colorNameBlueFg:
 			codeToProcess = escChar + "[0;34m"
-		case "bluebg":
+		case colorNameBlueBg:
 			codeToProcess = escChar + "[44m"
-		case "bold":
+		case colorNameBold:
 			codeToProcess = escChar + "[1m"
-		case "italic":
+		case colorNameItalic:
 			codeToProcess = escChar + "[3m"
 		default:
 			codeToProcess = escChar + "[0m"
@@ -654,35 +733,35 @@ func (c *Config) resolveColorNameByReflection(name string) string {
 
 	// Normalize name: convert to field name format (e.g., "paleblue" -> "PaleBlue")
 	lowerName := strings.ToLower(name)
-	
+
 	// Handle special cases and status constants
 	var fieldName string
 	switch lowerName {
-	case "process", StatusSuccess:
+	case colorNameProcess, colorNameSuccess:
 		fieldName = "Process"
-	case StatusWarning:
+	case colorNameWarning:
 		fieldName = "Warning"
-	case StatusError:
+	case colorNameError:
 		fieldName = "Error"
-	case "detail":
+	case colorNameDetail:
 		fieldName = "Detail"
-	case "muted":
+	case colorNameMuted:
 		fieldName = "Muted"
-	case "reset":
+	case colorNameReset:
 		fieldName = "Reset"
-	case "white":
+	case colorNameWhite:
 		fieldName = "White"
-	case "greenfg":
+	case colorNameGreenFg:
 		fieldName = "GreenFg"
-	case "bluefg":
+	case colorNameBlueFg:
 		fieldName = "BlueFg"
-	case "bluebg":
+	case colorNameBlueBg:
 		fieldName = "BlueBg"
 	case "paleblue":
 		fieldName = "PaleBlue"
-	case "bold":
+	case colorNameBold:
 		fieldName = "Bold"
-	case "italic":
+	case colorNameItalic:
 		fieldName = "Italic"
 	default:
 		// Try to convert to field name (capitalize first letter, handle camelCase)
@@ -704,17 +783,17 @@ func (c *Config) resolveColorNameByReflection(name string) string {
 	// Use reflection to get the field value from Colors struct
 	colorsValue := reflect.ValueOf(c.Colors)
 	colorsType := colorsValue.Type()
-	
+
 	field := colorsValue.FieldByName(fieldName)
 	if !field.IsValid() {
 		// Field not found, try fallback defaults
 		escChar := string([]byte{27})
 		switch lowerName {
-		case "process", StatusSuccess, "white":
+		case "process", "success", "white":
 			return escChar + "[0;97m"
-		case StatusWarning:
+		case "warning":
 			return escChar + "[0;33m"
-		case StatusError:
+		case "error":
 			return escChar + "[0;31m"
 		case "detail", "reset":
 			return escChar + "[0m"
@@ -732,7 +811,9 @@ func (c *Config) resolveColorNameByReflection(name string) string {
 			return escChar + "[3m"
 		default:
 			if os.Getenv("FO_DEBUG") != "" {
-				fmt.Fprintf(os.Stderr, "[DEBUG resolveColorNameByReflection] Color field '%s' (from '%s') not found in Colors struct (type: %s), using reset.\n", fieldName, name, colorsType.Name())
+				fmt.Fprintf(os.Stderr,
+					"[DEBUG resolveColorNameByReflection] Color field '%s' (from '%s') not found in Colors struct (type: %s), using reset.\n",
+					fieldName, name, colorsType.Name())
 			}
 			return escChar + "[0m"
 		}
@@ -743,11 +824,11 @@ func (c *Config) resolveColorNameByReflection(name string) string {
 		// Empty color, use fallback defaults (same as above)
 		escChar := string([]byte{27})
 		switch lowerName {
-		case "process", StatusSuccess, "white":
+		case "process", "success", "white":
 			return escChar + "[0;97m"
-		case StatusWarning:
+		case "warning":
 			return escChar + "[0;33m"
-		case StatusError:
+		case "error":
 			return escChar + "[0;31m"
 		case "detail", "reset":
 			return escChar + "[0m"
@@ -769,6 +850,30 @@ func (c *Config) resolveColorNameByReflection(name string) string {
 	}
 
 	return NormalizeANSIEscape(colorValue)
+}
+
+// syncTokensToColors syncs DesignTokens to the old Colors struct for backwards compatibility.
+// This allows code using the old Colors struct to continue working during the migration.
+// Will be removed in Phase 5.
+func (c *Config) syncTokensToColors() {
+	if c.Tokens == nil {
+		return
+	}
+	// Sync color values from Tokens to Colors
+	c.Colors.Process = c.Tokens.Colors.Process
+	c.Colors.Success = c.Tokens.Colors.Success
+	c.Colors.Warning = c.Tokens.Colors.Warning
+	c.Colors.Error = c.Tokens.Colors.Error
+	c.Colors.Detail = c.Tokens.Colors.Detail
+	c.Colors.Muted = c.Tokens.Colors.Muted
+	c.Colors.Reset = c.Tokens.Colors.Reset
+	c.Colors.White = c.Tokens.Colors.White
+	c.Colors.GreenFg = c.Tokens.Colors.GreenFg
+	c.Colors.BlueFg = c.Tokens.Colors.BlueFg
+	c.Colors.BlueBg = c.Tokens.Colors.BlueBg
+	c.Colors.PaleBlue = c.Tokens.Colors.Spinner // Map Spinner token to PaleBlue for compatibility
+	c.Colors.Bold = c.Tokens.Colors.Bold
+	c.Colors.Italic = c.Tokens.Colors.Italic
 }
 
 // GetColorObj returns a Color wrapper for the given color key.

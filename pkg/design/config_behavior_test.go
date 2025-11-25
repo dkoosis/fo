@@ -272,59 +272,56 @@ func TestApplyMonochromeDefaults_ClearsColorStyling_When_ConfigHasExistingColors
 }
 
 func TestConfig_UsesReflection_When_FeatureFlagEnabled(t *testing.T) {
-	t.Parallel()
 
 	// Save original env value
 	originalEnv := os.Getenv("FO_USE_REFLECTION_COLORS")
-	defer func() {
+	t.Cleanup(func() {
 		if originalEnv != "" {
 			os.Setenv("FO_USE_REFLECTION_COLORS", originalEnv)
 		} else {
 			os.Unsetenv("FO_USE_REFLECTION_COLORS")
 		}
-	}()
+	})
 
 	tests := []struct {
-		name           string
+		name             string
 		enableReflection bool
-		colorName      string
-		expectedPrefix string
+		colorName        string
+		expectedPrefix   string
 	}{
 		{
-			name:           "uses reflection when flag enabled",
+			name:             "uses reflection when flag enabled",
 			enableReflection: true,
-			colorName:      "error",
-			expectedPrefix: "\u001b[0;31m",
+			colorName:        "error",
+			expectedPrefix:   "\u001b[0;31m",
 		},
 		{
-			name:           "uses switch when flag disabled",
+			name:             "uses switch when flag disabled",
 			enableReflection: false,
-			colorName:      "error",
-			expectedPrefix: "\u001b[0;31m",
+			colorName:        "error",
+			expectedPrefix:   "\u001b[0;31m",
 		},
 		{
-			name:           "reflection handles paleblue",
+			name:             "reflection handles paleblue",
 			enableReflection: true,
-			colorName:      "paleblue",
-			expectedPrefix: "\u001b[38;5;111m",
+			colorName:        "paleblue",
+			expectedPrefix:   "\u001b[38;5;111m",
 		},
 		{
-			name:           "switch handles paleblue",
+			name:             "switch handles paleblue",
 			enableReflection: false,
-			colorName:      "paleblue",
-			expectedPrefix: "\u001b[38;5;111m",
+			colorName:        "paleblue",
+			expectedPrefix:   "\u001b[38;5;111m",
 		},
 	}
 
-	for _, tc := range tests {
+		for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
 			// Set environment variable
 			if tc.enableReflection {
-				os.Setenv("FO_USE_REFLECTION_COLORS", "1")
+				t.Setenv("FO_USE_REFLECTION_COLORS", "1")
 			} else {
-				os.Unsetenv("FO_USE_REFLECTION_COLORS")
+				t.Setenv("FO_USE_REFLECTION_COLORS", "")
 			}
 
 			// Create fresh config to pick up env change
@@ -338,17 +335,16 @@ func TestConfig_UsesReflection_When_FeatureFlagEnabled(t *testing.T) {
 }
 
 func TestConfig_ReflectionMatchesSwitch_When_AllColors(t *testing.T) {
-	t.Parallel()
 
 	// Save original env value
 	originalEnv := os.Getenv("FO_USE_REFLECTION_COLORS")
-	defer func() {
+	t.Cleanup(func() {
 		if originalEnv != "" {
 			os.Setenv("FO_USE_REFLECTION_COLORS", originalEnv)
 		} else {
 			os.Unsetenv("FO_USE_REFLECTION_COLORS")
 		}
-	}()
+	})
 
 	cfg := UnicodeVibrantTheme()
 	colorsToTest := []string{
@@ -359,14 +355,14 @@ func TestConfig_ReflectionMatchesSwitch_When_AllColors(t *testing.T) {
 	}
 
 	// Test with switch-based (default)
-	os.Unsetenv("FO_USE_REFLECTION_COLORS")
+	t.Setenv("FO_USE_REFLECTION_COLORS", "")
 	switchResults := make(map[string]string)
 	for _, color := range colorsToTest {
 		switchResults[color] = cfg.GetColor(color)
 	}
 
 	// Test with reflection-based
-	os.Setenv("FO_USE_REFLECTION_COLORS", "1")
+	t.Setenv("FO_USE_REFLECTION_COLORS", "1")
 	cfgReflection := UnicodeVibrantTheme()
 	reflectionResults := make(map[string]string)
 	for _, color := range colorsToTest {
