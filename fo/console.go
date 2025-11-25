@@ -1674,7 +1674,10 @@ func resolveDesignConfig(cfg ConsoleConfig) *design.Config {
 	if cfg.UseBoxesSet {
 		base.Style.UseBoxes = cfg.UseBoxes
 	}
-	base.Style.UseInlineProgress = cfg.InlineProgress
+	// Only override theme's UseInlineProgress if explicitly set in console config
+	if cfg.InlineSet {
+		base.Style.UseInlineProgress = cfg.InlineProgress
+	}
 	if cfg.ShowTimerSet {
 		base.Style.NoTimer = !cfg.ShowTimer
 	}
