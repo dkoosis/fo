@@ -157,9 +157,108 @@ func (c *Console) getPaleGrayColor() string {
 	return "\033[38;5;252m"
 }
 
+// getVeryPaleGrayColor returns an even paler, thinner gray for orca theme borders.
+func (c *Console) getVeryPaleGrayColor() string {
+	return "\033[38;5;250m" // Lighter than 252, appears thinner
+}
+
 // getFaintDarkGrayColor returns a very faint darkish gray ANSI color code.
 func (c *Console) getFaintDarkGrayColor() string {
 	return "\033[38;5;238m"
+}
+
+// BoxLayout defines the dimensions and styling of a rendered box.
+// This provides a single source of truth for all box rendering calculations.
+type BoxLayout struct {
+	TotalWidth   int    // Full terminal width
+	ContentWidth int    // Available width for content (TotalWidth - borders - padding)
+	LeftPadding  int    // Spaces after left border (typically 2)
+	RightPadding int    // Spaces before right border (typically 1)
+	BorderColor  string // ANSI color for borders
+	BorderChars  BorderChars
+}
+
+// BorderChars encapsulates all border characters for consistent rendering.
+type BorderChars struct {
+	TopLeft     string
+	TopRight    string
+	BottomLeft  string
+	BottomRight string
+	Horizontal  string
+	Vertical    string
+}
+
+// ContentLine represents structured content for consistent rendering.
+// This ensures icons and text align properly across all section lines.
+type ContentLine struct {
+	Icon      string // Optional icon (e.g., checkmark) - will be rendered at fixed position
+	IconColor string // Optional color for icon (empty = no color)
+	Text      string // Main text content
+	TextColor string // Optional color for text (empty = no color)
+}
+
+// calculateBoxLayout computes the box layout dimensions once, providing a single source of truth.
+func (c *Console) calculateBoxLayout() *BoxLayout {
+	cfg := c.designConf
+	totalWidth := c.getTerminalWidth()
+
+	// Content area = total width - left border (1) - left padding (2) - right padding (1) - right border (1)
+	// This ensures all content lines use the same width calculation
+	contentWidth := totalWidth - 5
+
+	// Determine border color based on theme
+	borderColor := c.getFaintDarkGrayColor()
+	if cfg.ThemeName == "orca" {
+		borderColor = c.getVeryPaleGrayColor()
+	}
+
+	// Determine border characters based on theme
+	borderChars := c.getBorderChars(cfg)
+
+	return &BoxLayout{
+		TotalWidth:   totalWidth,
+		ContentWidth: contentWidth,
+		LeftPadding:  2,
+		RightPadding: 1,
+		BorderColor:  borderColor,
+		BorderChars:  borderChars,
+	}
+}
+
+// getBorderChars returns the appropriate border characters for the current theme.
+func (c *Console) getBorderChars(cfg *design.Config) BorderChars {
+	topCorner := cfg.Border.TopCornerChar
+	bottomCorner := cfg.Border.BottomCornerChar
+	headerChar := cfg.Border.HeaderChar
+	verticalChar := cfg.Border.VerticalChar
+
+	// Determine closing corners based on opening corners
+	topRight := "╮"
+	switch topCorner {
+	case "╔": // Double-line square corner
+		topRight = "╗"
+	case "╒": // Double-line rounded corner
+		topRight = "╗"
+	case "╭": // Single-line rounded corner
+		topRight = "╮"
+	}
+
+	bottomRight := "╯"
+	switch bottomCorner {
+	case "╚": // Double-line square corner
+		bottomRight = "╝"
+	case "╰": // Single-line rounded corner
+		bottomRight = "╯"
+	}
+
+	return BorderChars{
+		TopLeft:     topCorner,
+		TopRight:    topRight,
+		BottomLeft:  bottomCorner,
+		BottomRight: bottomRight,
+		Horizontal:  headerChar,
+		Vertical:    verticalChar,
+	}
 }
 
 // getTerminalWidth returns the terminal width, or a default if unavailable.
@@ -199,68 +298,52 @@ func stripANSICodes(s string) string {
 }
 
 // PrintSectionHeader prints a section header and starts a section box.
+// Uses BoxLayout for consistent dimensions.
 func (c *Console) PrintSectionHeader(name string) {
 	cfg := c.designConf
-	headerWidth := c.getTerminalWidth()
-	title := strings.ToUpper(name)
-	faintGray := c.getFaintDarkGrayColor()
 	reset := cfg.ResetColor()
 
 	var sb strings.Builder
 	sb.WriteString("\n")
 
 	if cfg.IsMonochrome {
+		title := strings.ToUpper(name)
 		sb.WriteString("--- ")
 		sb.WriteString(title)
 		sb.WriteString(" ---\n")
 	} else {
+		box := c.calculateBoxLayout()
+		title := strings.ToUpper(name)
 		headerStyle := cfg.GetElementStyle("Task_Label_Header")
 		labelColor := cfg.GetColor(headerStyle.ColorFG, "Task_Label_Header")
 
-		topCorner := cfg.Border.TopCornerChar
-		headerChar := cfg.Border.HeaderChar
-		closingCorner := "╮"
-		// Determine closing corner based on the top corner character
-		switch topCorner {
-		case "╔": // Double-line square corner
-			closingCorner = "╗"
-		case "╒": // Double-line rounded corner
-			closingCorner = "╗"
-		case "╭": // Single-line rounded corner
-			closingCorner = "╮"
-		default:
-			closingCorner = "╮" // Default to rounded single-line
-		}
-		// Use very pale gray for orca theme, faint dark gray for others
-		borderColor := faintGray
-		if cfg.ThemeName == "orca" {
-			borderColor = c.getPaleGrayColor()
-		}
-		sb.WriteString(borderColor)
-		sb.WriteString(topCorner)
-		sb.WriteString(strings.Repeat(headerChar, headerWidth))
-		sb.WriteString(closingCorner)
+		// Top border line
+		sb.WriteString(box.BorderColor)
+		sb.WriteString(box.BorderChars.TopLeft)
+		sb.WriteString(strings.Repeat(box.BorderChars.Horizontal, box.TotalWidth))
+		sb.WriteString(box.BorderChars.TopRight)
 		sb.WriteString(reset)
 		sb.WriteString("\n")
 
-		sb.WriteString(borderColor)
-		sb.WriteString(cfg.Border.VerticalChar)
+		// Title line with consistent padding
+		sb.WriteString(box.BorderColor)
+		sb.WriteString(box.BorderChars.Vertical)
 		sb.WriteString(reset)
-		sb.WriteString("  ")
+		sb.WriteString(strings.Repeat(" ", box.LeftPadding))
 		sb.WriteString(labelColor)
 		if contains(headerStyle.TextStyle, "bold") {
 			sb.WriteString(cfg.GetColor("Bold"))
 		}
 		sb.WriteString(title)
 		sb.WriteString(reset)
-		titleLen := len(title) + 3
-		remainingWidth := headerWidth + 2 - titleLen - 1
+		titleVisualLen := len(stripANSICodes(title))
+		remainingWidth := box.TotalWidth - titleVisualLen - box.RightPadding
 		if remainingWidth < 0 {
 			remainingWidth = 0
 		}
 		sb.WriteString(strings.Repeat(" ", remainingWidth))
-		sb.WriteString(borderColor)
-		sb.WriteString(cfg.Border.VerticalChar)
+		sb.WriteString(box.BorderColor)
+		sb.WriteString(box.BorderChars.Vertical)
 		sb.WriteString(reset)
 		sb.WriteString("\n")
 	}
@@ -269,6 +352,7 @@ func (c *Console) PrintSectionHeader(name string) {
 }
 
 // PrintSectionLine prints a line of section content with side borders.
+// Uses BoxLayout for consistent dimensions. Supports both plain strings and structured ContentLine.
 func (c *Console) PrintSectionLine(line string) {
 	cfg := c.designConf
 	if cfg.IsMonochrome {
@@ -276,22 +360,13 @@ func (c *Console) PrintSectionLine(line string) {
 		return
 	}
 
-	// Use very pale gray for orca theme, faint dark gray for others
-	borderColor := c.getFaintDarkGrayColor()
-	if cfg.ThemeName == "orca" {
-		borderColor = c.getPaleGrayColor()
-	}
+	box := c.calculateBoxLayout()
 	reset := cfg.ResetColor()
-	headerWidth := c.getTerminalWidth()
 
-	maxContentWidth := headerWidth - 3
-	if maxContentWidth < 0 {
-		maxContentWidth = 0
-	}
-
+	// Clip content to fit within content width
 	visualLine := stripANSICodes(line)
-	if len(visualLine) > maxContentWidth {
-		clippedVisual := visualLine[:maxContentWidth]
+	if len(visualLine) > box.ContentWidth {
+		clippedVisual := visualLine[:box.ContentWidth]
 		ansiEnd := 0
 		for i := 0; i < len(line); i++ {
 			if line[i] == '\033' {
@@ -311,20 +386,84 @@ func (c *Console) PrintSectionLine(line string) {
 	}
 
 	visualWidth := len(stripANSICodes(line))
-	padding := headerWidth - visualWidth - 3
+	padding := box.TotalWidth - visualWidth - box.RightPadding
 	if padding < 0 {
 		padding = 0
 	}
 
 	var sb strings.Builder
-	sb.WriteString(borderColor)
-	sb.WriteString(cfg.Border.VerticalChar)
+	sb.WriteString(box.BorderColor)
+	sb.WriteString(box.BorderChars.Vertical)
 	sb.WriteString(reset)
-	sb.WriteString("  ")
+	sb.WriteString(strings.Repeat(" ", box.LeftPadding))
 	sb.WriteString(line)
 	sb.WriteString(strings.Repeat(" ", padding))
-	sb.WriteString(borderColor)
-	sb.WriteString(cfg.Border.VerticalChar)
+	sb.WriteString(box.BorderColor)
+	sb.WriteString(box.BorderChars.Vertical)
+	sb.WriteString(reset)
+	sb.WriteString("\n")
+
+	_, _ = c.cfg.Out.Write([]byte(sb.String()))
+}
+
+// PrintSectionContentLine renders a structured content line with guaranteed icon alignment.
+// Icons are always rendered at the same horizontal position, ensuring vertical alignment.
+func (c *Console) PrintSectionContentLine(content ContentLine) {
+	cfg := c.designConf
+	if cfg.IsMonochrome {
+		line := content.Text
+		if content.Icon != "" {
+			line = content.Icon + " " + line
+		}
+		_, _ = c.cfg.Out.Write([]byte(line + "\n"))
+		return
+	}
+
+	box := c.calculateBoxLayout()
+	reset := cfg.ResetColor()
+
+	var sb strings.Builder
+	sb.WriteString(box.BorderColor)
+	sb.WriteString(box.BorderChars.Vertical)
+	sb.WriteString(reset)
+	sb.WriteString(strings.Repeat(" ", box.LeftPadding))
+
+	// Render icon at fixed position (if present)
+	if content.Icon != "" {
+		if content.IconColor != "" {
+			sb.WriteString(content.IconColor)
+		}
+		sb.WriteString(content.Icon)
+		if content.IconColor != "" {
+			sb.WriteString(reset)
+		}
+		sb.WriteString(" ") // Space after icon
+	}
+
+	// Render text
+	if content.TextColor != "" {
+		sb.WriteString(content.TextColor)
+	}
+	sb.WriteString(content.Text)
+	if content.TextColor != "" {
+		sb.WriteString(reset)
+	}
+
+	// Calculate padding: icon (if present) + space + text
+	iconWidth := 0
+	if content.Icon != "" {
+		iconWidth = len([]rune(content.Icon)) + 1 // Icon + space
+	}
+	textWidth := len(stripANSICodes(content.Text))
+	totalContentWidth := iconWidth + textWidth
+	padding := box.TotalWidth - totalContentWidth - box.RightPadding
+	if padding < 0 {
+		padding = 0
+	}
+
+	sb.WriteString(strings.Repeat(" ", padding))
+	sb.WriteString(box.BorderColor)
+	sb.WriteString(box.BorderChars.Vertical)
 	sb.WriteString(reset)
 	sb.WriteString("\n")
 
@@ -332,6 +471,7 @@ func (c *Console) PrintSectionLine(line string) {
 }
 
 // PrintSectionFooter closes the section box with a bottom border.
+// Uses BoxLayout for consistent dimensions.
 func (c *Console) PrintSectionFooter() {
 	cfg := c.designConf
 	if cfg.IsMonochrome {
@@ -339,28 +479,14 @@ func (c *Console) PrintSectionFooter() {
 		return
 	}
 
-	// Use very pale gray for orca theme, faint dark gray for others
-	borderColor := c.getFaintDarkGrayColor()
-	if cfg.ThemeName == "orca" {
-		borderColor = c.getPaleGrayColor()
-	}
+	box := c.calculateBoxLayout()
 	reset := cfg.ResetColor()
-	headerWidth := c.getTerminalWidth()
-
-	bottomCorner := cfg.Border.BottomCornerChar
-	headerChar := cfg.Border.HeaderChar
-	bottomClosingCorner := "╯"
-	if bottomCorner == "╚" {
-		bottomClosingCorner = "╝"
-	} else if bottomCorner == "╰" {
-		bottomClosingCorner = "╯" // Rounded single-line corner
-	}
 
 	var sb strings.Builder
-	sb.WriteString(borderColor)
-	sb.WriteString(bottomCorner)
-	sb.WriteString(strings.Repeat(headerChar, headerWidth))
-	sb.WriteString(bottomClosingCorner)
+	sb.WriteString(box.BorderColor)
+	sb.WriteString(box.BorderChars.BottomLeft)
+	sb.WriteString(strings.Repeat(box.BorderChars.Horizontal, box.TotalWidth))
+	sb.WriteString(box.BorderChars.BottomRight)
 	sb.WriteString(reset)
 	sb.WriteString("\n\n")
 

@@ -523,7 +523,7 @@ func OrcaTheme() *Config {
 	// Initialize Design Tokens (Phase 1: centralized, semantic values)
 	cfg.Tokens = &DesignTokens{}
 	cfg.Tokens.Colors.Process = "\033[38;5;111m" // Pale blue for process/task/headings
-	cfg.Tokens.Colors.Success = "\033[0;32m"     // Green for success
+	cfg.Tokens.Colors.Success = "\033[38;5;120m" // Pale green for success
 	cfg.Tokens.Colors.Warning = "\033[0;33m"     // Yellow for warnings
 	cfg.Tokens.Colors.Error = "\033[0;31m"       // Red for errors
 	cfg.Tokens.Colors.Detail = "\033[0m"         // Reset for detail text
