@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os" // For debug prints to stderr
+	"reflect"
 	"strings"
 )
 
@@ -146,19 +147,20 @@ type Config struct {
 	} `yaml:"border"`
 
 	Colors struct {
-		Process string `yaml:"process"`
-		Success string `yaml:"success"`
-		Warning string `yaml:"warning"`
-		Error   string `yaml:"error"`
-		Detail  string `yaml:"detail"`
-		Muted   string `yaml:"muted"`
-		Reset   string `yaml:"reset"`
-		White   string `yaml:"white,omitempty"`
-		GreenFg string `yaml:"green_fg,omitempty"`
-		BlueFg  string `yaml:"blue_fg,omitempty"`
-		BlueBg  string `yaml:"blue_bg,omitempty"`
-		Bold    string `yaml:"bold,omitempty"`
-		Italic  string `yaml:"italic,omitempty"`
+		Process  string `yaml:"process"`
+		Success  string `yaml:"success"`
+		Warning  string `yaml:"warning"`
+		Error    string `yaml:"error"`
+		Detail   string `yaml:"detail"`
+		Muted    string `yaml:"muted"`
+		Reset    string `yaml:"reset"`
+		White    string `yaml:"white,omitempty"`
+		GreenFg  string `yaml:"green_fg,omitempty"`
+		BlueFg   string `yaml:"blue_fg,omitempty"`
+		BlueBg   string `yaml:"blue_bg,omitempty"`
+		PaleBlue string `yaml:"pale_blue,omitempty"`
+		Bold     string `yaml:"bold,omitempty"`
+		Italic   string `yaml:"italic,omitempty"`
 	} `yaml:"colors"`
 
 	Icons struct {
@@ -273,19 +275,20 @@ func ASCIIMinimalTheme() *Config {
 	cfg.Style.SpinnerInterval = 80
 
 	cfg.Colors = struct {
-		Process string `yaml:"process"`
-		Success string `yaml:"success"`
-		Warning string `yaml:"warning"`
-		Error   string `yaml:"error"`
-		Detail  string `yaml:"detail"`
-		Muted   string `yaml:"muted"`
-		Reset   string `yaml:"reset"`
-		White   string `yaml:"white,omitempty"`
-		GreenFg string `yaml:"green_fg,omitempty"`
-		BlueFg  string `yaml:"blue_fg,omitempty"`
-		BlueBg  string `yaml:"blue_bg,omitempty"`
-		Bold    string `yaml:"bold,omitempty"`
-		Italic  string `yaml:"italic,omitempty"`
+		Process  string `yaml:"process"`
+		Success  string `yaml:"success"`
+		Warning  string `yaml:"warning"`
+		Error    string `yaml:"error"`
+		Detail   string `yaml:"detail"`
+		Muted    string `yaml:"muted"`
+		Reset    string `yaml:"reset"`
+		White    string `yaml:"white,omitempty"`
+		GreenFg  string `yaml:"green_fg,omitempty"`
+		BlueFg   string `yaml:"blue_fg,omitempty"`
+		BlueBg   string `yaml:"blue_bg,omitempty"`
+		PaleBlue string `yaml:"pale_blue,omitempty"`
+		Bold     string `yaml:"bold,omitempty"`
+		Italic   string `yaml:"italic,omitempty"`
 	}{}
 
 	cfg.Border.TaskStyle = BorderNone
@@ -361,6 +364,7 @@ func UnicodeVibrantTheme() *Config {
 	cfg.Colors.GreenFg = "\033[38;5;120m"
 	cfg.Colors.BlueFg = "\033[0;34m"
 	cfg.Colors.BlueBg = "\033[44m"
+	cfg.Colors.PaleBlue = "\033[38;5;111m" // Pale blue for spinner
 	cfg.Colors.Bold = "\033[1m"
 	cfg.Colors.Italic = "\033[3m"
 
@@ -437,7 +441,7 @@ func initBaseElementStyles(elements map[string]ElementStyleDef) {
 		"Print_Header_Highlight", "Print_Success_Style", "Print_Warning_Style", "Print_Error_Style", "Print_Info_Style",
 	}
 	elements["Task_Progress_Line"] = ElementStyleDef{
-		AdditionalChars: "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏",
+		AdditionalChars: "·✻✽✶✳✢",
 		Text:            "{verb}ing {subject}...",
 		TextContent:     "{verb}ing {subject} complete",
 	}
@@ -542,14 +546,20 @@ func (c *Config) GetColor(colorKeyOrName string, elementName ...string) string {
 		return ""
 	}
 
+	// Use reflection-based resolution if enabled, otherwise use switch-based
+	resolveFunc := c.resolveColorName
+	if c.useReflectionForColors() {
+		resolveFunc = c.resolveColorNameByReflection
+	}
+
 	if len(elementName) > 0 && elementName[0] != "" {
 		if elemStyle, ok := c.Elements[elementName[0]]; ok {
 			if elemStyle.ColorFG != "" {
-				return c.resolveColorName(elemStyle.ColorFG)
+				return resolveFunc(elemStyle.ColorFG)
 			}
 		}
 	}
-	return c.resolveColorName(colorKeyOrName)
+	return resolveFunc(colorKeyOrName)
 }
 
 func (c *Config) resolveColorName(name string) string {
@@ -581,6 +591,8 @@ func (c *Config) resolveColorName(name string) string {
 		codeToProcess = c.Colors.BlueFg
 	case "bluebg":
 		codeToProcess = c.Colors.BlueBg
+	case "paleblue":
+		codeToProcess = c.Colors.PaleBlue
 	case "bold":
 		codeToProcess = c.Colors.Bold
 	case "italic":
@@ -625,6 +637,138 @@ func (c *Config) resolveColorName(name string) string {
 		}
 	}
 	return NormalizeANSIEscape(codeToProcess)
+}
+
+// useReflectionForColors determines if we should use reflection-based color resolution.
+// Controlled by environment variable FO_USE_REFLECTION_COLORS (default: false for now).
+func (c *Config) useReflectionForColors() bool {
+	return os.Getenv("FO_USE_REFLECTION_COLORS") != ""
+}
+
+// resolveColorNameByReflection uses reflection to dynamically access color fields.
+// This is the new extensible approach that doesn't require hardcoded switch statements.
+func (c *Config) resolveColorNameByReflection(name string) string {
+	if c.IsMonochrome || name == "" {
+		return ""
+	}
+
+	// Normalize name: convert to field name format (e.g., "paleblue" -> "PaleBlue")
+	lowerName := strings.ToLower(name)
+	
+	// Handle special cases and status constants
+	var fieldName string
+	switch lowerName {
+	case "process", StatusSuccess:
+		fieldName = "Process"
+	case StatusWarning:
+		fieldName = "Warning"
+	case StatusError:
+		fieldName = "Error"
+	case "detail":
+		fieldName = "Detail"
+	case "muted":
+		fieldName = "Muted"
+	case "reset":
+		fieldName = "Reset"
+	case "white":
+		fieldName = "White"
+	case "greenfg":
+		fieldName = "GreenFg"
+	case "bluefg":
+		fieldName = "BlueFg"
+	case "bluebg":
+		fieldName = "BlueBg"
+	case "paleblue":
+		fieldName = "PaleBlue"
+	case "bold":
+		fieldName = "Bold"
+	case "italic":
+		fieldName = "Italic"
+	default:
+		// Try to convert to field name (capitalize first letter, handle camelCase)
+		// For now, fall back to checking if it's a raw ANSI code
+		hasEscPrefix := strings.HasPrefix(name, "\033") || strings.HasPrefix(name, "\x1b") ||
+			strings.HasPrefix(name, "\\033") || strings.HasPrefix(name, "\\x1b")
+		if strings.Contains(name, "[") && hasEscPrefix {
+			return name
+		}
+		// If we can't map it, try to construct field name manually
+		// Convert "somecolor" -> "Somecolor" (simple capitalization)
+		if len(lowerName) > 0 {
+			fieldName = strings.ToUpper(lowerName[:1]) + lowerName[1:]
+		} else {
+			fieldName = ""
+		}
+	}
+
+	// Use reflection to get the field value from Colors struct
+	colorsValue := reflect.ValueOf(c.Colors)
+	colorsType := colorsValue.Type()
+	
+	field := colorsValue.FieldByName(fieldName)
+	if !field.IsValid() {
+		// Field not found, try fallback defaults
+		escChar := string([]byte{27})
+		switch lowerName {
+		case "process", StatusSuccess, "white":
+			return escChar + "[0;97m"
+		case StatusWarning:
+			return escChar + "[0;33m"
+		case StatusError:
+			return escChar + "[0;31m"
+		case "detail", "reset":
+			return escChar + "[0m"
+		case "muted":
+			return escChar + "[2m"
+		case "greenfg":
+			return escChar + "[38;5;120m"
+		case "bluefg":
+			return escChar + "[0;34m"
+		case "bluebg":
+			return escChar + "[44m"
+		case "bold":
+			return escChar + "[1m"
+		case "italic":
+			return escChar + "[3m"
+		default:
+			if os.Getenv("FO_DEBUG") != "" {
+				fmt.Fprintf(os.Stderr, "[DEBUG resolveColorNameByReflection] Color field '%s' (from '%s') not found in Colors struct (type: %s), using reset.\n", fieldName, name, colorsType.Name())
+			}
+			return escChar + "[0m"
+		}
+	}
+
+	colorValue := field.String()
+	if colorValue == "" {
+		// Empty color, use fallback defaults (same as above)
+		escChar := string([]byte{27})
+		switch lowerName {
+		case "process", StatusSuccess, "white":
+			return escChar + "[0;97m"
+		case StatusWarning:
+			return escChar + "[0;33m"
+		case StatusError:
+			return escChar + "[0;31m"
+		case "detail", "reset":
+			return escChar + "[0m"
+		case "muted":
+			return escChar + "[2m"
+		case "greenfg":
+			return escChar + "[38;5;120m"
+		case "bluefg":
+			return escChar + "[0;34m"
+		case "bluebg":
+			return escChar + "[44m"
+		case "bold":
+			return escChar + "[1m"
+		case "italic":
+			return escChar + "[3m"
+		default:
+			return escChar + "[0m"
+		}
+	}
+
+	return NormalizeANSIEscape(colorValue)
 }
 
 // GetColorObj returns a Color wrapper for the given color key.
@@ -690,19 +834,20 @@ func ApplyMonochromeDefaults(cfg *Config) {
 	cfg.Style.UseBoxes = false
 
 	cfg.Colors = struct {
-		Process string `yaml:"process"`
-		Success string `yaml:"success"`
-		Warning string `yaml:"warning"`
-		Error   string `yaml:"error"`
-		Detail  string `yaml:"detail"`
-		Muted   string `yaml:"muted"`
-		Reset   string `yaml:"reset"`
-		White   string `yaml:"white,omitempty"`
-		GreenFg string `yaml:"green_fg,omitempty"`
-		BlueFg  string `yaml:"blue_fg,omitempty"`
-		BlueBg  string `yaml:"blue_bg,omitempty"`
-		Bold    string `yaml:"bold,omitempty"`
-		Italic  string `yaml:"italic,omitempty"`
+		Process  string `yaml:"process"`
+		Success  string `yaml:"success"`
+		Warning  string `yaml:"warning"`
+		Error    string `yaml:"error"`
+		Detail   string `yaml:"detail"`
+		Muted    string `yaml:"muted"`
+		Reset    string `yaml:"reset"`
+		White    string `yaml:"white,omitempty"`
+		GreenFg  string `yaml:"green_fg,omitempty"`
+		BlueFg   string `yaml:"blue_fg,omitempty"`
+		BlueBg   string `yaml:"blue_bg,omitempty"`
+		PaleBlue string `yaml:"pale_blue,omitempty"`
+		Bold     string `yaml:"bold,omitempty"`
+		Italic   string `yaml:"italic,omitempty"`
 	}{}
 
 	asciiMinimalElements := ASCIIMinimalTheme().Elements
