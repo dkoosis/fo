@@ -136,6 +136,7 @@ type Console struct {
 	adapterRegistry *adapter.Registry
 	profiler        *Profiler
 	currentSummary  string // Summary message for current section being executed
+	inSection       bool    // Whether we're currently executing a section (suppresses individual Run() outputs)
 }
 
 func DefaultConsole() *Console {
@@ -560,8 +561,16 @@ func (c *Console) RunSection(s Section) SectionResult {
 	// 1) Section header
 	c.PrintSectionHeader(s.Name)
 
-	// 2) Run the actual work
+	// 2) Mark that we're in a section (suppresses individual Run() outputs when summary is set)
+	wasInSection := c.inSection
+	c.inSection = true
+	c.currentSummary = "" // Clear any previous summary
+
+	// 3) Run the actual work
 	err := s.Run()
+
+	// Restore previous section state
+	c.inSection = wasInSection
 
 	// 3) Derive status from error type
 	status := SectionOK
@@ -1097,7 +1106,12 @@ func (c *Console) runContext(
 	}
 
 	if !useInlineProgress {
-		_, _ = c.cfg.Out.Write([]byte(task.RenderEndLine() + "\n"))
+		// Suppress individual task end lines when we're in a section and have a summary
+		// The section summary will be printed instead
+		shouldSuppress := c.inSection && c.currentSummary != ""
+		if !shouldSuppress {
+			_, _ = c.cfg.Out.Write([]byte(task.RenderEndLine() + "\n"))
+		}
 	}
 
 	// Convert design.OutputLine to Line
