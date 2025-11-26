@@ -251,7 +251,9 @@ func (c *Console) calculateBoxLayout() *BoxLayout {
 		BorderForeground(borderLipglossColor).
 		Width(totalWidth - 2). // Lipgloss adds 2 for borders, so subtract 2 to get exact terminal width
 		PaddingLeft(2).
-		PaddingRight(1)
+		PaddingRight(1).
+		PaddingTop(0).
+		PaddingBottom(0)
 
 	return &BoxLayout{
 		TotalWidth:   totalWidth,
@@ -350,6 +352,7 @@ func (c *Console) PrintSectionHeader(name string) {
 	}
 
 	box := c.calculateBoxLayout()
+	reset := cfg.ResetColor()
 	title := strings.ToUpper(name)
 	headerStyle := cfg.GetElementStyle("Task_Label_Header")
 	labelColor := cfg.GetColor(headerStyle.ColorFG, "Task_Label_Header")
@@ -361,28 +364,28 @@ func (c *Console) PrintSectionHeader(name string) {
 		titleBuilder.WriteString(cfg.GetColor("Bold"))
 	}
 	titleBuilder.WriteString(title)
-	titleBuilder.WriteString(cfg.ResetColor())
+	titleBuilder.WriteString(reset)
 	styledTitle := titleBuilder.String()
 
 	// Use lipgloss to render the title line with borders
 	// We render just the title line, then manually add top border
 	titleLineStyle := box.BorderStyle.Copy().
 		BorderTop(false).
-		BorderBottom(false)
+		BorderBottom(false).
+		PaddingTop(0).
+		PaddingBottom(0)
+		// Keep horizontal padding (PaddingLeft/PaddingRight from BorderStyle)
 	
 	titleLine := titleLineStyle.Render(styledTitle)
 	
-	// Render top border separately
-	topBorderStyle := lipgloss.NewStyle().
-		Border(lipgloss.Border{
-			Top:     box.BorderChars.Horizontal,
-			TopLeft: box.BorderChars.TopLeft,
-			TopRight: box.BorderChars.TopRight,
-		}).
-		BorderForeground(lipgloss.Color(box.BorderColor)).
-		Width(box.TotalWidth - 2)
-	
-	topBorder := topBorderStyle.Render("")
+	// Render top border manually (lipgloss adds padding even with empty strings)
+	var topBorderBuilder strings.Builder
+	topBorderBuilder.WriteString(box.BorderColor)
+	topBorderBuilder.WriteString(box.BorderChars.TopLeft)
+	topBorderBuilder.WriteString(strings.Repeat(box.BorderChars.Horizontal, box.TotalWidth-2))
+	topBorderBuilder.WriteString(box.BorderChars.TopRight)
+	topBorderBuilder.WriteString(reset)
+	topBorder := topBorderBuilder.String()
 
 	var sb strings.Builder
 	sb.WriteString("\n")
@@ -401,7 +404,10 @@ func (c *Console) renderBoxLine(box *BoxLayout, content string) {
 	// BorderStyle already has correct width and padding configured
 	contentLineStyle := box.BorderStyle.Copy().
 		BorderTop(false).
-		BorderBottom(false)
+		BorderBottom(false).
+		PaddingTop(0).
+		PaddingBottom(0)
+		// Keep horizontal padding (PaddingLeft/PaddingRight from BorderStyle)
 	
 	rendered := contentLineStyle.Render(content)
 	_, _ = c.cfg.Out.Write([]byte(rendered + "\n"))
@@ -493,17 +499,16 @@ func (c *Console) PrintSectionFooter() {
 
 	box := c.calculateBoxLayout()
 
-	// Render bottom border using lipgloss
-	bottomBorderStyle := lipgloss.NewStyle().
-		Border(lipgloss.Border{
-			Bottom:      box.BorderChars.Horizontal,
-			BottomLeft:  box.BorderChars.BottomLeft,
-			BottomRight: box.BorderChars.BottomRight,
-		}).
-		BorderForeground(lipgloss.Color(box.BorderColor)).
-		Width(box.TotalWidth - 2)
+	// Render bottom border manually (lipgloss adds padding even with empty strings)
+	reset := cfg.ResetColor()
+	var bottomBorderBuilder strings.Builder
+	bottomBorderBuilder.WriteString(box.BorderColor)
+	bottomBorderBuilder.WriteString(box.BorderChars.BottomLeft)
+	bottomBorderBuilder.WriteString(strings.Repeat(box.BorderChars.Horizontal, box.TotalWidth-2))
+	bottomBorderBuilder.WriteString(box.BorderChars.BottomRight)
+	bottomBorderBuilder.WriteString(reset)
+	bottomBorder := bottomBorderBuilder.String()
 	
-	bottomBorder := bottomBorderStyle.Render("")
 	_, _ = c.cfg.Out.Write([]byte(bottomBorder + "\n\n"))
 }
 
