@@ -381,7 +381,7 @@ func (c *Console) PrintSectionHeader(name string) {
 	topBorder := topBorderStyle.Render("")
 
 	// Render title line with left/right borders (no top/bottom)
-	// Ensure width matches and content is constrained to prevent overflow
+	// Trust lipgloss to handle width correctly with MaxWidth
 	titleLineStyle := box.BorderStyle.Copy().
 		BorderTop(false).
 		BorderBottom(false).
@@ -389,9 +389,9 @@ func (c *Console) PrintSectionHeader(name string) {
 		BorderRight(true).
 		PaddingTop(0).
 		PaddingBottom(0).
-		Width(box.TotalWidth - 2). // Ensure total box width matches
-		MaxWidth(box.ContentWidth) // Constrain content width for emoji/wide chars
+		MaxWidth(box.ContentWidth)
 		// Keep horizontal padding (PaddingLeft/PaddingRight from BorderStyle)
+		// Width is inherited from BorderStyle
 	titleLine := titleLineStyle.Render(styledTitle)
 
 	var sb strings.Builder
@@ -410,16 +410,16 @@ func (c *Console) PrintSectionHeader(name string) {
 func (c *Console) renderBoxLine(box *BoxLayout, content string) {
 	// Use lipgloss to render the content line with borders
 	// BorderStyle already has correct width and padding configured
-	// MaxWidth limits content width (before padding) to handle emoji/wide chars correctly
-	// Width is total box width including borders, MaxWidth is content width
+	// MaxWidth ensures content (before padding) doesn't exceed content width
+	// This properly handles emoji/wide chars - trust lipgloss to do it right
 	contentLineStyle := box.BorderStyle.Copy().
 		BorderTop(false).
 		BorderBottom(false).
 		PaddingTop(0).
 		PaddingBottom(0).
-		MaxWidth(box.ContentWidth).
-		Width(box.TotalWidth - 2) // Ensure total box width matches terminal
+		MaxWidth(box.ContentWidth)
 		// Keep horizontal padding (PaddingLeft/PaddingRight from BorderStyle)
+		// Width is inherited from BorderStyle, which is set to (totalWidth - 2)
 
 	rendered := contentLineStyle.Render(content)
 	_, _ = c.cfg.Out.Write([]byte(rendered + "\n"))
