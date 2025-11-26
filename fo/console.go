@@ -393,11 +393,9 @@ func (c *Console) PrintSectionHeader(name string) {
 
 	var sb strings.Builder
 	sb.WriteString("\n")
-	sb.WriteString(topBorder)
-	sb.WriteString("\n")
-	sb.WriteString(titleLine)
-	sb.WriteString("\n")
-	// Removed extra newline - content will follow immediately
+	sb.WriteString(topBorder) // lipgloss already includes newline
+	sb.WriteString(titleLine)  // lipgloss already includes newline
+	// Content will follow immediately without extra blank lines
 
 	_, _ = c.cfg.Out.Write([]byte(sb.String()))
 }
