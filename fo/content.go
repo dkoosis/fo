@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mattn/go-runewidth"
 )
 
 // MetricLine represents a key-value metric with optional trend indicator.
@@ -236,12 +235,8 @@ func (c *Console) PrintText(text string) {
 // Content is expected to already include left padding/indentation (typically "      ").
 // This uses the unified renderBoxLine function for consistent border rendering.
 func (c *Console) printBoxLine(box *BoxLayout, content string) {
-	// Calculate visual width of content (excluding ANSI codes)
-	// Use runewidth for accurate Unicode character width calculation
-	visualWidth := runewidth.StringWidth(stripANSICodes(content))
-
-	// Use unified rendering function
-	c.renderBoxLine(box, content, visualWidth)
+	// Use unified rendering function (lipgloss handles width calculations)
+	c.renderBoxLine(box, content)
 }
 
 // FormatTrend returns a trend indicator string based on current vs average.

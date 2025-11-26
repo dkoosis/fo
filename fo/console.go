@@ -18,9 +18,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/dkoosis/fo/pkg/adapter"
 	"github.com/dkoosis/fo/pkg/design"
-	"github.com/mattn/go-runewidth"
 	"golang.org/x/term"
 )
 
@@ -178,12 +178,13 @@ func (c *Console) getFaintDarkGrayColor() string {
 // BoxLayout defines the dimensions and styling of a rendered box.
 // This provides a single source of truth for all box rendering calculations.
 type BoxLayout struct {
-	TotalWidth   int    // Full terminal width
-	ContentWidth int    // Available width for content (TotalWidth - borders - padding)
-	LeftPadding  int    // Spaces after left border (typically 2)
-	RightPadding int    // Spaces before right border (typically 1)
-	BorderColor  string // ANSI color for borders
+	TotalWidth   int            // Full terminal width
+	ContentWidth int            // Available width for content (TotalWidth - borders - padding)
+	LeftPadding  int            // Spaces after left border (typically 2)
+	RightPadding int            // Spaces before right border (typically 1)
+	BorderColor  string         // ANSI color for borders
 	BorderChars  BorderChars
+	BorderStyle  lipgloss.Style // Lipgloss style for rendering boxes
 }
 
 // BorderChars encapsulates all border characters for consistent rendering.
@@ -208,10 +209,12 @@ type ContentLine struct {
 // calculateBoxLayout computes the box layout dimensions once, providing a single source of truth.
 func (c *Console) calculateBoxLayout() *BoxLayout {
 	cfg := c.designConf
-	totalWidth := c.getTerminalWidth()
-
+	terminalWidth := c.getTerminalWidth()
+	
+	// TotalWidth is the full terminal width (used for border lines)
 	// Content area = total width - left border (1) - left padding (2) - right padding (1) - right border (1)
 	// This ensures all content lines use the same width calculation
+	totalWidth := terminalWidth
 	contentWidth := totalWidth - 5
 
 	// Determine border color based on theme
@@ -223,6 +226,33 @@ func (c *Console) calculateBoxLayout() *BoxLayout {
 	// Determine border characters based on theme
 	borderChars := c.getBorderChars(cfg)
 
+	// Create lipgloss border style
+	// Note: lipgloss Width includes borders, so we set width to terminalWidth - 2
+	// to get a box that's exactly terminalWidth wide
+	lipglossBorder := lipgloss.Border{
+		Top:         borderChars.Horizontal,
+		Bottom:      borderChars.Horizontal,
+		Left:        borderChars.Vertical,
+		Right:       borderChars.Vertical,
+		TopLeft:     borderChars.TopLeft,
+		TopRight:    borderChars.TopRight,
+		BottomLeft:  borderChars.BottomLeft,
+		BottomRight: borderChars.BottomRight,
+	}
+
+	// Parse border color to lipgloss color
+	borderLipglossColor := lipgloss.Color(borderColor)
+	if borderColor == "" {
+		borderLipglossColor = lipgloss.Color("250") // Default gray
+	}
+
+	borderStyle := lipgloss.NewStyle().
+		Border(lipglossBorder).
+		BorderForeground(borderLipglossColor).
+		Width(totalWidth - 2). // Lipgloss adds 2 for borders, so subtract 2 to get exact terminal width
+		PaddingLeft(2).
+		PaddingRight(1)
+
 	return &BoxLayout{
 		TotalWidth:   totalWidth,
 		ContentWidth: contentWidth,
@@ -230,6 +260,7 @@ func (c *Console) calculateBoxLayout() *BoxLayout {
 		RightPadding: 1,
 		BorderColor:  borderColor,
 		BorderChars:  borderChars,
+		BorderStyle:  borderStyle,
 	}
 }
 
@@ -277,7 +308,7 @@ func (c *Console) getTerminalWidth() int {
 	if err != nil || width <= 0 {
 		return DefaultTerminalWidth
 	}
-	return width - 3
+	return width
 }
 
 // contains checks if a slice contains a string.
@@ -308,96 +339,76 @@ func stripANSICodes(s string) string {
 }
 
 // PrintSectionHeader prints a section header and starts a section box.
-// Uses BoxLayout for consistent dimensions.
+// Uses lipgloss for consistent box rendering.
 func (c *Console) PrintSectionHeader(name string) {
 	cfg := c.designConf
-	reset := cfg.ResetColor()
-
-	var sb strings.Builder
-	sb.WriteString("\n")
 
 	if cfg.IsMonochrome {
 		title := strings.ToUpper(name)
-		sb.WriteString("--- ")
-		sb.WriteString(title)
-		sb.WriteString(" ---\n")
-	} else {
-		box := c.calculateBoxLayout()
-		title := strings.ToUpper(name)
-		headerStyle := cfg.GetElementStyle("Task_Label_Header")
-		labelColor := cfg.GetColor(headerStyle.ColorFG, "Task_Label_Header")
-
-		// Top border line
-		// TotalWidth includes corners, so subtract 2 for the corner chars
-		horizontalWidth := box.TotalWidth - 2
-		sb.WriteString(box.BorderColor)
-		sb.WriteString(box.BorderChars.TopLeft)
-		sb.WriteString(strings.Repeat(box.BorderChars.Horizontal, horizontalWidth))
-		sb.WriteString(box.BorderChars.TopRight)
-		sb.WriteString(reset)
-		sb.WriteString("\n")
-
-		// Title line with consistent padding
-		sb.WriteString(box.BorderColor)
-		sb.WriteString(box.BorderChars.Vertical)
-		sb.WriteString(reset)
-		sb.WriteString(strings.Repeat(" ", box.LeftPadding))
-		sb.WriteString(labelColor)
-		if contains(headerStyle.TextStyle, "bold") {
-			sb.WriteString(cfg.GetColor("Bold"))
-		}
-		sb.WriteString(title)
-		sb.WriteString(reset)
-		titleVisualLen := runewidth.StringWidth(stripANSICodes(title))
-		remainingWidth := box.TotalWidth - titleVisualLen - box.RightPadding
-		if remainingWidth < 0 {
-			remainingWidth = 0
-		}
-		sb.WriteString(strings.Repeat(" ", remainingWidth))
-		sb.WriteString(box.BorderColor)
-		sb.WriteString(box.BorderChars.Vertical)
-		sb.WriteString(reset)
-		sb.WriteString("\n")
+		_, _ = c.cfg.Out.Write([]byte("\n--- " + title + " ---\n"))
+		return
 	}
+
+	box := c.calculateBoxLayout()
+	title := strings.ToUpper(name)
+	headerStyle := cfg.GetElementStyle("Task_Label_Header")
+	labelColor := cfg.GetColor(headerStyle.ColorFG, "Task_Label_Header")
+
+	// Build styled title
+	var titleBuilder strings.Builder
+	titleBuilder.WriteString(labelColor)
+	if contains(headerStyle.TextStyle, "bold") {
+		titleBuilder.WriteString(cfg.GetColor("Bold"))
+	}
+	titleBuilder.WriteString(title)
+	titleBuilder.WriteString(cfg.ResetColor())
+	styledTitle := titleBuilder.String()
+
+	// Use lipgloss to render the title line with borders
+	// We render just the title line, then manually add top border
+	titleLineStyle := box.BorderStyle.Copy().
+		BorderTop(false).
+		BorderBottom(false)
+	
+	titleLine := titleLineStyle.Render(styledTitle)
+	
+	// Render top border separately
+	topBorderStyle := lipgloss.NewStyle().
+		Border(lipgloss.Border{
+			Top:     box.BorderChars.Horizontal,
+			TopLeft: box.BorderChars.TopLeft,
+			TopRight: box.BorderChars.TopRight,
+		}).
+		BorderForeground(lipgloss.Color(box.BorderColor)).
+		Width(box.TotalWidth - 2)
+	
+	topBorder := topBorderStyle.Render("")
+
+	var sb strings.Builder
+	sb.WriteString("\n")
+	sb.WriteString(topBorder)
+	sb.WriteString("\n")
+	sb.WriteString(titleLine)
+	sb.WriteString("\n")
 
 	_, _ = c.cfg.Out.Write([]byte(sb.String()))
 }
 
 // renderBoxLine is the unified function for rendering a line with box borders.
-// It handles the border characters, padding, and content alignment consistently.
-// The contentWidth parameter is the total visual width of the content including any left padding.
-// The content string may include ANSI codes and should already have left padding if needed.
-func (c *Console) renderBoxLine(box *BoxLayout, content string, contentWidth int) {
-	cfg := c.designConf
-	reset := cfg.ResetColor()
-
-	// Calculate right padding to fill the box
-	// TotalWidth is the total rendered width including border chars (terminal width - 3)
-	// Total rendered = left border (1) + left padding (2) + content + right padding + right border (1) = TotalWidth
-	// So: left padding (2) + content + right padding = TotalWidth - 2 (for the two border chars)
-	// Therefore: right padding = (TotalWidth - 2) - contentWidth
-	// where contentWidth already includes the left padding
-	rightPadding := (box.TotalWidth - 2) - contentWidth
-	if rightPadding < 0 {
-		rightPadding = 0
-	}
-
-	var sb strings.Builder
-	sb.WriteString(box.BorderColor)
-	sb.WriteString(box.BorderChars.Vertical)
-	sb.WriteString(reset)
-	sb.WriteString(content)
-	sb.WriteString(strings.Repeat(" ", rightPadding))
-	sb.WriteString(box.BorderColor)
-	sb.WriteString(box.BorderChars.Vertical)
-	sb.WriteString(reset)
-	sb.WriteString("\n")
-
-	_, _ = c.cfg.Out.Write([]byte(sb.String()))
+// Uses lipgloss for consistent rendering.
+func (c *Console) renderBoxLine(box *BoxLayout, content string) {
+	// Use lipgloss to render the content line with borders
+	// BorderStyle already has correct width and padding configured
+	contentLineStyle := box.BorderStyle.Copy().
+		BorderTop(false).
+		BorderBottom(false)
+	
+	rendered := contentLineStyle.Render(content)
+	_, _ = c.cfg.Out.Write([]byte(rendered + "\n"))
 }
 
 // PrintSectionLine prints a line of section content with side borders.
-// Uses BoxLayout for consistent dimensions. Supports both plain strings and structured ContentLine.
+// Uses lipgloss for consistent rendering.
 func (c *Console) PrintSectionLine(line string) {
 	cfg := c.designConf
 	if cfg.IsMonochrome {
@@ -406,7 +417,6 @@ func (c *Console) PrintSectionLine(line string) {
 	}
 
 	box := c.calculateBoxLayout()
-	reset := cfg.ResetColor()
 
 	// Clip content to fit within content width
 	visualLine := stripANSICodes(line)
@@ -424,22 +434,18 @@ func (c *Console) PrintSectionLine(line string) {
 			}
 		}
 		if ansiEnd > 0 {
-			line = line[:ansiEnd] + clippedVisual + reset
+			line = line[:ansiEnd] + clippedVisual + cfg.ResetColor()
 		} else {
 			line = clippedVisual
 		}
 	}
 
-	// Prepare content with left padding
-	visualWidth := runewidth.StringWidth(stripANSICodes(line))
-	contentWithPadding := strings.Repeat(" ", box.LeftPadding) + line
-
-	// Use unified rendering function
-	c.renderBoxLine(box, contentWithPadding, box.LeftPadding+visualWidth)
+	// Lipgloss will handle padding, so just pass the content
+	c.renderBoxLine(box, line)
 }
 
 // PrintSectionContentLine renders a structured content line with guaranteed icon alignment.
-// Icons are always rendered at the same horizontal position, ensuring vertical alignment.
+// Uses lipgloss for consistent rendering.
 func (c *Console) PrintSectionContentLine(content ContentLine) {
 	cfg := c.designConf
 	if cfg.IsMonochrome {
@@ -451,61 +457,33 @@ func (c *Console) PrintSectionContentLine(content ContentLine) {
 		return
 	}
 
+	// Build the content line with icon and text
+	var contentBuilder strings.Builder
+	if content.Icon != "" {
+		if content.IconColor != "" {
+			contentBuilder.WriteString(content.IconColor)
+		}
+		contentBuilder.WriteString(content.Icon)
+		if content.IconColor != "" {
+			contentBuilder.WriteString(cfg.ResetColor())
+		}
+		contentBuilder.WriteString(" ") // Space after icon
+	}
+	if content.TextColor != "" {
+		contentBuilder.WriteString(content.TextColor)
+	}
+	contentBuilder.WriteString(content.Text)
+	if content.TextColor != "" {
+		contentBuilder.WriteString(cfg.ResetColor())
+	}
+
 	box := c.calculateBoxLayout()
-	reset := cfg.ResetColor()
-
-	var sb strings.Builder
-	sb.WriteString(box.BorderColor)
-	sb.WriteString(box.BorderChars.Vertical)
-	sb.WriteString(reset)
-	sb.WriteString(strings.Repeat(" ", box.LeftPadding))
-
-	// Render icon at fixed position (if present)
-	if content.Icon != "" {
-		if content.IconColor != "" {
-			sb.WriteString(content.IconColor)
-		}
-		sb.WriteString(content.Icon)
-		if content.IconColor != "" {
-			sb.WriteString(reset)
-		}
-		sb.WriteString(" ") // Space after icon
-	}
-
-	// Render text
-	if content.TextColor != "" {
-		sb.WriteString(content.TextColor)
-	}
-	sb.WriteString(content.Text)
-	if content.TextColor != "" {
-		sb.WriteString(reset)
-	}
-
-	// Calculate padding: left padding + icon (if present) + space + text + right padding
-	iconWidth := 0
-	if content.Icon != "" {
-		iconWidth = runewidth.StringWidth(content.Icon) + 1 // Icon + space
-	}
-	textWidth := runewidth.StringWidth(stripANSICodes(content.Text))
-	totalContentWidth := iconWidth + textWidth
-
-	minRightPadding := box.RightPadding
-	dynamicPadding := (box.TotalWidth - 2) - box.LeftPadding - totalContentWidth - minRightPadding
-	if dynamicPadding < 0 {
-		dynamicPadding = 0
-	}
-
-	sb.WriteString(strings.Repeat(" ", minRightPadding+dynamicPadding))
-	sb.WriteString(box.BorderColor)
-	sb.WriteString(box.BorderChars.Vertical)
-	sb.WriteString(reset)
-	sb.WriteString("\n")
-
-	_, _ = c.cfg.Out.Write([]byte(sb.String()))
+	// Lipgloss will handle padding and borders
+	c.renderBoxLine(box, contentBuilder.String())
 }
 
 // PrintSectionFooter closes the section box with a bottom border.
-// Uses BoxLayout for consistent dimensions.
+// Uses lipgloss for consistent rendering.
 func (c *Console) PrintSectionFooter() {
 	cfg := c.designConf
 	if cfg.IsMonochrome {
@@ -514,19 +492,19 @@ func (c *Console) PrintSectionFooter() {
 	}
 
 	box := c.calculateBoxLayout()
-	reset := cfg.ResetColor()
 
-	var sb strings.Builder
-	// TotalWidth includes corners, so subtract 2 for the corner chars
-	horizontalWidth := box.TotalWidth - 2
-	sb.WriteString(box.BorderColor)
-	sb.WriteString(box.BorderChars.BottomLeft)
-	sb.WriteString(strings.Repeat(box.BorderChars.Horizontal, horizontalWidth))
-	sb.WriteString(box.BorderChars.BottomRight)
-	sb.WriteString(reset)
-	sb.WriteString("\n\n")
-
-	_, _ = c.cfg.Out.Write([]byte(sb.String()))
+	// Render bottom border using lipgloss
+	bottomBorderStyle := lipgloss.NewStyle().
+		Border(lipgloss.Border{
+			Bottom:      box.BorderChars.Horizontal,
+			BottomLeft:  box.BorderChars.BottomLeft,
+			BottomRight: box.BorderChars.BottomRight,
+		}).
+		BorderForeground(lipgloss.Color(box.BorderColor)).
+		Width(box.TotalWidth - 2)
+	
+	bottomBorder := bottomBorderStyle.Render("")
+	_, _ = c.cfg.Out.Write([]byte(bottomBorder + "\n\n"))
 }
 
 // SectionStatus represents the outcome status of a section execution.
