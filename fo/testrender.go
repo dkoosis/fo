@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 // Default success icon fallback.
@@ -90,11 +92,12 @@ type CoverageThreshold struct {
 
 // TestRenderer renders test results using the console's theme.
 type TestRenderer struct {
-	console    *Console
-	writer     io.Writer
-	config     TestTableConfig
-	inGroupBox bool // Track if we're inside a group box
-	boxWidth   int  // Width of the box for consistent borders
+	console     *Console
+	writer      io.Writer
+	config      TestTableConfig
+	inGroupBox  bool          // Track if we're inside a group box
+	boxWidth    int           // Width of the box for consistent borders
+	boxStyle    lipgloss.Style // Lipgloss style for rendering test table boxes
 }
 
 // getPaleGrayColor returns a very pale gray ANSI color code.
@@ -125,10 +128,23 @@ func stripANSI(s string) string {
 func NewTestRenderer(console *Console, writer io.Writer) *TestRenderer {
 	// Build configuration from the console's design config
 	config := buildTestTableConfig(console)
+	
+	// Calculate box width and create lipgloss style for test table boxes
+	boxWidth := 67 // Width for test table (content + 2 for borders = 69 total)
+	
+	// Use console's box layout calculation to get consistent styling
+	boxLayout := console.calculateBoxLayout()
+	
+	// Create lipgloss style based on console's box style, but with test table width
+	boxStyle := boxLayout.BorderStyle.Copy().
+		Width(boxWidth)
+	
 	return &TestRenderer{
-		console: console,
-		writer:  writer,
-		config:  config,
+		console:    console,
+		writer:     writer,
+		config:     config,
+		boxWidth:   boxWidth,
+		boxStyle:   boxStyle,
 	}
 }
 
@@ -177,55 +193,99 @@ func (r *TestRenderer) SetConfig(config TestTableConfig) {
 
 // RenderTableHeader renders the table header with column labels in a complete box.
 func (r *TestRenderer) RenderTableHeader() {
-	paleGray := r.getPaleGrayColor()
-	reset := r.console.ResetColor()
 	cfg := r.console.designConf
 
 	// Box width: accommodate the header line content
-	// "  PASS  PATH                               TESTS   TIME    COVERAGE" = 67 chars
+	// "  STATUS  PATH                             TESTS   TIME    COVERAGE" = 67 chars
 	// Add 2 for left/right borders = 69 total
 	r.boxWidth = 67
 
 	fmt.Fprintf(r.writer, "\n")
 
-	// Top border: ╭───────────────────────────────╮
-	topCorner := cfg.Border.TopCornerChar
-	headerChar := cfg.Border.HeaderChar
-	closingCorner := "╮"
-	if topCorner == "╔" {
-		closingCorner = "╗"
+	// Use lipgloss to render top border
+	topBorderStyle := r.boxStyle.Copy().
+		BorderTop(true).
+		BorderBottom(false).
+		BorderLeft(true).
+		BorderRight(true).
+		PaddingTop(0).
+		PaddingBottom(0).
+		PaddingLeft(0).
+		PaddingRight(0)
+	topBorder := topBorderStyle.Render("")
+	fmt.Fprintf(r.writer, "%s\n", topBorder)
+
+	// Header line with borders: │  STATUS  PATH... │
+	headerContent := "  STATUS  PATH                             TESTS   TIME    COVERAGE"
+	headerLineStyle := r.boxStyle.Copy().
+		BorderTop(false).
+		BorderBottom(false).
+		BorderLeft(true).
+		BorderRight(true).
+		PaddingTop(0).
+		PaddingBottom(0)
+	headerLine := headerLineStyle.Render(headerContent)
+	fmt.Fprintf(r.writer, "%s\n", headerLine)
+
+	// Separator line using lipgloss
+	// Create a border style for the separator (horizontal line with left/right borders)
+	separatorBorder := lipgloss.Border{
+		Top:         cfg.Border.HeaderChar,
+		Bottom:      "",
+		Left:        cfg.Border.VerticalChar,
+		Right:       cfg.Border.VerticalChar,
+		TopLeft:     r.getSeparatorChar(cfg, true),
+		TopRight:    r.getSeparatorChar(cfg, false),
+		BottomLeft:  "",
+		BottomRight: "",
 	}
-	fmt.Fprintf(r.writer, "%s%s%s%s%s\n", paleGray, topCorner, strings.Repeat(headerChar, r.boxWidth), closingCorner, reset)
+	separatorStyle := r.boxStyle.Copy().
+		Border(separatorBorder).
+		BorderTop(true).
+		BorderBottom(false).
+		BorderLeft(true).
+		BorderRight(true).
+		PaddingTop(0).
+		PaddingBottom(0).
+		PaddingLeft(0).
+		PaddingRight(0)
+	separatorLine := separatorStyle.Render("")
+	fmt.Fprintf(r.writer, "%s\n", separatorLine)
+}
 
-	// Header line with borders: │  PASS  PATH... │
-	fmt.Fprintf(r.writer, "%s%s%s  PASS  PATH                               TESTS   TIME    COVERAGE %s%s%s\n",
-		paleGray, cfg.Border.VerticalChar, reset, paleGray, cfg.Border.VerticalChar, reset)
-
-	// Separator line: ├───────────────────────────────┤
-	separatorChar := "├"
-	separatorEnd := "┤"
+// getSeparatorChar returns the appropriate separator character based on theme.
+func (r *TestRenderer) getSeparatorChar(cfg *design.Config, isLeft bool) string {
 	if cfg.Border.TopCornerChar == "╔" {
-		separatorChar = "╠"
-		separatorEnd = "╣"
+		if isLeft {
+			return "╠"
+		}
+		return "╣"
 	}
-	fmt.Fprintf(r.writer, "%s%s%s%s%s\n", paleGray, separatorChar, strings.Repeat(headerChar, r.boxWidth), separatorEnd, reset)
+	if isLeft {
+		return "├"
+	}
+	return "┤"
 }
 
 // RenderGroupHeader renders the directory group header and starts a box.
 func (r *TestRenderer) RenderGroupHeader(dirName string) {
-	paleGray := r.getPaleGrayColor()
 	blueColor := r.console.GetBlueFgColor()
 	reset := r.console.ResetColor()
-	cfg := r.console.designConf
 
 	// Start a new box for the group
 	r.inGroupBox = true
 
 	// Group header line with borders: │  ⊙ dirname/ │
-	fmt.Fprintf(r.writer, "%s%s%s  %s%s%s %s/ %s%s%s\n",
-		paleGray, cfg.Border.VerticalChar, reset,
-		blueColor, "⊙", reset, dirName,
-		paleGray, cfg.Border.VerticalChar, reset)
+	groupContent := fmt.Sprintf("  %s%s%s %s/", blueColor, "⊙", reset, dirName)
+	groupLineStyle := r.boxStyle.Copy().
+		BorderTop(false).
+		BorderBottom(false).
+		BorderLeft(true).
+		BorderRight(true).
+		PaddingTop(0).
+		PaddingBottom(0)
+	groupLine := groupLineStyle.Render(groupContent)
+	fmt.Fprintf(r.writer, "%s\n", groupLine)
 }
 
 // RenderPackageLine renders a single package test result line.
@@ -457,18 +517,18 @@ func (r *TestRenderer) renderTestsWithHierarchy(tests []TestResult) {
 // RenderGroupFooter renders the bottom border of the group box.
 func (r *TestRenderer) RenderGroupFooter() {
 	if r.inGroupBox {
-		paleGray := r.getPaleGrayColor()
-		reset := r.console.ResetColor()
-		cfg := r.console.designConf
-
-		// Bottom border: ╰───────────────────────────────╯
-		bottomCorner := cfg.Border.BottomCornerChar
-		headerChar := cfg.Border.HeaderChar
-		bottomClosingCorner := "╯"
-		if bottomCorner == "╚" {
-			bottomClosingCorner = "╝"
-		}
-		fmt.Fprintf(r.writer, "%s%s%s%s%s\n", paleGray, bottomCorner, strings.Repeat(headerChar, r.boxWidth), bottomClosingCorner, reset)
+		// Use lipgloss to render bottom border
+		bottomBorderStyle := r.boxStyle.Copy().
+			BorderTop(false).
+			BorderBottom(true).
+			BorderLeft(true).
+			BorderRight(true).
+			PaddingTop(0).
+			PaddingBottom(0).
+			PaddingLeft(0).
+			PaddingRight(0)
+		bottomBorder := bottomBorderStyle.Render("")
+		fmt.Fprintf(r.writer, "%s\n", bottomBorder)
 		r.inGroupBox = false
 	}
 	fmt.Fprintf(r.writer, "\n")
