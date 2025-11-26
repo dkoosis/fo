@@ -405,11 +405,13 @@ func (c *Console) PrintSectionHeader(name string) {
 func (c *Console) renderBoxLine(box *BoxLayout, content string) {
 	// Use lipgloss to render the content line with borders
 	// BorderStyle already has correct width and padding configured
+	// Set MaxWidth to ensure content doesn't overflow (handles emoji/wide chars)
 	contentLineStyle := box.BorderStyle.Copy().
 		BorderTop(false).
 		BorderBottom(false).
 		PaddingTop(0).
-		PaddingBottom(0)
+		PaddingBottom(0).
+		MaxWidth(box.ContentWidth)
 		// Keep horizontal padding (PaddingLeft/PaddingRight from BorderStyle)
 
 	rendered := contentLineStyle.Render(content)
@@ -427,29 +429,8 @@ func (c *Console) PrintSectionLine(line string) {
 
 	box := c.calculateBoxLayout()
 
-	// Clip content to fit within content width
-	visualLine := stripANSICodes(line)
-	if len(visualLine) > box.ContentWidth {
-		clippedVisual := visualLine[:box.ContentWidth]
-		ansiEnd := 0
-		for i := 0; i < len(line); i++ {
-			if line[i] == '\033' {
-				for i < len(line) && line[i] != 'm' {
-					i++
-				}
-				ansiEnd = i + 1
-			} else {
-				break
-			}
-		}
-		if ansiEnd > 0 {
-			line = line[:ansiEnd] + clippedVisual + string(cfg.ResetColor())
-		} else {
-			line = clippedVisual
-		}
-	}
-
-	// Lipgloss will handle padding, so just pass the content
+	// Lipgloss will handle width constraints and emoji/wide chars automatically
+	// via MaxWidth in renderBoxLine, so just pass the content
 	c.renderBoxLine(box, line)
 }
 
@@ -487,7 +468,7 @@ func (c *Console) PrintSectionContentLine(content ContentLine) {
 	}
 
 	box := c.calculateBoxLayout()
-	// Lipgloss will handle padding and borders
+	// Lipgloss will handle padding, borders, and width constraints (including emoji/wide chars)
 	c.renderBoxLine(box, contentBuilder.String())
 }
 
