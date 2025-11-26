@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/dkoosis/fo/pkg/design"
 )
 
 // Default success icon fallback.
