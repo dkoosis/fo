@@ -359,12 +359,12 @@ func (c *Console) PrintSectionHeader(name string) {
 
 	// Build styled title
 	var titleBuilder strings.Builder
-	titleBuilder.WriteString(labelColor)
+	titleBuilder.WriteString(string(labelColor))
 	if contains(headerStyle.TextStyle, "bold") {
-		titleBuilder.WriteString(cfg.GetColor("Bold"))
+		titleBuilder.WriteString(string(cfg.GetColor("Bold")))
 	}
 	titleBuilder.WriteString(title)
-	titleBuilder.WriteString(reset)
+	titleBuilder.WriteString(string(reset))
 	styledTitle := titleBuilder.String()
 
 	// Use lipgloss to render the title line with borders
@@ -384,7 +384,7 @@ func (c *Console) PrintSectionHeader(name string) {
 	topBorderBuilder.WriteString(box.BorderChars.TopLeft)
 	topBorderBuilder.WriteString(strings.Repeat(box.BorderChars.Horizontal, box.TotalWidth-2))
 	topBorderBuilder.WriteString(box.BorderChars.TopRight)
-	topBorderBuilder.WriteString(reset)
+		topBorderBuilder.WriteString(string(reset))
 	topBorder := topBorderBuilder.String()
 
 	var sb strings.Builder
@@ -440,7 +440,7 @@ func (c *Console) PrintSectionLine(line string) {
 			}
 		}
 		if ansiEnd > 0 {
-			line = line[:ansiEnd] + clippedVisual + cfg.ResetColor()
+			line = line[:ansiEnd] + clippedVisual + string(cfg.ResetColor())
 		} else {
 			line = clippedVisual
 		}
@@ -471,7 +471,7 @@ func (c *Console) PrintSectionContentLine(content ContentLine) {
 		}
 		contentBuilder.WriteString(content.Icon)
 		if content.IconColor != "" {
-			contentBuilder.WriteString(cfg.ResetColor())
+			contentBuilder.WriteString(string(cfg.ResetColor()))
 		}
 		contentBuilder.WriteString(" ") // Space after icon
 	}
@@ -480,7 +480,7 @@ func (c *Console) PrintSectionContentLine(content ContentLine) {
 	}
 	contentBuilder.WriteString(content.Text)
 	if content.TextColor != "" {
-		contentBuilder.WriteString(cfg.ResetColor())
+		contentBuilder.WriteString(string(cfg.ResetColor()))
 	}
 
 	box := c.calculateBoxLayout()
@@ -506,7 +506,7 @@ func (c *Console) PrintSectionFooter() {
 	bottomBorderBuilder.WriteString(box.BorderChars.BottomLeft)
 	bottomBorderBuilder.WriteString(strings.Repeat(box.BorderChars.Horizontal, box.TotalWidth-2))
 	bottomBorderBuilder.WriteString(box.BorderChars.BottomRight)
-	bottomBorderBuilder.WriteString(reset)
+		bottomBorderBuilder.WriteString(string(reset))
 	bottomBorder := bottomBorderBuilder.String()
 	
 	_, _ = c.cfg.Out.Write([]byte(bottomBorder + "\n\n"))
@@ -697,15 +697,15 @@ func (c *Console) getStatusIcon(status SectionStatus) (string, string) {
 	case SectionOK:
 		icon := cfg.GetIcon("Success")
 		color := cfg.GetColor("Success")
-		return icon, color
+		return icon, string(color)
 	case SectionWarning:
 		icon := cfg.GetIcon("Warning")
 		color := cfg.GetColor("Warning")
-		return icon, color
+		return icon, string(color)
 	case SectionError:
 		icon := cfg.GetIcon("Error")
 		color := cfg.GetColor("Error")
-		return icon, color
+		return icon, string(color)
 	default:
 		// Fallback for unknown status
 		return "", ""
@@ -744,19 +744,19 @@ func (c *Console) PrintH1Header(name string) {
 		sb.WriteString(topCorner)
 		sb.WriteString(strings.Repeat(headerChar, headerWidth))
 		sb.WriteString(closingCorner)
-		sb.WriteString(reset)
+		sb.WriteString(string(reset))
 		sb.WriteString("\n")
 
 		sb.WriteString(paleGray)
 		sb.WriteString(cfg.Border.VerticalChar)
-		sb.WriteString(reset)
+		sb.WriteString(string(reset))
 		sb.WriteString("  ")
-		sb.WriteString(labelColor)
+		sb.WriteString(string(labelColor))
 		if contains(headerStyle.TextStyle, "bold") {
-			sb.WriteString(cfg.GetColor("Bold"))
+			sb.WriteString(string(cfg.GetColor("Bold")))
 		}
 		sb.WriteString(title)
-		sb.WriteString(reset)
+		sb.WriteString(string(reset))
 		titleLen := len(title) + 3
 		remainingWidth := headerWidth + 2 - titleLen - 1
 		if remainingWidth < 0 {
@@ -765,7 +765,7 @@ func (c *Console) PrintH1Header(name string) {
 		sb.WriteString(strings.Repeat(" ", remainingWidth))
 		sb.WriteString(paleGray)
 		sb.WriteString(cfg.Border.VerticalChar)
-		sb.WriteString(reset)
+		sb.WriteString(string(reset))
 		sb.WriteString("\n")
 
 		bottomCorner := cfg.Border.BottomCornerChar
@@ -777,7 +777,7 @@ func (c *Console) PrintH1Header(name string) {
 		sb.WriteString(bottomCorner)
 		sb.WriteString(strings.Repeat(headerChar, headerWidth))
 		sb.WriteString(bottomClosingCorner)
-		sb.WriteString(reset)
+		sb.WriteString(string(reset))
 		sb.WriteString("\n")
 	}
 
@@ -786,37 +786,37 @@ func (c *Console) PrintH1Header(name string) {
 
 // GetMutedColor returns the Muted color code from the theme.
 func (c *Console) GetMutedColor() string {
-	return c.designConf.GetColor("Muted")
+	return string(c.designConf.GetColor("Muted"))
 }
 
 // ResetColor returns the reset color code from the theme.
 func (c *Console) ResetColor() string {
-	return c.designConf.ResetColor()
+	return string(c.designConf.ResetColor())
 }
 
 // GetSuccessColor returns the Success color code from the theme.
 func (c *Console) GetSuccessColor() string {
-	return c.designConf.GetColor("Success")
+	return string(c.designConf.GetColor("Success"))
 }
 
 // GetGreenFgColor returns the light green color code from the theme.
 func (c *Console) GetGreenFgColor() string {
-	return c.designConf.GetColor("GreenFg")
+	return string(c.designConf.GetColor("GreenFg"))
 }
 
 // GetBlueFgColor returns the light blue color code from the theme.
 func (c *Console) GetBlueFgColor() string {
-	return c.designConf.GetColor("BlueFg")
+	return string(c.designConf.GetColor("BlueFg"))
 }
 
 // GetWarningColor returns the Warning color code from the theme.
 func (c *Console) GetWarningColor() string {
-	return c.designConf.GetColor("Warning")
+	return string(c.designConf.GetColor("Warning"))
 }
 
 // GetErrorColor returns the Error color code from the theme.
 func (c *Console) GetErrorColor() string {
-	return c.designConf.GetColor("Error")
+	return string(c.designConf.GetColor("Error"))
 }
 
 // GetIcon returns an icon from the theme by key.
@@ -826,7 +826,7 @@ func (c *Console) GetIcon(iconKey string) string {
 
 // GetColor returns a color code from the theme by key.
 func (c *Console) GetColor(colorKey string) string {
-	return c.designConf.GetColor(colorKey)
+	return string(c.designConf.GetColor(colorKey))
 }
 
 // FormatStatusIcon returns a fully styled icon string for the given status.

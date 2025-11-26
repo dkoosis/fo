@@ -251,20 +251,20 @@ type Config struct {
 	} `yaml:"border"`
 
 	Colors struct {
-		Process  string `yaml:"process"`
-		Success  string `yaml:"success"`
-		Warning  string `yaml:"warning"`
-		Error    string `yaml:"error"`
-		Detail   string `yaml:"detail"`
-		Muted    string `yaml:"muted"`
-		Reset    string `yaml:"reset"`
-		White    string `yaml:"white,omitempty"`
-		GreenFg  string `yaml:"green_fg,omitempty"`
-		BlueFg   string `yaml:"blue_fg,omitempty"`
-		BlueBg   string `yaml:"blue_bg,omitempty"`
-		PaleBlue string `yaml:"pale_blue,omitempty"`
-		Bold     string `yaml:"bold,omitempty"`
-		Italic   string `yaml:"italic,omitempty"`
+		Process  lipgloss.Color `yaml:"process"`
+		Success  lipgloss.Color `yaml:"success"`
+		Warning  lipgloss.Color `yaml:"warning"`
+		Error    lipgloss.Color `yaml:"error"`
+		Detail   lipgloss.Color `yaml:"detail"`
+		Muted    lipgloss.Color `yaml:"muted"`
+		Reset    lipgloss.Color `yaml:"reset"`
+		White    lipgloss.Color `yaml:"white,omitempty"`
+		GreenFg  lipgloss.Color `yaml:"green_fg,omitempty"`
+		BlueFg   lipgloss.Color `yaml:"blue_fg,omitempty"`
+		BlueBg   lipgloss.Color `yaml:"blue_bg,omitempty"`
+		PaleBlue lipgloss.Color `yaml:"pale_blue,omitempty"`
+		Bold     lipgloss.Color `yaml:"bold,omitempty"`
+		Italic   lipgloss.Color `yaml:"italic,omitempty"`
 	} `yaml:"colors"`
 
 	Icons struct {
@@ -307,40 +307,12 @@ type PatternsRepo struct {
 	Output map[string][]string `yaml:"output"`
 }
 
-// NormalizeANSIEscape normalizes ANSI escape sequences to ensure they start with
-// the ESC character (0x1b). YAML should handle escape sequences correctly, but
-// this function normalizes them to handle edge cases and ensure consistency.
+// NormalizeANSIEscape is deprecated. lipgloss handles color format detection automatically.
+// This function is kept temporarily for compatibility but will be removed.
+// Use lipgloss.Color directly - it accepts color names, hex codes, and ANSI codes.
 func NormalizeANSIEscape(s string) string {
-	if s == "" {
-		return ""
-	}
-
-	escChar := string([]byte{27}) // The actual ESC character (\x1b)
-
-	// If it already starts with the ESC character, it's correct.
-	if strings.HasPrefix(s, escChar) {
-		return s
-	}
-
-	// Handle octal escape sequence \033 (which is ESC in octal)
-	if strings.HasPrefix(s, "\033") {
-		return s
-	}
-
-	// Handle literal backslash sequences that might come from YAML
-	// YAML string like "\x1b[32m" should be unmarshaled as actual ESC, but
-	// double-escaped like "\\x1b[32m" comes through as literal "\x1b[32m"
-	if strings.HasPrefix(s, `\x1b`) {
-		// Replace literal "\x1b" with actual ESC character
-		return escChar + strings.TrimPrefix(s, `\x1b`)
-	}
-	if strings.HasPrefix(s, `\033`) {
-		// Replace literal "\033" with actual ESC character
-		return escChar + strings.TrimPrefix(s, `\033`)
-	}
-
-	// If we don't recognize it as an ANSI sequence, return as-is
-	// (might be a color name or non-ANSI string)
+	// lipgloss.Color is a string type, so we can return it directly
+	// lipgloss will handle the normalization when creating styles
 	return s
 }
 
@@ -378,22 +350,21 @@ func ASCIIMinimalTheme() *Config {
 	cfg.Style.NoSpinner = false
 	cfg.Style.SpinnerInterval = 80
 
-	cfg.Colors = struct {
-		Process  string `yaml:"process"`
-		Success  string `yaml:"success"`
-		Warning  string `yaml:"warning"`
-		Error    string `yaml:"error"`
-		Detail   string `yaml:"detail"`
-		Muted    string `yaml:"muted"`
-		Reset    string `yaml:"reset"`
-		White    string `yaml:"white,omitempty"`
-		GreenFg  string `yaml:"green_fg,omitempty"`
-		BlueFg   string `yaml:"blue_fg,omitempty"`
-		BlueBg   string `yaml:"blue_bg,omitempty"`
-		PaleBlue string `yaml:"pale_blue,omitempty"`
-		Bold     string `yaml:"bold,omitempty"`
-		Italic   string `yaml:"italic,omitempty"`
-	}{}
+	// ASCII theme is monochrome, so all colors are empty
+	cfg.Colors.Process = lipgloss.Color("")
+	cfg.Colors.Success = lipgloss.Color("")
+	cfg.Colors.Warning = lipgloss.Color("")
+	cfg.Colors.Error = lipgloss.Color("")
+	cfg.Colors.Detail = lipgloss.Color("")
+	cfg.Colors.Muted = lipgloss.Color("")
+	cfg.Colors.Reset = lipgloss.Color("")
+	cfg.Colors.White = lipgloss.Color("")
+	cfg.Colors.GreenFg = lipgloss.Color("")
+	cfg.Colors.BlueFg = lipgloss.Color("")
+	cfg.Colors.BlueBg = lipgloss.Color("")
+	cfg.Colors.PaleBlue = lipgloss.Color("")
+	cfg.Colors.Bold = lipgloss.Color("")
+	cfg.Colors.Italic = lipgloss.Color("")
 
 	cfg.Border.TaskStyle = BorderNone
 
@@ -458,23 +429,24 @@ func UnicodeVibrantTheme() *Config {
 	cfg.Icons.Bullet = "•"
 
 	// Initialize Design Tokens (Phase 1: centralized, semantic values)
-	// Using Lip Gloss Color types for proper color handling
-	// Note: lipgloss.Color accepts ANSI codes as strings, so we store full ANSI sequences
+	// Using lipgloss.Color with ANSI codes (for Phase 1 manual concatenation)
+	// In Phase 2, we'll switch to lipgloss.Style which handles color format conversion
 	cfg.Tokens = &DesignTokens{}
-	cfg.Tokens.Colors.Process = lipgloss.Color(ANSIBrightWhite)  // Bright white
-	cfg.Tokens.Colors.Success = lipgloss.Color(ANSIBrightWhite)  // Bright white
-	cfg.Tokens.Colors.Warning = lipgloss.Color("\033[0;33m")     // Yellow
-	cfg.Tokens.Colors.Error = lipgloss.Color("\033[0;31m")       // Red
-	cfg.Tokens.Colors.Detail = lipgloss.Color("\033[0m")         // Reset
-	cfg.Tokens.Colors.Muted = lipgloss.Color("\033[2m")          // Dim
-	cfg.Tokens.Colors.Reset = lipgloss.Color("\033[0m")          // Reset
-	cfg.Tokens.Colors.White = lipgloss.Color("\033[0;97m")       // Bright white
-	cfg.Tokens.Colors.GreenFg = lipgloss.Color("\033[38;5;120m") // Light green
-	cfg.Tokens.Colors.BlueFg = lipgloss.Color("\033[0;34m")      // Blue
-	cfg.Tokens.Colors.BlueBg = lipgloss.Color("\033[44m")        // Blue background
-	cfg.Tokens.Colors.Spinner = lipgloss.Color("\033[38;5;111m") // Pale blue (semantic: Spinner, was PaleBlue)
-	cfg.Tokens.Colors.Bold = lipgloss.Color("\033[1m")           // Bold
-	cfg.Tokens.Colors.Italic = lipgloss.Color("\033[3m")         // Italic
+	escChar := string([]byte{27})
+	cfg.Tokens.Colors.Process = lipgloss.Color(escChar + "[0;97m")   // Bright white
+	cfg.Tokens.Colors.Success = lipgloss.Color(escChar + "[0;97m")   // Bright white
+	cfg.Tokens.Colors.Warning = lipgloss.Color(escChar + "[0;33m")    // Yellow
+	cfg.Tokens.Colors.Error = lipgloss.Color(escChar + "[0;31m")      // Red
+	cfg.Tokens.Colors.Detail = lipgloss.Color(escChar + "[0m")        // Reset
+	cfg.Tokens.Colors.Muted = lipgloss.Color(escChar + "[2m")         // Dim
+	cfg.Tokens.Colors.Reset = lipgloss.Color(escChar + "[0m")         // Reset
+	cfg.Tokens.Colors.White = lipgloss.Color(escChar + "[0;97m")      // Bright white
+	cfg.Tokens.Colors.GreenFg = lipgloss.Color(escChar + "[38;5;120m") // Light green (256-color)
+	cfg.Tokens.Colors.BlueFg = lipgloss.Color(escChar + "[0;34m")      // Blue
+	cfg.Tokens.Colors.BlueBg = lipgloss.Color(escChar + "[44m")       // Blue background
+	cfg.Tokens.Colors.Spinner = lipgloss.Color(escChar + "[38;5;111m") // Pale blue (256-color, semantic: Spinner, was PaleBlue)
+	cfg.Tokens.Colors.Bold = lipgloss.Color(escChar + "[1m")           // Bold
+	cfg.Tokens.Colors.Italic = lipgloss.Color(escChar + "[3m")         // Italic
 	cfg.Tokens.Spacing.Progress = 0
 	cfg.Tokens.Spacing.Indent = 2
 	cfg.Tokens.Typography.HeaderWidth = 40
@@ -758,9 +730,9 @@ func (c *Config) GetIcon(iconKey string) string {
 	}
 }
 
-func (c *Config) GetColor(colorKeyOrName string, elementName ...string) string {
+func (c *Config) GetColor(colorKeyOrName string, elementName ...string) lipgloss.Color {
 	if c.IsMonochrome {
-		return ""
+		return lipgloss.Color("")
 	}
 
 	// Use reflection-based resolution if enabled, otherwise use switch-based
@@ -779,85 +751,85 @@ func (c *Config) GetColor(colorKeyOrName string, elementName ...string) string {
 	return resolveFunc(colorKeyOrName)
 }
 
-func (c *Config) resolveColorName(name string) string {
+func (c *Config) resolveColorName(name string) lipgloss.Color {
 	if c.IsMonochrome || name == "" {
-		return ""
+		return lipgloss.Color("")
 	}
 
-	var codeToProcess string
+	var color lipgloss.Color
 	lowerName := strings.ToLower(name)
 
 	switch lowerName {
 	case colorNameProcess:
-		codeToProcess = c.Colors.Process
+		color = c.Colors.Process
 	case colorNameSuccess:
-		codeToProcess = c.Colors.Success
+		color = c.Colors.Success
 	case colorNameWarning:
-		codeToProcess = c.Colors.Warning
+		color = c.Colors.Warning
 	case colorNameError:
-		codeToProcess = c.Colors.Error
+		color = c.Colors.Error
 	case colorNameDetail:
-		codeToProcess = c.Colors.Detail
+		color = c.Colors.Detail
 	case colorNameMuted:
-		codeToProcess = c.Colors.Muted
+		color = c.Colors.Muted
 	case colorNameReset:
-		codeToProcess = c.Colors.Reset
+		color = c.Colors.Reset
 	case colorNameWhite:
-		codeToProcess = c.Colors.White
+		color = c.Colors.White
 	case colorNameGreenFg:
-		codeToProcess = c.Colors.GreenFg
+		color = c.Colors.GreenFg
 	case colorNameBlueFg:
-		codeToProcess = c.Colors.BlueFg
+		color = c.Colors.BlueFg
 	case colorNameBlueBg:
-		codeToProcess = c.Colors.BlueBg
+		color = c.Colors.BlueBg
 	case "paleblue":
-		codeToProcess = c.Colors.PaleBlue
+		color = c.Colors.PaleBlue
 	case colorNameBold:
-		codeToProcess = c.Colors.Bold
+		color = c.Colors.Bold
 	case colorNameItalic:
-		codeToProcess = c.Colors.Italic
+		color = c.Colors.Italic
 	default:
-		// If name contains '[' and starts with an escape sequence, treat it as a raw ANSI code
-		hasEscPrefix := strings.HasPrefix(name, "\033") || strings.HasPrefix(name, "\x1b") ||
-			strings.HasPrefix(name, "\\033") || strings.HasPrefix(name, "\\x1b")
-		if strings.Contains(name, "[") && hasEscPrefix {
-			codeToProcess = name
+		// If name looks like a color value (hex, ANSI code, or color name), use it directly
+		// lipgloss.Color accepts: hex codes (#ffffff), color names (red, blue), or ANSI codes
+		if name != "" {
+			color = lipgloss.Color(name)
 		}
 	}
 
-	escChar := string([]byte{27})
-	if codeToProcess == "" {
+	// If color is empty, use defaults as ANSI codes (for Phase 1 manual concatenation)
+	if color == "" {
+		escChar := string([]byte{27})
 		switch lowerName {
 		case colorNameProcess, colorNameWhite:
-			codeToProcess = escChar + "[0;97m"
+			color = lipgloss.Color(escChar + "[0;97m")
 		case colorNameSuccess:
-			codeToProcess = escChar + "[0;32m" // Default green
+			color = lipgloss.Color(escChar + "[0;32m") // Green
 		case colorNameWarning:
-			codeToProcess = escChar + "[0;33m"
+			color = lipgloss.Color(escChar + "[0;33m")
 		case colorNameError:
-			codeToProcess = escChar + "[0;31m"
+			color = lipgloss.Color(escChar + "[0;31m")
 		case colorNameDetail, colorNameReset:
-			codeToProcess = escChar + "[0m"
+			color = lipgloss.Color(escChar + "[0m")
 		case colorNameMuted:
-			codeToProcess = escChar + "[2m"
+			color = lipgloss.Color(escChar + "[2m")
 		case colorNameGreenFg:
-			codeToProcess = escChar + "[38;5;120m"
+			color = lipgloss.Color(escChar + "[38;5;120m")
 		case colorNameBlueFg:
-			codeToProcess = escChar + "[0;34m"
+			color = lipgloss.Color(escChar + "[0;34m")
 		case colorNameBlueBg:
-			codeToProcess = escChar + "[44m"
+			color = lipgloss.Color(escChar + "[44m")
 		case colorNameBold:
-			codeToProcess = escChar + "[1m"
+			color = lipgloss.Color(escChar + "[1m")
 		case colorNameItalic:
-			codeToProcess = escChar + "[3m"
+			color = lipgloss.Color(escChar + "[3m")
 		default:
-			codeToProcess = escChar + "[0m"
+			color = lipgloss.Color(escChar + "[0m")
 			if os.Getenv("FO_DEBUG") != "" {
 				fmt.Fprintf(os.Stderr, "[DEBUG resolveColorName] Color key/name '%s' not found in theme or defaults, using reset.\n", name)
 			}
 		}
 	}
-	return NormalizeANSIEscape(codeToProcess)
+	return color
 }
 
 // useReflectionForColors determines if we should use reflection-based color resolution.
@@ -868,9 +840,9 @@ func (c *Config) useReflectionForColors() bool {
 
 // resolveColorNameByReflection uses reflection to dynamically access color fields.
 // This is the new extensible approach that doesn't require hardcoded switch statements.
-func (c *Config) resolveColorNameByReflection(name string) string {
+func (c *Config) resolveColorNameByReflection(name string) lipgloss.Color {
 	if c.IsMonochrome || name == "" {
-		return ""
+		return lipgloss.Color("")
 	}
 
 	// Normalize name: convert to field name format (e.g., "paleblue" -> "PaleBlue")
@@ -907,137 +879,137 @@ func (c *Config) resolveColorNameByReflection(name string) string {
 		fieldName = "Bold"
 	case colorNameItalic:
 		fieldName = "Italic"
-	default:
-		// Try to convert to field name (capitalize first letter, handle camelCase)
-		// For now, fall back to checking if it's a raw ANSI code
-		hasEscPrefix := strings.HasPrefix(name, "\033") || strings.HasPrefix(name, "\x1b") ||
-			strings.HasPrefix(name, "\\033") || strings.HasPrefix(name, "\\x1b")
-		if strings.Contains(name, "[") && hasEscPrefix {
-			return name
+		default:
+			// Try to construct field name manually
+			// Convert "somecolor" -> "Somecolor" (simple capitalization)
+			if len(lowerName) > 0 {
+				fieldName = strings.ToUpper(lowerName[:1]) + lowerName[1:]
+			} else {
+				fieldName = ""
+			}
+			// If field name construction fails, we'll try to use the name directly as a lipgloss color
 		}
-		// If we can't map it, try to construct field name manually
-		// Convert "somecolor" -> "Somecolor" (simple capitalization)
-		if len(lowerName) > 0 {
-			fieldName = strings.ToUpper(lowerName[:1]) + lowerName[1:]
-		} else {
-			fieldName = ""
-		}
-	}
 
 	// Use reflection to get the field value from Colors struct
 	colorsValue := reflect.ValueOf(c.Colors)
 	colorsType := colorsValue.Type()
 
 	field := colorsValue.FieldByName(fieldName)
-	if !field.IsValid() {
-		// Field not found, try fallback defaults
-		escChar := string([]byte{27})
-		switch lowerName {
-		case "process", "white":
-			return escChar + "[0;97m"
-		case "success":
-			return escChar + "[0;32m" // Default green
-		case "warning":
-			return escChar + "[0;33m"
-		case "error":
-			return escChar + "[0;31m"
-		case "detail", "reset":
-			return escChar + "[0m"
-		case "muted":
-			return escChar + "[2m"
-		case "greenfg":
-			return escChar + "[38;5;120m"
-		case "bluefg":
-			return escChar + "[0;34m"
-		case "bluebg":
-			return escChar + "[44m"
-		case "bold":
-			return escChar + "[1m"
-		case "italic":
-			return escChar + "[3m"
-		default:
-			if os.Getenv("FO_DEBUG") != "" {
-				fmt.Fprintf(os.Stderr,
-					"[DEBUG resolveColorNameByReflection] Color field '%s' (from '%s') not found in Colors struct (type: %s), using reset.\n",
-					fieldName, name, colorsType.Name())
+		if !field.IsValid() {
+			// Field not found, try fallback defaults as ANSI codes
+			escChar := string([]byte{27})
+			switch lowerName {
+			case "process", "white":
+				return lipgloss.Color(escChar + "[0;97m")
+			case "success":
+				return lipgloss.Color(escChar + "[0;32m")
+			case "warning":
+				return lipgloss.Color(escChar + "[0;33m")
+			case "error":
+				return lipgloss.Color(escChar + "[0;31m")
+			case "detail", "reset":
+				return lipgloss.Color(escChar + "[0m")
+			case "muted":
+				return lipgloss.Color(escChar + "[2m")
+			case "greenfg":
+				return lipgloss.Color(escChar + "[38;5;120m")
+			case "bluefg":
+				return lipgloss.Color(escChar + "[0;34m")
+			case "bluebg":
+				return lipgloss.Color(escChar + "[44m")
+			case "bold":
+				return lipgloss.Color(escChar + "[1m")
+			case "italic":
+				return lipgloss.Color(escChar + "[3m")
+			default:
+				if os.Getenv("FO_DEBUG") != "" {
+					fmt.Fprintf(os.Stderr,
+						"[DEBUG resolveColorNameByReflection] Color field '%s' (from '%s') not found in Colors struct (type: %s), using reset.\n",
+						fieldName, name, colorsType.Name())
+				}
+				// Try to use the name directly as a lipgloss color (supports hex, color names, etc.)
+				return lipgloss.Color(name)
 			}
-			return escChar + "[0m"
 		}
-	}
 
-	colorValue := field.String()
-	if colorValue == "" {
-		// Empty color, use fallback defaults (same as above)
-		escChar := string([]byte{27})
-		switch lowerName {
-		case "process", "success", "white":
-			return escChar + "[0;97m"
-		case "warning":
-			return escChar + "[0;33m"
-		case "error":
-			return escChar + "[0;31m"
-		case "detail", "reset":
-			return escChar + "[0m"
-		case "muted":
-			return escChar + "[2m"
-		case "greenfg":
-			return escChar + "[38;5;120m"
-		case "bluefg":
-			return escChar + "[0;34m"
-		case "bluebg":
-			return escChar + "[44m"
-		case "bold":
-			return escChar + "[1m"
-		case "italic":
-			return escChar + "[3m"
-		default:
-			return escChar + "[0m"
+		// Get the color value - field is now lipgloss.Color which is a string type
+		colorValue := lipgloss.Color(field.String())
+		if colorValue == "" {
+			// Empty color, use fallback defaults as ANSI codes
+			escChar := string([]byte{27})
+			switch lowerName {
+			case "process", "white":
+				return lipgloss.Color(escChar + "[0;97m")
+			case "success":
+				return lipgloss.Color(escChar + "[0;32m")
+			case "warning":
+				return lipgloss.Color(escChar + "[0;33m")
+			case "error":
+				return lipgloss.Color(escChar + "[0;31m")
+			case "detail", "reset":
+				return lipgloss.Color(escChar + "[0m")
+			case "muted":
+				return lipgloss.Color(escChar + "[2m")
+			case "greenfg":
+				return lipgloss.Color(escChar + "[38;5;120m")
+			case "bluefg":
+				return lipgloss.Color(escChar + "[0;34m")
+			case "bluebg":
+				return lipgloss.Color(escChar + "[44m")
+			case "bold":
+				return lipgloss.Color(escChar + "[1m")
+			case "italic":
+				return lipgloss.Color(escChar + "[3m")
+			default:
+				return lipgloss.Color(escChar + "[0m")
+			}
 		}
-	}
 
-	return NormalizeANSIEscape(colorValue)
+	return colorValue
 }
 
-// syncTokensToColors syncs DesignTokens to the old Colors struct for backwards compatibility.
-// This allows code using the old Colors struct to continue working during the migration.
-// Converts lipgloss.Color (which is a string type) to ANSI string format.
+// syncTokensToColors syncs DesignTokens to Colors struct.
+// Both now use lipgloss.Color, so this is a direct assignment.
 func (c *Config) syncTokensToColors() {
 	if c.Tokens == nil {
 		return
 	}
-	// lipgloss.Color is a string type, so we can convert directly
-	c.Colors.Process = string(c.Tokens.Colors.Process)
-	c.Colors.Success = string(c.Tokens.Colors.Success)
-	c.Colors.Warning = string(c.Tokens.Colors.Warning)
-	c.Colors.Error = string(c.Tokens.Colors.Error)
-	c.Colors.Detail = string(c.Tokens.Colors.Detail)
-	c.Colors.Muted = string(c.Tokens.Colors.Muted)
-	c.Colors.Reset = string(c.Tokens.Colors.Reset)
-	c.Colors.White = string(c.Tokens.Colors.White)
-	c.Colors.GreenFg = string(c.Tokens.Colors.GreenFg)
-	c.Colors.BlueFg = string(c.Tokens.Colors.BlueFg)
-	c.Colors.BlueBg = string(c.Tokens.Colors.BlueBg)
-	c.Colors.PaleBlue = string(c.Tokens.Colors.Spinner) // Map Spinner token to PaleBlue for compatibility
-	c.Colors.Bold = string(c.Tokens.Colors.Bold)
-	c.Colors.Italic = string(c.Tokens.Colors.Italic)
+	// Both are lipgloss.Color (which is a string type), so we can assign directly
+	c.Colors.Process = c.Tokens.Colors.Process
+	c.Colors.Success = c.Tokens.Colors.Success
+	c.Colors.Warning = c.Tokens.Colors.Warning
+	c.Colors.Error = c.Tokens.Colors.Error
+	c.Colors.Detail = c.Tokens.Colors.Detail
+	c.Colors.Muted = c.Tokens.Colors.Muted
+	c.Colors.Reset = c.Tokens.Colors.Reset
+	c.Colors.White = c.Tokens.Colors.White
+	c.Colors.GreenFg = c.Tokens.Colors.GreenFg
+	c.Colors.BlueFg = c.Tokens.Colors.BlueFg
+	c.Colors.BlueBg = c.Tokens.Colors.BlueBg
+	c.Colors.PaleBlue = c.Tokens.Colors.Spinner // Map Spinner token to PaleBlue for compatibility
+	c.Colors.Bold = c.Tokens.Colors.Bold
+	c.Colors.Italic = c.Tokens.Colors.Italic
 }
 
 // GetColorObj returns a Color wrapper for the given color key.
 // This provides a safer interface for color handling with automatic reset.
 // Example: cfg.GetColorObj("Error").Sprint("Error message").
 func (c *Config) GetColorObj(colorKeyOrName string) Color {
-	return NewColor(c.GetColor(colorKeyOrName))
+	// Convert lipgloss.Color to string for NewColor
+	return NewColor(string(c.GetColor(colorKeyOrName)))
 }
 
-func (c *Config) ResetColor() string {
+func (c *Config) ResetColor() lipgloss.Color {
 	if c.IsMonochrome {
-		return ""
+		return lipgloss.Color("")
 	}
-	resetCode := c.Colors.Reset
-	if resetCode == "" {
-		resetCode = string([]byte{27}) + "[0m"
+	resetColor := c.Colors.Reset
+	if resetColor == "" {
+		// lipgloss doesn't need explicit reset - styles handle this automatically
+		// Return empty color which means "no color"
+		return lipgloss.Color("")
 	}
-	return NormalizeANSIEscape(resetCode)
+	return resetColor
 }
 
 // DeepCopyConfig creates a deep copy of the Config using JSON marshal/unmarshal.
@@ -1085,22 +1057,21 @@ func ApplyMonochromeDefaults(cfg *Config) {
 	cfg.IsMonochrome = true
 	cfg.Style.UseBoxes = false
 
-	cfg.Colors = struct {
-		Process  string `yaml:"process"`
-		Success  string `yaml:"success"`
-		Warning  string `yaml:"warning"`
-		Error    string `yaml:"error"`
-		Detail   string `yaml:"detail"`
-		Muted    string `yaml:"muted"`
-		Reset    string `yaml:"reset"`
-		White    string `yaml:"white,omitempty"`
-		GreenFg  string `yaml:"green_fg,omitempty"`
-		BlueFg   string `yaml:"blue_fg,omitempty"`
-		BlueBg   string `yaml:"blue_bg,omitempty"`
-		PaleBlue string `yaml:"pale_blue,omitempty"`
-		Bold     string `yaml:"bold,omitempty"`
-		Italic   string `yaml:"italic,omitempty"`
-	}{}
+	// Set all colors to empty (monochrome mode)
+	cfg.Colors.Process = lipgloss.Color("")
+	cfg.Colors.Success = lipgloss.Color("")
+	cfg.Colors.Warning = lipgloss.Color("")
+	cfg.Colors.Error = lipgloss.Color("")
+	cfg.Colors.Detail = lipgloss.Color("")
+	cfg.Colors.Muted = lipgloss.Color("")
+	cfg.Colors.Reset = lipgloss.Color("")
+	cfg.Colors.White = lipgloss.Color("")
+	cfg.Colors.GreenFg = lipgloss.Color("")
+	cfg.Colors.BlueFg = lipgloss.Color("")
+	cfg.Colors.BlueBg = lipgloss.Color("")
+	cfg.Colors.PaleBlue = lipgloss.Color("")
+	cfg.Colors.Bold = lipgloss.Color("")
+	cfg.Colors.Italic = lipgloss.Color("")
 
 	asciiMinimalElements := ASCIIMinimalTheme().Elements
 	if cfg.Elements == nil {

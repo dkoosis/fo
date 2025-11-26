@@ -234,6 +234,10 @@ go test ./...
 - **Tufte Principles**: Data-ink ratio, sparklines, small multiples
 - **Information Visualization**: Pattern recognition for semantic meaning
 
+For detailed citations and research references, see:
+- [Research Foundations](docs/RESEARCH_FOUNDATIONS.md) - Complete citations and methodology
+- [Tufte Principles](docs/TUFTE_PRINCIPLES.md) - How Tufte's design principles are applied in fo
+
 ## Related Projects
 
 - [fo](fo/README.md): Go API for programmatic use

@@ -226,27 +226,15 @@ func getConfigPath() string {
 	return "" // No config file found or UserConfigDir was problematic
 }
 
-// normalizeThemeColors normalizes all ANSI escape sequences in a theme's color settings
-// after YAML unmarshal. This ensures colors are properly formatted regardless of how
-// they were specified in the YAML file.
+// normalizeThemeColors is no longer needed - lipgloss.Color handles color format detection automatically.
+// YAML unmarshaling will work correctly with lipgloss.Color (which is a string type).
+// Users can specify colors as: "111" (256-color), "#87afff" (hex), "red" (color name), etc.
 func normalizeThemeColors(cfg *design.Config) {
+	// No-op: lipgloss handles color normalization automatically
 	if cfg == nil || cfg.IsMonochrome {
 		return
 	}
-
-	// Use the canonical ANSI normalization from the design package
-	cfg.Colors.Process = design.NormalizeANSIEscape(cfg.Colors.Process)
-	cfg.Colors.Success = design.NormalizeANSIEscape(cfg.Colors.Success)
-	cfg.Colors.Warning = design.NormalizeANSIEscape(cfg.Colors.Warning)
-	cfg.Colors.Error = design.NormalizeANSIEscape(cfg.Colors.Error)
-	cfg.Colors.Detail = design.NormalizeANSIEscape(cfg.Colors.Detail)
-	cfg.Colors.Muted = design.NormalizeANSIEscape(cfg.Colors.Muted)
-	cfg.Colors.Reset = design.NormalizeANSIEscape(cfg.Colors.Reset)
-	cfg.Colors.White = design.NormalizeANSIEscape(cfg.Colors.White)
-	cfg.Colors.BlueFg = design.NormalizeANSIEscape(cfg.Colors.BlueFg)
-	cfg.Colors.BlueBg = design.NormalizeANSIEscape(cfg.Colors.BlueBg)
-	cfg.Colors.Bold = design.NormalizeANSIEscape(cfg.Colors.Bold)
-	cfg.Colors.Italic = design.NormalizeANSIEscape(cfg.Colors.Italic)
+	// Colors are already lipgloss.Color, which handles format detection
 }
 
 // LoadThemeFromFile loads a custom theme from a YAML file.

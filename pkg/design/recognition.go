@@ -410,7 +410,22 @@ func (pm *PatternMatcher) DetermineCognitiveLoad(lines []OutputLine) CognitiveLo
 		}
 	}
 
-	// Research-based heuristics (Zhou et al.)
+	// Research-based heuristics for cognitive load estimation.
+	//
+	// Error threshold (5): Based on Miller's Law (1956) - working memory capacity of 7±2 items.
+	// Five errors represent high cognitive load, requiring simplified rendering.
+	//
+	// Output size thresholds:
+	//   - High (>100 lines): Requires scrolling, significantly increases cognitive load
+	//   - Medium (>30 lines): Approximately one screen of output, moderate cognitive load
+	//
+	// Warning threshold (3): Lower than errors since warnings are less critical, but
+	// multiple warnings indicate potential issues requiring attention.
+	//
+	// References:
+	//   - Sweller, J. (1988). "Cognitive load during problem solving: Effects on learning."
+	//   - Miller, G. A. (1956). "The magical number seven, plus or minus two."
+	//   - See docs/RESEARCH_FOUNDATIONS.md for detailed citations.
 	if errorCount > 5 || outputSize > 100 {
 		return LoadHigh
 	} else if errorCount > 0 || warningCount > 3 || outputSize > 30 {

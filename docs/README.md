@@ -26,11 +26,15 @@ This directory contains documentation for the fo project, organized by purpose.
 ## Root Files
 
 - **VISION_REVIEW.md** - Product vision and design philosophy
+- **RESEARCH_FOUNDATIONS.md** - Research citations and methodology for design decisions
+- **TUFTE_PRINCIPLES.md** - Documentation of Tufte design principles applied in fo
 - **issues.json** - Issue tracking metadata (for tooling)
 
 ## Quick Links
 
 - [Pattern Types Documentation](design/pattern-types.md)
+- [Research Foundations](RESEARCH_FOUNDATIONS.md) - Citations and methodology
+- [Tufte Principles](TUFTE_PRINCIPLES.md) - Design principles documentation
 - [ADR-001: Pattern-Based Architecture](adr/ADR-001-pattern-based-architecture.md)
 - [GitHub Issue Prompt Template](guides/GITHUB_ISSUE_PROMPT.md)
 - [Documentation Policy](DOCUMENTATION_POLICY.md)

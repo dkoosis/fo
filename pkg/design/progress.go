@@ -163,7 +163,7 @@ func (p *InlineProgress) formatProgressMessage(status string) string {
 			// Fallback to Process color if PaleBlue not available
 			spinnerColor = p.Task.Config.GetColor("Process")
 		}
-		coloredSpinner := spinnerColor + spinnerIcon + p.Task.Config.ResetColor()
+		coloredSpinner := string(spinnerColor) + spinnerIcon + string(p.Task.Config.ResetColor())
 
 		runningColor := p.Task.Config.GetColor("Process")
 		runningDuration := formatDuration(time.Since(p.StartTime))

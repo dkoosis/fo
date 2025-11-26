@@ -325,7 +325,7 @@ func TestConfig_UsesReflection_When_FeatureFlagEnabled(t *testing.T) {
 
 			// Create fresh config to pick up env change
 			cfg := UnicodeVibrantTheme()
-			result := cfg.GetColor(tc.colorName)
+			result := string(cfg.GetColor(tc.colorName))
 
 			// Both methods should produce same result
 			assert.Contains(t, result, tc.expectedPrefix)
@@ -358,7 +358,7 @@ func TestConfig_ReflectionMatchesSwitch_When_AllColors(t *testing.T) {
 	cfg := UnicodeVibrantTheme()
 	switchResults := make(map[string]string)
 	for _, color := range colorsToTest {
-		switchResults[color] = cfg.GetColor(color)
+		switchResults[color] = string(cfg.GetColor(color))
 	}
 
 	// Test with reflection-based
@@ -367,7 +367,7 @@ func TestConfig_ReflectionMatchesSwitch_When_AllColors(t *testing.T) {
 	cfgReflection := UnicodeVibrantTheme()
 	reflectionResults := make(map[string]string)
 	for _, color := range colorsToTest {
-		reflectionResults[color] = cfgReflection.GetColor(color)
+		reflectionResults[color] = string(cfgReflection.GetColor(color))
 	}
 
 	// Compare results - they should match

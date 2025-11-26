@@ -1,4 +1,11 @@
-// Package design implements a research-backed design system for CLI output
+// Package design implements a research-backed design system for CLI output.
+//
+// Research foundations:
+//   - Cognitive Load Theory (Sweller, 1988): Adaptive rendering based on cognitive load
+//   - Tufte's Information Visualization (1983): Data-ink ratio, sparklines, small multiples
+//   - Miller's Law (1956): Working memory limits inform error threshold heuristics
+//
+// See docs/RESEARCH_FOUNDATIONS.md and docs/TUFTE_PRINCIPLES.md for detailed citations.
 package design
 
 import (
@@ -42,8 +49,14 @@ type OutputLine struct {
 
 // TaskContext holds information about the cognitive context of the task
 // (e.g., complexity, user's likely cognitive load).
+//
+// Cognitive load assessment is based on Sweller's Cognitive Load Theory (1988),
+// which suggests that information presentation should adapt to reduce cognitive
+// processing demands when load is high.
 type TaskContext struct {
 	// CognitiveLoad determines styling based on research (e.g., simplify for high load).
+	// Thresholds: High (>5 errors or >100 lines), Medium (>0 errors or >3 warnings or >30 lines), Low (otherwise).
+	// See pkg/design/recognition.go:estimateCognitiveLoad() for implementation.
 	CognitiveLoad CognitiveLoadContext
 
 	// IsDetailView indicates if a detailed view is active, affecting verbosity.

@@ -6,6 +6,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 // DensityMode controls the space-efficiency of pattern rendering.
@@ -163,18 +165,18 @@ func (s *Sparkline) Render(cfg *Config) string {
 	// Build output
 	if s.Label != "" {
 		if !cfg.IsMonochrome {
-			sb.WriteString(labelColor)
+			sb.WriteString(string(labelColor))
 		}
 		sb.WriteString(s.Label)
 		sb.WriteString(": ")
 		if !cfg.IsMonochrome {
-			sb.WriteString(cfg.ResetColor())
+			sb.WriteString(string(cfg.ResetColor()))
 		}
 	}
 
 	// Render sparkline
 	if !cfg.IsMonochrome {
-		sb.WriteString(sparklineColor)
+		sb.WriteString(string(sparklineColor))
 	}
 	for _, value := range s.Values {
 		// Normalize value to 0-1 range
@@ -190,7 +192,7 @@ func (s *Sparkline) Render(cfg *Config) string {
 		sb.WriteRune(blocks[blockIndex])
 	}
 	if !cfg.IsMonochrome {
-		sb.WriteString(cfg.ResetColor())
+		sb.WriteString(string(cfg.ResetColor()))
 	}
 
 	// Add latest value with unit
@@ -198,11 +200,11 @@ func (s *Sparkline) Render(cfg *Config) string {
 		latest := s.Values[len(s.Values)-1]
 		sb.WriteString(" ")
 		if !cfg.IsMonochrome {
-			sb.WriteString(unitColor)
+			sb.WriteString(string(unitColor))
 		}
 		sb.WriteString(fmt.Sprintf("%.1f%s", latest, s.Unit))
 		if !cfg.IsMonochrome {
-			sb.WriteString(cfg.ResetColor())
+			sb.WriteString(string(cfg.ResetColor()))
 		}
 	}
 
@@ -267,21 +269,21 @@ func (l *Leaderboard) Render(cfg *Config) string {
 	// Header
 	if l.Label != "" {
 		if headerColor != "" {
-			sb.WriteString(headerColor)
-			sb.WriteString(cfg.GetColor("Bold"))
+			sb.WriteString(string(headerColor))
+			sb.WriteString(string(cfg.GetColor("Bold")))
 		}
 		sb.WriteString(l.Label)
 		if headerColor != "" {
-			sb.WriteString(cfg.ResetColor())
+			sb.WriteString(string(cfg.ResetColor()))
 		}
 		if l.TotalCount > len(l.Items) {
 			if rankColor != "" {
 				sb.WriteString(" ")
-				sb.WriteString(rankColor)
+				sb.WriteString(string(rankColor))
 			}
 			sb.WriteString(fmt.Sprintf(" (top %d of %d)", len(l.Items), l.TotalCount))
 			if rankColor != "" {
-				sb.WriteString(cfg.ResetColor())
+				sb.WriteString(string(cfg.ResetColor()))
 			}
 		}
 		sb.WriteString("\n")
@@ -316,11 +318,11 @@ func (l *Leaderboard) Render(cfg *Config) string {
 		// Rank (if enabled)
 		if l.ShowRank {
 			if rankColor != "" {
-				sb.WriteString(rankColor)
+				sb.WriteString(string(rankColor))
 			}
 			sb.WriteString(fmt.Sprintf("%*d. ", maxRankWidth, item.Rank))
 			if rankColor != "" {
-				sb.WriteString(cfg.ResetColor())
+				sb.WriteString(string(cfg.ResetColor()))
 			}
 		}
 
@@ -332,32 +334,32 @@ func (l *Leaderboard) Render(cfg *Config) string {
 			displayName = truncated + "..."
 		}
 		if nameColor != "" {
-			sb.WriteString(nameColor)
+			sb.WriteString(string(nameColor))
 		}
 		sb.WriteString(PadRight(displayName, maxNameWidth))
 		if nameColor != "" {
-			sb.WriteString(cfg.ResetColor())
+			sb.WriteString(string(cfg.ResetColor()))
 		}
 
 		// Metric (right-aligned)
 		sb.WriteString("  ")
 		if metricColor != "" {
-			sb.WriteString(metricColor)
+			sb.WriteString(string(metricColor))
 		}
 		sb.WriteString(PadLeft(item.Metric, maxMetricWidth))
 		if metricColor != "" {
-			sb.WriteString(cfg.ResetColor())
+			sb.WriteString(string(cfg.ResetColor()))
 		}
 
 		// Context (if provided)
 		if item.Context != "" {
 			sb.WriteString("  ")
 			if contextColor != "" {
-				sb.WriteString(contextColor)
+				sb.WriteString(string(contextColor))
 			}
 			sb.WriteString(item.Context)
 			if contextColor != "" {
-				sb.WriteString(cfg.ResetColor())
+				sb.WriteString(string(cfg.ResetColor()))
 			}
 		}
 
@@ -438,12 +440,12 @@ func (t *TestTable) Render(cfg *Config) string {
 	// Header
 	if t.Label != "" {
 		if headerColor != "" {
-			sb.WriteString(headerColor)
-			sb.WriteString(cfg.GetColor("Bold"))
+			sb.WriteString(string(headerColor))
+			sb.WriteString(string(cfg.GetColor("Bold")))
 		}
 		sb.WriteString(t.Label)
 		if headerColor != "" {
-			sb.WriteString(cfg.ResetColor())
+			sb.WriteString(string(cfg.ResetColor()))
 		}
 		sb.WriteString("\n")
 	}
@@ -474,7 +476,7 @@ func (t *TestTable) Render(cfg *Config) string {
 
 		// Status icon
 		var statusIcon string
-		var statusColor string
+		var statusColor lipgloss.Color
 		switch result.Status {
 		case "pass":
 			statusIcon = cfg.GetIcon("Success")
@@ -491,12 +493,12 @@ func (t *TestTable) Render(cfg *Config) string {
 		}
 
 		if statusColor != "" {
-			sb.WriteString(statusColor)
+			sb.WriteString(string(statusColor))
 		}
 		sb.WriteString(statusIcon)
 		sb.WriteString(" ")
 		if statusColor != "" {
-			sb.WriteString(cfg.ResetColor())
+			sb.WriteString(string(cfg.ResetColor()))
 		}
 
 		// Name
@@ -516,11 +518,11 @@ func (t *TestTable) Render(cfg *Config) string {
 		// Duration
 		sb.WriteString("  ")
 		if durationColor != "" {
-			sb.WriteString(durationColor)
+			sb.WriteString(string(durationColor))
 		}
 		sb.WriteString(PadLeft(result.Duration, maxDurationWidth))
 		if durationColor != "" {
-			sb.WriteString(cfg.ResetColor())
+			sb.WriteString(string(cfg.ResetColor()))
 		}
 
 		// Details (on next line if present)
@@ -530,11 +532,11 @@ func (t *TestTable) Render(cfg *Config) string {
 			sb.WriteString(cfg.GetIndentation(1))
 			detailColor := cfg.GetColor("Muted")
 			if detailColor != "" {
-				sb.WriteString(detailColor)
+				sb.WriteString(string(detailColor))
 			}
 			sb.WriteString(result.Details)
 			if detailColor != "" {
-				sb.WriteString(cfg.ResetColor())
+				sb.WriteString(string(cfg.ResetColor()))
 			}
 		}
 
@@ -567,12 +569,12 @@ func (t *TestTable) renderCompact(cfg *Config, columns int) string {
 	// Header
 	if t.Label != "" {
 		if headerColor != "" {
-			sb.WriteString(headerColor)
-			sb.WriteString(cfg.GetColor("Bold"))
+			sb.WriteString(string(headerColor))
+			sb.WriteString(string(cfg.GetColor("Bold")))
 		}
 		sb.WriteString(t.Label)
 		if headerColor != "" {
-			sb.WriteString(cfg.ResetColor())
+			sb.WriteString(string(cfg.ResetColor()))
 		}
 		sb.WriteString("\n")
 	}
@@ -596,7 +598,7 @@ func (t *TestTable) renderCompact(cfg *Config, columns int) string {
 
 			// Status icon
 			var statusIcon string
-			var statusColor string
+			var statusColor lipgloss.Color
 			switch result.Status {
 			case "pass":
 				statusIcon = cfg.GetIcon("Success")
@@ -609,16 +611,16 @@ func (t *TestTable) renderCompact(cfg *Config, columns int) string {
 				statusColor = skipColor
 			default:
 				statusIcon = cfg.GetIcon("Info")
-				statusColor = ""
+				statusColor = lipgloss.Color("")
 			}
 
 			if statusColor != "" {
-				sb.WriteString(statusColor)
+				sb.WriteString(string(statusColor))
 			}
 			sb.WriteString(statusIcon)
 			sb.WriteString(" ")
 			if statusColor != "" {
-				sb.WriteString(cfg.ResetColor())
+				sb.WriteString(string(cfg.ResetColor()))
 			}
 
 			// Name (truncated to fit column)
@@ -634,11 +636,11 @@ func (t *TestTable) renderCompact(cfg *Config, columns int) string {
 			// Duration (compact format)
 			sb.WriteString(" ")
 			if durationColor != "" {
-				sb.WriteString(durationColor)
+				sb.WriteString(string(durationColor))
 			}
 			sb.WriteString(result.Duration)
 			if durationColor != "" {
-				sb.WriteString(cfg.ResetColor())
+				sb.WriteString(string(cfg.ResetColor()))
 			}
 		}
 
@@ -679,12 +681,12 @@ func (s *Summary) Render(cfg *Config) string {
 	if s.Label != "" {
 		headerColor := cfg.GetColor("Process")
 		if headerColor != "" && !cfg.IsMonochrome {
-			sb.WriteString(headerColor)
-			sb.WriteString(cfg.GetColor("Bold"))
+			sb.WriteString(string(headerColor))
+			sb.WriteString(string(cfg.GetColor("Bold")))
 		}
 		sb.WriteString(s.Label)
 		if headerColor != "" && !cfg.IsMonochrome {
-			sb.WriteString(cfg.ResetColor())
+			sb.WriteString(string(cfg.ResetColor()))
 		}
 		sb.WriteString("\n")
 	}
@@ -696,7 +698,7 @@ func (s *Summary) Render(cfg *Config) string {
 
 		// Icon based on type
 		var icon string
-		var valueColor string
+		var valueColor lipgloss.Color
 		switch metric.Type {
 		case "success":
 			icon = cfg.GetIcon("Success")
@@ -721,11 +723,11 @@ func (s *Summary) Render(cfg *Config) string {
 		sb.WriteString(metric.Label)
 		sb.WriteString(": ")
 		if valueColor != "" {
-			sb.WriteString(valueColor)
+			sb.WriteString(string(valueColor))
 		}
 		sb.WriteString(metric.Value)
 		if valueColor != "" {
-			sb.WriteString(cfg.ResetColor())
+			sb.WriteString(string(cfg.ResetColor()))
 		}
 		sb.WriteString("\n")
 	}
@@ -766,12 +768,12 @@ func (c *Comparison) Render(cfg *Config) string {
 	if c.Label != "" {
 		headerColor := cfg.GetColor("Process")
 		if headerColor != "" && !cfg.IsMonochrome {
-			sb.WriteString(headerColor)
-			sb.WriteString(cfg.GetColor("Bold"))
+			sb.WriteString(string(headerColor))
+			sb.WriteString(string(cfg.GetColor("Bold")))
 		}
 		sb.WriteString(c.Label)
 		if headerColor != "" && !cfg.IsMonochrome {
-			sb.WriteString(cfg.ResetColor())
+			sb.WriteString(string(cfg.ResetColor()))
 		}
 		sb.WriteString("\n")
 	}
@@ -788,19 +790,19 @@ func (c *Comparison) Render(cfg *Config) string {
 		// Before → After
 		mutedColor := cfg.GetColor("Muted")
 		if mutedColor != "" && !cfg.IsMonochrome {
-			sb.WriteString(mutedColor)
+			sb.WriteString(string(mutedColor))
 		}
 		sb.WriteString(item.Before)
 		sb.WriteString(" → ")
 		sb.WriteString(item.After)
 		if mutedColor != "" && !cfg.IsMonochrome {
-			sb.WriteString(cfg.ResetColor())
+			sb.WriteString(string(cfg.ResetColor()))
 		}
 
 		// Change indicator
 		sb.WriteString(" ")
 		var changeIcon string
-		var changeColor string
+		var changeColor lipgloss.Color
 		switch {
 		case item.Change > 0:
 			changeIcon = "↑"
@@ -814,16 +816,16 @@ func (c *Comparison) Render(cfg *Config) string {
 		}
 
 		if cfg.IsMonochrome {
-			changeColor = ""
+			changeColor = lipgloss.Color("")
 		}
 
 		if changeColor != "" {
-			sb.WriteString(changeColor)
+			sb.WriteString(string(changeColor))
 		}
 		sb.WriteString(changeIcon)
 		sb.WriteString(fmt.Sprintf(" %.1f%s", math.Abs(item.Change), item.Unit))
 		if changeColor != "" {
-			sb.WriteString(cfg.ResetColor())
+			sb.WriteString(string(cfg.ResetColor()))
 		}
 
 		sb.WriteString("\n")
@@ -863,12 +865,12 @@ func (i *Inventory) Render(cfg *Config) string {
 	if i.Label != "" {
 		headerColor := cfg.GetColor("Process")
 		if headerColor != "" && !cfg.IsMonochrome {
-			sb.WriteString(headerColor)
-			sb.WriteString(cfg.GetColor("Bold"))
+			sb.WriteString(string(headerColor))
+			sb.WriteString(string(cfg.GetColor("Bold")))
 		}
 		sb.WriteString(i.Label)
 		if headerColor != "" && !cfg.IsMonochrome {
-			sb.WriteString(cfg.ResetColor())
+			sb.WriteString(string(cfg.ResetColor()))
 		}
 		sb.WriteString("\n")
 	}
@@ -906,11 +908,11 @@ func (i *Inventory) Render(cfg *Config) string {
 		}
 		nameColor := cfg.GetColor("Detail")
 		if nameColor != "" && !cfg.IsMonochrome {
-			sb.WriteString(nameColor)
+			sb.WriteString(string(nameColor))
 		}
 		sb.WriteString(PadRight(displayName, maxNameWidth))
 		if nameColor != "" && !cfg.IsMonochrome {
-			sb.WriteString(cfg.ResetColor())
+			sb.WriteString(string(cfg.ResetColor()))
 		}
 
 		// Size
@@ -918,13 +920,13 @@ func (i *Inventory) Render(cfg *Config) string {
 			sb.WriteString("  ")
 			sizeColor := cfg.GetColor("Muted")
 			if sizeColor != "" && !cfg.IsMonochrome {
-				sb.WriteString(sizeColor)
+				sb.WriteString(string(sizeColor))
 			}
 			sb.WriteString("[")
 			sb.WriteString(item.Size)
 			sb.WriteString("]")
 			if sizeColor != "" && !cfg.IsMonochrome {
-				sb.WriteString(cfg.ResetColor())
+				sb.WriteString(string(cfg.ResetColor()))
 			}
 		}
 
@@ -935,11 +937,11 @@ func (i *Inventory) Render(cfg *Config) string {
 			sb.WriteString(cfg.GetIndentation(1))
 			pathColor := cfg.GetColor("Muted")
 			if pathColor != "" && !cfg.IsMonochrome {
-				sb.WriteString(pathColor)
+				sb.WriteString(string(pathColor))
 			}
 			sb.WriteString(item.Path)
 			if pathColor != "" && !cfg.IsMonochrome {
-				sb.WriteString(cfg.ResetColor())
+				sb.WriteString(string(cfg.ResetColor()))
 			}
 		}
 

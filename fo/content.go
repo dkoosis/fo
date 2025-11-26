@@ -8,7 +8,6 @@ package fo
 import (
 	"fmt"
 	"strings"
-
 )
 
 // MetricLine represents a key-value metric with optional trend indicator.
@@ -51,7 +50,7 @@ type SparklineSegment struct {
 func (c *Console) PrintMetricLine(m MetricLine) {
 	cfg := c.designConf
 	box := c.calculateBoxLayout()
-	reset := cfg.ResetColor()
+	reset := string(cfg.ResetColor())
 
 	// Format: "      Label:     Value Trend"
 	indent := "      "
@@ -59,7 +58,7 @@ func (c *Console) PrintMetricLine(m MetricLine) {
 
 	var valueColor string
 	if m.Color != "" {
-		valueColor = cfg.GetColor(m.Color)
+		valueColor = string(cfg.GetColor(m.Color))
 	}
 
 	// Build trend indicator with color
@@ -67,9 +66,9 @@ func (c *Console) PrintMetricLine(m MetricLine) {
 	if m.Trend != "" {
 		switch m.Trend {
 		case "↑":
-			trendStr = cfg.GetColor("error") + m.Trend + reset // Up is bad for LOC
+			trendStr = string(cfg.GetColor("error")) + m.Trend + reset // Up is bad for LOC
 		case "↓":
-			trendStr = cfg.GetColor("success") + m.Trend + reset // Down is good
+			trendStr = string(cfg.GetColor("success")) + m.Trend + reset // Down is good
 		default:
 			trendStr = m.Trend
 		}
@@ -93,9 +92,9 @@ func (c *Console) PrintMetricLine(m MetricLine) {
 func (c *Console) PrintBulletHeader(text string) {
 	cfg := c.designConf
 	box := c.calculateBoxLayout()
-	reset := cfg.ResetColor()
+	reset := string(cfg.ResetColor())
 
-	bulletColor := cfg.GetColor("process") // Use theme's process color
+	bulletColor := string(cfg.GetColor("process")) // Use theme's process color
 	bullet := cfg.Icons.Bullet
 	if bullet == "" {
 		bullet = "◉"
@@ -111,14 +110,14 @@ func (c *Console) PrintBulletHeader(text string) {
 func (c *Console) PrintBulletItem(item BulletItem) {
 	cfg := c.designConf
 	box := c.calculateBoxLayout()
-	reset := cfg.ResetColor()
+	reset := string(cfg.ResetColor())
 
-	bulletColor := cfg.GetColor("muted")
+	bulletColor := string(cfg.GetColor("muted"))
 	bullet := "•"
 
 	var textColor string
 	if item.Color != "" {
-		textColor = cfg.GetColor(item.Color)
+		textColor = string(cfg.GetColor(item.Color))
 	}
 
 	text := item.Text
@@ -142,14 +141,14 @@ func (c *Console) PrintRankedList(title string, items []RankedItem) {
 
 	cfg := c.designConf
 	box := c.calculateBoxLayout()
-	reset := cfg.ResetColor()
+	reset := string(cfg.ResetColor())
 
 	for _, item := range items {
 		// Format: "      1. 2562  path/to/file.go"
 		line := fmt.Sprintf("      %d. %s  %s", item.Rank, item.Value, item.Label)
 
 		if item.Color != "" {
-			valueColor := cfg.GetColor(item.Color)
+			valueColor := string(cfg.GetColor(item.Color))
 			line = fmt.Sprintf("      %d. %s%s%s  %s", item.Rank, valueColor, item.Value, reset, item.Label)
 		}
 
@@ -169,7 +168,7 @@ func (c *Console) PrintSparkline(title string, data []SparklineData, width int) 
 
 	cfg := c.designConf
 	box := c.calculateBoxLayout()
-	reset := cfg.ResetColor()
+	reset := string(cfg.ResetColor())
 
 	filledChar := "■"
 	emptyChar := "□"
@@ -188,7 +187,7 @@ func (c *Console) PrintSparkline(title string, data []SparklineData, width int) 
 
 		if !hasData {
 			// Show dim empty bar
-			barBuilder.WriteString(cfg.GetColor("muted"))
+			barBuilder.WriteString(string(cfg.GetColor("muted")))
 			barBuilder.WriteString(strings.Repeat(emptyChar, width))
 			barBuilder.WriteString(reset)
 		} else {
@@ -202,7 +201,7 @@ func (c *Console) PrintSparkline(title string, data []SparklineData, width int) 
 				}
 				if chars > 0 {
 					color := cfg.GetColor(seg.Color)
-					barBuilder.WriteString(color)
+					barBuilder.WriteString(string(color))
 					barBuilder.WriteString(strings.Repeat(filledChar, chars))
 					barBuilder.WriteString(reset)
 					usedChars += chars
