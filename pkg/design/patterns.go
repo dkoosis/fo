@@ -151,33 +151,25 @@ func (s *Sparkline) Render(cfg *Config) string {
 	// Unicode block elements for sparkline (8 levels)
 	blocks := []rune{'▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
 
-	// Get colors
-	labelColor := cfg.GetColor("Process")
-	if labelColor == "" && !cfg.IsMonochrome {
-		labelColor = cfg.GetColor("Detail")
+	// Get styles (Phase 2: using lipgloss.Style instead of manual concatenation)
+	labelStyle := cfg.GetStyle("Process")
+	if cfg.GetColor("Process") == "" && !cfg.IsMonochrome {
+		labelStyle = cfg.GetStyle("Detail")
 	}
-	sparklineColor := cfg.GetColor("Success")
-	if sparklineColor == "" && !cfg.IsMonochrome {
-		sparklineColor = cfg.GetColor("Process")
+	sparklineStyle := cfg.GetStyle("Success")
+	if cfg.GetColor("Success") == "" && !cfg.IsMonochrome {
+		sparklineStyle = cfg.GetStyle("Process")
 	}
-	unitColor := cfg.GetColor("Muted")
+	unitStyle := cfg.GetStyle("Muted")
 
-	// Build output
+	// Build output using lipgloss styles
 	if s.Label != "" {
-		if !cfg.IsMonochrome {
-			sb.WriteString(string(labelColor))
-		}
-		sb.WriteString(s.Label)
-		sb.WriteString(": ")
-		if !cfg.IsMonochrome {
-			sb.WriteString(string(cfg.ResetColor()))
-		}
+		labelText := s.Label + ": "
+		sb.WriteString(labelStyle.Render(labelText))
 	}
 
 	// Render sparkline
-	if !cfg.IsMonochrome {
-		sb.WriteString(string(sparklineColor))
-	}
+	var sparklineBuilder strings.Builder
 	for _, value := range s.Values {
 		// Normalize value to 0-1 range
 		normalized := (value - minVal) / valueRange
@@ -189,22 +181,23 @@ func (s *Sparkline) Render(cfg *Config) string {
 		if blockIndex > 7 {
 			blockIndex = 7
 		}
-		sb.WriteRune(blocks[blockIndex])
+		sparklineBuilder.WriteRune(blocks[blockIndex])
 	}
+	sparklineStr := sparklineBuilder.String()
 	if !cfg.IsMonochrome {
-		sb.WriteString(string(cfg.ResetColor()))
+		sb.WriteString(sparklineStyle.Render(sparklineStr))
+	} else {
+		sb.WriteString(sparklineStr)
 	}
 
 	// Add latest value with unit
 	if len(s.Values) > 0 {
 		latest := s.Values[len(s.Values)-1]
-		sb.WriteString(" ")
+		unitText := fmt.Sprintf(" %.1f%s", latest, s.Unit)
 		if !cfg.IsMonochrome {
-			sb.WriteString(string(unitColor))
-		}
-		sb.WriteString(fmt.Sprintf("%.1f%s", latest, s.Unit))
-		if !cfg.IsMonochrome {
-			sb.WriteString(string(cfg.ResetColor()))
+			sb.WriteString(unitStyle.Render(unitText))
+		} else {
+			sb.WriteString(unitText)
 		}
 	}
 
@@ -251,41 +244,20 @@ func (l *Leaderboard) Render(cfg *Config) string {
 
 	var sb strings.Builder
 
-	// Colors
-	headerColor := cfg.GetColor("Process")
-	rankColor := cfg.GetColor("Muted")
-	nameColor := cfg.GetColor("Detail")
-	metricColor := cfg.GetColor("Success")
-	contextColor := cfg.GetColor("Muted")
-
-	if cfg.IsMonochrome {
-		headerColor = ""
-		rankColor = ""
-		nameColor = ""
-		metricColor = ""
-		contextColor = ""
-	}
+	// Styles (Phase 2: using lipgloss.Style)
+	headerStyle := cfg.GetStyleWithBold("Process")
+	rankStyle := cfg.GetStyle("Muted")
+	nameStyle := cfg.GetStyle("Detail")
+	metricStyle := cfg.GetStyle("Success")
+	contextStyle := cfg.GetStyle("Muted")
 
 	// Header
 	if l.Label != "" {
-		if headerColor != "" {
-			sb.WriteString(string(headerColor))
-			sb.WriteString(string(cfg.GetColor("Bold")))
-		}
-		sb.WriteString(l.Label)
-		if headerColor != "" {
-			sb.WriteString(string(cfg.ResetColor()))
-		}
+		headerText := l.Label
 		if l.TotalCount > len(l.Items) {
-			if rankColor != "" {
-				sb.WriteString(" ")
-				sb.WriteString(string(rankColor))
-			}
-			sb.WriteString(fmt.Sprintf(" (top %d of %d)", len(l.Items), l.TotalCount))
-			if rankColor != "" {
-				sb.WriteString(string(cfg.ResetColor()))
-			}
+			headerText += fmt.Sprintf(" (top %d of %d)", len(l.Items), l.TotalCount)
 		}
+		sb.WriteString(headerStyle.Render(headerText))
 		sb.WriteString("\n")
 	}
 
@@ -317,13 +289,8 @@ func (l *Leaderboard) Render(cfg *Config) string {
 
 		// Rank (if enabled)
 		if l.ShowRank {
-			if rankColor != "" {
-				sb.WriteString(string(rankColor))
-			}
-			sb.WriteString(fmt.Sprintf("%*d. ", maxRankWidth, item.Rank))
-			if rankColor != "" {
-				sb.WriteString(string(cfg.ResetColor()))
-			}
+			rankText := fmt.Sprintf("%*d. ", maxRankWidth, item.Rank)
+			sb.WriteString(rankStyle.Render(rankText))
 		}
 
 		// Name (truncated if needed)
@@ -333,34 +300,16 @@ func (l *Leaderboard) Render(cfg *Config) string {
 			truncated := truncateToWidth(displayName, maxNameWidth-3)
 			displayName = truncated + "..."
 		}
-		if nameColor != "" {
-			sb.WriteString(string(nameColor))
-		}
-		sb.WriteString(PadRight(displayName, maxNameWidth))
-		if nameColor != "" {
-			sb.WriteString(string(cfg.ResetColor()))
-		}
+		sb.WriteString(nameStyle.Render(PadRight(displayName, maxNameWidth)))
 
 		// Metric (right-aligned)
 		sb.WriteString("  ")
-		if metricColor != "" {
-			sb.WriteString(string(metricColor))
-		}
-		sb.WriteString(PadLeft(item.Metric, maxMetricWidth))
-		if metricColor != "" {
-			sb.WriteString(string(cfg.ResetColor()))
-		}
+		sb.WriteString(metricStyle.Render(PadLeft(item.Metric, maxMetricWidth)))
 
 		// Context (if provided)
 		if item.Context != "" {
 			sb.WriteString("  ")
-			if contextColor != "" {
-				sb.WriteString(string(contextColor))
-			}
-			sb.WriteString(item.Context)
-			if contextColor != "" {
-				sb.WriteString(string(cfg.ResetColor()))
-			}
+			sb.WriteString(contextStyle.Render(item.Context))
 		}
 
 		sb.WriteString("\n")
@@ -422,31 +371,17 @@ func (t *TestTable) Render(cfg *Config) string {
 	// Default detailed rendering
 	var sb strings.Builder
 
-	// Colors
-	headerColor := cfg.GetColor("Process")
-	passColor := cfg.GetColor("Success")
-	failColor := cfg.GetColor("Error")
-	skipColor := cfg.GetColor("Warning")
-	durationColor := cfg.GetColor("Muted")
-
-	if cfg.IsMonochrome {
-		headerColor = ""
-		passColor = ""
-		failColor = ""
-		skipColor = ""
-		durationColor = ""
-	}
+	// Styles (Phase 2: using lipgloss.Style)
+	headerStyle := cfg.GetStyleWithBold("Process")
+	passStyle := cfg.GetStyle("Success")
+	failStyle := cfg.GetStyle("Error")
+	skipStyle := cfg.GetStyle("Warning")
+	durationStyle := cfg.GetStyle("Muted")
+	detailStyle := cfg.GetStyle("Muted")
 
 	// Header
 	if t.Label != "" {
-		if headerColor != "" {
-			sb.WriteString(string(headerColor))
-			sb.WriteString(string(cfg.GetColor("Bold")))
-		}
-		sb.WriteString(t.Label)
-		if headerColor != "" {
-			sb.WriteString(string(cfg.ResetColor()))
-		}
+		sb.WriteString(headerStyle.Render(t.Label))
 		sb.WriteString("\n")
 	}
 
@@ -476,30 +411,24 @@ func (t *TestTable) Render(cfg *Config) string {
 
 		// Status icon
 		var statusIcon string
-		var statusColor lipgloss.Color
+		var statusStyle lipgloss.Style
 		switch result.Status {
 		case "pass":
 			statusIcon = cfg.GetIcon("Success")
-			statusColor = passColor
+			statusStyle = passStyle
 		case "fail":
 			statusIcon = cfg.GetIcon("Error")
-			statusColor = failColor
+			statusStyle = failStyle
 		case "skip":
 			statusIcon = cfg.GetIcon("Warning")
-			statusColor = skipColor
+			statusStyle = skipStyle
 		default:
 			statusIcon = cfg.GetIcon("Info")
-			statusColor = ""
+			statusStyle = lipgloss.NewStyle()
 		}
 
-		if statusColor != "" {
-			sb.WriteString(string(statusColor))
-		}
-		sb.WriteString(statusIcon)
-		sb.WriteString(" ")
-		if statusColor != "" {
-			sb.WriteString(string(cfg.ResetColor()))
-		}
+		iconText := statusIcon + " "
+		sb.WriteString(statusStyle.Render(iconText))
 
 		// Name
 		displayName := result.Name
@@ -517,27 +446,14 @@ func (t *TestTable) Render(cfg *Config) string {
 
 		// Duration
 		sb.WriteString("  ")
-		if durationColor != "" {
-			sb.WriteString(string(durationColor))
-		}
-		sb.WriteString(PadLeft(result.Duration, maxDurationWidth))
-		if durationColor != "" {
-			sb.WriteString(string(cfg.ResetColor()))
-		}
+		sb.WriteString(durationStyle.Render(PadLeft(result.Duration, maxDurationWidth)))
 
 		// Details (on next line if present)
 		if result.Details != "" {
 			sb.WriteString("\n")
 			sb.WriteString(indent)
 			sb.WriteString(cfg.GetIndentation(1))
-			detailColor := cfg.GetColor("Muted")
-			if detailColor != "" {
-				sb.WriteString(string(detailColor))
-			}
-			sb.WriteString(result.Details)
-			if detailColor != "" {
-				sb.WriteString(string(cfg.ResetColor()))
-			}
+			sb.WriteString(detailStyle.Render(result.Details))
 		}
 
 		sb.WriteString("\n")
@@ -551,31 +467,16 @@ func (t *TestTable) Render(cfg *Config) string {
 func (t *TestTable) renderCompact(cfg *Config, columns int) string {
 	var sb strings.Builder
 
-	// Colors
-	headerColor := cfg.GetColor("Process")
-	passColor := cfg.GetColor("Success")
-	failColor := cfg.GetColor("Error")
-	skipColor := cfg.GetColor("Warning")
-	durationColor := cfg.GetColor("Muted")
-
-	if cfg.IsMonochrome {
-		headerColor = ""
-		passColor = ""
-		failColor = ""
-		skipColor = ""
-		durationColor = ""
-	}
+	// Styles (Phase 2: using lipgloss.Style)
+	headerStyle := cfg.GetStyleWithBold("Process")
+	passStyle := cfg.GetStyle("Success")
+	failStyle := cfg.GetStyle("Error")
+	skipStyle := cfg.GetStyle("Warning")
+	durationStyle := cfg.GetStyle("Muted")
 
 	// Header
 	if t.Label != "" {
-		if headerColor != "" {
-			sb.WriteString(string(headerColor))
-			sb.WriteString(string(cfg.GetColor("Bold")))
-		}
-		sb.WriteString(t.Label)
-		if headerColor != "" {
-			sb.WriteString(string(cfg.ResetColor()))
-		}
+		sb.WriteString(headerStyle.Render(t.Label))
 		sb.WriteString("\n")
 	}
 
@@ -598,30 +499,24 @@ func (t *TestTable) renderCompact(cfg *Config, columns int) string {
 
 			// Status icon
 			var statusIcon string
-			var statusColor lipgloss.Color
+			var statusStyle lipgloss.Style
 			switch result.Status {
 			case "pass":
 				statusIcon = cfg.GetIcon("Success")
-				statusColor = passColor
+				statusStyle = passStyle
 			case "fail":
 				statusIcon = cfg.GetIcon("Error")
-				statusColor = failColor
+				statusStyle = failStyle
 			case "skip":
 				statusIcon = cfg.GetIcon("Warning")
-				statusColor = skipColor
+				statusStyle = skipStyle
 			default:
 				statusIcon = cfg.GetIcon("Info")
-				statusColor = lipgloss.Color("")
+				statusStyle = lipgloss.NewStyle()
 			}
 
-			if statusColor != "" {
-				sb.WriteString(string(statusColor))
-			}
-			sb.WriteString(statusIcon)
-			sb.WriteString(" ")
-			if statusColor != "" {
-				sb.WriteString(string(cfg.ResetColor()))
-			}
+			iconText := statusIcon + " "
+			sb.WriteString(statusStyle.Render(iconText))
 
 			// Name (truncated to fit column)
 			maxNameLen := colWidth - 10 // Reserve space for duration
@@ -635,13 +530,7 @@ func (t *TestTable) renderCompact(cfg *Config, columns int) string {
 
 			// Duration (compact format)
 			sb.WriteString(" ")
-			if durationColor != "" {
-				sb.WriteString(string(durationColor))
-			}
-			sb.WriteString(result.Duration)
-			if durationColor != "" {
-				sb.WriteString(string(cfg.ResetColor()))
-			}
+			sb.WriteString(durationStyle.Render(result.Duration))
 		}
 
 		sb.WriteString("\n")
@@ -678,16 +567,9 @@ func (s *Summary) Render(cfg *Config) string {
 	var sb strings.Builder
 
 	// Header
+	headerStyle := cfg.GetStyleWithBold("Process")
 	if s.Label != "" {
-		headerColor := cfg.GetColor("Process")
-		if headerColor != "" && !cfg.IsMonochrome {
-			sb.WriteString(string(headerColor))
-			sb.WriteString(string(cfg.GetColor("Bold")))
-		}
-		sb.WriteString(s.Label)
-		if headerColor != "" && !cfg.IsMonochrome {
-			sb.WriteString(string(cfg.ResetColor()))
-		}
+		sb.WriteString(headerStyle.Render(s.Label))
 		sb.WriteString("\n")
 	}
 
@@ -696,39 +578,27 @@ func (s *Summary) Render(cfg *Config) string {
 		indent := cfg.GetIndentation(1)
 		sb.WriteString(indent)
 
-		// Icon based on type
+		// Icon and style based on type
 		var icon string
-		var valueColor lipgloss.Color
+		var valueStyle lipgloss.Style
 		switch metric.Type {
 		case "success":
 			icon = cfg.GetIcon("Success")
-			valueColor = cfg.GetColor("Success")
+			valueStyle = cfg.GetStyle("Success")
 		case "error":
 			icon = cfg.GetIcon("Error")
-			valueColor = cfg.GetColor("Error")
+			valueStyle = cfg.GetStyle("Error")
 		case "warning":
 			icon = cfg.GetIcon("Warning")
-			valueColor = cfg.GetColor("Warning")
+			valueStyle = cfg.GetStyle("Warning")
 		default:
 			icon = cfg.GetIcon("Info")
-			valueColor = cfg.GetColor("Process")
+			valueStyle = cfg.GetStyle("Process")
 		}
 
-		if cfg.IsMonochrome {
-			valueColor = ""
-		}
-
-		sb.WriteString(icon)
-		sb.WriteString(" ")
-		sb.WriteString(metric.Label)
-		sb.WriteString(": ")
-		if valueColor != "" {
-			sb.WriteString(string(valueColor))
-		}
-		sb.WriteString(metric.Value)
-		if valueColor != "" {
-			sb.WriteString(string(cfg.ResetColor()))
-		}
+		labelText := icon + " " + metric.Label + ": "
+		sb.WriteString(labelText)
+		sb.WriteString(valueStyle.Render(metric.Value))
 		sb.WriteString("\n")
 	}
 
@@ -765,16 +635,9 @@ func (c *Comparison) Render(cfg *Config) string {
 	var sb strings.Builder
 
 	// Header
+	headerStyle := cfg.GetStyleWithBold("Process")
 	if c.Label != "" {
-		headerColor := cfg.GetColor("Process")
-		if headerColor != "" && !cfg.IsMonochrome {
-			sb.WriteString(string(headerColor))
-			sb.WriteString(string(cfg.GetColor("Bold")))
-		}
-		sb.WriteString(c.Label)
-		if headerColor != "" && !cfg.IsMonochrome {
-			sb.WriteString(string(cfg.ResetColor()))
-		}
+		sb.WriteString(headerStyle.Render(c.Label))
 		sb.WriteString("\n")
 	}
 
@@ -788,45 +651,28 @@ func (c *Comparison) Render(cfg *Config) string {
 		sb.WriteString(": ")
 
 		// Before → After
-		mutedColor := cfg.GetColor("Muted")
-		if mutedColor != "" && !cfg.IsMonochrome {
-			sb.WriteString(string(mutedColor))
-		}
-		sb.WriteString(item.Before)
-		sb.WriteString(" → ")
-		sb.WriteString(item.After)
-		if mutedColor != "" && !cfg.IsMonochrome {
-			sb.WriteString(string(cfg.ResetColor()))
-		}
+		mutedStyle := cfg.GetStyle("Muted")
+		beforeAfterText := item.Before + " → " + item.After
+		sb.WriteString(mutedStyle.Render(beforeAfterText))
 
 		// Change indicator
 		sb.WriteString(" ")
 		var changeIcon string
-		var changeColor lipgloss.Color
+		var changeStyle lipgloss.Style
 		switch {
 		case item.Change > 0:
 			changeIcon = "↑"
-			changeColor = cfg.GetColor("Warning") // Increase might be bad (e.g., build time)
+			changeStyle = cfg.GetStyle("Warning") // Increase might be bad (e.g., build time)
 		case item.Change < 0:
 			changeIcon = "↓"
-			changeColor = cfg.GetColor("Success") // Decrease might be good (e.g., build time)
+			changeStyle = cfg.GetStyle("Success") // Decrease might be good (e.g., build time)
 		default:
 			changeIcon = "="
-			changeColor = cfg.GetColor("Process")
+			changeStyle = cfg.GetStyle("Process")
 		}
 
-		if cfg.IsMonochrome {
-			changeColor = lipgloss.Color("")
-		}
-
-		if changeColor != "" {
-			sb.WriteString(string(changeColor))
-		}
-		sb.WriteString(changeIcon)
-		sb.WriteString(fmt.Sprintf(" %.1f%s", math.Abs(item.Change), item.Unit))
-		if changeColor != "" {
-			sb.WriteString(string(cfg.ResetColor()))
-		}
+		changeText := changeIcon + fmt.Sprintf(" %.1f%s", math.Abs(item.Change), item.Unit)
+		sb.WriteString(changeStyle.Render(changeText))
 
 		sb.WriteString("\n")
 	}
@@ -862,16 +708,9 @@ func (i *Inventory) Render(cfg *Config) string {
 	var sb strings.Builder
 
 	// Header
+	headerStyle := cfg.GetStyleWithBold("Process")
 	if i.Label != "" {
-		headerColor := cfg.GetColor("Process")
-		if headerColor != "" && !cfg.IsMonochrome {
-			sb.WriteString(string(headerColor))
-			sb.WriteString(string(cfg.GetColor("Bold")))
-		}
-		sb.WriteString(i.Label)
-		if headerColor != "" && !cfg.IsMonochrome {
-			sb.WriteString(string(cfg.ResetColor()))
-		}
+		sb.WriteString(headerStyle.Render(i.Label))
 		sb.WriteString("\n")
 	}
 
@@ -906,28 +745,15 @@ func (i *Inventory) Render(cfg *Config) string {
 			truncated := truncateToWidth(displayName, maxNameWidth-3)
 			displayName = truncated + "..."
 		}
-		nameColor := cfg.GetColor("Detail")
-		if nameColor != "" && !cfg.IsMonochrome {
-			sb.WriteString(string(nameColor))
-		}
-		sb.WriteString(PadRight(displayName, maxNameWidth))
-		if nameColor != "" && !cfg.IsMonochrome {
-			sb.WriteString(string(cfg.ResetColor()))
-		}
+		nameStyle := cfg.GetStyle("Detail")
+		sb.WriteString(nameStyle.Render(PadRight(displayName, maxNameWidth)))
 
 		// Size
 		if item.Size != "" {
 			sb.WriteString("  ")
-			sizeColor := cfg.GetColor("Muted")
-			if sizeColor != "" && !cfg.IsMonochrome {
-				sb.WriteString(string(sizeColor))
-			}
-			sb.WriteString("[")
-			sb.WriteString(item.Size)
-			sb.WriteString("]")
-			if sizeColor != "" && !cfg.IsMonochrome {
-				sb.WriteString(string(cfg.ResetColor()))
-			}
+			sizeStyle := cfg.GetStyle("Muted")
+			sizeText := "[" + item.Size + "]"
+			sb.WriteString(sizeStyle.Render(sizeText))
 		}
 
 		// Path (if provided)
@@ -935,14 +761,8 @@ func (i *Inventory) Render(cfg *Config) string {
 			sb.WriteString("\n")
 			sb.WriteString(indent)
 			sb.WriteString(cfg.GetIndentation(1))
-			pathColor := cfg.GetColor("Muted")
-			if pathColor != "" && !cfg.IsMonochrome {
-				sb.WriteString(string(pathColor))
-			}
-			sb.WriteString(item.Path)
-			if pathColor != "" && !cfg.IsMonochrome {
-				sb.WriteString(string(cfg.ResetColor()))
-			}
+			pathStyle := cfg.GetStyle("Muted")
+			sb.WriteString(pathStyle.Render(item.Path))
 		}
 
 		sb.WriteString("\n")

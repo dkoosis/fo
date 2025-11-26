@@ -1012,6 +1012,79 @@ func (c *Config) ResetColor() lipgloss.Color {
 	return resetColor
 }
 
+// GetStyle returns a lipgloss.Style for the given color key.
+// This is the idiomatic way to use colors in Phase 2+.
+// Returns a style with foreground color set, or empty style if monochrome or color not found.
+func (c *Config) GetStyle(colorKey string) lipgloss.Style {
+	if c.IsMonochrome {
+		return lipgloss.NewStyle()
+	}
+	color := c.GetColor(colorKey)
+	if color == "" {
+		return lipgloss.NewStyle()
+	}
+	return lipgloss.NewStyle().Foreground(color)
+}
+
+// GetStyleWithBold returns a lipgloss.Style with color and bold text.
+func (c *Config) GetStyleWithBold(colorKey string) lipgloss.Style {
+	style := c.GetStyle(colorKey)
+	if c.IsMonochrome {
+		return style
+	}
+	return style.Bold(true)
+}
+
+// GetStyleWithBackground returns a lipgloss.Style with foreground and background colors.
+func (c *Config) GetStyleWithBackground(fgKey, bgKey string) lipgloss.Style {
+	if c.IsMonochrome {
+		return lipgloss.NewStyle()
+	}
+	fgColor := c.GetColor(fgKey)
+	bgColor := c.GetColor(bgKey)
+	style := lipgloss.NewStyle()
+	if fgColor != "" {
+		style = style.Foreground(fgColor)
+	}
+	if bgColor != "" {
+		style = style.Background(bgColor)
+	}
+	return style
+}
+
+// GetStyleFromElement builds a lipgloss.Style from an ElementStyleDef.
+// This is used in Phase 2+ to convert element styles to lipgloss styles.
+func (c *Config) GetStyleFromElement(element ElementStyleDef, fallbackColorKey string) lipgloss.Style {
+	if c.IsMonochrome {
+		return lipgloss.NewStyle()
+	}
+	
+	colorKey := element.ColorFG
+	if colorKey == "" {
+		colorKey = fallbackColorKey
+	}
+	if colorKey == "" {
+		return lipgloss.NewStyle()
+	}
+	
+	color := c.GetColor(colorKey)
+	if color == "" {
+		return lipgloss.NewStyle()
+	}
+	
+	style := lipgloss.NewStyle().Foreground(color)
+	
+	// Apply text styles
+	if contains(element.TextStyle, "bold") {
+		style = style.Bold(true)
+	}
+	if contains(element.TextStyle, "italic") {
+		style = style.Italic(true)
+	}
+	
+	return style
+}
+
 // DeepCopyConfig creates a deep copy of the Config using JSON marshal/unmarshal.
 // This automatically handles all fields, preventing bugs when new fields are added.
 // The small overhead of JSON encoding is acceptable since this is not in a hot path.
