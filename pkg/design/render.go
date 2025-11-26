@@ -568,10 +568,10 @@ func (t *Task) RenderOutputLine(line OutputLine) string {
 		}
 
 		contentStyleDef := t.Config.GetElementStyle(contentElementStyleKey)
-		
+
 		// Build content style (Phase 2: using lipgloss.Style)
 		contentStyle := t.Config.GetStyleFromElement(contentStyleDef, contentColorKey)
-		
+
 		if !t.Config.IsMonochrome {
 			// Cognitive-load aware formatting:
 			// - High-load error lines get italic emphasis
