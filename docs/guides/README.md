@@ -5,7 +5,8 @@ This directory contains guides for users and contributors.
 ## Contents
 
 - **GITHUB_ISSUE_PROMPT.md** - Template for creating well-structured GitHub issues
-- **DOCUMENTATION_POLICY.md** - Guidelines for writing and maintaining documentation
+- **config-resolution.md** - How fo resolves configuration from multiple sources
+- **THEME_GUIDE.md** - Complete guide to creating custom themes for fo
 
 ## Purpose
 
