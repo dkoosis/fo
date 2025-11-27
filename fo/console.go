@@ -211,11 +211,9 @@ func (c *Console) calculateBoxLayout() *BoxLayout {
 	cfg := c.designConf
 	terminalWidth := c.getTerminalWidth()
 
-	// TotalWidth is the full terminal width (used for border lines)
-	// Content area = total width - left border (1) - left padding (2) - right padding (1) - right border (1)
-	// This ensures all content lines use the same width calculation
+	// TotalWidth is the full terminal width
+	// Let lipgloss handle content width calculation via Width() and Padding()
 	totalWidth := terminalWidth
-	contentWidth := totalWidth - 5
 
 	// Determine border color based on theme
 	borderColor := c.getFaintDarkGrayColor()
@@ -227,8 +225,8 @@ func (c *Console) calculateBoxLayout() *BoxLayout {
 	borderChars := c.getBorderChars(cfg)
 
 	// Create lipgloss border style
-	// Note: lipgloss Width includes borders, so we set width to terminalWidth - 2
-	// to get a box that's exactly terminalWidth wide
+	// Width() sets content area width (excluding borders), so use totalWidth - 2
+	// Lipgloss will add 2 for borders to get exactly totalWidth total width
 	lipglossBorder := lipgloss.Border{
 		Top:         borderChars.Horizontal,
 		Bottom:      borderChars.Horizontal,
@@ -249,7 +247,7 @@ func (c *Console) calculateBoxLayout() *BoxLayout {
 	borderStyle := lipgloss.NewStyle().
 		Border(lipglossBorder).
 		BorderForeground(borderLipglossColor).
-		Width(totalWidth - 2). // Lipgloss adds 2 for borders, so subtract 2 to get exact terminal width
+		Width(totalWidth - 2). // Width sets content area; borders add 2 for total width
 		PaddingLeft(2).
 		PaddingRight(1).
 		PaddingTop(0).
@@ -257,7 +255,7 @@ func (c *Console) calculateBoxLayout() *BoxLayout {
 
 	return &BoxLayout{
 		TotalWidth:   totalWidth,
-		ContentWidth: contentWidth,
+		ContentWidth: 0, // Not needed - lipgloss handles this via Width() and Padding()
 		LeftPadding:  2,
 		RightPadding: 1,
 		BorderColor:  borderColor,
@@ -323,23 +321,6 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
-// stripANSICodes removes ANSI escape sequences from a string to calculate visual width.
-func stripANSICodes(s string) string {
-	var result strings.Builder
-	inEscape := false
-	for i := range len(s) {
-		switch {
-		case s[i] == '\033':
-			inEscape = true
-		case inEscape && s[i] == 'm':
-			inEscape = false
-		case !inEscape:
-			result.WriteByte(s[i])
-		}
-	}
-	return result.String()
-}
-
 // PrintSectionHeader prints a section header and starts a section box.
 // Uses lipgloss for consistent box rendering.
 func (c *Console) PrintSectionHeader(name string) {
@@ -369,7 +350,7 @@ func (c *Console) PrintSectionHeader(name string) {
 
 	// Use lipgloss to render complete box with top border and title
 	// Render top border using lipgloss (empty content with top border enabled)
-	topBorderStyle := box.BorderStyle.Copy().
+	topBorderStyle := box.BorderStyle.
 		BorderTop(true).
 		BorderBottom(false).
 		BorderLeft(true).
@@ -381,17 +362,15 @@ func (c *Console) PrintSectionHeader(name string) {
 	topBorder := topBorderStyle.Render("")
 
 	// Render title line with left/right borders (no top/bottom)
-	// Trust lipgloss to handle width correctly with MaxWidth
-	titleLineStyle := box.BorderStyle.Copy().
+	// Let lipgloss handle width automatically via inherited Width() and Padding()
+	titleLineStyle := box.BorderStyle.
 		BorderTop(false).
 		BorderBottom(false).
 		BorderLeft(true).
 		BorderRight(true).
 		PaddingTop(0).
-		PaddingBottom(0).
-		MaxWidth(box.ContentWidth)
-		// Keep horizontal padding (PaddingLeft/PaddingRight from BorderStyle)
-		// Width is inherited from BorderStyle
+		PaddingBottom(0)
+		// Width and Padding are inherited from BorderStyle
 	titleLine := titleLineStyle.Render(styledTitle)
 
 	var sb strings.Builder
@@ -409,17 +388,13 @@ func (c *Console) PrintSectionHeader(name string) {
 // Uses lipgloss for consistent rendering.
 func (c *Console) renderBoxLine(box *BoxLayout, content string) {
 	// Use lipgloss to render the content line with borders
-	// BorderStyle already has correct width and padding configured
-	// MaxWidth ensures content (before padding) doesn't exceed content width
-	// This properly handles emoji/wide chars - trust lipgloss to do it right
-	contentLineStyle := box.BorderStyle.Copy().
+	// Let lipgloss handle width and wrapping automatically via Width() and Padding()
+	contentLineStyle := box.BorderStyle.
 		BorderTop(false).
 		BorderBottom(false).
 		PaddingTop(0).
-		PaddingBottom(0).
-		MaxWidth(box.ContentWidth)
-		// Keep horizontal padding (PaddingLeft/PaddingRight from BorderStyle)
-		// Width is inherited from BorderStyle, which is set to (totalWidth - 2)
+		PaddingBottom(0)
+		// Width and Padding are inherited from BorderStyle
 
 	rendered := contentLineStyle.Render(content)
 	_, _ = c.cfg.Out.Write([]byte(rendered + "\n"))
@@ -490,19 +465,15 @@ func (c *Console) PrintSectionFooter() {
 
 	box := c.calculateBoxLayout()
 
-	// Use lipgloss to render bottom border (empty content with bottom border enabled)
-	bottomBorderStyle := box.BorderStyle.Copy().
-		BorderTop(false).
-		BorderBottom(true).
-		BorderLeft(true).
-		BorderRight(true).
-		PaddingTop(0).
-		PaddingBottom(0).
-		PaddingLeft(0).
-		PaddingRight(0)
-	bottomBorder := bottomBorderStyle.Render("")
-
-	_, _ = c.cfg.Out.Write([]byte(bottomBorder + "\n"))
+	// Manually construct the bottom border to ensure full width
+	// This ensures consistent rendering regardless of lipgloss's internal calculations
+	// and fixes the "hole" issue where the border wasn't rendering at full width
+	leftCorner := box.BorderChars.BottomLeft
+	rightCorner := box.BorderChars.BottomRight
+	horizontal := box.BorderChars.Horizontal
+	width := box.TotalWidth - 2 // Width of horizontal line between corners
+	fullBorderLine := leftCorner + strings.Repeat(horizontal, width) + rightCorner
+	_, _ = c.cfg.Out.Write([]byte(fullBorderLine + "\n"))
 }
 
 // SectionStatus represents the outcome status of a section execution.

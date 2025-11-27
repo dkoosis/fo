@@ -6,11 +6,9 @@ import (
 
 // QualityCheck runs all quality checks.
 func QualityCheck() error {
-	PrintH2Header("Quality Checks")
-
 	// Run linters
 	if err := LintAll(); err != nil {
-		fmt.Println("Warning: Linting issues found")
+		PrintWarning("Linting issues found")
 	}
 
 	// Run tests
@@ -23,14 +21,12 @@ func QualityCheck() error {
 		return fmt.Errorf("build failed: %w", err)
 	}
 
-	PrintSuccess("Quality checks complete")
+	SetSectionSummary("Quality checks complete")
 	return nil
 }
 
 // QualityReport generates a quality report.
 func QualityReport() error {
-	PrintH2Header("Quality Report")
-
 	// For now, just run quality check
 	// In the future, this could generate detailed metrics
 	return QualityCheck()

@@ -93,12 +93,12 @@ type CoverageThreshold struct {
 
 // TestRenderer renders test results using the console's theme.
 type TestRenderer struct {
-	console     *Console
-	writer      io.Writer
-	config      TestTableConfig
-	inGroupBox  bool          // Track if we're inside a group box
-	boxWidth    int           // Width of the box for consistent borders
-	boxStyle    lipgloss.Style // Lipgloss style for rendering test table boxes
+	console    *Console
+	writer     io.Writer
+	config     TestTableConfig
+	inGroupBox bool           // Track if we're inside a group box
+	boxWidth   int            // Width of the box for consistent borders
+	boxStyle   lipgloss.Style // Lipgloss style for rendering test table boxes
 }
 
 // getPaleGrayColor returns a very pale gray ANSI color code.
@@ -129,23 +129,23 @@ func stripANSI(s string) string {
 func NewTestRenderer(console *Console, writer io.Writer) *TestRenderer {
 	// Build configuration from the console's design config
 	config := buildTestTableConfig(console)
-	
+
 	// Calculate box width and create lipgloss style for test table boxes
 	boxWidth := 67 // Width for test table (content + 2 for borders = 69 total)
-	
+
 	// Use console's box layout calculation to get consistent styling
 	boxLayout := console.calculateBoxLayout()
-	
+
 	// Create lipgloss style based on console's box style, but with test table width
-	boxStyle := boxLayout.BorderStyle.Copy().
+	boxStyle := boxLayout.BorderStyle.
 		Width(boxWidth)
-	
+
 	return &TestRenderer{
-		console:    console,
-		writer:     writer,
-		config:     config,
-		boxWidth:   boxWidth,
-		boxStyle:   boxStyle,
+		console:  console,
+		writer:   writer,
+		config:   config,
+		boxWidth: boxWidth,
+		boxStyle: boxStyle,
 	}
 }
 
@@ -204,7 +204,7 @@ func (r *TestRenderer) RenderTableHeader() {
 	fmt.Fprintf(r.writer, "\n")
 
 	// Use lipgloss to render top border
-	topBorderStyle := r.boxStyle.Copy().
+	topBorderStyle := r.boxStyle.
 		BorderTop(true).
 		BorderBottom(false).
 		BorderLeft(true).
@@ -218,7 +218,7 @@ func (r *TestRenderer) RenderTableHeader() {
 
 	// Header line with borders: │  STATUS  PATH... │
 	headerContent := "  STATUS  PATH                             TESTS   TIME    COVERAGE"
-	headerLineStyle := r.boxStyle.Copy().
+	headerLineStyle := r.boxStyle.
 		BorderTop(false).
 		BorderBottom(false).
 		BorderLeft(true).
@@ -240,7 +240,7 @@ func (r *TestRenderer) RenderTableHeader() {
 		BottomLeft:  "",
 		BottomRight: "",
 	}
-	separatorStyle := r.boxStyle.Copy().
+	separatorStyle := r.boxStyle.
 		Border(separatorBorder).
 		BorderTop(true).
 		BorderBottom(false).
@@ -278,7 +278,7 @@ func (r *TestRenderer) RenderGroupHeader(dirName string) {
 
 	// Group header line with borders: │  ⊙ dirname/ │
 	groupContent := fmt.Sprintf("  %s%s%s %s/", blueColor, "⊙", reset, dirName)
-	groupLineStyle := r.boxStyle.Copy().
+	groupLineStyle := r.boxStyle.
 		BorderTop(false).
 		BorderBottom(false).
 		BorderLeft(true).
@@ -519,7 +519,7 @@ func (r *TestRenderer) renderTestsWithHierarchy(tests []TestResult) {
 func (r *TestRenderer) RenderGroupFooter() {
 	if r.inGroupBox {
 		// Use lipgloss to render bottom border
-		bottomBorderStyle := r.boxStyle.Copy().
+		bottomBorderStyle := r.boxStyle.
 			BorderTop(false).
 			BorderBottom(true).
 			BorderLeft(true).

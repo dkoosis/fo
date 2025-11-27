@@ -5,24 +5,44 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/dkoosis/fo/internal/magetasks"
 	"github.com/dkoosis/fo/fo"
 	"github.com/magefile/mage/mg"
+	"github.com/magefile/mage/sh"
 )
 
 var (
 	console = fo.DefaultConsole()
 )
 
-// Default target - build the binary
-var Default = Build
+// Default target - run build and test workflow
+var Default = Mage
 
 func init() {
 	if err := magetasks.Initialize(); err != nil {
 		fmt.Fprintf(os.Stderr, "Fatal: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// Mage runs the standard build + test workflow
+func Mage() error {
+	buildID := getBuildID()
+	if buildID != "" {
+		magetasks.Console().PrintH1Header("fo Build Suite - " + buildID)
+	}
+	return magetasks.RunAll()
+}
+
+// getBuildID returns a meaningful build identifier (git commit hash).
+func getBuildID() string {
+	commit, err := sh.Output("git", "rev-parse", "--short", "HEAD")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(commit)
 }
 
 // Build builds the fo binary
@@ -37,58 +57,8 @@ func Clean() error {
 
 // QA runs all quality assurance checks (uses fo library for better output)
 func QA() error {
-	magetasks.PrintH1Header("fo Quality Assurance")
-
-	fmt.Println("🔍 Running QA checks...")
-
-	// Format check
-	if _, err := console.Run("Go Format", "go", "fmt", "./..."); err != nil {
-		return fmt.Errorf("format check failed: %w", err)
-	}
-
-	// Go vet
-	if _, err := console.Run("Go Vet", "go", "vet", "./..."); err != nil {
-		return fmt.Errorf("vet failed: %w", err)
-	}
-
-	// Staticcheck
-	if _, err := console.Run("Staticcheck", "staticcheck", "./..."); err != nil {
-		if magetasks.IsCommandNotFound(err) {
-			magetasks.PrintWarning("Staticcheck not found (install: go install honnef.co/go/tools/cmd/staticcheck@latest)")
-		} else {
-			return fmt.Errorf("staticcheck failed: %w", err)
-		}
-	}
-
-	// Golangci-lint with extensive checks
-	if _, err := console.Run("Golangci-lint", "golangci-lint", "run",
-		"--enable-all",
-		"--disable=exhaustivestruct,exhaustruct,varnamelen,ireturn,wrapcheck,nlreturn,gochecknoglobals,gomnd,mnd,depguard,tagalign",
-		"--timeout=5m",
-		"./..."); err != nil {
-		if magetasks.IsCommandNotFound(err) {
-			magetasks.PrintWarning("Golangci-lint not found (install: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)")
-		} else {
-			return fmt.Errorf("golangci-lint failed: %w", err)
-		}
-	}
-
-	// Security scan
-	if _, err := console.Run("Gosec Security Scan", "gosec", "-quiet", "./..."); err != nil {
-		if magetasks.IsCommandNotFound(err) {
-			magetasks.PrintWarning("Gosec not found (install: go install github.com/securego/gosec/v2/cmd/gosec@latest)")
-		} else {
-			return fmt.Errorf("gosec failed: %w", err)
-		}
-	}
-
-	// Build
-	if _, err := console.Run("Go Build", "go", "build", "./..."); err != nil {
-		return fmt.Errorf("build failed: %w", err)
-	}
-
-	magetasks.PrintSuccess("QA complete!")
-	return nil
+	magetasks.Console().PrintH1Header("fo Quality Assurance")
+	return magetasks.QualityCheck()
 }
 
 // Lint namespace for linting commands

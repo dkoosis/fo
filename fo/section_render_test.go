@@ -8,6 +8,23 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
+// stripANSICodes removes ANSI escape sequences from a string to calculate visual width.
+func stripANSICodes(s string) string {
+	var result strings.Builder
+	inEscape := false
+	for i := range len(s) {
+		switch {
+		case s[i] == '\033':
+			inEscape = true
+		case inEscape && s[i] == 'm':
+			inEscape = false
+		case !inEscape:
+			result.WriteByte(s[i])
+		}
+	}
+	return result.String()
+}
+
 func TestConsole_RendersAlignedSectionContentLine_When_IconAndTextProvided(t *testing.T) {
 	t.Parallel()
 
@@ -19,7 +36,7 @@ func TestConsole_RendersAlignedSectionContentLine_When_IconAndTextProvided(t *te
 
 	console.PrintSectionContentLine(ContentLine{
 		Icon:      icon,
-		IconColor: console.designConf.GetColor("Success"),
+		IconColor: console.GetColor("Success"),
 		Text:      text,
 	})
 

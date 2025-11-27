@@ -1,64 +1,92 @@
 package magetasks
 
 import (
-	"fmt"
 	"os"
-	"os/exec"
+	"strings"
 )
 
-// TestAll runs all tests.
+// TestAll runs all tests with formatted output.
 func TestAll() error {
-	PrintH2Header("Tests")
+	return TestReport()
+}
 
-	fmt.Println("Running tests...")
-	cmd := exec.Command("go", "test", "-v", "./...")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		PrintError("Tests failed")
-		return err
+// TestReport runs all test suites with formatted output.
+func TestReport() error {
+	// Check if race detector is supported
+	raceSupported := hasRaceSupport()
+	if !raceSupported {
+		PrintInfo("CGO disabled; running tests without -race")
 	}
 
-	PrintSuccess("All tests passed")
-	return nil
+	// Build test args
+	args := []string{"-v"}
+	if raceSupported {
+		args = append(args, "-race")
+	}
+	args = append(args, "-cover")
+	args = append(args, listGoTestPackages()...)
+
+	// Use custom formatter for animated output
+	return RunFormattedTests(args)
 }
 
 // TestCoverage runs tests with coverage.
 func TestCoverage() error {
-	PrintH2Header("Test Coverage")
+	args := []string{"-coverprofile=coverage.out", "-covermode=atomic"}
+	args = append(args, listGoTestPackages()...)
 
-	fmt.Println("Running tests with coverage...")
-	cmd := exec.Command("go", "test", "-coverprofile=coverage.out", "./...")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		PrintError("Tests failed")
+	if err := RunFormattedTests(args); err != nil {
 		return err
 	}
 
 	// Show coverage report
-	cmd = exec.Command("go", "tool", "cover", "-func=coverage.out")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	_ = cmd.Run() // Ignore error for coverage display
-
-	PrintSuccess("Coverage report generated")
+	summary, err := RunCapture("Get coverage summary", "go", "tool", "cover", "-func=coverage.out")
+	if err != nil {
+		return err
+	}
+	printCoverageSummary(summary)
 	return nil
 }
 
 // TestRace runs tests with race detector.
 func TestRace() error {
-	PrintH2Header("Race Detector")
+	args := []string{"-race", "-v"}
+	args = append(args, listGoTestPackages()...)
+	return RunFormattedTests(args)
+}
 
-	fmt.Println("Running tests with race detector...")
-	cmd := exec.Command("go", "test", "-race", "./...")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		PrintError("Race detector found issues")
-		return err
+func listGoTestPackages() []string {
+	output, err := RunCapture("List packages", "go", "list", "./...")
+	if err != nil {
+		return []string{"./..."}
 	}
 
-	PrintSuccess("No race conditions detected")
-	return nil
+	fields := strings.Fields(output)
+	pkgs := append(make([]string, 0, len(fields)), fields...)
+
+	if len(pkgs) == 0 {
+		return []string{"./..."}
+	}
+
+	return pkgs
+}
+
+func hasRaceSupport() bool {
+	if env := os.Getenv("CGO_ENABLED"); env != "" {
+		env = strings.ToLower(strings.TrimSpace(env))
+		return env != "0" && env != "false"
+	}
+	// Default to true for most systems
+	return true
+}
+
+func printCoverageSummary(summary string) {
+	lines := strings.Split(summary, "\n")
+	if len(lines) > 0 {
+		// Print the last line which contains total coverage
+		lastLine := lines[len(lines)-1]
+		if strings.Contains(lastLine, "total:") {
+			Console().PrintText(lastLine)
+		}
+	}
 }

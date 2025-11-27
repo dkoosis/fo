@@ -2,16 +2,12 @@ package magetasks
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
 	"time"
 )
 
 // BuildAll builds all binaries.
 func BuildAll() error {
-	PrintH2Header("Build")
-
 	version := getGitVersion()
 	commit := getGitCommit()
 	date := time.Now().UTC().Format(time.RFC3339)
@@ -21,46 +17,37 @@ func BuildAll() error {
 		ModulePath, version, ModulePath, commit, ModulePath, date,
 	)
 
-	fmt.Println("Building fo...")
-	// #nosec G204 -- ldflags is a build-time constant, not user input
-	cmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", BinPath, "./cmd")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		PrintError("Build failed")
+	if err := Run("Build fo", "go", "build", "-ldflags", ldflags, "-o", BinPath, "./cmd"); err != nil {
 		return err
 	}
 
-	PrintSuccess("Built: " + BinPath)
+	SetSectionSummary("fo binary ready")
 	return nil
 }
 
 // Clean removes build artifacts.
 func Clean() error {
-	PrintH2Header("Clean")
-
-	if err := os.RemoveAll("./bin"); err != nil {
+	if err := Run("Remove bin directory", "rm", "-rf", "./bin"); err != nil {
 		PrintWarning("Failed to remove bin directory: " + err.Error())
 	}
-	cmd := exec.Command("go", "clean", "-cache")
-	_ = cmd.Run() // Ignore error for cleanup command
+	_ = Run("Clean Go cache", "go", "clean", "-cache") // Ignore error for cleanup command
 
-	PrintSuccess("Cleaned build artifacts")
+	SetSectionSummary("Build artifacts cleaned")
 	return nil
 }
 
 func getGitVersion() string {
-	out, err := exec.Command("git", "describe", "--tags", "--always", "--dirty", "--match=v*").Output()
+	out, err := RunCapture("Get git version", "git", "describe", "--tags", "--always", "--dirty", "--match=v*")
 	if err != nil {
 		return "dev"
 	}
-	return strings.TrimSpace(string(out))
+	return strings.TrimSpace(out)
 }
 
 func getGitCommit() string {
-	out, err := exec.Command("git", "rev-parse", "--short", "HEAD").Output()
+	out, err := RunCapture("Get git commit", "git", "rev-parse", "--short", "HEAD")
 	if err != nil {
 		return "unknown"
 	}
-	return strings.TrimSpace(string(out))
+	return strings.TrimSpace(out)
 }
