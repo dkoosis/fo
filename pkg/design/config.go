@@ -207,6 +207,13 @@ func (dt *DesignTokens) GetColorString(name string) string {
 }
 
 // Config holds all resolved design system settings for rendering.
+// styleCache holds pre-computed lipgloss styles for performance.
+type styleCache struct {
+	colors   map[string]lipgloss.Style // Cached styles by color key
+	elements map[string]lipgloss.Style // Cached styles by element name
+}
+
+// Config holds theme configuration.
 type Config struct {
 	ThemeName    string `yaml:"-"`
 	IsMonochrome bool   `yaml:"-"`
@@ -215,6 +222,9 @@ type Config struct {
 	// DesignTokens provides centralized, semantic design values
 	// This is the new extensible system (Phase 1)
 	Tokens *DesignTokens `yaml:"-"`
+
+	// styleCache holds pre-computed styles (lazy-initialized)
+	cache *styleCache `yaml:"-"`
 
 	Style struct {
 		UseBoxes          bool   `yaml:"use_boxes"`
@@ -1035,18 +1045,40 @@ func (c *Config) GetStyleWithFallback(colorKeys ...string) lipgloss.Style {
 	return lipgloss.NewStyle()
 }
 
+// initCache initializes the style cache if not already initialized.
+func (c *Config) initCache() {
+	if c.cache == nil {
+		c.cache = &styleCache{
+			colors:   make(map[string]lipgloss.Style),
+			elements: make(map[string]lipgloss.Style),
+		}
+	}
+}
+
 // GetStyle returns a lipgloss.Style for the given color key.
-// This is the idiomatic way to use colors in Phase 2+.
+// Styles are cached for performance - subsequent calls return the same Style object.
 // Returns a style with foreground color set, or empty style if monochrome or color not found.
 func (c *Config) GetStyle(colorKey string) lipgloss.Style {
 	if c.IsMonochrome {
 		return lipgloss.NewStyle()
 	}
-	color := c.GetColor(colorKey)
-	if color == "" {
-		return lipgloss.NewStyle()
+
+	// Check cache first
+	c.initCache()
+	if cached, ok := c.cache.colors[colorKey]; ok {
+		return cached
 	}
-	return lipgloss.NewStyle().Foreground(color)
+
+	// Build and cache the style
+	color := c.GetColor(colorKey)
+	var style lipgloss.Style
+	if color == "" {
+		style = lipgloss.NewStyle()
+	} else {
+		style = lipgloss.NewStyle().Foreground(color)
+	}
+	c.cache.colors[colorKey] = style
+	return style
 }
 
 // GetStyleWithBold returns a lipgloss.Style with color and bold text.
@@ -1123,14 +1155,34 @@ func (c *Config) GetStyleFromElement(element ElementStyleDef, fallbackColorKey s
 }
 
 // BuildStyle is a convenience method that gets an element style by name and builds
-// a lipgloss.Style from it. This combines GetElementStyle and GetStyleFromElement.
+// a lipgloss.Style from it. Styles are cached for performance.
+// This combines GetElementStyle and GetStyleFromElement.
 func (c *Config) BuildStyle(elementName string, fallbackColorKey ...string) lipgloss.Style {
-	element := c.GetElementStyle(elementName)
+	if c.IsMonochrome {
+		return lipgloss.NewStyle()
+	}
+
+	// Build cache key including fallback
 	fallback := ""
 	if len(fallbackColorKey) > 0 {
 		fallback = fallbackColorKey[0]
 	}
-	return c.GetStyleFromElement(element, fallback)
+	cacheKey := elementName
+	if fallback != "" {
+		cacheKey = elementName + ":" + fallback
+	}
+
+	// Check cache first
+	c.initCache()
+	if cached, ok := c.cache.elements[cacheKey]; ok {
+		return cached
+	}
+
+	// Build and cache the style
+	element := c.GetElementStyle(elementName)
+	style := c.GetStyleFromElement(element, fallback)
+	c.cache.elements[cacheKey] = style
+	return style
 }
 
 // DeepCopyConfig creates a deep copy of the Config using JSON marshal/unmarshal.
