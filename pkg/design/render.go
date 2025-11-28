@@ -73,6 +73,16 @@ func visualWidth(s string) int {
 	return VisualWidth(s)
 }
 
+// BorderChars encapsulates all border characters for consistent rendering.
+type BorderChars struct {
+	TopLeft     string
+	TopRight    string
+	BottomLeft  string
+	BottomRight string
+	Horizontal  string
+	Vertical    string
+}
+
 // BoxLayout is the single source of truth for box dimensions.
 // It centralizes all box-related calculations to eliminate magic numbers
 // and ensure consistent rendering across all box functions.
@@ -81,6 +91,8 @@ type BoxLayout struct {
 	ContentWidth int            // Available width for content (TotalWidth - borders - padding)
 	LeftPadding  int            // Left padding inside box
 	RightPadding int            // Right padding inside box
+	BorderColor  lipgloss.Color // Color for borders
+	BorderChars  BorderChars    // Border characters
 	BorderStyle  lipgloss.Style // Lip Gloss style for borders
 	Config       *Config        // Reference to config for border chars
 }
@@ -92,7 +104,7 @@ func (c *Config) NewBoxLayout(termWidth int) *BoxLayout {
 		termWidth = 80 // Default fallback
 	}
 
-	leftPad := 1
+	leftPad := 2
 	rightPad := 1
 	borderWidth := 2 // left + right border chars
 
@@ -101,28 +113,94 @@ func (c *Config) NewBoxLayout(termWidth int) *BoxLayout {
 		contentWidth = 0
 	}
 
+	// Resolve border characters with proper corner matching
+	borderChars := c.ResolveBorderChars()
+
+	// Determine border color based on theme
+	borderColor := c.resolveBorderColor()
+
 	// Create Lip Gloss border style
 	border := lipgloss.Border{
-		Top:         c.Border.HeaderChar,
-		Bottom:      c.Border.FooterContinuationChar,
-		Left:        c.Border.VerticalChar,
-		Right:       c.Border.VerticalChar,
-		TopLeft:     c.Border.TopCornerChar,
-		TopRight:    c.Border.TopRightChar,
-		BottomLeft:  c.Border.BottomCornerChar,
-		BottomRight: c.Border.BottomRightChar,
+		Top:         borderChars.Horizontal,
+		Bottom:      borderChars.Horizontal,
+		Left:        borderChars.Vertical,
+		Right:       borderChars.Vertical,
+		TopLeft:     borderChars.TopLeft,
+		TopRight:    borderChars.TopRight,
+		BottomLeft:  borderChars.BottomLeft,
+		BottomRight: borderChars.BottomRight,
 	}
 
-	style := lipgloss.NewStyle().Border(border)
+	style := lipgloss.NewStyle().
+		Border(border).
+		BorderForeground(borderColor).
+		Width(termWidth - 2). // Content width; borders add 2 for total
+		PaddingLeft(leftPad).
+		PaddingRight(rightPad).
+		PaddingTop(0).
+		PaddingBottom(0)
 
 	return &BoxLayout{
 		TotalWidth:   termWidth,
 		ContentWidth: contentWidth,
 		LeftPadding:  leftPad,
 		RightPadding: rightPad,
+		BorderColor:  borderColor,
+		BorderChars:  borderChars,
 		BorderStyle:  style,
 		Config:       c,
 	}
+}
+
+// ResolveBorderChars returns the appropriate border characters with matching corners.
+func (c *Config) ResolveBorderChars() BorderChars {
+	topCorner := c.Border.TopCornerChar
+	bottomCorner := c.Border.BottomCornerChar
+	headerChar := c.Border.HeaderChar
+	verticalChar := c.Border.VerticalChar
+
+	// Determine closing corners based on opening corners
+	topRight := "┐" // Default single-line
+	switch topCorner {
+	case "╔": // Double-line square corner
+		topRight = "╗"
+	case "╒": // Mixed double/single
+		topRight = "╕"
+	case "╭": // Single-line rounded corner
+		topRight = "╮"
+	case "┌": // Single-line square corner
+		topRight = "┐"
+	}
+
+	bottomRight := "┘" // Default single-line
+	switch bottomCorner {
+	case "╚": // Double-line square corner
+		bottomRight = "╝"
+	case "╰": // Single-line rounded corner
+		bottomRight = "╯"
+	case "└": // Single-line square corner
+		bottomRight = "┘"
+	}
+
+	return BorderChars{
+		TopLeft:     topCorner,
+		TopRight:    topRight,
+		BottomLeft:  bottomCorner,
+		BottomRight: bottomRight,
+		Horizontal:  headerChar,
+		Vertical:    verticalChar,
+	}
+}
+
+// resolveBorderColor returns the appropriate border color based on theme.
+func (c *Config) resolveBorderColor() lipgloss.Color {
+	if c.IsMonochrome {
+		return lipgloss.Color("")
+	}
+	if c.ThemeName == "orca" {
+		return lipgloss.Color("250") // Very pale gray for orca
+	}
+	return lipgloss.Color("238") // Faint dark gray for others
 }
 
 // RenderTopBorder renders the top border line with optional title.
@@ -132,8 +210,8 @@ func (b *BoxLayout) RenderTopBorder(title string) string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString(b.Config.Border.TopCornerChar)
-	sb.WriteString(b.Config.Border.HeaderChar)
+	sb.WriteString(b.BorderChars.TopLeft)
+	sb.WriteString(b.BorderChars.Horizontal)
 
 	if title != "" {
 		// Add title with padding
@@ -148,23 +226,16 @@ func (b *BoxLayout) RenderTopBorder(title string) string {
 		}
 		sb.WriteString(" ")
 		sb.WriteString(title)
-		sb.WriteString(strings.Repeat(b.Config.Border.HeaderChar, repeatCount))
+		sb.WriteString(strings.Repeat(b.BorderChars.Horizontal, repeatCount))
 	} else {
 		// Fill header line
 		headerWidth := b.TotalWidth - 2 // -2 for corner chars
 		if headerWidth > 0 {
-			sb.WriteString(strings.Repeat(b.Config.Border.HeaderChar, headerWidth))
+			sb.WriteString(strings.Repeat(b.BorderChars.Horizontal, headerWidth))
 		}
 	}
 
-	// Add top right corner if configured
-	if b.Config.Border.TopRightChar != "" {
-		sb.WriteString(b.Config.Border.TopRightChar)
-	} else {
-		// Fallback: use header char
-		sb.WriteString(b.Config.Border.HeaderChar)
-	}
-
+	sb.WriteString(b.BorderChars.TopRight)
 	return sb.String()
 }
 
@@ -175,7 +246,7 @@ func (b *BoxLayout) RenderContentLine(content string) string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString(b.Config.Border.VerticalChar)
+	sb.WriteString(b.BorderChars.Vertical)
 	sb.WriteString(strings.Repeat(" ", b.LeftPadding))
 	sb.WriteString(content)
 	// Pad to content width
@@ -184,7 +255,7 @@ func (b *BoxLayout) RenderContentLine(content string) string {
 		sb.WriteString(strings.Repeat(" ", b.ContentWidth-contentWidth))
 	}
 	sb.WriteString(strings.Repeat(" ", b.RightPadding))
-	sb.WriteString(b.Config.Border.VerticalChar)
+	sb.WriteString(b.BorderChars.Vertical)
 
 	return sb.String()
 }
@@ -195,27 +266,18 @@ func (b *BoxLayout) RenderBottomBorder() string {
 		return ""
 	}
 
-	var sb strings.Builder
-	sb.WriteString(b.Config.Border.BottomCornerChar)
-	footerChar := b.Config.Border.FooterContinuationChar
-	if footerChar == "" {
-		footerChar = b.Config.Border.HeaderChar
-	}
-	if footerChar == "" {
-		footerChar = "─"
-	}
-	footerWidth := b.TotalWidth - 2 // -2 for corner chars
-	if footerWidth > 0 {
-		sb.WriteString(strings.Repeat(footerChar, footerWidth))
-	}
-	// Add bottom right corner if configured
-	if b.Config.Border.BottomRightChar != "" {
-		sb.WriteString(b.Config.Border.BottomRightChar)
-	} else {
-		// Fallback: use footer char
-		sb.WriteString(footerChar)
+	horizontal := b.BorderChars.Horizontal
+	if horizontal == "" {
+		horizontal = "─"
 	}
 
+	var sb strings.Builder
+	sb.WriteString(b.BorderChars.BottomLeft)
+	footerWidth := b.TotalWidth - 2 // -2 for corner chars
+	if footerWidth > 0 {
+		sb.WriteString(strings.Repeat(horizontal, footerWidth))
+	}
+	sb.WriteString(b.BorderChars.BottomRight)
 	return sb.String()
 }
 

@@ -8,6 +8,8 @@ package fo
 import (
 	"fmt"
 	"strings"
+
+	"github.com/dkoosis/fo/pkg/design"
 )
 
 // MetricLine represents a key-value metric with optional trend indicator.
@@ -233,7 +235,7 @@ func (c *Console) PrintText(text string) {
 // printBoxLine renders a single line with box borders.
 // Content is expected to already include left padding/indentation (typically "      ").
 // This uses the unified renderBoxLine function for consistent border rendering.
-func (c *Console) printBoxLine(box *BoxLayout, content string) {
+func (c *Console) printBoxLine(box *design.BoxLayout, content string) {
 	// Use unified rendering function (lipgloss handles width calculations)
 	c.renderBoxLine(box, content)
 }

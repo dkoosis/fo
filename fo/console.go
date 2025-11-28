@@ -43,14 +43,6 @@ const (
 
 	// StreamCount is the number of output streams (stdout and stderr).
 	StreamCount = 2
-
-	// BorderCornerDouble is the double-line box drawing corner character.
-	BorderCornerDouble = "╔"
-
-	// Box drawing corner characters.
-	BoxCornerTopRightSingle    = "╮"
-	BoxCornerTopRightDouble    = "╗"
-	BoxCornerBottomRightSingle = "╯"
 )
 
 type ConsoleConfig struct {
@@ -168,39 +160,6 @@ func (c *Console) getPaleGrayStyle() lipgloss.Style {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 }
 
-// getBorderColor returns the appropriate lipgloss color for borders based on theme.
-func (c *Console) getBorderColor() lipgloss.Color {
-	if c.designConf.IsMonochrome {
-		return lipgloss.Color("")
-	}
-	if c.designConf.ThemeName == "orca" {
-		return lipgloss.Color("250") // Very pale gray for orca
-	}
-	return lipgloss.Color("238") // Faint dark gray for others
-}
-
-// BoxLayout defines the dimensions and styling of a rendered box.
-// This provides a single source of truth for all box rendering calculations.
-type BoxLayout struct {
-	TotalWidth   int            // Full terminal width
-	ContentWidth int            // Available width for content (TotalWidth - borders - padding)
-	LeftPadding  int            // Spaces after left border (typically 2)
-	RightPadding int            // Spaces before right border (typically 1)
-	BorderColor  lipgloss.Color // Color for borders
-	BorderChars  BorderChars
-	BorderStyle  lipgloss.Style // Lipgloss style for rendering boxes
-}
-
-// BorderChars encapsulates all border characters for consistent rendering.
-type BorderChars struct {
-	TopLeft     string
-	TopRight    string
-	BottomLeft  string
-	BottomRight string
-	Horizontal  string
-	Vertical    string
-}
-
 // ContentLine represents structured content for consistent rendering.
 // This ensures icons and text align properly across all section lines.
 type ContentLine struct {
@@ -210,89 +169,9 @@ type ContentLine struct {
 	TextColor string // Optional color for text (empty = no color)
 }
 
-// calculateBoxLayout computes the box layout dimensions once, providing a single source of truth.
-func (c *Console) calculateBoxLayout() *BoxLayout {
-	cfg := c.designConf
-	terminalWidth := c.getTerminalWidth()
-
-	// TotalWidth is the full terminal width
-	// Let lipgloss handle content width calculation via Width() and Padding()
-	totalWidth := terminalWidth
-
-	// Determine border color based on theme
-	borderColor := c.getBorderColor()
-
-	// Determine border characters based on theme
-	borderChars := c.getBorderChars(cfg)
-
-	// Create lipgloss border style
-	// Width() sets content area width (excluding borders), so use totalWidth - 2
-	// Lipgloss will add 2 for borders to get exactly totalWidth total width
-	lipglossBorder := lipgloss.Border{
-		Top:         borderChars.Horizontal,
-		Bottom:      borderChars.Horizontal,
-		Left:        borderChars.Vertical,
-		Right:       borderChars.Vertical,
-		TopLeft:     borderChars.TopLeft,
-		TopRight:    borderChars.TopRight,
-		BottomLeft:  borderChars.BottomLeft,
-		BottomRight: borderChars.BottomRight,
-	}
-
-	borderStyle := lipgloss.NewStyle().
-		Border(lipglossBorder).
-		BorderForeground(borderColor).
-		Width(totalWidth - 2). // Width sets content area; borders add 2 for total width
-		PaddingLeft(2).
-		PaddingRight(1).
-		PaddingTop(0).
-		PaddingBottom(0)
-
-	return &BoxLayout{
-		TotalWidth:   totalWidth,
-		ContentWidth: 0, // Not needed - lipgloss handles this via Width() and Padding()
-		LeftPadding:  2,
-		RightPadding: 1,
-		BorderColor:  borderColor,
-		BorderChars:  borderChars,
-		BorderStyle:  borderStyle,
-	}
-}
-
-// getBorderChars returns the appropriate border characters for the current theme.
-func (c *Console) getBorderChars(cfg *design.Config) BorderChars {
-	topCorner := cfg.Border.TopCornerChar
-	bottomCorner := cfg.Border.BottomCornerChar
-	headerChar := cfg.Border.HeaderChar
-	verticalChar := cfg.Border.VerticalChar
-
-	// Determine closing corners based on opening corners
-	topRight := BoxCornerTopRightSingle
-	switch topCorner {
-	case "╔": // Double-line square corner
-		topRight = BoxCornerTopRightDouble
-	case "╒": // Double-line rounded corner
-		topRight = BoxCornerTopRightDouble
-	case "╭": // Single-line rounded corner
-		topRight = BoxCornerTopRightSingle
-	}
-
-	bottomRight := BoxCornerBottomRightSingle
-	switch bottomCorner {
-	case "╚": // Double-line square corner
-		bottomRight = "╝"
-	case "╰": // Single-line rounded corner
-		bottomRight = BoxCornerBottomRightSingle
-	}
-
-	return BorderChars{
-		TopLeft:     topCorner,
-		TopRight:    topRight,
-		BottomLeft:  bottomCorner,
-		BottomRight: bottomRight,
-		Horizontal:  headerChar,
-		Vertical:    verticalChar,
-	}
+// calculateBoxLayout computes the box layout dimensions using the design package.
+func (c *Console) calculateBoxLayout() *design.BoxLayout {
+	return c.designConf.NewBoxLayout(c.getTerminalWidth())
 }
 
 // getTerminalWidth returns the terminal width, or a default if unavailable.
@@ -376,7 +255,7 @@ func (c *Console) PrintSectionHeader(name string) {
 
 // renderBoxLine is the unified function for rendering a line with box borders.
 // Uses lipgloss for consistent rendering.
-func (c *Console) renderBoxLine(box *BoxLayout, content string) {
+func (c *Console) renderBoxLine(box *design.BoxLayout, content string) {
 	// Use lipgloss to render the content line with borders
 	// Let lipgloss handle width and wrapping automatically via Width() and Padding()
 	contentLineStyle := box.BorderStyle.
@@ -685,27 +564,17 @@ func (c *Console) PrintH1Header(name string) {
 	} else {
 		// Get styles for border and title
 		borderStyle := c.getPaleGrayStyle()
-		headerStyle := cfg.GetElementStyle("H1_Major_Header")
-		titleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(string(cfg.GetColor(headerStyle.ColorFG, "H1_Major_Header"))))
-		if contains(headerStyle.TextStyle, "bold") {
+		headerStyleCfg := cfg.GetElementStyle("H1_Major_Header")
+		titleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(string(cfg.GetColor(headerStyleCfg.ColorFG, "H1_Major_Header"))))
+		if contains(headerStyleCfg.TextStyle, "bold") {
 			titleStyle = titleStyle.Bold(true)
 		}
 
-		// Get border characters
-		topCorner := cfg.Border.TopCornerChar
-		headerChar := cfg.Border.HeaderChar
-		closingCorner := BoxCornerTopRightSingle
-		if topCorner == BorderCornerDouble {
-			closingCorner = BoxCornerTopRightDouble
-		}
-		bottomCorner := cfg.Border.BottomCornerChar
-		bottomClosingCorner := BoxCornerBottomRightSingle
-		if bottomCorner == "╚" {
-			bottomClosingCorner = "╝"
-		}
+		// Get border characters from design package (single source of truth)
+		borderChars := cfg.ResolveBorderChars()
 
 		// Build top border line
-		topLine := topCorner + strings.Repeat(headerChar, headerWidth) + closingCorner
+		topLine := borderChars.TopLeft + strings.Repeat(borderChars.Horizontal, headerWidth) + borderChars.TopRight
 		sb.WriteString(borderStyle.Render(topLine))
 		sb.WriteString("\n")
 
@@ -715,15 +584,15 @@ func (c *Console) PrintH1Header(name string) {
 		if remainingWidth < 0 {
 			remainingWidth = 0
 		}
-		sb.WriteString(borderStyle.Render(cfg.Border.VerticalChar))
+		sb.WriteString(borderStyle.Render(borderChars.Vertical))
 		sb.WriteString("  ")
 		sb.WriteString(titleStyle.Render(title))
 		sb.WriteString(strings.Repeat(" ", remainingWidth))
-		sb.WriteString(borderStyle.Render(cfg.Border.VerticalChar))
+		sb.WriteString(borderStyle.Render(borderChars.Vertical))
 		sb.WriteString("\n")
 
 		// Build bottom border line
-		bottomLine := bottomCorner + strings.Repeat(headerChar, headerWidth) + bottomClosingCorner
+		bottomLine := borderChars.BottomLeft + strings.Repeat(borderChars.Horizontal, headerWidth) + borderChars.BottomRight
 		sb.WriteString(borderStyle.Render(bottomLine))
 		sb.WriteString("\n")
 	}
