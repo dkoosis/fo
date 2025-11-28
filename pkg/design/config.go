@@ -1012,6 +1012,29 @@ func (c *Config) ResetColor() lipgloss.Color {
 	return resetColor
 }
 
+// GetStyleWithFallback returns the first available lipgloss.Style from the
+// provided color keys. If all color keys are empty or unavailable, an empty
+// style is returned. This helper keeps color fallback logic centralized for
+// callers that want a preferred color but need a graceful secondary option.
+func (c *Config) GetStyleWithFallback(colorKeys ...string) lipgloss.Style {
+	if c.IsMonochrome {
+		return lipgloss.NewStyle()
+	}
+
+	for _, key := range colorKeys {
+		if key == "" {
+			continue
+		}
+		color := c.GetColor(key)
+		if color == "" {
+			continue
+		}
+		return lipgloss.NewStyle().Foreground(color)
+	}
+
+	return lipgloss.NewStyle()
+}
+
 // GetStyle returns a lipgloss.Style for the given color key.
 // This is the idiomatic way to use colors in Phase 2+.
 // Returns a style with foreground color set, or empty style if monochrome or color not found.
