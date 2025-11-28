@@ -158,23 +158,18 @@ func (p *InlineProgress) formatProgressMessage(status string) string {
 		p.mutex.Unlock()
 
 		// Apply pale blue color to spinner icon
-		spinnerColor := p.Task.Config.GetColor("PaleBlue")
-		if spinnerColor == "" {
-			// Fallback to Process color if PaleBlue not available
-			spinnerColor = p.Task.Config.GetColor("Process")
-		}
-		coloredSpinner := string(spinnerColor) + spinnerIcon + string(p.Task.Config.ResetColor())
+		spinnerStyle := p.Task.Config.GetStyleWithFallback("PaleBlue", "Process")
+		coloredSpinner := spinnerStyle.Render(spinnerIcon)
 
-		runningColor := p.Task.Config.GetColor("Process")
+		runningStyle := p.Task.Config.GetStyle("Process")
 		runningDuration := formatDuration(time.Since(p.StartTime))
 
 		// Simplified format - no action phrase
-		return fmt.Sprintf("%s%s %s [%sWorking%s %s]",
+		return fmt.Sprintf("%s%s %s [%s %s]",
 			indent,
 			coloredSpinner,
 			toolLabel,
-			runningColor,
-			p.Task.Config.ResetColor(),
+			runningStyle.Render("Working"),
 			runningDuration)
 	}
 
