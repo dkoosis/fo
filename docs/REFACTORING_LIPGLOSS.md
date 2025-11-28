@@ -71,19 +71,25 @@ All patterns and rendering functions now use idiomatic lipgloss styling.
 - `pkg/design/render.go` - All rendering uses styles
 - `pkg/design/patterns.go` - All patterns use styles
 
-### Phase 3: Border System
+### Phase 3: Border System ✅ **COMPLETE**
 **Goal**: Replace custom border handling with `lipgloss.Border()` types
 
 **Tasks**:
-- [ ] Replace custom border character handling with `lipgloss.Border()` types
-- [ ] Use `lipgloss.RoundedBorder()`, `lipgloss.ThickBorder()`, etc.
-- [ ] Leverage lipgloss padding/margin for spacing
-- [ ] Update box rendering in `fo/console.go`
+- [x] Replace custom border character handling with `lipgloss.Border()` types
+- [x] Consolidate BoxLayout to single implementation in `pkg/design/render.go`
+- [x] Use lipgloss.Border for border styling with proper corner resolution
+- [x] Leverage lipgloss padding/margin for spacing via BorderStyle
+- [x] Update box rendering in `fo/console.go` to use design.BoxLayout
 
-**Files to Modify**:
-- `pkg/design/config.go` - Border configuration
-- `fo/console.go` - Box rendering
-- `pkg/design/render.go` - Border rendering
+**Status**: Complete. BoxLayout consolidated into `pkg/design/render.go` with:
+- `BorderChars` struct for corner/edge characters
+- `ResolveBorderChars()` for proper corner matching
+- `resolveBorderColor()` for theme-aware border colors
+- lipgloss.Border integration in NewBoxLayout()
+
+**Files Modified**:
+- `pkg/design/render.go` - Consolidated BoxLayout with lipgloss borders
+- `fo/console.go` - Uses design.BoxLayout, removed duplicate types
 
 ### Phase 4: Theme Definition
 **Goal**: Define themes as collections of `lipgloss.Style` instances
@@ -123,8 +129,8 @@ All patterns and rendering functions now use idiomatic lipgloss styling.
 
 - [x] Phase 1: Color System ✅
 - [x] Phase 2: Style Rendering ✅
-- [ ] Phase 3: Border System
-- [ ] Phase 4: Theme Definition
+- [x] Phase 3: Border System ✅
+- [ ] Phase 4: Theme Definition (future enhancement)
 
 ## Related Issues
 
