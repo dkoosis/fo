@@ -58,12 +58,12 @@ type ResolvedConfig struct {
 	Theme *design.Config
 
 	// Behavioral settings
-	NoColor    bool
-	CI         bool
-	NoTimer    bool
-	Debug      bool
-	Stream     bool
-	ShowOutput string
+	NoColor          bool
+	CI               bool
+	NoTimer          bool
+	Debug            bool
+	LiveStreamOutput bool
+	ShowOutput       string
 
 	// Resource limits
 	MaxBufferSize int64
@@ -91,17 +91,17 @@ func ResolveConfig(cliFlags CliFlags) (*ResolvedConfig, error) {
 
 	// Start with file-based defaults
 	resolved := &ResolvedConfig{
-		NoColor:       appCfg.NoColor,
-		CI:            appCfg.CI,
-		NoTimer:       appCfg.NoTimer,
-		Debug:         appCfg.Debug,
-		Stream:        appCfg.Stream,
-		ShowOutput:    appCfg.ShowOutput,
-		MaxBufferSize: appCfg.MaxBufferSize,
-		MaxLineLength: appCfg.MaxLineLength,
-		NoColorSource: configSourceFile,
-		CISource:      configSourceFile,
-		NoTimerSource: configSourceFile,
+		NoColor:          appCfg.NoColor,
+		CI:               appCfg.CI,
+		NoTimer:          appCfg.NoTimer,
+		Debug:            appCfg.Debug,
+		LiveStreamOutput: appCfg.LiveStreamOutput,
+		ShowOutput:       appCfg.ShowOutput,
+		MaxBufferSize:    appCfg.MaxBufferSize,
+		MaxLineLength:    appCfg.MaxLineLength,
+		NoColorSource:    configSourceFile,
+		CISource:         configSourceFile,
+		NoTimerSource:    configSourceFile,
 	}
 
 	// Resolve theme with priority: CLI file > CLI name > ENV > file > default
@@ -147,9 +147,9 @@ func ResolveConfig(cliFlags CliFlags) (*ResolvedConfig, error) {
 		}
 	}
 
-	// Resolve Stream with priority: CLI > file > default
-	if cliFlags.StreamSet {
-		resolved.Stream = cliFlags.Stream
+	// Resolve LiveStreamOutput with priority: CLI > file > default
+	if cliFlags.LiveStreamOutputSet {
+		resolved.LiveStreamOutput = cliFlags.LiveStreamOutput
 	}
 
 	// Resolve ShowOutput with priority: CLI > file > default

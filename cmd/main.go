@@ -24,15 +24,15 @@ var validPatterns = map[string]bool{
 
 // LocalAppConfig holds behavioral settings derived from AppConfig and CLI flags.
 type LocalAppConfig struct {
-	Label         string
-	Stream        bool
-	ShowOutput    string
-	NoTimer       bool // Effective NoTimer after all flags/configs
-	NoColor       bool // Effective NoColor (IsMonochrome)
-	CI            bool // Effective CI mode
-	Debug         bool
-	MaxBufferSize int64 // Max total size for combined stdout/stderr in capture mode
-	MaxLineLength int   // Max size for a single line from stdout/stderr
+	Label            string
+	LiveStreamOutput bool
+	ShowOutput       string
+	NoTimer          bool // Effective NoTimer after all flags/configs
+	NoColor          bool // Effective NoColor (IsMonochrome)
+	CI               bool // Effective CI mode
+	Debug            bool
+	MaxBufferSize    int64 // Max total size for combined stdout/stderr in capture mode
+	MaxLineLength    int   // Max size for a single line from stdout/stderr
 }
 
 // run executes the application logic and returns the exit code.
@@ -89,8 +89,8 @@ func run(args []string) int {
 	if cliFlags.Label != "" {
 		behavioralSettings.Label = cliFlags.Label
 	}
-	if cliFlags.StreamSet {
-		behavioralSettings.Stream = cliFlags.Stream
+	if cliFlags.LiveStreamOutputSet {
+		behavioralSettings.LiveStreamOutput = cliFlags.LiveStreamOutput
 	}
 	if cliFlags.ShowOutputSet && cliFlags.ShowOutput != "" {
 		behavioralSettings.ShowOutput = cliFlags.ShowOutput
@@ -127,27 +127,27 @@ func run(args []string) int {
 	behavioralSettings.NoColor = resolvedCfg.NoColor
 	behavioralSettings.CI = resolvedCfg.CI
 	behavioralSettings.Debug = resolvedCfg.Debug
-	behavioralSettings.Stream = resolvedCfg.Stream
+	behavioralSettings.LiveStreamOutput = resolvedCfg.LiveStreamOutput
 	behavioralSettings.ShowOutput = resolvedCfg.ShowOutput
 	behavioralSettings.MaxBufferSize = resolvedCfg.MaxBufferSize
 	behavioralSettings.MaxLineLength = resolvedCfg.MaxLineLength
 
 	consoleCfg := fo.ConsoleConfig{
-		ThemeName:      finalDesignConfig.ThemeName,
-		UseBoxes:       finalDesignConfig.Style.UseBoxes,
-		UseBoxesSet:    true,
-		InlineProgress: finalDesignConfig.Style.UseInlineProgress,
-		InlineSet:      true,
-		Monochrome:     finalDesignConfig.IsMonochrome,
-		ShowTimer:      !finalDesignConfig.Style.NoTimer,
-		ShowTimerSet:   true,
-		ShowOutputMode: behavioralSettings.ShowOutput,
-		Stream:         behavioralSettings.Stream,
-		Pattern:        cliFlags.Pattern,
-		Debug:          behavioralSettings.Debug,
-		MaxBufferSize:  behavioralSettings.MaxBufferSize,
-		MaxLineLength:  behavioralSettings.MaxLineLength,
-		Design:         finalDesignConfig,
+		ThemeName:        finalDesignConfig.ThemeName,
+		UseBoxes:         finalDesignConfig.Style.UseBoxes,
+		UseBoxesSet:      true,
+		InlineProgress:   finalDesignConfig.Style.UseInlineProgress,
+		InlineSet:        true,
+		Monochrome:       finalDesignConfig.IsMonochrome,
+		ShowTimer:        !finalDesignConfig.Style.NoTimer,
+		ShowTimerSet:     true,
+		ShowOutputMode:   behavioralSettings.ShowOutput,
+		LiveStreamOutput: behavioralSettings.LiveStreamOutput,
+		PatternHint:      cliFlags.PatternHint,
+		Debug:            behavioralSettings.Debug,
+		MaxBufferSize:    behavioralSettings.MaxBufferSize,
+		MaxLineLength:    behavioralSettings.MaxLineLength,
+		Design:           finalDesignConfig,
 	}
 
 	console := fo.NewConsole(consoleCfg)
@@ -186,15 +186,15 @@ func main() {
 
 func convertAppConfigToLocal(appCfg *config.AppConfig) LocalAppConfig {
 	return LocalAppConfig{
-		Label:         appCfg.Label,
-		Stream:        appCfg.Stream,
-		ShowOutput:    appCfg.ShowOutput,
-		NoTimer:       appCfg.NoTimer,
-		NoColor:       appCfg.NoColor,
-		CI:            appCfg.CI,
-		Debug:         false, // Default to false, only enable when explicitly set by flag
-		MaxBufferSize: appCfg.MaxBufferSize,
-		MaxLineLength: appCfg.MaxLineLength,
+		Label:            appCfg.Label,
+		LiveStreamOutput: appCfg.LiveStreamOutput,
+		ShowOutput:       appCfg.ShowOutput,
+		NoTimer:          appCfg.NoTimer,
+		NoColor:          appCfg.NoColor,
+		CI:               appCfg.CI,
+		Debug:            false, // Default to false, only enable when explicitly set by flag
+		MaxBufferSize:    appCfg.MaxBufferSize,
+		MaxLineLength:    appCfg.MaxLineLength,
 	}
 }
 
@@ -298,10 +298,10 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 	// Flags specific to command wrapping mode
 	flag.StringVar(&cliFlags.Label, "l", "", "Label for the task.")
 	flag.StringVar(&cliFlags.Label, "label", "", "Label for the task.")
-	flag.BoolVar(&cliFlags.Stream, "s", false, "Stream mode - print command's stdout/stderr live.")
-	flag.BoolVar(&cliFlags.Stream, "stream", false, "Stream mode.")
+	flag.BoolVar(&cliFlags.LiveStreamOutput, "s", false, "Live stream output mode - print command's stdout/stderr live.")
+	flag.BoolVar(&cliFlags.LiveStreamOutput, "stream", false, "Live stream output mode.")
 	flag.StringVar(&cliFlags.ShowOutput, "show-output", "", "When to show captured output: on-fail, always, never.")
-	flag.StringVar(&cliFlags.Pattern, "pattern", "",
+	flag.StringVar(&cliFlags.PatternHint, "pattern", "",
 		"Force specific visualization pattern (test-table, sparkline, leaderboard, inventory, summary, comparison).")
 	flag.StringVar(&cliFlags.Format, "format", "text",
 		"Output format: 'text' (default) or 'json' (structured output for AI/automation).")
@@ -324,11 +324,11 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 	flag.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "s", "stream":
-			cliFlags.StreamSet = true
+			cliFlags.LiveStreamOutputSet = true
 		case "show-output":
 			cliFlags.ShowOutputSet = true
 		case "pattern":
-			cliFlags.PatternSet = true
+			cliFlags.PatternHintSet = true
 		case "no-timer":
 			cliFlags.NoTimerSet = true
 		case "no-color":
@@ -367,12 +367,12 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 		}
 	}
 
-	if cliFlags.Pattern != "" {
-		if !validPatterns[cliFlags.Pattern] {
+	if cliFlags.PatternHint != "" {
+		if !validPatterns[cliFlags.PatternHint] {
 			fmt.Fprintf(os.Stderr,
 				"[fo] Error: Invalid value for --pattern: %s\n"+
 					"[fo] Valid values are: test-table, sparkline, leaderboard, inventory, summary, comparison\n",
-				cliFlags.Pattern)
+				cliFlags.PatternHint)
 			flag.Usage()
 			os.Exit(1)
 		}

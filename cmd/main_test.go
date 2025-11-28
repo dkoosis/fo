@@ -46,21 +46,21 @@ func TestConvertAppConfigToLocal_MirrorsValues_When_AppConfigHasOverrides(t *tes
 	t.Parallel()
 
 	appCfg := &config.AppConfig{
-		Label:         "custom-label",
-		Stream:        true,
-		ShowOutput:    "always",
-		NoTimer:       true,
-		NoColor:       true,
-		CI:            true,
-		Debug:         true,
-		MaxBufferSize: 42,
-		MaxLineLength: 7,
+		Label:            "custom-label",
+		LiveStreamOutput: true,
+		ShowOutput:       "always",
+		NoTimer:          true,
+		NoColor:          true,
+		CI:               true,
+		Debug:            true,
+		MaxBufferSize:    42,
+		MaxLineLength:    7,
 	}
 
 	local := convertAppConfigToLocal(appCfg)
 
 	assert.Equal(t, appCfg.Label, local.Label)
-	assert.Equal(t, appCfg.Stream, local.Stream)
+	assert.Equal(t, appCfg.LiveStreamOutput, local.LiveStreamOutput)
 	assert.Equal(t, appCfg.ShowOutput, local.ShowOutput)
 	assert.Equal(t, appCfg.NoTimer, local.NoTimer)
 	assert.Equal(t, appCfg.NoColor, local.NoColor)
@@ -125,12 +125,12 @@ func TestParseGlobalFlags_SetsCliFields_When_ValidInputsProvided(t *testing.T) {
 				t.Helper()
 				require.False(t, version)
 				assert.Equal(t, "task", flags.Label)
-				assert.True(t, flags.Stream)
-				assert.True(t, flags.StreamSet)
+				assert.True(t, flags.LiveStreamOutput)
+				assert.True(t, flags.LiveStreamOutputSet)
 				assert.Equal(t, "always", flags.ShowOutput)
 				assert.True(t, flags.ShowOutputSet)
-				assert.Equal(t, "sparkline", flags.Pattern)
-				assert.True(t, flags.PatternSet)
+				assert.Equal(t, "sparkline", flags.PatternHint)
+				assert.True(t, flags.PatternHintSet)
 				assert.Equal(t, "json", flags.Format)
 				assert.True(t, flags.NoTimer)
 				assert.True(t, flags.NoTimerSet)

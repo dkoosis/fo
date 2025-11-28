@@ -54,25 +54,25 @@ const (
 )
 
 type ConsoleConfig struct {
-	ThemeName      string
-	UseBoxes       bool
-	UseBoxesSet    bool
-	InlineProgress bool
-	InlineSet      bool
-	Monochrome     bool
-	ShowTimer      bool
-	ShowTimerSet   bool
-	ShowOutputMode string
-	Stream         bool
-	Pattern        string // Manual pattern selection hint (e.g., "test-table", "sparkline", "leaderboard")
-	Debug          bool
-	Profile        bool   // Enable performance profiling
-	ProfileOutput  string // Profile output destination
-	MaxBufferSize  int64
-	MaxLineLength  int
-	Design         *design.Config
-	Out            io.Writer // Output writer, defaults to os.Stdout
-	Err            io.Writer // Error writer, defaults to os.Stderr
+	ThemeName        string
+	UseBoxes         bool
+	UseBoxesSet      bool
+	InlineProgress   bool
+	InlineSet        bool
+	Monochrome       bool
+	ShowTimer        bool
+	ShowTimerSet     bool
+	ShowOutputMode   string
+	LiveStreamOutput bool
+	PatternHint      string // Manual pattern selection hint (e.g., "test-table", "sparkline", "leaderboard")
+	Debug            bool
+	Profile          bool   // Enable performance profiling
+	ProfileOutput    string // Profile output destination
+	MaxBufferSize    int64
+	MaxLineLength    int
+	Design           *design.Config
+	Out              io.Writer // Output writer, defaults to os.Stdout
+	Err              io.Writer // Error writer, defaults to os.Stderr
 }
 
 // Line represents a classified line of command output.
@@ -1032,7 +1032,7 @@ func (c *Console) runContext(
 	intent := patternMatcher.DetectCommandIntent(command, args)
 	task := design.NewTask(labelToUse, intent, command, args, designCfg)
 
-	useInlineProgress := designCfg.Style.UseInlineProgress && c.cfg.InlineProgress && !c.cfg.Stream
+	useInlineProgress := designCfg.Style.UseInlineProgress && c.cfg.InlineProgress && !c.cfg.LiveStreamOutput
 
 	progress := design.NewInlineProgress(task, c.cfg.Debug, c.cfg.Out)
 
@@ -1122,7 +1122,7 @@ func (c *Console) runContext(
 
 	// Execute command (these functions call cmd.Start() and cmd.Wait())
 	// They will close cmdDone when cmd.Wait() completes
-	if c.cfg.Stream {
+	if c.cfg.LiveStreamOutput {
 		exitCode, cmdRunError = c.executeStreamMode(cmd, task, cmdDone)
 		if cmdRunError != nil {
 			var exitErr *exec.ExitError
@@ -1166,7 +1166,7 @@ func (c *Console) runContext(
 		progress.Complete(status)
 	}
 
-	if !c.cfg.Stream {
+	if !c.cfg.LiveStreamOutput {
 		c.renderCapturedOutput(task, exitCode, isActualFoStartupFailure)
 	} else if (task.Status == design.StatusError || task.Status == design.StatusWarning) && !isActualFoStartupFailure {
 		summary := task.RenderSummary()

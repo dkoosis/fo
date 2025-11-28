@@ -45,7 +45,7 @@ func TestLoadConfig_When_ValidYAML(t *testing.T) {
 
 	yamlContent := `
 label: "Test Label"
-stream: true
+live_stream_output: true
 show_output: "always"
 no_timer: true
 no_color: true
@@ -70,7 +70,7 @@ themes:
 	cfg := LoadConfig()
 
 	assert.Equal(t, "Test Label", cfg.Label)
-	assert.True(t, cfg.Stream)
+	assert.True(t, cfg.LiveStreamOutput)
 	assert.Equal(t, "always", cfg.ShowOutput)
 	assert.True(t, cfg.NoTimer)
 	assert.True(t, cfg.NoColor)
@@ -176,7 +176,7 @@ stream: false
 	cfg := LoadConfig()
 
 	assert.Equal(t, "Partial Label", cfg.Label)
-	assert.False(t, cfg.Stream)
+	assert.False(t, cfg.LiveStreamOutput)
 	// Other fields should keep defaults
 	assert.Equal(t, DefaultShowOutput, cfg.ShowOutput)
 	assert.Equal(t, DefaultActiveThemeName, cfg.ActiveThemeName)

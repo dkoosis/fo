@@ -29,7 +29,7 @@ type ProjectConfig struct {
 		ErrorLines     int `yaml:"error_lines"`      // Error when files exceed (default: 1000)
 		WarnTestLines  int `yaml:"warn_test_lines"`  // Warn for test files (default: 800)
 		ErrorTestLines int `yaml:"error_test_lines"` // Error for test files (default: 1400)
-		TopCount       int `yaml:"top_count"`        // Show top N files (default: 5)
+		TopFilesCount  int `yaml:"top_files_count"`  // Show top N files (default: 5)
 		WarnMarkdown   int `yaml:"warn_markdown"`    // Warn on markdown count (default: 50)
 	} `yaml:"file_sizes"`
 
@@ -72,7 +72,7 @@ func DefaultProjectConfig() *ProjectConfig {
 	cfg.FileSizes.ErrorLines = 1000
 	cfg.FileSizes.WarnTestLines = 800
 	cfg.FileSizes.ErrorTestLines = 1400
-	cfg.FileSizes.TopCount = 5
+	cfg.FileSizes.TopFilesCount = 5
 	cfg.FileSizes.WarnMarkdown = 50
 
 	cfg.Sections.Dependencies.Enabled = true
@@ -137,7 +137,7 @@ func (p *ProjectConfig) ToFileSizeConfig() FileSizeConfig {
 		ErrorLineCount:     p.FileSizes.ErrorLines,
 		WarnLineCountTest:  p.FileSizes.WarnTestLines,
 		ErrorLineCountTest: p.FileSizes.ErrorTestLines,
-		TopFilesCount:      p.FileSizes.TopCount,
+		TopFilesCount:      p.FileSizes.TopFilesCount,
 		WarnMarkdownCount:  p.FileSizes.WarnMarkdown,
 		SnapshotDir:        p.SnapshotDir,
 	}

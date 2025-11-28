@@ -46,9 +46,9 @@ Creates a new Console with the specified configuration.
 
 ```go
 console := fo.NewConsole(fo.ConsoleConfig{
-    Stream:         true,        // Stream output live
-    ShowOutputMode: "on-fail",   // Show captured output: "always", "on-fail", "never"
-    Monochrome:     false,       // Disable colors
+    LiveStreamOutput: true,        // Stream output live
+    ShowOutputMode:   "on-fail",   // Show captured output: "always", "on-fail", "never"
+    Monochrome:       false,       // Disable colors
 })
 ```
 
@@ -141,7 +141,7 @@ if errors.Is(err, fo.ErrNonZeroExit) {
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `Stream` | bool | false | Stream output live instead of capturing |
+| `LiveStreamOutput` | bool | false | Stream output live instead of capturing |
 | `ShowOutputMode` | string | "on-fail" | When to show captured output: "always", "on-fail", "never" |
 | `Monochrome` | bool | false | Disable ANSI colors |
 | `ShowTimer` | bool | true | Show execution duration |
@@ -169,7 +169,7 @@ console := fo.NewConsole(fo.ConsoleConfig{
 
 ```go
 console := fo.NewConsole(fo.ConsoleConfig{
-    Stream: true,
+    LiveStreamOutput: true,
 })
 ```
 

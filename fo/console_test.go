@@ -138,10 +138,10 @@ func TestConsole_Run_FailedCommand(t *testing.T) {
 func TestConsole_Run_StreamMode(t *testing.T) {
 	var out, errOut bytes.Buffer
 	c := NewConsole(ConsoleConfig{
-		Out:        &out,
-		Err:        &errOut,
-		Monochrome: true,
-		Stream:     true,
+		Out:              &out,
+		Err:              &errOut,
+		Monochrome:       true,
+		LiveStreamOutput: true,
 	})
 
 	result, err := c.Run("stream-test", "echo", "streaming")
@@ -159,11 +159,11 @@ func TestConsole_Run_StreamMode(t *testing.T) {
 func TestConsole_Run_CaptureMode(t *testing.T) {
 	var out, errOut bytes.Buffer
 	c := NewConsole(ConsoleConfig{
-		Out:            &out,
-		Err:            &errOut,
-		Monochrome:     true,
-		Stream:         false,
-		ShowOutputMode: "always",
+		Out:              &out,
+		Err:              &errOut,
+		Monochrome:       true,
+		LiveStreamOutput: false,
+		ShowOutputMode:   "always",
 	})
 
 	result, err := c.Run("capture-test", "echo", "captured")

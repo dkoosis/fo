@@ -4,7 +4,7 @@
 //
 // Configuration values are resolved in the following order (highest to lowest priority):
 //
-//  1. CLI flags (--no-color, --ci, --stream, --theme, etc.)
+//  1. CLI flags (--no-color, --ci, --stream/--s, --theme, etc.)
 //  2. Environment variables (FO_NO_COLOR, FO_CI, NO_COLOR, CI)
 //  3. YAML config file (.fo.yaml in local directory or ~/.config/fo/.fo.yaml)
 //  4. Hardcoded defaults
@@ -15,7 +15,7 @@
 //
 //   - NoColor: Disables all ANSI colors and uses ASCII-only output
 //   - CI: Enables CI mode (implies NoColor, NoTimer, and disables interactive features)
-//   - Stream: Shows output in real-time instead of capturing it
+//   - LiveStreamOutput: Shows output in real-time instead of capturing it
 //   - Theme: Selects the visual theme (unicode_vibrant or ascii_minimal)
 //
 // # CI Mode Behavior

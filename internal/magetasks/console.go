@@ -21,8 +21,8 @@ var console = fo.NewConsoleFromProject()
 
 // streamConsole shows output in real-time (for tests, long-running commands).
 var streamConsole = fo.NewConsole(fo.ConsoleConfig{
-	Stream:    true,
-	ThemeName: getProjectTheme(),
+	LiveStreamOutput: true,
+	ThemeName:        getProjectTheme(),
 })
 
 // Console returns the shared fo instance.

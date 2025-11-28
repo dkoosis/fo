@@ -13,46 +13,46 @@ import (
 
 // CliFlags holds the values of command-line flags.
 type CliFlags struct {
-	Label         string
-	Stream        bool
-	ShowOutput    string
-	Pattern       string // Manual pattern selection (e.g., "test-table", "sparkline", "leaderboard")
-	Format        string // Output format: "text" (default) or "json"
-	Profile       bool   // Enable performance profiling
-	ProfileOutput string // Profile output destination: "stderr" or file path
-	NoTimer       bool
-	NoColor       bool
-	CI            bool
-	Debug         bool
-	MaxBufferSize int64 // In bytes, passed from main after parsing
-	MaxLineLength int   // In bytes, passed from main after parsing
-	ThemeName     string
-	ThemeFile     string // Path to custom theme YAML file
+	Label            string
+	LiveStreamOutput bool
+	ShowOutput       string
+	PatternHint      string // Manual pattern selection (e.g., "test-table", "sparkline", "leaderboard")
+	Format           string // Output format: "text" (default) or "json"
+	Profile          bool   // Enable performance profiling
+	ProfileOutput    string // Profile output destination: "stderr" or file path
+	NoTimer          bool
+	NoColor          bool
+	CI               bool
+	Debug            bool
+	MaxBufferSize    int64 // In bytes, passed from main after parsing
+	MaxLineLength    int   // In bytes, passed from main after parsing
+	ThemeName        string
+	ThemeFile        string // Path to custom theme YAML file
 
 	// Flags to track if they were explicitly set by the user
-	StreamSet     bool
-	ShowOutputSet bool
-	PatternSet    bool
-	NoTimerSet    bool
-	NoColorSet    bool
-	CISet         bool
-	DebugSet      bool
+	LiveStreamOutputSet bool
+	ShowOutputSet       bool
+	PatternHintSet      bool
+	NoTimerSet          bool
+	NoColorSet          bool
+	CISet               bool
+	DebugSet            bool
 }
 
 // AppConfig represents the application's overall configuration from .fo.yaml.
 type AppConfig struct {
-	Label           string                        `yaml:"label,omitempty"`
-	Stream          bool                          `yaml:"stream"`
-	ShowOutput      string                        `yaml:"show_output"`
-	NoTimer         bool                          `yaml:"no_timer"`
-	NoColor         bool                          `yaml:"no_color"`
-	CI              bool                          `yaml:"ci"`
-	Debug           bool                          `yaml:"debug"`
-	MaxBufferSize   int64                         `yaml:"max_buffer_size"` // In bytes
-	MaxLineLength   int                           `yaml:"max_line_length"` // In bytes
-	ActiveThemeName string                        `yaml:"active_theme"`
-	Presets         map[string]*design.ToolConfig `yaml:"presets"` // Uses design.ToolConfig
-	Themes          map[string]*design.Config     `yaml:"themes"`  // Holds fully resolved design.Config objects
+	Label            string                        `yaml:"label,omitempty"`
+	LiveStreamOutput bool                          `yaml:"live_stream_output"`
+	ShowOutput       string                        `yaml:"show_output"`
+	NoTimer          bool                          `yaml:"no_timer"`
+	NoColor          bool                          `yaml:"no_color"`
+	CI               bool                          `yaml:"ci"`
+	Debug            bool                          `yaml:"debug"`
+	MaxBufferSize    int64                         `yaml:"max_buffer_size"` // In bytes
+	MaxLineLength    int                           `yaml:"max_line_length"` // In bytes
+	ActiveThemeName  string                        `yaml:"active_theme"`
+	Presets          map[string]*design.ToolConfig `yaml:"presets"` // Uses design.ToolConfig
+	Themes           map[string]*design.Config     `yaml:"themes"`  // Holds fully resolved design.Config objects
 }
 
 // Constants for default values.
@@ -67,17 +67,17 @@ const (
 func LoadConfig() *AppConfig {
 	// Initialize with default themes from pkg/design (single source of truth).
 	appCfg := &AppConfig{
-		Stream:          false,
-		ShowOutput:      DefaultShowOutput,
-		NoTimer:         false,
-		NoColor:         false,
-		CI:              false,
-		Debug:           false, // Debug will be determined by CLI flags or YAML later
-		MaxBufferSize:   DefaultMaxBufferSize,
-		MaxLineLength:   DefaultMaxLineLength,
-		ActiveThemeName: DefaultActiveThemeName,
-		Themes:          design.DefaultThemes(), // Single source of truth for default themes
-		Presets:         make(map[string]*design.ToolConfig),
+		LiveStreamOutput: false,
+		ShowOutput:       DefaultShowOutput,
+		NoTimer:          false,
+		NoColor:          false,
+		CI:               false,
+		Debug:            false, // Debug will be determined by CLI flags or YAML later
+		MaxBufferSize:    DefaultMaxBufferSize,
+		MaxLineLength:    DefaultMaxLineLength,
+		ActiveThemeName:  DefaultActiveThemeName,
+		Themes:           design.DefaultThemes(), // Single source of truth for default themes
+		Presets:          make(map[string]*design.ToolConfig),
 	}
 
 	initialDebug := os.Getenv("FO_DEBUG") != ""
@@ -123,7 +123,7 @@ func LoadConfig() *AppConfig {
 	if yamlAppCfg.Label != "" {
 		appCfg.Label = yamlAppCfg.Label
 	}
-	appCfg.Stream = yamlAppCfg.Stream
+	appCfg.LiveStreamOutput = yamlAppCfg.LiveStreamOutput
 	if yamlAppCfg.ShowOutput != "" {
 		appCfg.ShowOutput = yamlAppCfg.ShowOutput
 	}
