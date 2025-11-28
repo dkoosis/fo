@@ -594,20 +594,20 @@ func (t *Task) RenderOutputLine(line OutputLine) string {
 
 func (t *Task) RenderSummary() string {
 	errorCount, warningCount := 0, 0
-	t.OutputLinesLock()
-	for _, line := range t.OutputLines {
-		// Skip internal fo errors - use IsInternal flag only for clean encapsulation
-		if line.Context.IsInternal {
-			continue
+	t.ProcessOutputLines(func(lines []OutputLine) {
+		for _, line := range lines {
+			// Skip internal fo errors - use IsInternal flag only for clean encapsulation
+			if line.Context.IsInternal {
+				continue
+			}
+			switch line.Type {
+			case TypeError:
+				errorCount++
+			case TypeWarning:
+				warningCount++
+			}
 		}
-		switch line.Type {
-		case TypeError:
-			errorCount++
-		case TypeWarning:
-			warningCount++
-		}
-	}
-	t.OutputLinesUnlock()
+	})
 	if errorCount == 0 && warningCount == 0 {
 		return ""
 	}

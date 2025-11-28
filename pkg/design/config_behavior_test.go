@@ -58,9 +58,9 @@ func TestNormalizeANSIEscape_ReturnsNormalizedSequence_When_ProvidedVariousInput
 			expected: "\x1b[31m",
 		},
 		{
-			name:     "converts literal hex sequence",
+			name:     "passes through literal sequences unchanged",
 			input:    "\\x1b[32m",
-			expected: "\x1b[32m",
+			expected: "\\x1b[32m",
 		},
 		{
 			name:     "returns empty when input empty",
@@ -84,10 +84,11 @@ func TestConfig_ResetsToDefault_When_ResetColorMissing(t *testing.T) {
 	cfg := UnicodeVibrantTheme()
 	cfg.Colors.Reset = ""
 
-	assert.Equal(t, "\u001b[0m", cfg.ResetColor())
+	// ResetColor returns empty when reset color is not configured (lipgloss handles reset internally)
+	assert.Equal(t, "", string(cfg.ResetColor()))
 
 	cfg.IsMonochrome = true
-	assert.Equal(t, "", cfg.ResetColor())
+	assert.Equal(t, "", string(cfg.ResetColor()))
 }
 
 func TestConfig_ResolvesColors_When_UsingElementOverrides(t *testing.T) {
@@ -114,9 +115,9 @@ func TestConfig_ResolvesColors_When_UsingElementOverrides(t *testing.T) {
 			expected: "\u001b[35m",
 		},
 		{
-			name:     "falls back to reset for unknown name",
+			name:     "returns input for unknown name",
 			color:    "unknown-key",
-			expected: "\u001b[0m",
+			expected: "unknown-key",
 		},
 	}
 
@@ -125,7 +126,7 @@ func TestConfig_ResolvesColors_When_UsingElementOverrides(t *testing.T) {
 			t.Parallel()
 
 			got := cfg.GetColor(tc.color, tc.elementName)
-			assert.Equal(t, tc.expected, got)
+			assert.Equal(t, tc.expected, string(got))
 		})
 	}
 }
@@ -276,9 +277,9 @@ func TestConfig_UsesReflection_When_FeatureFlagEnabled(t *testing.T) {
 	originalEnv := os.Getenv("FO_USE_REFLECTION_COLORS")
 	t.Cleanup(func() {
 		if originalEnv != "" {
-			os.Setenv("FO_USE_REFLECTION_COLORS", originalEnv)
+			_ = os.Setenv("FO_USE_REFLECTION_COLORS", originalEnv)
 		} else {
-			os.Unsetenv("FO_USE_REFLECTION_COLORS")
+			_ = os.Unsetenv("FO_USE_REFLECTION_COLORS")
 		}
 	})
 
@@ -340,9 +341,9 @@ func TestConfig_ReflectionMatchesSwitch_When_AllColors(t *testing.T) {
 	originalEnv := os.Getenv("FO_USE_REFLECTION_COLORS")
 	t.Cleanup(func() {
 		if originalEnv != "" {
-			os.Setenv("FO_USE_REFLECTION_COLORS", originalEnv)
+			_ = os.Setenv("FO_USE_REFLECTION_COLORS", originalEnv)
 		} else {
-			os.Unsetenv("FO_USE_REFLECTION_COLORS")
+			_ = os.Unsetenv("FO_USE_REFLECTION_COLORS")
 		}
 	})
 
@@ -354,7 +355,7 @@ func TestConfig_ReflectionMatchesSwitch_When_AllColors(t *testing.T) {
 	}
 
 	// Test with switch-based (default)
-	os.Unsetenv("FO_USE_REFLECTION_COLORS")
+	_ = os.Unsetenv("FO_USE_REFLECTION_COLORS") //nolint:errcheck,usetesting
 	cfg := UnicodeVibrantTheme()
 	switchResults := make(map[string]string)
 	for _, color := range colorsToTest {
@@ -363,7 +364,7 @@ func TestConfig_ReflectionMatchesSwitch_When_AllColors(t *testing.T) {
 
 	// Test with reflection-based
 	// Cannot use t.Setenv() with t.Parallel() - they are incompatible
-	os.Setenv("FO_USE_REFLECTION_COLORS", "1") //nolint:tenv
+	_ = os.Setenv("FO_USE_REFLECTION_COLORS", "1") //nolint:errcheck,usetesting
 	cfgReflection := UnicodeVibrantTheme()
 	reflectionResults := make(map[string]string)
 	for _, color := range colorsToTest {

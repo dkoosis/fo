@@ -362,10 +362,13 @@ func (t *TestTable) Render(cfg *Config) string {
 	}
 
 	// Use compact rendering for compact/balanced modes
-	if density == DensityCompact {
+	switch density {
+	case DensityCompact:
 		return t.renderCompact(cfg, 3) // 3 columns
-	} else if density == DensityBalanced {
+	case DensityBalanced:
 		return t.renderCompact(cfg, 2) // 2 columns
+	case DensityDetailed:
+		// Fall through to detailed rendering below
 	}
 
 	// Default detailed rendering

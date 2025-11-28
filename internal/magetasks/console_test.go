@@ -2,73 +2,48 @@ package magetasks
 
 import (
 	"bytes"
-	"os"
 	"strings"
 	"testing"
 )
 
 func TestPrintH1Header(t *testing.T) {
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	// Capture output using SetConsoleWriter
+	var buf bytes.Buffer
+	SetConsoleWriter(&buf)
+	defer ResetConsole()
 
 	PrintH1Header("Test Title")
 
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	if _, err := buf.ReadFrom(r); err != nil {
-		t.Fatalf("Failed to read from pipe: %v", err)
-	}
 	output := buf.String()
 
-	if !strings.Contains(output, "Test Title") {
-		t.Errorf("PrintH1Header output should contain 'Test Title', got: %s", output)
-	}
-	if !strings.Contains(output, "=") {
-		t.Errorf("PrintH1Header output should contain '=' separator, got: %s", output)
+	if !strings.Contains(output, "TEST TITLE") {
+		t.Errorf("PrintH1Header output should contain 'TEST TITLE', got: %s", output)
 	}
 }
 
 func TestPrintH2Header(t *testing.T) {
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	// Capture output using SetConsoleWriter
+	var buf bytes.Buffer
+	SetConsoleWriter(&buf)
+	defer ResetConsole()
 
 	PrintH2Header("Test Section")
 
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	if _, err := buf.ReadFrom(r); err != nil {
-		t.Fatalf("Failed to read from pipe: %v", err)
-	}
 	output := buf.String()
 
-	if !strings.Contains(output, "=== Test Section ===") {
-		t.Errorf("PrintH2Header output should contain '=== Test Section ===', got: %s", output)
+	if !strings.Contains(output, "TEST SECTION") {
+		t.Errorf("PrintH2Header output should contain 'TEST SECTION', got: %s", output)
 	}
 }
 
 func TestPrintSuccess(t *testing.T) {
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	// Capture output using SetConsoleWriter
+	var buf bytes.Buffer
+	SetConsoleWriter(&buf)
+	defer ResetConsole()
 
 	PrintSuccess("Operation completed")
 
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	if _, err := buf.ReadFrom(r); err != nil {
-		t.Fatalf("Failed to read from pipe: %v", err)
-	}
 	output := buf.String()
 
 	if !strings.Contains(output, "Operation completed") {
@@ -77,20 +52,13 @@ func TestPrintSuccess(t *testing.T) {
 }
 
 func TestPrintWarning(t *testing.T) {
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	// Capture output using SetConsoleWriter
+	var buf bytes.Buffer
+	SetConsoleWriter(&buf)
+	defer ResetConsole()
 
 	PrintWarning("Warning message")
 
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	if _, err := buf.ReadFrom(r); err != nil {
-		t.Fatalf("Failed to read from pipe: %v", err)
-	}
 	output := buf.String()
 
 	if !strings.Contains(output, "Warning message") {
@@ -99,20 +67,13 @@ func TestPrintWarning(t *testing.T) {
 }
 
 func TestPrintError(t *testing.T) {
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	// Capture output using SetConsoleWriter
+	var buf bytes.Buffer
+	SetConsoleWriter(&buf)
+	defer ResetConsole()
 
 	PrintError("Error message")
 
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	if _, err := buf.ReadFrom(r); err != nil {
-		t.Fatalf("Failed to read from pipe: %v", err)
-	}
 	output := buf.String()
 
 	if !strings.Contains(output, "Error message") {
@@ -121,20 +82,13 @@ func TestPrintError(t *testing.T) {
 }
 
 func TestPrintInfo(t *testing.T) {
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	// Capture output using SetConsoleWriter
+	var buf bytes.Buffer
+	SetConsoleWriter(&buf)
+	defer ResetConsole()
 
 	PrintInfo("Info message")
 
-	w.Close()
-	os.Stdout = oldStdout
-
-	var buf bytes.Buffer
-	if _, err := buf.ReadFrom(r); err != nil {
-		t.Fatalf("Failed to read from pipe: %v", err)
-	}
 	output := buf.String()
 
 	if !strings.Contains(output, "Info message") {

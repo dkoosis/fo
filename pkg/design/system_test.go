@@ -436,3 +436,86 @@ func TestTask_OutputLinesLock_When_ConcurrentAccess(t *testing.T) {
 	defer task.OutputLinesUnlock()
 	assert.Len(t, task.OutputLines, 2)
 }
+
+func TestTask_GetOutputLinesSnapshot_When_ReturnsIndependentCopy(t *testing.T) {
+	t.Parallel()
+
+	cfg := UnicodeVibrantTheme()
+	task := NewTask("test", "", "cmd", nil, cfg)
+
+	task.AddOutputLine("line1", TypeDetail, LineContext{Importance: 1})
+	task.AddOutputLine("line2", TypeError, LineContext{Importance: 5})
+
+	// Get snapshot
+	snapshot := task.GetOutputLinesSnapshot()
+	assert.Len(t, snapshot, 2)
+	assert.Equal(t, "line1", snapshot[0].Content)
+	assert.Equal(t, "line2", snapshot[1].Content)
+
+	// Add more lines to original
+	task.AddOutputLine("line3", TypeWarning, LineContext{Importance: 3})
+
+	// Snapshot should not be affected
+	assert.Len(t, snapshot, 2, "snapshot should remain unchanged after adding lines")
+
+	// New snapshot should have all 3 lines
+	newSnapshot := task.GetOutputLinesSnapshot()
+	assert.Len(t, newSnapshot, 3)
+}
+
+func TestTask_ProcessOutputLines_When_ProcessesSafely(t *testing.T) {
+	t.Parallel()
+
+	cfg := UnicodeVibrantTheme()
+	task := NewTask("test", "", "cmd", nil, cfg)
+
+	task.AddOutputLine("error1", TypeError, LineContext{Importance: 5})
+	task.AddOutputLine("warning1", TypeWarning, LineContext{Importance: 3})
+	task.AddOutputLine("detail1", TypeDetail, LineContext{Importance: 1})
+
+	// Count errors using ProcessOutputLines
+	errorCount := 0
+	task.ProcessOutputLines(func(lines []OutputLine) {
+		for _, line := range lines {
+			if line.Type == TypeError {
+				errorCount++
+			}
+		}
+	})
+
+	assert.Equal(t, 1, errorCount)
+}
+
+func TestTask_IncrementalCounters_When_TrackErrorsAndWarnings(t *testing.T) {
+	t.Parallel()
+
+	cfg := UnicodeVibrantTheme()
+	task := NewTask("test", "", "cmd", nil, cfg)
+
+	// Initially no errors or warnings
+	hasErrors, hasWarnings := task.hasOutputIssues()
+	assert.False(t, hasErrors)
+	assert.False(t, hasWarnings)
+
+	// Add an error
+	task.AddOutputLine("error1", TypeError, LineContext{})
+	hasErrors, hasWarnings = task.hasOutputIssues()
+	assert.True(t, hasErrors)
+	assert.False(t, hasWarnings)
+
+	// Add a warning
+	task.AddOutputLine("warning1", TypeWarning, LineContext{})
+	hasErrors, hasWarnings = task.hasOutputIssues()
+	assert.True(t, hasErrors)
+	assert.True(t, hasWarnings)
+
+	// Add more errors and warnings
+	task.AddOutputLine("error2", TypeError, LineContext{})
+	task.AddOutputLine("warning2", TypeWarning, LineContext{})
+	task.AddOutputLine("detail", TypeDetail, LineContext{})
+
+	// UpdateTaskContext should use O(1) counters
+	task.UpdateTaskContext()
+	// With 2 errors, cognitive load should be medium (not high until >5)
+	assert.Equal(t, LoadMedium, task.Context.CognitiveLoad)
+}

@@ -201,7 +201,7 @@ func (r *TestRenderer) RenderTableHeader() {
 	// Add 2 for left/right borders = 69 total
 	r.boxWidth = 67
 
-	fmt.Fprintf(r.writer, "\n")
+	_, _ = fmt.Fprintf(r.writer, "\n")
 
 	// Use lipgloss to render top border
 	topBorderStyle := r.boxStyle.
@@ -214,7 +214,7 @@ func (r *TestRenderer) RenderTableHeader() {
 		PaddingLeft(0).
 		PaddingRight(0)
 	topBorder := topBorderStyle.Render("")
-	fmt.Fprintf(r.writer, "%s\n", topBorder)
+	_, _ = fmt.Fprintf(r.writer, "%s\n", topBorder)
 
 	// Header line with borders: │  STATUS  PATH... │
 	headerContent := "  STATUS  PATH                             TESTS   TIME    COVERAGE"
@@ -226,7 +226,7 @@ func (r *TestRenderer) RenderTableHeader() {
 		PaddingTop(0).
 		PaddingBottom(0)
 	headerLine := headerLineStyle.Render(headerContent)
-	fmt.Fprintf(r.writer, "%s\n", headerLine)
+	_, _ = fmt.Fprintf(r.writer, "%s\n", headerLine)
 
 	// Separator line using lipgloss
 	// Create a border style for the separator (horizontal line with left/right borders)
@@ -251,7 +251,7 @@ func (r *TestRenderer) RenderTableHeader() {
 		PaddingLeft(0).
 		PaddingRight(0)
 	separatorLine := separatorStyle.Render("")
-	fmt.Fprintf(r.writer, "%s\n", separatorLine)
+	_, _ = fmt.Fprintf(r.writer, "%s\n", separatorLine)
 }
 
 // getSeparatorChar returns the appropriate separator character based on theme.
@@ -286,7 +286,7 @@ func (r *TestRenderer) RenderGroupHeader(dirName string) {
 		PaddingTop(0).
 		PaddingBottom(0)
 	groupLine := groupLineStyle.Render(groupContent)
-	fmt.Fprintf(r.writer, "%s\n", groupLine)
+	_, _ = fmt.Fprintf(r.writer, "%s\n", groupLine)
 }
 
 // RenderPackageLine renders a single package test result line.
@@ -336,13 +336,13 @@ func (r *TestRenderer) RenderPackageLine(pkg TestPackageResult) {
 			padding = 0
 		}
 
-		fmt.Fprintf(r.writer, "%s%s%s%s%s%s%s%s\n",
+		_, _ = fmt.Fprintf(r.writer, "%s%s%s%s%s%s%s%s\n",
 			paleGray, cfg.Border.VerticalChar, reset,
 			lineContent,
 			strings.Repeat(" ", padding),
 			paleGray, cfg.Border.VerticalChar, reset)
 	} else {
-		fmt.Fprintf(r.writer, "    %s%s%s   %-30s %8s %8s   %s\n",
+		_, _ = fmt.Fprintf(r.writer, "    %s%s%s   %-30s %8s %8s   %s\n",
 			statusColor, statusIcon, reset, pkg.Name, result, duration, sparkbar)
 	}
 
@@ -390,13 +390,13 @@ func (r *TestRenderer) renderTestLine(test TestResult, status string) {
 		if padding < 0 {
 			padding = 0
 		}
-		fmt.Fprintf(r.writer, "%s%s%s%s%s%s%s%s\n",
+		_, _ = fmt.Fprintf(r.writer, "%s%s%s%s%s%s%s%s\n",
 			paleGray, cfg.Border.VerticalChar, reset,
 			lineContent,
 			strings.Repeat(" ", padding),
 			paleGray, cfg.Border.VerticalChar, reset)
 	} else {
-		fmt.Fprintf(r.writer, "        %s %s\n", styledTestName, statusText)
+		_, _ = fmt.Fprintf(r.writer, "        %s %s\n", styledTestName, statusText)
 	}
 }
 
@@ -460,13 +460,13 @@ func (r *TestRenderer) renderTestsWithHierarchy(tests []TestResult) {
 				if padding < 0 {
 					padding = 0
 				}
-				fmt.Fprintf(r.writer, "%s%s%s%s%s%s%s%s\n",
+				_, _ = fmt.Fprintf(r.writer, "%s%s%s%s%s%s%s%s\n",
 					paleGray, cfg.Border.VerticalChar, reset,
 					lineContent,
 					strings.Repeat(" ", padding),
 					paleGray, cfg.Border.VerticalChar, reset)
 			} else {
-				fmt.Fprintf(r.writer, "        %s\n", parentName)
+				_, _ = fmt.Fprintf(r.writer, "        %s\n", parentName)
 			}
 		}
 
@@ -503,13 +503,13 @@ func (r *TestRenderer) renderTestsWithHierarchy(tests []TestResult) {
 				if padding < 0 {
 					padding = 0
 				}
-				fmt.Fprintf(r.writer, "%s%s%s%s%s%s%s%s\n",
+				_, _ = fmt.Fprintf(r.writer, "%s%s%s%s%s%s%s%s\n",
 					paleGray, cfg.Border.VerticalChar, reset,
 					lineContent,
 					strings.Repeat(" ", padding),
 					paleGray, cfg.Border.VerticalChar, reset)
 			} else {
-				fmt.Fprintf(r.writer, "%s%s%s %s\n", originalIndent, extraIndent, styledTestName, statusText)
+				_, _ = fmt.Fprintf(r.writer, "%s%s%s %s\n", originalIndent, extraIndent, styledTestName, statusText)
 			}
 		}
 	}
@@ -529,10 +529,10 @@ func (r *TestRenderer) RenderGroupFooter() {
 			PaddingLeft(0).
 			PaddingRight(0)
 		bottomBorder := bottomBorderStyle.Render("")
-		fmt.Fprintf(r.writer, "%s\n", bottomBorder)
+		_, _ = fmt.Fprintf(r.writer, "%s\n", bottomBorder)
 		r.inGroupBox = false
 	}
-	fmt.Fprintf(r.writer, "\n")
+	_, _ = fmt.Fprintf(r.writer, "\n")
 }
 
 // renderCoverageSparkbar renders a coverage sparkbar with theme colors.

@@ -1243,28 +1243,27 @@ func (c *Console) renderCapturedOutput(task *design.Task, exitCode int, isActual
 		}
 
 		hasActualRenderableOutput := false
-		task.OutputLinesLock()
-		for _, l := range task.OutputLines {
-			// Check IsInternal flag first, fall back to string prefix for backwards compatibility
-			isInternal := l.Context.IsInternal ||
-				(l.Type == design.TypeError && (strings.HasPrefix(l.Content, "Error starting command") ||
-					strings.HasPrefix(l.Content, "Error creating stdout pipe") ||
-					strings.HasPrefix(l.Content, "Error creating stderr pipe") ||
-					strings.HasPrefix(l.Content, "[fo] ")))
-			if !isInternal {
-				hasActualRenderableOutput = true
-				break
+		task.ProcessOutputLines(func(lines []design.OutputLine) {
+			for _, l := range lines {
+				// Check IsInternal flag first, fall back to string prefix for backwards compatibility
+				isInternal := l.Context.IsInternal ||
+					(l.Type == design.TypeError && (strings.HasPrefix(l.Content, "Error starting command") ||
+						strings.HasPrefix(l.Content, "Error creating stdout pipe") ||
+						strings.HasPrefix(l.Content, "Error creating stderr pipe") ||
+						strings.HasPrefix(l.Content, "[fo] ")))
+				if !isInternal {
+					hasActualRenderableOutput = true
+					break
+				}
 			}
-		}
-		task.OutputLinesUnlock()
+		})
 
 		if hasActualRenderableOutput {
 			_, _ = c.cfg.Out.Write([]byte(task.Config.GetColor("Muted") + "--- Captured output: ---" + task.Config.ResetColor() + "\n"))
-			task.OutputLinesLock()
-			for _, line := range task.OutputLines {
+			// Use snapshot for rendering to avoid holding lock during I/O
+			for _, line := range task.GetOutputLinesSnapshot() {
 				_, _ = c.cfg.Out.Write([]byte(task.RenderOutputLine(line) + "\n"))
 			}
-			task.OutputLinesUnlock()
 		} else if (task.Status == design.StatusError || task.Status == design.StatusWarning) && summary == "" {
 			summary = task.RenderSummary()
 			if summary != "" {
@@ -1321,7 +1320,7 @@ func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task, cmdDone ch
 			if c.cfg.Debug {
 				fmt.Fprintf(os.Stderr, "[DEBUG executeStreamMode STDERR] Scanned line: %s\n", line)
 			}
-			fmt.Fprintln(c.cfg.Err, line)
+			_, _ = fmt.Fprintln(c.cfg.Err, line)
 			task.AddOutputLine(line, design.TypeDetail, design.LineContext{CognitiveLoad: design.LoadMedium, Importance: 2})
 		}
 		if scanErr := scanner.Err(); scanErr != nil {
@@ -1348,7 +1347,7 @@ func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task, cmdDone ch
 	if startErr != nil {
 		errMsg := fmt.Sprintf("Error starting command '%s': %v", strings.Join(cmd.Args, " "), startErr)
 		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true})
-		fmt.Fprintln(c.cfg.Err, errMsg)
+		_, _ = fmt.Fprintln(c.cfg.Err, errMsg)
 
 		_ = stderrPipe.Close()
 		waitGroup.Wait()
@@ -1383,7 +1382,7 @@ func (c *Console) executeCaptureMode(
 	if err != nil {
 		errMsg := formatInternalError("Error creating stdout pipe: %v", err)
 		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true})
-		fmt.Fprintln(c.cfg.Err, errMsg)
+		_, _ = fmt.Fprintln(c.cfg.Err, errMsg)
 		close(cmdDone) // Signal that command has finished (failed to create pipe)
 		return 1, err
 	}
@@ -1392,9 +1391,9 @@ func (c *Console) executeCaptureMode(
 	if err != nil {
 		errMsg := formatInternalError("Error creating stderr pipe: %v", err)
 		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true})
-		fmt.Fprintln(c.cfg.Err, errMsg)
+		_, _ = fmt.Fprintln(c.cfg.Err, errMsg)
 		if closeErr := stdoutPipe.Close(); closeErr != nil && c.cfg.Debug {
-			fmt.Fprintf(c.cfg.Err, "[DEBUG] Error closing stdout pipe: %v\n", closeErr)
+			_, _ = fmt.Fprintf(c.cfg.Err, "[DEBUG] Error closing stdout pipe: %v\n", closeErr)
 		}
 		close(cmdDone) // Signal that command has finished (failed to create pipe)
 		return 1, err
@@ -1403,12 +1402,12 @@ func (c *Console) executeCaptureMode(
 	if err := cmd.Start(); err != nil {
 		errMsg := formatInternalError("Error starting command '%s': %v", strings.Join(cmd.Args, " "), err)
 		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true})
-		fmt.Fprintln(c.cfg.Err, errMsg)
+		_, _ = fmt.Fprintln(c.cfg.Err, errMsg)
 		if closeErr := stdoutPipe.Close(); closeErr != nil && c.cfg.Debug {
-			fmt.Fprintf(c.cfg.Err, "[DEBUG] Error closing stdout pipe: %v\n", closeErr)
+			_, _ = fmt.Fprintf(c.cfg.Err, "[DEBUG] Error closing stdout pipe: %v\n", closeErr)
 		}
 		if closeErr := stderrPipe.Close(); closeErr != nil && c.cfg.Debug {
-			fmt.Fprintf(c.cfg.Err, "[DEBUG] Error closing stderr pipe: %v\n", closeErr)
+			_, _ = fmt.Fprintf(c.cfg.Err, "[DEBUG] Error closing stderr pipe: %v\n", closeErr)
 		}
 		close(cmdDone) // Signal that command has finished (failed to start)
 		return getExitCode(err, c.cfg.Debug), err

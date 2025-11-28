@@ -153,8 +153,6 @@ func LoadConfig() *AppConfig {
 			copiedTheme := design.DeepCopyConfig(themeFromFile)
 			if copiedTheme != nil {
 				copiedTheme.ThemeName = name
-				// Normalize color strings after YAML unmarshal to ensure proper ANSI escape sequences
-				normalizeThemeColors(copiedTheme)
 				appCfg.Themes[name] = copiedTheme
 				if appCfg.Debug || debugEnabled {
 					fmt.Fprintf(os.Stderr, "Loaded/Overwrote Theme from YAML: %s (IsMonochrome: %t)\n", name, copiedTheme.IsMonochrome)
@@ -226,17 +224,6 @@ func getConfigPath() string {
 	return "" // No config file found or UserConfigDir was problematic
 }
 
-// normalizeThemeColors is no longer needed - lipgloss.Color handles color format detection automatically.
-// YAML unmarshaling will work correctly with lipgloss.Color (which is a string type).
-// Users can specify colors as: "111" (256-color), "#87afff" (hex), "red" (color name), etc.
-func normalizeThemeColors(cfg *design.Config) {
-	// No-op: lipgloss handles color normalization automatically
-	if cfg == nil || cfg.IsMonochrome {
-		return
-	}
-	// Colors are already lipgloss.Color, which handles format detection
-}
-
 // LoadThemeFromFile loads a custom theme from a YAML file.
 func LoadThemeFromFile(filePath string) (*design.Config, error) {
 	// #nosec G304 -- filePath is from user-provided --theme-file flag
@@ -254,9 +241,6 @@ func LoadThemeFromFile(filePath string) (*design.Config, error) {
 	// Set theme name based on file name
 	baseName := filepath.Base(filePath)
 	themeConfig.ThemeName = baseName
-
-	// Normalize color strings after YAML unmarshal
-	normalizeThemeColors(&themeConfig)
 
 	return &themeConfig, nil
 }

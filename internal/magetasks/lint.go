@@ -66,7 +66,7 @@ func LintStaticcheck() error {
 // LintGolangci runs golangci-lint.
 func LintGolangci() error {
 	if err := Run("Golangci-lint", "golangci-lint", "run",
-		"--disable=exhaustruct,varnamelen,ireturn,wrapcheck,nlreturn,gochecknoglobals,mnd,depguard,tagalign,tenv",
+		"--disable=exhaustruct,varnamelen,ireturn,wrapcheck,nlreturn,gochecknoglobals,mnd,depguard,tagalign",
 		"--timeout=5m",
 		"./..."); err != nil {
 		if IsCommandNotFound(err) {
@@ -81,7 +81,7 @@ func LintGolangci() error {
 // LintGolangciFix runs golangci-lint with auto-fixes.
 func LintGolangciFix() error {
 	if err := Run("Golangci-lint Fix", "golangci-lint", "run", "--fix",
-		"--disable=exhaustruct,varnamelen,ireturn,wrapcheck,nlreturn,gochecknoglobals,mnd,depguard,tagalign,tenv",
+		"--disable=exhaustruct,varnamelen,ireturn,wrapcheck,nlreturn,gochecknoglobals,mnd,depguard,tagalign",
 		"--timeout=5m",
 		"./..."); err != nil {
 		if IsCommandNotFound(err) {

@@ -30,6 +30,10 @@ type Task struct {
 	OutputLines []OutputLine
 	outputLock  sync.Mutex // Mutex to protect concurrent access to OutputLines and related context
 
+	// Incremental counters for O(1) context updates (updated in AddOutputLine)
+	errorCount   int
+	warningCount int
+
 	// Configuration and context
 	Config  *Config
 	Context TaskContext
@@ -141,6 +145,7 @@ func NewTask(label, intent, command string, args []string, config *Config) *Task
 
 // AddOutputLine appends a new classified output line to the task's OutputLines.
 // This method is thread-safe due to the use of outputLock.
+// It also updates incremental error/warning counters for O(1) context updates.
 func (t *Task) AddOutputLine(content, lineType string, context LineContext) {
 	t.outputLock.Lock()         // Acquire lock before modifying shared OutputLines.
 	defer t.outputLock.Unlock() // Ensure lock is released when function exits.
@@ -151,6 +156,14 @@ func (t *Task) AddOutputLine(content, lineType string, context LineContext) {
 		Timestamp: time.Now(), // Timestamp the line addition.
 		Context:   context,
 	})
+
+	// Update incremental counters for O(1) context updates
+	switch lineType {
+	case TypeError:
+		t.errorCount++
+	case TypeWarning:
+		t.warningCount++
+	}
 }
 
 // Complete finalizes the task's status based on its exit code and output analysis.
@@ -178,43 +191,25 @@ func (t *Task) Complete(exitCode int) {
 	}
 }
 
-// hasOutputIssues checks the collected OutputLines for any lines classified as errors or warnings.
-// This method is thread-safe for reading OutputLines.
+// hasOutputIssues checks if there are any errors or warnings using incremental counters.
+// This method is thread-safe and O(1).
 func (t *Task) hasOutputIssues() (bool, bool) {
-	t.outputLock.Lock()         // Acquire lock for reading shared OutputLines.
-	defer t.outputLock.Unlock() // Release lock.
-
-	var hasErrors, hasWarnings bool
-	for _, line := range t.OutputLines {
-		switch line.Type {
-		case TypeError:
-			hasErrors = true
-		case TypeWarning:
-			hasWarnings = true
-			// Note: TypeInfo, TypeDetail, etc., are not considered "issues" for status determination.
-		}
-	}
-	return hasErrors, hasWarnings
+	t.outputLock.Lock()
+	defer t.outputLock.Unlock()
+	return t.errorCount > 0, t.warningCount > 0
 }
 
 // UpdateTaskContext heuristically adjusts the task's cognitive load and complexity
-// based on the analysis of its output lines. This method is thread-safe.
+// based on the analysis of its output lines. This method is thread-safe and O(1)
+// due to incremental counters maintained by AddOutputLine.
 func (t *Task) UpdateTaskContext() {
-	t.outputLock.Lock()         // Acquire lock for reading OutputLines and writing to t.Context.
-	defer t.outputLock.Unlock() // Release lock.
+	t.outputLock.Lock()
+	defer t.outputLock.Unlock()
 
-	errorCount := 0
-	warningCount := 0
-	for _, line := range t.OutputLines {
-		switch line.Type {
-		case TypeError:
-			errorCount++
-		case TypeWarning:
-			warningCount++
-		}
-	}
-
-	outputSize := len(t.OutputLines) // Safely read length while holding the lock.
+	// Use pre-computed counters instead of iterating (O(1) instead of O(N))
+	errorCount := t.errorCount
+	warningCount := t.warningCount
+	outputSize := len(t.OutputLines)
 
 	// Get configurable thresholds (with sensible defaults if not set)
 	veryHighThreshold := t.Config.ComplexityThresholds.VeryHigh
@@ -264,11 +259,37 @@ func (t *Task) UpdateTaskContext() {
 
 // OutputLinesLock provides external access to lock the task's outputLock.
 // This is used by cmd/main.go to synchronize reading of OutputLines when rendering.
+// Deprecated: Use GetOutputLinesSnapshot or ProcessOutputLines instead to avoid
+// exposing internal locking to callers, which can cause deadlocks if the caller
+// panics or forgets to unlock.
 func (t *Task) OutputLinesLock() {
 	t.outputLock.Lock()
 }
 
 // OutputLinesUnlock provides external access to unlock the task's outputLock.
+// Deprecated: Use GetOutputLinesSnapshot or ProcessOutputLines instead.
 func (t *Task) OutputLinesUnlock() {
 	t.outputLock.Unlock()
+}
+
+// GetOutputLinesSnapshot returns a thread-safe copy of the output lines.
+// This is the preferred way to read output lines from external code.
+func (t *Task) GetOutputLinesSnapshot() []OutputLine {
+	t.outputLock.Lock()
+	defer t.outputLock.Unlock()
+
+	// Return a copy to prevent external modification and race conditions
+	snapshot := make([]OutputLine, len(t.OutputLines))
+	copy(snapshot, t.OutputLines)
+	return snapshot
+}
+
+// ProcessOutputLines calls the provided function with the output lines while
+// holding the lock. This is useful when you need to iterate over the lines
+// without making a copy. The function should not modify the slice or store
+// references to it beyond the function call.
+func (t *Task) ProcessOutputLines(fn func(lines []OutputLine)) {
+	t.outputLock.Lock()
+	defer t.outputLock.Unlock()
+	fn(t.OutputLines)
 }

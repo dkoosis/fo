@@ -1,7 +1,6 @@
 package config
 
 import (
-	"os"
 	"testing"
 
 	"github.com/dkoosis/fo/pkg/design"
@@ -58,8 +57,7 @@ func TestResolveConfig_PriorityOrder(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set up environment
 			for k, v := range tt.envVars {
-				os.Setenv(k, v)
-				defer os.Unsetenv(k)
+				t.Setenv(k, v)
 			}
 
 			resolved, err := ResolveConfig(tt.cliFlags)

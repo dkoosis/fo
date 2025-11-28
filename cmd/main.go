@@ -168,7 +168,7 @@ func run(args []string) int {
 			fmt.Fprintf(os.Stderr, "[fo] Error generating JSON output: %v\n", jsonErr)
 			return 1
 		}
-		fmt.Fprintf(os.Stdout, "%s\n", string(jsonOutput))
+		_, _ = fmt.Fprintf(os.Stdout, "%s\n", string(jsonOutput))
 		return exitCode
 	}
 
