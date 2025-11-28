@@ -303,14 +303,13 @@ func (t *Task) RenderStartLine() string {
 		sb.WriteString("...")
 	} else {
 		headerStyle := t.Config.GetElementStyle("Task_Label_Header")
-		startIndicatorStyle := t.Config.GetElementStyle("Task_StartIndicator_Line")
 
 		if t.Config.Style.UseBoxes {
 			// Use BoxLayout for consistent dimension calculations
 			box := t.Config.NewBoxLayout(getTerminalWidth())
 
-			// Render top border with label (Phase 2: using lipgloss.Style)
-			labelStyle := t.Config.GetStyleFromElement(headerStyle, "")
+			// Render top border with label using unified style helper
+			labelStyle := t.Config.BuildStyle("Task_Label_Header")
 			labelText := applyTextCase(t.Label, headerStyle.TextCase)
 			styledLabel := labelStyle.Render(labelText)
 
@@ -322,7 +321,7 @@ func (t *Task) RenderStartLine() string {
 			sb.WriteString(t.Config.GetIndentation(1))
 		} else {
 			h2Style := t.Config.GetElementStyle("H2_Target_Title")
-			labelStyle := t.Config.GetStyleFromElement(h2Style, "")
+			labelStyle := t.Config.BuildStyle("H2_Target_Title")
 			labelText := h2Style.Prefix + applyTextCase(t.Label, h2Style.TextCase)
 			sb.WriteString(labelStyle.Render(labelText))
 			sb.WriteString("\n\n")
@@ -330,7 +329,8 @@ func (t *Task) RenderStartLine() string {
 		}
 
 		processLabelText := getProcessLabel(t.Intent)
-		processStyle := t.Config.GetStyleFromElement(startIndicatorStyle, "Process")
+		processStyle := t.Config.BuildStyle("Task_StartIndicator_Line", "Process")
+		startIndicatorStyle := t.Config.GetElementStyle("Task_StartIndicator_Line")
 		icon := t.Config.GetIcon(startIndicatorStyle.IconKey)
 		if icon == "" {
 			icon = t.Config.GetIcon("Start")

@@ -185,16 +185,6 @@ func (c *Console) getTerminalWidth() int {
 	return width
 }
 
-// contains checks if a slice contains a string.
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
-}
-
 // PrintSectionHeader prints a section header and starts a section box.
 // Uses lipgloss for consistent box rendering.
 func (c *Console) PrintSectionHeader(name string) {
@@ -208,13 +198,9 @@ func (c *Console) PrintSectionHeader(name string) {
 
 	box := c.calculateBoxLayout()
 	title := strings.ToUpper(name)
-	headerStyleCfg := cfg.GetElementStyle("Task_Label_Header")
 
-	// Build title style using lipgloss
-	titleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(string(cfg.GetColor(headerStyleCfg.ColorFG, "Task_Label_Header"))))
-	if contains(headerStyleCfg.TextStyle, "bold") {
-		titleStyle = titleStyle.Bold(true)
-	}
+	// Build title style using unified helper
+	titleStyle := cfg.BuildStyle("Task_Label_Header")
 	styledTitle := titleStyle.Render(title)
 
 	// Use lipgloss to render complete box with top border and title
@@ -562,13 +548,9 @@ func (c *Console) PrintH1Header(name string) {
 		sb.WriteString(title)
 		sb.WriteString(" ===\n")
 	} else {
-		// Get styles for border and title
+		// Get styles for border and title using unified helpers
 		borderStyle := c.getPaleGrayStyle()
-		headerStyleCfg := cfg.GetElementStyle("H1_Major_Header")
-		titleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(string(cfg.GetColor(headerStyleCfg.ColorFG, "H1_Major_Header"))))
-		if contains(headerStyleCfg.TextStyle, "bold") {
-			titleStyle = titleStyle.Bold(true)
-		}
+		titleStyle := cfg.BuildStyle("H1_Major_Header")
 
 		// Get border characters from design package (single source of truth)
 		borderChars := cfg.ResolveBorderChars()

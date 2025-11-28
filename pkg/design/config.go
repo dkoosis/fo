@@ -1076,36 +1076,61 @@ func (c *Config) GetStyleWithBackground(fgKey, bgKey string) lipgloss.Style {
 }
 
 // GetStyleFromElement builds a lipgloss.Style from an ElementStyleDef.
-// This is used in Phase 2+ to convert element styles to lipgloss styles.
+// This is the unified way to convert element styles to lipgloss styles.
+// Parameters:
+//   - element: The ElementStyleDef containing style configuration
+//   - fallbackColorKey: Used if element.ColorFG is empty
+//
+// Handles: foreground color, background color, bold, italic, and underline.
 func (c *Config) GetStyleFromElement(element ElementStyleDef, fallbackColorKey string) lipgloss.Style {
 	if c.IsMonochrome {
 		return lipgloss.NewStyle()
 	}
 
+	style := lipgloss.NewStyle()
+
+	// Apply foreground color
 	colorKey := element.ColorFG
 	if colorKey == "" {
 		colorKey = fallbackColorKey
 	}
-	if colorKey == "" {
-		return lipgloss.NewStyle()
+	if colorKey != "" {
+		if color := c.GetColor(colorKey); color != "" {
+			style = style.Foreground(color)
+		}
 	}
 
-	color := c.GetColor(colorKey)
-	if color == "" {
-		return lipgloss.NewStyle()
+	// Apply background color
+	if element.ColorBG != "" {
+		if bgColor := c.GetColor(element.ColorBG); bgColor != "" {
+			style = style.Background(bgColor)
+		}
 	}
-
-	style := lipgloss.NewStyle().Foreground(color)
 
 	// Apply text styles
-	if contains(element.TextStyle, "bold") {
-		style = style.Bold(true)
-	}
-	if contains(element.TextStyle, "italic") {
-		style = style.Italic(true)
+	for _, textStyle := range element.TextStyle {
+		switch textStyle {
+		case "bold":
+			style = style.Bold(true)
+		case "italic":
+			style = style.Italic(true)
+		case "underline":
+			style = style.Underline(true)
+		}
 	}
 
 	return style
+}
+
+// BuildStyle is a convenience method that gets an element style by name and builds
+// a lipgloss.Style from it. This combines GetElementStyle and GetStyleFromElement.
+func (c *Config) BuildStyle(elementName string, fallbackColorKey ...string) lipgloss.Style {
+	element := c.GetElementStyle(elementName)
+	fallback := ""
+	if len(fallbackColorKey) > 0 {
+		fallback = fallbackColorKey[0]
+	}
+	return c.GetStyleFromElement(element, fallback)
 }
 
 // DeepCopyConfig creates a deep copy of the Config using JSON marshal/unmarshal.
