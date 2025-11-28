@@ -705,35 +705,27 @@ func (c *Console) FormatTestName(name, status string) string {
 }
 
 // SuccessMsg returns a themed success message with icon and color.
+// Uses RenderDirectMessage as the single rendering engine.
 func (c *Console) SuccessMsg(msg string) string {
-	icon := c.GetIcon("Success")
-	color := c.GetColor("Success")
-	reset := c.designConf.ResetColor()
-	return fmt.Sprintf("%s%s%s %s", color, icon, reset, msg)
+	return strings.TrimSuffix(design.RenderDirectMessage(c.designConf, "success", "", msg, 0), "\n")
 }
 
 // InfoMsg returns a themed info message with icon and color.
+// Uses RenderDirectMessage as the single rendering engine.
 func (c *Console) InfoMsg(msg string) string {
-	icon := c.GetIcon("Info")
-	color := c.GetColor("BlueFg")
-	reset := c.designConf.ResetColor()
-	return fmt.Sprintf("%s%s%s %s", color, icon, reset, msg)
+	return strings.TrimSuffix(design.RenderDirectMessage(c.designConf, "info", "", msg, 0), "\n")
 }
 
 // WarnMsg returns a themed warning message with icon and color.
+// Uses RenderDirectMessage as the single rendering engine.
 func (c *Console) WarnMsg(msg string) string {
-	icon := c.GetIcon("Warning")
-	color := c.GetColor("Warning")
-	reset := c.designConf.ResetColor()
-	return fmt.Sprintf("%s%s%s %s", color, icon, reset, msg)
+	return strings.TrimSuffix(design.RenderDirectMessage(c.designConf, "warning", "", msg, 0), "\n")
 }
 
 // ErrorMsg returns a themed error message with icon and color.
+// Uses RenderDirectMessage as the single rendering engine.
 func (c *Console) ErrorMsg(msg string) string {
-	icon := c.GetIcon("Error")
-	color := c.GetColor("Error")
-	reset := c.designConf.ResetColor()
-	return fmt.Sprintf("%s%s%s %s", color, icon, reset, msg)
+	return strings.TrimSuffix(design.RenderDirectMessage(c.designConf, "error", "", msg, 0), "\n")
 }
 
 // FormatPath formats a file path with directory in muted color and filename in white.
