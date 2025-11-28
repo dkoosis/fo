@@ -27,3 +27,18 @@ func TestGetStyleWithFallbackMonochrome(t *testing.T) {
 		t.Fatalf("expected unstyled text in monochrome mode, got %q", rendered)
 	}
 }
+
+func TestGetStyleWithFallbackReturnsEmptyWithNoValidColors(t *testing.T) {
+	cfg := DefaultConfig()
+
+	// Ensure no colors are available for the test
+	cfg.Colors.Warning = ""
+	cfg.Colors.Process = ""
+	cfg.Colors.Success = ""
+
+	result := cfg.GetStyleWithFallback("Warning", "Process", "Success").Render("text")
+
+	if result != "text" {
+		t.Fatalf("expected unstyled text when no colors are available, got %q", result)
+	}
+}
