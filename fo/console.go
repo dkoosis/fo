@@ -160,29 +160,33 @@ func NewConsole(cfg ConsoleConfig) *Console {
 	}
 }
 
-// getPaleGrayColor returns a very pale gray ANSI color code.
-func (c *Console) getPaleGrayColor() string {
-	return "\033[38;5;252m"
+// getPaleGrayStyle returns a lipgloss style with pale gray foreground.
+func (c *Console) getPaleGrayStyle() lipgloss.Style {
+	if c.designConf.IsMonochrome {
+		return lipgloss.NewStyle()
+	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 }
 
-// getVeryPaleGrayColor returns an even paler, thinner gray for orca theme borders.
-func (c *Console) getVeryPaleGrayColor() string {
-	return "\033[38;5;250m" // Lighter than 252, appears thinner
-}
-
-// getFaintDarkGrayColor returns a very faint darkish gray ANSI color code.
-func (c *Console) getFaintDarkGrayColor() string {
-	return "\033[38;5;238m"
+// getBorderColor returns the appropriate lipgloss color for borders based on theme.
+func (c *Console) getBorderColor() lipgloss.Color {
+	if c.designConf.IsMonochrome {
+		return lipgloss.Color("")
+	}
+	if c.designConf.ThemeName == "orca" {
+		return lipgloss.Color("250") // Very pale gray for orca
+	}
+	return lipgloss.Color("238") // Faint dark gray for others
 }
 
 // BoxLayout defines the dimensions and styling of a rendered box.
 // This provides a single source of truth for all box rendering calculations.
 type BoxLayout struct {
-	TotalWidth   int    // Full terminal width
-	ContentWidth int    // Available width for content (TotalWidth - borders - padding)
-	LeftPadding  int    // Spaces after left border (typically 2)
-	RightPadding int    // Spaces before right border (typically 1)
-	BorderColor  string // ANSI color for borders
+	TotalWidth   int            // Full terminal width
+	ContentWidth int            // Available width for content (TotalWidth - borders - padding)
+	LeftPadding  int            // Spaces after left border (typically 2)
+	RightPadding int            // Spaces before right border (typically 1)
+	BorderColor  lipgloss.Color // Color for borders
 	BorderChars  BorderChars
 	BorderStyle  lipgloss.Style // Lipgloss style for rendering boxes
 }
@@ -216,10 +220,7 @@ func (c *Console) calculateBoxLayout() *BoxLayout {
 	totalWidth := terminalWidth
 
 	// Determine border color based on theme
-	borderColor := c.getFaintDarkGrayColor()
-	if cfg.ThemeName == "orca" {
-		borderColor = c.getVeryPaleGrayColor()
-	}
+	borderColor := c.getBorderColor()
 
 	// Determine border characters based on theme
 	borderChars := c.getBorderChars(cfg)
@@ -238,15 +239,9 @@ func (c *Console) calculateBoxLayout() *BoxLayout {
 		BottomRight: borderChars.BottomRight,
 	}
 
-	// Parse border color to lipgloss color
-	borderLipglossColor := lipgloss.Color(borderColor)
-	if borderColor == "" {
-		borderLipglossColor = lipgloss.Color("250") // Default gray
-	}
-
 	borderStyle := lipgloss.NewStyle().
 		Border(lipglossBorder).
-		BorderForeground(borderLipglossColor).
+		BorderForeground(borderColor).
 		Width(totalWidth - 2). // Width sets content area; borders add 2 for total width
 		PaddingLeft(2).
 		PaddingRight(1).
@@ -333,20 +328,15 @@ func (c *Console) PrintSectionHeader(name string) {
 	}
 
 	box := c.calculateBoxLayout()
-	reset := cfg.ResetColor()
 	title := strings.ToUpper(name)
-	headerStyle := cfg.GetElementStyle("Task_Label_Header")
-	labelColor := cfg.GetColor(headerStyle.ColorFG, "Task_Label_Header")
+	headerStyleCfg := cfg.GetElementStyle("Task_Label_Header")
 
-	// Build styled title
-	var titleBuilder strings.Builder
-	titleBuilder.WriteString(string(labelColor))
-	if contains(headerStyle.TextStyle, "bold") {
-		titleBuilder.WriteString(string(cfg.GetColor("Bold")))
+	// Build title style using lipgloss
+	titleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(string(cfg.GetColor(headerStyleCfg.ColorFG, "Task_Label_Header"))))
+	if contains(headerStyleCfg.TextStyle, "bold") {
+		titleStyle = titleStyle.Bold(true)
 	}
-	titleBuilder.WriteString(title)
-	titleBuilder.WriteString(string(reset))
-	styledTitle := titleBuilder.String()
+	styledTitle := titleStyle.Render(title)
 
 	// Use lipgloss to render complete box with top border and title
 	// Render top border using lipgloss (empty content with top border enabled)
@@ -685,8 +675,6 @@ func (c *Console) PrintH1Header(name string) {
 	}
 
 	title := strings.ToUpper(name)
-	paleGray := c.getPaleGrayColor()
-	reset := cfg.ResetColor()
 
 	var sb strings.Builder
 
@@ -695,53 +683,48 @@ func (c *Console) PrintH1Header(name string) {
 		sb.WriteString(title)
 		sb.WriteString(" ===\n")
 	} else {
+		// Get styles for border and title
+		borderStyle := c.getPaleGrayStyle()
 		headerStyle := cfg.GetElementStyle("H1_Major_Header")
-		labelColor := cfg.GetColor(headerStyle.ColorFG, "H1_Major_Header")
+		titleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(string(cfg.GetColor(headerStyle.ColorFG, "H1_Major_Header"))))
+		if contains(headerStyle.TextStyle, "bold") {
+			titleStyle = titleStyle.Bold(true)
+		}
 
+		// Get border characters
 		topCorner := cfg.Border.TopCornerChar
 		headerChar := cfg.Border.HeaderChar
 		closingCorner := BoxCornerTopRightSingle
 		if topCorner == BorderCornerDouble {
 			closingCorner = BoxCornerTopRightDouble
 		}
-		sb.WriteString(paleGray)
-		sb.WriteString(topCorner)
-		sb.WriteString(strings.Repeat(headerChar, headerWidth))
-		sb.WriteString(closingCorner)
-		sb.WriteString(string(reset))
-		sb.WriteString("\n")
-
-		sb.WriteString(paleGray)
-		sb.WriteString(cfg.Border.VerticalChar)
-		sb.WriteString(string(reset))
-		sb.WriteString("  ")
-		sb.WriteString(string(labelColor))
-		if contains(headerStyle.TextStyle, "bold") {
-			sb.WriteString(string(cfg.GetColor("Bold")))
-		}
-		sb.WriteString(title)
-		sb.WriteString(string(reset))
-		titleLen := len(title) + 3
-		remainingWidth := headerWidth + 2 - titleLen - 1
-		if remainingWidth < 0 {
-			remainingWidth = 0
-		}
-		sb.WriteString(strings.Repeat(" ", remainingWidth))
-		sb.WriteString(paleGray)
-		sb.WriteString(cfg.Border.VerticalChar)
-		sb.WriteString(string(reset))
-		sb.WriteString("\n")
-
 		bottomCorner := cfg.Border.BottomCornerChar
 		bottomClosingCorner := BoxCornerBottomRightSingle
 		if bottomCorner == "╚" {
 			bottomClosingCorner = "╝"
 		}
-		sb.WriteString(paleGray)
-		sb.WriteString(bottomCorner)
-		sb.WriteString(strings.Repeat(headerChar, headerWidth))
-		sb.WriteString(bottomClosingCorner)
-		sb.WriteString(string(reset))
+
+		// Build top border line
+		topLine := topCorner + strings.Repeat(headerChar, headerWidth) + closingCorner
+		sb.WriteString(borderStyle.Render(topLine))
+		sb.WriteString("\n")
+
+		// Build content line: border + padding + title + padding + border
+		titleLen := len(title) + 3 // 2 spaces before title, 1 after
+		remainingWidth := headerWidth + 2 - titleLen - 1
+		if remainingWidth < 0 {
+			remainingWidth = 0
+		}
+		sb.WriteString(borderStyle.Render(cfg.Border.VerticalChar))
+		sb.WriteString("  ")
+		sb.WriteString(titleStyle.Render(title))
+		sb.WriteString(strings.Repeat(" ", remainingWidth))
+		sb.WriteString(borderStyle.Render(cfg.Border.VerticalChar))
+		sb.WriteString("\n")
+
+		// Build bottom border line
+		bottomLine := bottomCorner + strings.Repeat(headerChar, headerWidth) + bottomClosingCorner
+		sb.WriteString(borderStyle.Render(bottomLine))
 		sb.WriteString("\n")
 	}
 
