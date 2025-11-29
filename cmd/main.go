@@ -238,7 +238,7 @@ func runEditorMode(cliFlags config.CliFlags, fileAppConfig *config.AppConfig) in
 		ShowTimer:        false, // No timer for stdin processing
 		ShowTimerSet:     true,
 		ShowOutputMode:   "always",
-		LiveStreamOutput: false,
+		LiveStreamOutput: cliFlags.LiveStreamOutput,
 		PatternHint:      cliFlags.PatternHint,
 		Debug:            resolvedCfg.Debug,
 		MaxBufferSize:    resolvedCfg.MaxBufferSize,
@@ -246,7 +246,18 @@ func runEditorMode(cliFlags config.CliFlags, fileAppConfig *config.AppConfig) in
 		Design:           resolvedCfg.Theme,
 	}
 
-	// Read all stdin
+	console := fo.NewConsole(consoleCfg)
+
+	// Use live streaming mode if -s/--stream flag is set
+	if cliFlags.LiveStreamOutput {
+		if err := console.RunLive(os.Stdin); err != nil {
+			fmt.Fprintf(os.Stderr, "[fo] Error processing stream: %v\n", err)
+			return 1
+		}
+		return 0
+	}
+
+	// Batch mode: read all stdin, then process and render
 	input, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[fo] Error reading stdin: %v\n", err)
@@ -258,14 +269,10 @@ func runEditorMode(cliFlags config.CliFlags, fileAppConfig *config.AppConfig) in
 		return 0
 	}
 
-	// Create console and process
-	console := fo.NewConsole(consoleCfg)
-
 	// Create a task for the stdin processing
 	task := design.NewTask("stdin", "stream", "pipe", nil, resolvedCfg.Theme)
 
-	// Process through the processor (via console's internal processor)
-	// For now, use the console's ProcessStdin method which we'll add
+	// Process through the processor
 	console.ProcessStdin(task, input)
 
 	// Render output

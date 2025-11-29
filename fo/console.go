@@ -1746,3 +1746,41 @@ func (c *Console) ProcessStdin(task *design.Task, input []byte) {
 func (c *Console) ProcessStdinStream(input io.Reader, onLine LineCallback) error {
 	return c.processor.ProcessStream(input, "stdin", nil, onLine)
 }
+
+// RunLive processes streaming input with live terminal updates.
+// Lines are classified and rendered as they arrive, with in-place updates
+// for status information. Falls back to simple streaming on non-TTY outputs.
+func (c *Console) RunLive(input io.Reader) error {
+	renderer := NewLiveRenderer(c.cfg.Out)
+	renderer.Start()
+	defer renderer.Complete()
+
+	// Track lines for potential in-place updates
+	var currentLines []string
+	maxDisplayLines := 20 // Limit visible history for performance
+
+	err := c.processor.ProcessStream(input, "stdin", nil, func(line string, lineType string, ctx design.LineContext) {
+		// Create a temporary task for rendering this line
+		tempTask := design.NewTask("", "", "", nil, c.designConf)
+		rendered := tempTask.RenderOutputLine(design.OutputLine{
+			Content: line,
+			Type:    lineType,
+			Context: ctx,
+		})
+
+		if renderer.IsTTY() {
+			// TTY mode: accumulate and re-render for smooth updates
+			currentLines = append(currentLines, rendered)
+			if len(currentLines) > maxDisplayLines {
+				// Trim old lines, keep recent history
+				currentLines = currentLines[len(currentLines)-maxDisplayLines:]
+			}
+			renderer.Render(currentLines)
+		} else {
+			// Non-TTY: simple line-by-line output
+			renderer.AppendLine(rendered)
+		}
+	})
+
+	return err
+}
