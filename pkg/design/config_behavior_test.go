@@ -171,14 +171,17 @@ func TestDeepCopyConfig_CreatesIndependentCopy_When_ConfigContainsNestedStructs(
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
+			// Make a copy of the source to avoid race conditions when running in parallel
+			var sourceCopy *Config
 			if tc.source != nil {
-				tc.source.Patterns.Intent["deploy"] = []string{"blue"}
-				tc.source.Elements["Custom"] = ElementStyleDef{Text: "original"}
+				sourceCopy = DeepCopyConfig(tc.source)
+				sourceCopy.Patterns.Intent["deploy"] = []string{"blue"}
+				sourceCopy.Elements["Custom"] = ElementStyleDef{Text: "original"}
 			}
 
-			cfgCopy := DeepCopyConfig(tc.source)
+			cfgCopy := DeepCopyConfig(sourceCopy)
 
-			if tc.source == nil {
+			if sourceCopy == nil {
 				assert.Nil(t, cfgCopy)
 				return
 			}
@@ -189,8 +192,8 @@ func TestDeepCopyConfig_CreatesIndependentCopy_When_ConfigContainsNestedStructs(
 			cfgCopy.Patterns.Intent["deploy"][0] = "green"
 			cfgCopy.Elements["Custom"] = ElementStyleDef{Text: "modified"}
 
-			assert.Equal(t, []string{"blue"}, tc.source.Patterns.Intent["deploy"])
-			assert.Equal(t, ElementStyleDef{Text: "original"}, tc.source.Elements["Custom"])
+			assert.Equal(t, []string{"blue"}, sourceCopy.Patterns.Intent["deploy"])
+			assert.Equal(t, ElementStyleDef{Text: "original"}, sourceCopy.Elements["Custom"])
 		})
 	}
 }
@@ -301,7 +304,8 @@ func TestConfig_UsesReflection_When_FeatureFlagEnabled(t *testing.T) {
 }
 
 func TestConfig_ReflectionMatchesSwitch_When_AllColors(t *testing.T) {
-	t.Parallel()
+	// Cannot use t.Parallel() because this test modifies the global environment variable
+	// FO_USE_REFLECTION_COLORS, which causes race conditions when multiple tests run concurrently.
 
 	// Save original env value
 	originalEnv := os.Getenv("FO_USE_REFLECTION_COLORS")
@@ -329,7 +333,6 @@ func TestConfig_ReflectionMatchesSwitch_When_AllColors(t *testing.T) {
 	}
 
 	// Test with reflection-based
-	// Cannot use t.Setenv() with t.Parallel() - they are incompatible
 	_ = os.Setenv("FO_USE_REFLECTION_COLORS", "1") //nolint:errcheck,usetesting
 	cfgReflection := UnicodeVibrantTheme()
 	reflectionResults := make(map[string]string)
@@ -340,6 +343,7 @@ func TestConfig_ReflectionMatchesSwitch_When_AllColors(t *testing.T) {
 	// Compare results - they should match
 	for _, color := range colorsToTest {
 		t.Run(color, func(t *testing.T) {
+			// Subtests can run in parallel since they only read the pre-computed results
 			t.Parallel()
 			assert.Equal(t, switchResults[color], reflectionResults[color],
 				"Reflection and switch should produce same result for color: %s", color)
