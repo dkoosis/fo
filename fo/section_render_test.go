@@ -171,3 +171,88 @@ func TestLiveSection_GetRows_When_ConcurrentAccess(t *testing.T) {
 	rows := ls.GetRows()
 	assert.Len(t, rows, numGoroutines)
 }
+
+func TestLiveSection_AddRowWithExpansion_When_ExpandedContentProvided(t *testing.T) {
+	t.Parallel()
+
+	ls := NewLiveSection("Test Section", func(*LiveSection) error { return nil })
+	expandedContent := []string{"Detail 1", "Detail 2", "Detail 3"}
+	ls.AddRowWithExpansion("row1", "Summary", expandedContent)
+
+	rows := ls.GetRows()
+	assert.Len(t, rows, 1)
+	assert.Equal(t, "Summary", rows[0].Content)
+	assert.False(t, rows[0].Expanded)
+	assert.Equal(t, expandedContent, rows[0].ExpandedContent)
+}
+
+func TestLiveSection_ExpandRow_When_ExistingRow(t *testing.T) {
+	t.Parallel()
+
+	ls := NewLiveSection("Test Section", func(*LiveSection) error { return nil })
+	ls.AddRowWithExpansion("row1", "Summary", []string{"Detail 1"})
+	ls.ExpandRow("row1")
+
+	rows := ls.GetRows()
+	assert.Len(t, rows, 1)
+	assert.True(t, rows[0].Expanded)
+}
+
+func TestLiveSection_CollapseRow_When_ExpandedRow(t *testing.T) {
+	t.Parallel()
+
+	ls := NewLiveSection("Test Section", func(*LiveSection) error { return nil })
+	ls.AddRowWithExpansion("row1", "Summary", []string{"Detail 1"})
+	ls.ExpandRow("row1")
+	ls.CollapseRow("row1")
+
+	rows := ls.GetRows()
+	assert.Len(t, rows, 1)
+	assert.False(t, rows[0].Expanded)
+}
+
+func TestLiveSection_ToggleRowExpansion_When_ExistingRow(t *testing.T) {
+	t.Parallel()
+
+	ls := NewLiveSection("Test Section", func(*LiveSection) error { return nil })
+	ls.AddRowWithExpansion("row1", "Summary", []string{"Detail 1"})
+	
+	// Toggle from false to true
+	ls.ToggleRowExpansion("row1")
+	rows := ls.GetRows()
+	assert.True(t, rows[0].Expanded)
+
+	// Toggle from true to false
+	ls.ToggleRowExpansion("row1")
+	rows = ls.GetRows()
+	assert.False(t, rows[0].Expanded)
+}
+
+func TestLiveSection_SetExpandedContent_When_ExistingRow(t *testing.T) {
+	t.Parallel()
+
+	ls := NewLiveSection("Test Section", func(*LiveSection) error { return nil })
+	ls.AddRow("row1", "Summary")
+	ls.SetExpandedContent("row1", []string{"New Detail 1", "New Detail 2"})
+
+	rows := ls.GetRows()
+	assert.Len(t, rows, 1)
+	assert.Equal(t, []string{"New Detail 1", "New Detail 2"}, rows[0].ExpandedContent)
+}
+
+func TestLiveSection_GetRows_When_ExpandedContent(t *testing.T) {
+	t.Parallel()
+
+	ls := NewLiveSection("Test Section", func(*LiveSection) error { return nil })
+	expandedContent := []string{"Detail 1", "Detail 2"}
+	ls.AddRowWithExpansion("row1", "Summary", expandedContent)
+	ls.ExpandRow("row1")
+
+	rows := ls.GetRows()
+	assert.Len(t, rows, 1)
+	assert.True(t, rows[0].Expanded)
+	assert.Equal(t, expandedContent, rows[0].ExpandedContent)
+	// Verify it's a deep copy (modifying original shouldn't affect snapshot)
+	expandedContent[0] = "Modified"
+	assert.Equal(t, []string{"Detail 1", "Detail 2"}, rows[0].ExpandedContent)
+}

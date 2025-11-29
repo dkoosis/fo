@@ -375,9 +375,10 @@ type Section struct {
 
 // LiveRow represents a single row in a LiveSection that can be updated dynamically.
 type LiveRow struct {
-	ID      string // Unique identifier for the row
-	Content string // Current content of the row
-	Expanded bool  // Whether the row is expanded (for future use in #151)
+	ID             string   // Unique identifier for the row
+	Content        string   // Current content of the row (summary line)
+	Expanded        bool     // Whether the row is expanded
+	ExpandedContent []string // Additional content lines shown when expanded
 }
 
 // LiveSection represents a section that can update its content in real-time.
@@ -402,12 +403,22 @@ func NewLiveSection(name string, run func(*LiveSection) error) *LiveSection {
 
 // AddRow adds or updates a row in the LiveSection.
 func (ls *LiveSection) AddRow(id, content string) {
+	ls.AddRowWithExpansion(id, content, nil)
+}
+
+// AddRowWithExpansion adds or updates a row with expandable content.
+// If expandedContent is provided, the row can be expanded to show additional details.
+func (ls *LiveSection) AddRowWithExpansion(id, content string, expandedContent []string) {
 	ls.mu.Lock()
 	defer ls.mu.Unlock()
+	if expandedContent == nil {
+		expandedContent = []string{}
+	}
 	ls.Rows[id] = &LiveRow{
-		ID:      id,
-		Content: content,
-		Expanded: false,
+		ID:             id,
+		Content:        content,
+		Expanded:       false,
+		ExpandedContent: expandedContent,
 	}
 }
 
@@ -427,16 +438,59 @@ func (ls *LiveSection) RemoveRow(id string) {
 	delete(ls.Rows, id)
 }
 
+// ExpandRow expands a row to show its expanded content.
+func (ls *LiveSection) ExpandRow(id string) {
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
+	if row, exists := ls.Rows[id]; exists {
+		row.Expanded = true
+	}
+}
+
+// CollapseRow collapses a row to hide its expanded content.
+func (ls *LiveSection) CollapseRow(id string) {
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
+	if row, exists := ls.Rows[id]; exists {
+		row.Expanded = false
+	}
+}
+
+// ToggleRowExpansion toggles the expansion state of a row.
+func (ls *LiveSection) ToggleRowExpansion(id string) {
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
+	if row, exists := ls.Rows[id]; exists {
+		row.Expanded = !row.Expanded
+	}
+}
+
+// SetExpandedContent sets the expanded content for a row.
+func (ls *LiveSection) SetExpandedContent(id string, expandedContent []string) {
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
+	if row, exists := ls.Rows[id]; exists {
+		if expandedContent == nil {
+			expandedContent = []string{}
+		}
+		row.ExpandedContent = expandedContent
+	}
+}
+
 // GetRows returns a snapshot of all rows in the LiveSection.
 func (ls *LiveSection) GetRows() []*LiveRow {
 	ls.mu.RLock()
 	defer ls.mu.RUnlock()
 	rows := make([]*LiveRow, 0, len(ls.Rows))
 	for _, row := range ls.Rows {
+		// Deep copy expanded content
+		expandedContent := make([]string, len(row.ExpandedContent))
+		copy(expandedContent, row.ExpandedContent)
 		rows = append(rows, &LiveRow{
-			ID:       row.ID,
-			Content:  row.Content,
-			Expanded: row.Expanded,
+			ID:             row.ID,
+			Content:        row.Content,
+			Expanded:       row.Expanded,
+			ExpandedContent: expandedContent,
 		})
 	}
 	return rows
