@@ -227,14 +227,14 @@ type Config struct {
 	cache *styleCache `yaml:"-"`
 
 	Style struct {
-		UseBoxes          bool   `yaml:"use_boxes"`
-		Indentation       string `yaml:"indentation"`
-		ShowTimestamps    bool   `yaml:"show_timestamps"`
-		NoTimer           bool   `yaml:"no_timer"`
-		Density           string `yaml:"density"`
-		NoSpinner         bool   `yaml:"no_spinner"`
-		SpinnerInterval   int    `yaml:"spinner_interval"`
-		HeaderWidth       int    `yaml:"header_width"` // Visual width of header content (default: 40)
+		UseBoxes        bool   `yaml:"use_boxes"`
+		Indentation     string `yaml:"indentation"`
+		ShowTimestamps  bool   `yaml:"show_timestamps"`
+		NoTimer         bool   `yaml:"no_timer"`
+		Density         string `yaml:"density"`
+		NoSpinner       bool   `yaml:"no_spinner"`
+		SpinnerInterval int    `yaml:"spinner_interval"`
+		HeaderWidth     int    `yaml:"header_width"` // Visual width of header content (default: 40)
 	} `yaml:"style"`
 
 	Border struct {
@@ -315,7 +315,6 @@ type PatternsRepo struct {
 	Intent map[string][]string `yaml:"intent"`
 	Output map[string][]string `yaml:"output"`
 }
-
 
 func DefaultConfig() *Config {
 	return UnicodeVibrantTheme()

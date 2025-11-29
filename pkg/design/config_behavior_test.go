@@ -44,7 +44,6 @@ func TestColor_SprintsWithReset_When_CodeIsProvided(t *testing.T) {
 	}
 }
 
-
 func TestConfig_ResetsToDefault_When_ResetColorMissing(t *testing.T) {
 	t.Parallel()
 

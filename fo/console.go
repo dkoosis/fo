@@ -379,8 +379,8 @@ type Section struct {
 
 // LiveRow represents a single row in a LiveSection that can be updated dynamically.
 type LiveRow struct {
-	ID             string   // Unique identifier for the row
-	Content        string   // Current content of the row (summary line)
+	ID              string   // Unique identifier for the row
+	Content         string   // Current content of the row (summary line)
 	Expanded        bool     // Whether the row is expanded
 	ExpandedContent []string // Additional content lines shown when expanded
 }
@@ -388,13 +388,13 @@ type LiveRow struct {
 // LiveSection represents a section that can update its content in real-time.
 // Rows can be added, updated, or removed dynamically during execution.
 type LiveSection struct {
-	Name           string              // Human-readable section name, shown in header
-	Description    string              // Optional description
-	Summary        string              // Optional summary message
-	Rows           map[string]*LiveRow // Map of row ID to row content
-	Run            func(*LiveSection) error // Work function that receives the LiveSection for updates
-	DefaultExpanded bool               // Default expansion state for new rows (default: false, collapsed)
-	mu             sync.RWMutex        // Protects Rows map
+	Name            string                   // Human-readable section name, shown in header
+	Description     string                   // Optional description
+	Summary         string                   // Optional summary message
+	Rows            map[string]*LiveRow      // Map of row ID to row content
+	Run             func(*LiveSection) error // Work function that receives the LiveSection for updates
+	DefaultExpanded bool                     // Default expansion state for new rows (default: false, collapsed)
+	mu              sync.RWMutex             // Protects Rows map
 }
 
 // NewLiveSection creates a new LiveSection with the given name and run function.
@@ -421,9 +421,9 @@ func (ls *LiveSection) AddRowWithExpansion(id, content string, expandedContent [
 		expandedContent = []string{}
 	}
 	ls.Rows[id] = &LiveRow{
-		ID:             id,
-		Content:        content,
-		Expanded:       ls.DefaultExpanded, // Use section's default expansion state
+		ID:              id,
+		Content:         content,
+		Expanded:        ls.DefaultExpanded, // Use section's default expansion state
 		ExpandedContent: expandedContent,
 	}
 }
@@ -513,9 +513,9 @@ func (ls *LiveSection) GetRows() []*LiveRow {
 		expandedContent := make([]string, len(row.ExpandedContent))
 		copy(expandedContent, row.ExpandedContent)
 		rows = append(rows, &LiveRow{
-			ID:             row.ID,
-			Content:        row.Content,
-			Expanded:       row.Expanded,
+			ID:              row.ID,
+			Content:         row.Content,
+			Expanded:        row.Expanded,
 			ExpandedContent: expandedContent,
 		})
 	}
@@ -564,7 +564,7 @@ func (c *Console) RunLiveSection(ls *LiveSection) SectionResult {
 	for _, row := range rows {
 		// Render the main content line
 		c.PrintSectionLine(row.Content)
-		
+
 		// Render expanded content if row is expanded
 		if row.Expanded && len(row.ExpandedContent) > 0 {
 			for _, expandedLine := range row.ExpandedContent {
@@ -1592,33 +1592,6 @@ func (c *Console) tryAdapterMode(
 	task.UpdateTaskContext()
 
 	return exitCode, runErr
-}
-
-
-// processBufferedOutputLineByLine processes buffered output with line-by-line classification.
-func (c *Console) processBufferedOutputLineByLine(
-	task *design.Task,
-	output string,
-	patternMatcher *design.PatternMatcher,
-) {
-	scanner := bufio.NewScanner(strings.NewReader(output))
-	buf := make([]byte, 0, bufio.MaxScanTokenSize)
-	scanner.Buffer(buf, c.cfg.MaxLineLength)
-
-	lineCount := 0
-	for scanner.Scan() {
-		line := scanner.Text()
-		lineType, lineContext := patternMatcher.ClassifyOutputLine(line, task.Command, task.Args)
-		if c.cfg.Debug && lineCount < 5 {
-			fmt.Fprintf(os.Stderr, "[DEBUG processBufferedOutput] Line classified as %s: %s\n", lineType, line)
-		}
-		task.AddOutputLine(line, lineType, lineContext)
-		lineCount++
-	}
-
-	if c.cfg.Debug {
-		fmt.Fprintf(os.Stderr, "[DEBUG processBufferedOutput] Processed %d lines with line-by-line classification\n", lineCount)
-	}
 }
 
 // formatInternalError formats an internal fo error message with consistent prefix.

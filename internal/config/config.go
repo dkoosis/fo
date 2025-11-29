@@ -264,12 +264,12 @@ type ThemeOverrides struct {
 		Italic  *string `yaml:"italic,omitempty"`
 	} `yaml:"colors,omitempty"`
 	Style struct {
-		UseBoxes          *bool   `yaml:"use_boxes,omitempty"`
-		Indentation       *string `yaml:"indentation,omitempty"`
-		ShowTimestamps    *bool   `yaml:"show_timestamps,omitempty"`
-		NoTimer           *bool   `yaml:"no_timer,omitempty"`
-		Density           *string `yaml:"density,omitempty"`
-		HeaderWidth       *int    `yaml:"header_width,omitempty"`
+		UseBoxes       *bool   `yaml:"use_boxes,omitempty"`
+		Indentation    *string `yaml:"indentation,omitempty"`
+		ShowTimestamps *bool   `yaml:"show_timestamps,omitempty"`
+		NoTimer        *bool   `yaml:"no_timer,omitempty"`
+		Density        *string `yaml:"density,omitempty"`
+		HeaderWidth    *int    `yaml:"header_width,omitempty"`
 	} `yaml:"style,omitempty"`
 	Border struct {
 		HeaderChar             *string `yaml:"header_char,omitempty"`

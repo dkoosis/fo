@@ -34,14 +34,18 @@ func (e *EditorMode) OpenInEditor(content string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() {
+		_ = os.Remove(tmpFile.Name()) // Best effort cleanup
+	}()
 
 	// Write content to temp file
 	if _, err := tmpFile.WriteString(content); err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close() // Best effort cleanup
 		return "", err
 	}
-	tmpFile.Close()
+	if err := tmpFile.Close(); err != nil {
+		return "", err
+	}
 
 	// Open in editor
 	editorParts := strings.Fields(e.editorCmd)
@@ -67,4 +71,3 @@ func (e *EditorMode) OpenInEditor(content string) (string, error) {
 func (e *EditorMode) GetEditorCommand() string {
 	return e.editorCmd
 }
-

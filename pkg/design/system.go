@@ -257,7 +257,6 @@ func (t *Task) UpdateTaskContext() {
 	}
 }
 
-
 // GetOutputLinesSnapshot returns a thread-safe copy of the output lines.
 // This is the preferred way to read output lines from external code.
 func (t *Task) GetOutputLinesSnapshot() []OutputLine {

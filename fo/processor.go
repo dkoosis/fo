@@ -13,7 +13,7 @@ import (
 // Processor handles processing of command output, including classification
 // and adapter-based parsing.
 type Processor struct {
-	patternMatcher *design.PatternMatcher
+	patternMatcher  *design.PatternMatcher
 	adapterRegistry *adapter.Registry
 	maxLineLength   int
 	debug           bool
@@ -45,10 +45,6 @@ func (p *Processor) ProcessOutput(
 	// Extract first N lines for adapter detection
 	const adapterDetectionLineCount = 15
 	firstLines := extractFirstLines(string(output), adapterDetectionLineCount)
-
-	if p.debug {
-		// Note: debug output would need access to stderr, but we'll keep it simple for now
-	}
 
 	// Try to detect a suitable adapter
 	detectedAdapter := p.adapterRegistry.Detect(firstLines)
@@ -103,4 +99,3 @@ func extractFirstLines(output string, count int) []string {
 	}
 	return lines
 }
-

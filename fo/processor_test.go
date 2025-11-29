@@ -349,4 +349,3 @@ func (p *emptyPattern) Render(cfg *design.Config) string {
 func (p *emptyPattern) PatternType() design.PatternType {
 	return design.PatternTypeSummary
 }
-
