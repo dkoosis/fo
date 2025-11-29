@@ -837,6 +837,24 @@ func getProcessLabel(intent string) string {
 	return strings.ToUpper(string(intent[0])) + strings.ToLower(intent[1:])
 }
 
+// JoinVertical composes multiple rendered strings vertically using lipgloss.
+// This is useful for combining multiple patterns or sections into a single output.
+// The components are joined with proper alignment and spacing.
+//
+// Example:
+//   summary := renderSummary()
+//   testTable := renderTestTable()
+//   combined := JoinVertical(summary, testTable)
+func JoinVertical(components ...string) string {
+	if len(components) == 0 {
+		return ""
+	}
+	if len(components) == 1 {
+		return components[0]
+	}
+	return lipgloss.JoinVertical(lipgloss.Left, components...)
+}
+
 // RenderDirectMessage creates the formatted status line.
 func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, indentLevel int) string {
 	var sb strings.Builder

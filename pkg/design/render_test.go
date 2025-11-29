@@ -450,3 +450,34 @@ func TestGetProcessLabel_When_ValidIntent(t *testing.T) {
 	result := getProcessLabel("building")
 	assert.Equal(t, "Building", result)
 }
+
+func TestJoinVertical_When_Empty(t *testing.T) {
+	t.Parallel()
+
+	result := JoinVertical()
+	assert.Empty(t, result)
+}
+
+func TestJoinVertical_When_SingleComponent(t *testing.T) {
+	t.Parallel()
+
+	component := "single line"
+	result := JoinVertical(component)
+	assert.Equal(t, component, result)
+}
+
+func TestJoinVertical_When_MultipleComponents(t *testing.T) {
+	t.Parallel()
+
+	comp1 := "first component"
+	comp2 := "second component"
+	comp3 := "third component"
+	result := JoinVertical(comp1, comp2, comp3)
+
+	// Should contain all components
+	assert.Contains(t, result, comp1)
+	assert.Contains(t, result, comp2)
+	assert.Contains(t, result, comp3)
+	// Should be joined with newlines (lipgloss.JoinVertical behavior)
+	assert.Greater(t, len(result), len(comp1)+len(comp2)+len(comp3))
+}
