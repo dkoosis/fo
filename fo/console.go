@@ -130,6 +130,7 @@ type Console struct {
 	cfg             ConsoleConfig
 	designConf      *design.Config
 	adapterRegistry *adapter.Registry
+	processor       *Processor
 	profiler        *Profiler
 	currentSummary  string // Summary message for current section being executed
 	inSection       bool   // Whether we're currently executing a section (suppresses individual Run() outputs)
@@ -142,10 +143,15 @@ func DefaultConsole() *Console {
 func NewConsole(cfg ConsoleConfig) *Console {
 	normalized := normalizeConfig(cfg)
 	profiler := NewProfiler(normalized.Profile, normalized.ProfileOutput)
+	designConf := resolveDesignConfig(normalized)
+	adapterRegistry := adapter.NewRegistry()
+	patternMatcher := design.NewPatternMatcher(designConf)
+	processor := NewProcessor(patternMatcher, adapterRegistry, normalized.MaxLineLength, normalized.Debug)
 	return &Console{
 		cfg:             normalized,
-		designConf:      resolveDesignConfig(normalized),
-		adapterRegistry: adapter.NewRegistry(),
+		designConf:      designConf,
+		adapterRegistry: adapterRegistry,
+		processor:       processor,
 		profiler:        profiler,
 	}
 }
@@ -1100,8 +1106,8 @@ func (c *Console) runContext(
 
 	designCfg := design.DeepCopyConfig(c.designConf)
 
-	patternMatcher := design.NewPatternMatcher(designCfg)
-	intent := patternMatcher.DetectCommandIntent(command, args)
+	// Use processor's pattern matcher for intent detection
+	intent := c.processor.patternMatcher.DetectCommandIntent(command, args)
 	task := design.NewTask(labelToUse, intent, command, args, designCfg)
 
 	if !c.inSection {
@@ -1188,7 +1194,7 @@ func (c *Console) runContext(
 			}
 		}
 	} else {
-		exitCode, cmdRunError = c.executeCaptureMode(cmd, task, patternMatcher, cmdDone)
+		exitCode, cmdRunError = c.executeCaptureMode(cmd, task, cmdDone)
 		if cmdRunError != nil {
 			var exitErr *exec.ExitError
 			if !errors.As(cmdRunError, &exitErr) {
@@ -1417,7 +1423,7 @@ func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task, cmdDone ch
 }
 
 func (c *Console) executeCaptureMode(
-	cmd *exec.Cmd, task *design.Task, patternMatcher *design.PatternMatcher, cmdDone chan struct{},
+	cmd *exec.Cmd, task *design.Task, cmdDone chan struct{},
 ) (int, error) {
 	if c.cfg.Debug {
 		fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Starting in CAPTURE mode\n")
@@ -1459,7 +1465,7 @@ func (c *Console) executeCaptureMode(
 	}
 
 	// Try adapter-based parsing first
-	exitCode, runErr := c.tryAdapterMode(cmd, task, stdoutPipe, stderrPipe, patternMatcher, cmdDone)
+	exitCode, runErr := c.tryAdapterMode(cmd, task, stdoutPipe, stderrPipe, cmdDone)
 
 	return exitCode, runErr
 }
@@ -1471,7 +1477,6 @@ func (c *Console) tryAdapterMode(
 	task *design.Task,
 	stdoutPipe io.ReadCloser,
 	stderrPipe io.ReadCloser,
-	patternMatcher *design.PatternMatcher,
 	cmdDone chan struct{},
 ) (int, error) {
 	captureStart := c.profiler.StartStage("capture")
@@ -1558,54 +1563,9 @@ func (c *Console) tryAdapterMode(
 	// Get combined output for detection
 	combinedOutput := append(stdoutBuffer.Bytes(), stderrBuffer.Bytes()...)
 
-	// Extract first N lines for adapter detection
-	firstLines := extractFirstLines(string(combinedOutput), AdapterDetectionLineCount)
-
-	if c.cfg.Debug {
-		fmt.Fprintf(os.Stderr, "[DEBUG tryAdapterMode] Captured %d bytes, first %d lines for detection\n",
-			len(combinedOutput), len(firstLines))
-	}
-
-	// Try to detect a suitable adapter
-	detectedAdapter := c.adapterRegistry.Detect(firstLines)
-
-	if detectedAdapter != nil {
-		if c.cfg.Debug {
-			fmt.Fprintf(os.Stderr, "[DEBUG tryAdapterMode] Detected adapter: %s\n", detectedAdapter.Name())
-		}
-
-		// Parse with adapter
-		pattern, parseErr := detectedAdapter.Parse(bytes.NewReader(combinedOutput))
-		if parseErr == nil && pattern != nil {
-			if c.cfg.Debug {
-				fmt.Fprintf(os.Stderr, "[DEBUG tryAdapterMode] Successfully parsed with adapter: %s\n", detectedAdapter.Name())
-			}
-
-			// Render the pattern using the design config
-			rendered := pattern.Render(task.Config)
-			if rendered != "" {
-				// Add the rendered pattern as output
-				task.AddOutputLine(rendered, design.TypeDetail, design.LineContext{
-					CognitiveLoad: design.LoadLow,
-					Importance:    4,
-					IsInternal:    false,
-				})
-			}
-
-			exitCode := getExitCode(runErr, c.cfg.Debug)
-			return exitCode, runErr
-		}
-
-		if c.cfg.Debug {
-			fmt.Fprintf(os.Stderr, "[DEBUG tryAdapterMode] Adapter parsing failed: %v, falling back to line-by-line\n", parseErr)
-		}
-	} else if c.cfg.Debug {
-		fmt.Fprintf(os.Stderr, "[DEBUG tryAdapterMode] No adapter detected, using line-by-line classification\n")
-	}
-
-	// Fall back to line-by-line classification
+	// Use Processor to handle output processing (adapter detection and line-by-line fallback)
 	processStart := c.profiler.StartStage("process")
-	c.processBufferedOutputLineByLine(task, string(combinedOutput), patternMatcher)
+	c.processor.ProcessOutput(task, combinedOutput, task.Command, task.Args)
 	c.profiler.EndStage("process", processStart, map[string]interface{}{
 		"line_count":  len(strings.Split(string(combinedOutput), "\n")),
 		"buffer_size": int64(len(combinedOutput)),
@@ -1634,14 +1594,6 @@ func (c *Console) tryAdapterMode(
 	return exitCode, runErr
 }
 
-// extractFirstLines extracts the first N lines from the output for adapter detection.
-func extractFirstLines(output string, count int) []string {
-	lines := strings.Split(output, "\n")
-	if len(lines) > count {
-		lines = lines[:count]
-	}
-	return lines
-}
 
 // processBufferedOutputLineByLine processes buffered output with line-by-line classification.
 func (c *Console) processBufferedOutputLineByLine(
