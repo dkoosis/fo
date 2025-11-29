@@ -44,39 +44,6 @@ func TestColor_SprintsWithReset_When_CodeIsProvided(t *testing.T) {
 	}
 }
 
-func TestNormalizeANSIEscape_ReturnsNormalizedSequence_When_ProvidedVariousInputs(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "keeps existing escape prefix",
-			input:    "\x1b[31m",
-			expected: "\x1b[31m",
-		},
-		{
-			name:     "passes through literal sequences unchanged",
-			input:    "\\x1b[32m",
-			expected: "\\x1b[32m",
-		},
-		{
-			name:     "returns empty when input empty",
-			input:    "",
-			expected: "",
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			assert.Equal(t, tc.expected, NormalizeANSIEscape(tc.input))
-		})
-	}
-}
 
 func TestConfig_ResetsToDefault_When_ResetColorMissing(t *testing.T) {
 	t.Parallel()

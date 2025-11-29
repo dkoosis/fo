@@ -317,14 +317,6 @@ type PatternsRepo struct {
 	Output map[string][]string `yaml:"output"`
 }
 
-// NormalizeANSIEscape is deprecated. lipgloss handles color format detection automatically.
-// This function is kept temporarily for compatibility but will be removed.
-// Use lipgloss.Color directly - it accepts color names, hex codes, and ANSI codes.
-func NormalizeANSIEscape(s string) string {
-	// lipgloss.Color is a string type, so we can return it directly
-	// lipgloss will handle the normalization when creating styles
-	return s
-}
 
 func DefaultConfig() *Config {
 	return UnicodeVibrantTheme()

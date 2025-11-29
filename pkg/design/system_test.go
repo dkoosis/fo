@@ -67,9 +67,8 @@ func TestTask_AddOutputLine_When_ConcurrentAccess(t *testing.T) {
 	wg.Wait()
 
 	// All lines should be added without race conditions
-	task.OutputLinesLock()
-	defer task.OutputLinesUnlock()
-	assert.Len(t, task.OutputLines, numGoroutines)
+	snapshot := task.GetOutputLinesSnapshot()
+	assert.Len(t, snapshot, numGoroutines)
 }
 
 func TestTask_AddOutputLine_When_MultipleTypes(t *testing.T) {
@@ -114,9 +113,8 @@ func TestTask_AddOutputLine_When_MultipleTypes(t *testing.T) {
 			task := NewTask("test", "", "cmd", nil, cfg)
 			task.AddOutputLine(tc.content, tc.lineType, tc.context)
 
-			task.OutputLinesLock()
-			defer task.OutputLinesUnlock()
-			assert.Len(t, task.OutputLines, 1)
+			snapshot := task.GetOutputLinesSnapshot()
+			assert.Len(t, snapshot, 1)
 			assert.Equal(t, tc.content, task.OutputLines[0].Content)
 			assert.Equal(t, tc.lineType, task.OutputLines[0].Type)
 		})
@@ -413,12 +411,11 @@ func TestTask_UpdateTaskContext_When_ConcurrentAccess(t *testing.T) {
 
 	wg.Wait()
 
-	task.OutputLinesLock()
-	defer task.OutputLinesUnlock()
-	assert.Len(t, task.OutputLines, numGoroutines)
+	snapshot := task.GetOutputLinesSnapshot()
+	assert.Len(t, snapshot, numGoroutines)
 }
 
-func TestTask_OutputLinesLock_When_ConcurrentAccess(t *testing.T) {
+func TestTask_GetOutputLinesSnapshot_When_ConcurrentAccess(t *testing.T) {
 	t.Parallel()
 
 	cfg := UnicodeVibrantTheme()
@@ -427,14 +424,12 @@ func TestTask_OutputLinesLock_When_ConcurrentAccess(t *testing.T) {
 	task.AddOutputLine("line1", TypeDetail, LineContext{Importance: 1})
 	task.AddOutputLine("line2", TypeDetail, LineContext{Importance: 1})
 
-	task.OutputLinesLock()
-	assert.Len(t, task.OutputLines, 2)
-	task.OutputLinesUnlock()
+	snapshot := task.GetOutputLinesSnapshot()
+	assert.Len(t, snapshot, 2)
 
-	// Should still be accessible after unlock
-	task.OutputLinesLock()
-	defer task.OutputLinesUnlock()
-	assert.Len(t, task.OutputLines, 2)
+	// Should still be accessible after snapshot
+	snapshot2 := task.GetOutputLinesSnapshot()
+	assert.Len(t, snapshot2, 2)
 }
 
 func TestTask_GetOutputLinesSnapshot_When_ReturnsIndependentCopy(t *testing.T) {

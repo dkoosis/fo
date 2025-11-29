@@ -257,20 +257,6 @@ func (t *Task) UpdateTaskContext() {
 	}
 }
 
-// OutputLinesLock provides external access to lock the task's outputLock.
-// This is used by cmd/main.go to synchronize reading of OutputLines when rendering.
-// Deprecated: Use GetOutputLinesSnapshot or ProcessOutputLines instead to avoid
-// exposing internal locking to callers, which can cause deadlocks if the caller
-// panics or forgets to unlock.
-func (t *Task) OutputLinesLock() {
-	t.outputLock.Lock()
-}
-
-// OutputLinesUnlock provides external access to unlock the task's outputLock.
-// Deprecated: Use GetOutputLinesSnapshot or ProcessOutputLines instead.
-func (t *Task) OutputLinesUnlock() {
-	t.outputLock.Unlock()
-}
 
 // GetOutputLinesSnapshot returns a thread-safe copy of the output lines.
 // This is the preferred way to read output lines from external code.

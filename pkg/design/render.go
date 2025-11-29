@@ -749,9 +749,8 @@ func (t *Task) RenderSummary() string {
 	if t.Context.CognitiveLoad == LoadHigh && t.Context.Complexity >= 4 {
 		sb.WriteString(itemFurtherIndent)
 		mutedStyle := t.Config.GetStyle("Muted")
-		t.OutputLinesLock()
-		lineCount := len(t.OutputLines)
-		t.OutputLinesUnlock()
+		snapshot := t.GetOutputLinesSnapshot()
+		lineCount := len(snapshot)
 		contextText := fmt.Sprintf("(%d lines - see above for details)", lineCount)
 		sb.WriteString(mutedStyle.Render(contextText))
 		sb.WriteString("\n")
