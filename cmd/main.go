@@ -136,8 +136,6 @@ func run(args []string) int {
 		ThemeName:        finalDesignConfig.ThemeName,
 		UseBoxes:         finalDesignConfig.Style.UseBoxes,
 		UseBoxesSet:      true,
-		InlineProgress:   finalDesignConfig.Style.UseInlineProgress,
-		InlineSet:        true,
 		Monochrome:       finalDesignConfig.IsMonochrome,
 		ShowTimer:        !finalDesignConfig.Style.NoTimer,
 		ShowTimerSet:     true,

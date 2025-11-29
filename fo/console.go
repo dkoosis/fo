@@ -49,8 +49,6 @@ type ConsoleConfig struct {
 	ThemeName        string
 	UseBoxes         bool
 	UseBoxesSet      bool
-	InlineProgress   bool
-	InlineSet        bool
 	Monochrome       bool
 	ShowTimer        bool
 	ShowTimerSet     bool
@@ -1106,22 +1104,7 @@ func (c *Console) runContext(
 	intent := patternMatcher.DetectCommandIntent(command, args)
 	task := design.NewTask(labelToUse, intent, command, args, designCfg)
 
-	useInlineProgress := designCfg.Style.UseInlineProgress && c.cfg.InlineProgress && !c.cfg.LiveStreamOutput
-
-	progress := design.NewInlineProgress(task, c.cfg.Debug, c.cfg.Out)
-
-	// Set up cursor restoration at the outermost level for inline progress
-	if useInlineProgress {
-		enableSpinner := !designCfg.Style.NoSpinner
-		if enableSpinner && design.IsInteractiveTerminal() && !designCfg.IsMonochrome {
-			// Hide cursor at start, restore on any exit path
-			_, _ = c.cfg.Out.Write([]byte("\033[?25l"))
-			defer func() {
-				_, _ = c.cfg.Out.Write([]byte("\033[?25h"))
-			}()
-		}
-		progress.Start(ctx, enableSpinner)
-	} else if !c.inSection {
+	if !c.inSection {
 		// Suppress start line when in a section - section header already shows context
 		_, _ = c.cfg.Out.Write([]byte(task.RenderStartLine() + "\n"))
 	}
@@ -1230,16 +1213,6 @@ func (c *Console) runContext(
 			c.cfg.Monochrome && !c.cfg.ShowTimer, exitCode, task.Status, isActualFoStartupFailure)
 	}
 
-	if useInlineProgress {
-		status := design.StatusSuccess
-		if exitCode != 0 {
-			status = design.StatusError
-		} else if task.Status == design.StatusWarning {
-			status = design.StatusWarning
-		}
-		progress.Complete(status)
-	}
-
 	if !c.cfg.LiveStreamOutput {
 		c.renderCapturedOutput(task, exitCode, isActualFoStartupFailure)
 	} else if (task.Status == design.StatusError || task.Status == design.StatusWarning) && !isActualFoStartupFailure {
@@ -1249,17 +1222,15 @@ func (c *Console) runContext(
 		}
 	}
 
-	if !useInlineProgress {
-		// Suppress individual task end lines when we're in a section
-		// The section summary will be printed instead at the end of RunSection()
-		if c.inSection {
-			if c.cfg.Debug {
-				fmt.Fprintf(os.Stderr, "[DEBUG] Suppressing RenderEndLine for '%s' (inSection=true)\n", task.Label)
-			}
-			// Don't render - section summary will be shown instead
-		} else {
-			_, _ = c.cfg.Out.Write([]byte(task.RenderEndLine() + "\n"))
+	// Suppress individual task end lines when we're in a section
+	// The section summary will be printed instead at the end of RunSection()
+	if c.inSection {
+		if c.cfg.Debug {
+			fmt.Fprintf(os.Stderr, "[DEBUG] Suppressing RenderEndLine for '%s' (inSection=true)\n", task.Label)
 		}
+		// Don't render - section summary will be shown instead
+	} else {
+		_, _ = c.cfg.Out.Write([]byte(task.RenderEndLine() + "\n"))
 	}
 
 	// Convert design.OutputLine to Line
@@ -1765,14 +1736,6 @@ func normalizeConfig(cfg ConsoleConfig) ConsoleConfig {
 	} else {
 		normalized.ShowTimer = true
 	}
-	switch {
-	case cfg.InlineSet:
-		normalized.InlineProgress = cfg.InlineProgress
-	case cfg.Design != nil:
-		normalized.InlineProgress = cfg.Design.Style.UseInlineProgress
-	default:
-		normalized.InlineProgress = true
-	}
 	if normalized.Out == nil {
 		normalized.Out = os.Stdout
 	}
@@ -1826,10 +1789,6 @@ func resolveDesignConfig(cfg ConsoleConfig) *design.Config {
 
 	if cfg.UseBoxesSet {
 		base.Style.UseBoxes = cfg.UseBoxes
-	}
-	// Only override theme's UseInlineProgress if explicitly set in console config
-	if cfg.InlineSet {
-		base.Style.UseInlineProgress = cfg.InlineProgress
 	}
 	if cfg.ShowTimerSet {
 		base.Style.NoTimer = !cfg.ShowTimer

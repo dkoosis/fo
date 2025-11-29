@@ -232,7 +232,6 @@ type Config struct {
 		ShowTimestamps    bool   `yaml:"show_timestamps"`
 		NoTimer           bool   `yaml:"no_timer"`
 		Density           string `yaml:"density"`
-		UseInlineProgress bool   `yaml:"use_inline_progress"`
 		NoSpinner         bool   `yaml:"no_spinner"`
 		SpinnerInterval   int    `yaml:"spinner_interval"`
 		HeaderWidth       int    `yaml:"header_width"` // Visual width of header content (default: 40)
@@ -348,7 +347,6 @@ func ASCIIMinimalTheme() *Config {
 	cfg.Icons.Info = IconInfo
 	cfg.Icons.Bullet = IconBullet
 
-	cfg.Style.UseInlineProgress = true
 	cfg.Style.NoSpinner = false
 	cfg.Style.SpinnerInterval = 80
 
@@ -522,7 +520,6 @@ func OrcaTheme() *Config {
 	cfg.Style.ShowTimestamps = false
 	cfg.Style.Density = "balanced"
 	cfg.Style.NoTimer = false
-	cfg.Style.UseInlineProgress = false // Disable inline progress for sections
 	cfg.Style.HeaderWidth = 50
 
 	cfg.Icons.Start = "▶"

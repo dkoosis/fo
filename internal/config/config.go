@@ -269,7 +269,6 @@ type ThemeOverrides struct {
 		ShowTimestamps    *bool   `yaml:"show_timestamps,omitempty"`
 		NoTimer           *bool   `yaml:"no_timer,omitempty"`
 		Density           *string `yaml:"density,omitempty"`
-		UseInlineProgress *bool   `yaml:"use_inline_progress,omitempty"`
 		HeaderWidth       *int    `yaml:"header_width,omitempty"`
 	} `yaml:"style,omitempty"`
 	Border struct {
@@ -370,9 +369,6 @@ func MergeThemes(base *design.Config, overrides *ThemeOverrides) *design.Config 
 	}
 	if overrides.Style.Density != nil {
 		merged.Style.Density = *overrides.Style.Density
-	}
-	if overrides.Style.UseInlineProgress != nil {
-		merged.Style.UseInlineProgress = *overrides.Style.UseInlineProgress
 	}
 	if overrides.Style.HeaderWidth != nil {
 		merged.Style.HeaderWidth = *overrides.Style.HeaderWidth
