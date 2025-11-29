@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -72,9 +73,17 @@ func run(args []string) int {
 	// Find the command and arguments to be executed (must be after "--")
 	cmdArgs := findCommandArgs()
 	if len(cmdArgs) == 0 {
-		fmt.Fprintln(os.Stderr, "[fo] Error: No command specified after --")
+		// No command specified - check if data is being piped via stdin
+		stat, _ := os.Stdin.Stat()
+		if (stat.Mode() & os.ModeCharDevice) == 0 {
+			// Data is being piped in - run Editor mode
+			return runEditorMode(cliFlags, fileAppConfig)
+		}
+		// No command and no pipe - show usage
+		fmt.Fprintln(os.Stderr, "[fo] Error: No command specified")
 		fmt.Fprintln(os.Stderr, "[fo] Usage: fo [flags] -- <COMMAND> [ARGS...]")
-		return 1 // Exit if no command is provided
+		fmt.Fprintln(os.Stderr, "[fo]        <command> | fo [flags]")
+		return 1
 	}
 
 	// Apply any command-specific presets from the config file
@@ -207,6 +216,65 @@ func findCommandArgs() []string {
 		}
 	}
 	return []string{}
+}
+
+// runEditorMode processes piped stdin input through fo's formatting pipeline.
+// This is the "Editor" mode - fo receives messy output and transforms it into
+// clear, beautiful signal.
+func runEditorMode(cliFlags config.CliFlags, fileAppConfig *config.AppConfig) int {
+	// Resolve configuration with priority order
+	resolvedCfg, err := config.ResolveConfig(cliFlags)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[fo] Error resolving configuration: %v\n", err)
+		return 1
+	}
+
+	// Build console config
+	consoleCfg := fo.ConsoleConfig{
+		ThemeName:        resolvedCfg.Theme.ThemeName,
+		UseBoxes:         resolvedCfg.Theme.Style.UseBoxes,
+		UseBoxesSet:      true,
+		Monochrome:       resolvedCfg.Theme.IsMonochrome,
+		ShowTimer:        false, // No timer for stdin processing
+		ShowTimerSet:     true,
+		ShowOutputMode:   "always",
+		LiveStreamOutput: false,
+		PatternHint:      cliFlags.PatternHint,
+		Debug:            resolvedCfg.Debug,
+		MaxBufferSize:    resolvedCfg.MaxBufferSize,
+		MaxLineLength:    resolvedCfg.MaxLineLength,
+		Design:           resolvedCfg.Theme,
+	}
+
+	// Read all stdin
+	input, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[fo] Error reading stdin: %v\n", err)
+		return 1
+	}
+
+	if len(input) == 0 {
+		// Nothing to process
+		return 0
+	}
+
+	// Create console and process
+	console := fo.NewConsole(consoleCfg)
+
+	// Create a task for the stdin processing
+	task := design.NewTask("stdin", "stream", "pipe", nil, resolvedCfg.Theme)
+
+	// Process through the processor (via console's internal processor)
+	// For now, use the console's ProcessStdin method which we'll add
+	console.ProcessStdin(task, input)
+
+	// Render output
+	for _, line := range task.OutputLines {
+		rendered := task.RenderOutputLine(line)
+		fmt.Println(rendered)
+	}
+
+	return 0
 }
 
 func handlePrintCommand(args []string) {

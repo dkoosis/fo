@@ -1734,3 +1734,9 @@ func getThemeNames(themes map[string]*design.Config) []string {
 	}
 	return names
 }
+
+// ProcessStdin processes stdin input through the processor pipeline.
+// This is the core of Editor mode - transforming raw input into formatted output.
+func (c *Console) ProcessStdin(task *design.Task, input []byte) {
+	c.processor.ProcessOutput(task, input, "stdin", nil)
+}
