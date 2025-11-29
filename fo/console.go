@@ -505,6 +505,115 @@ type SectionResult struct {
 	Summary  string // Optional summary message from the section
 }
 
+// RunLiveSection executes a LiveSection and returns its result.
+// It prints a section header, runs the work function (which can update rows),
+// renders all rows (including expanded content), and prints a summary.
+func (c *Console) RunLiveSection(ls *LiveSection) SectionResult {
+	start := time.Now()
+
+	// 1) Section header
+	c.PrintSectionHeader(ls.Name)
+
+	// 2) Mark that we're in a section
+	wasInSection := c.inSection
+	c.inSection = true
+	c.currentSummary = ""
+
+	if c.cfg.Debug {
+		fmt.Fprintf(os.Stderr, "[DEBUG RunLiveSection] Starting live section '%s'\n", ls.Name)
+	}
+
+	// 3) Run the actual work (which can update rows)
+	err := ls.Run(ls)
+
+	// Restore previous section state
+	c.inSection = wasInSection
+
+	if c.cfg.Debug {
+		fmt.Fprintf(os.Stderr, "[DEBUG RunLiveSection] Completed live section '%s'\n", ls.Name)
+	}
+
+	// 4) Render all rows
+	rows := ls.GetRows()
+	for _, row := range rows {
+		// Render the main content line
+		c.PrintSectionLine(row.Content)
+		
+		// Render expanded content if row is expanded
+		if row.Expanded && len(row.ExpandedContent) > 0 {
+			for _, expandedLine := range row.ExpandedContent {
+				// Indent expanded content
+				indentedLine := "  " + expandedLine
+				c.PrintSectionLine(indentedLine)
+			}
+		}
+	}
+
+	// 5) Derive status from error type
+	status := SectionOK
+	var displayErr error
+	if err != nil {
+		var warningErr *SectionWarningError
+		if errors.As(err, &warningErr) {
+			status = SectionWarning
+			displayErr = warningErr.Err
+		} else {
+			status = SectionError
+			displayErr = err
+		}
+	}
+
+	// 6) Timing + trailing summary line
+	duration := time.Since(start)
+	roundedDuration := duration.Round(time.Second)
+	seconds := int(roundedDuration.Seconds())
+
+	// Format duration with muted color
+	mutedColor := c.GetMutedColor()
+	resetColor := c.designConf.ResetColor()
+	durationStr := fmt.Sprintf("%s(%ds)%s", mutedColor, seconds, resetColor)
+
+	// Get status icon and color from theme
+	icon, iconColor := c.getStatusIcon(status)
+
+	// Render status line with structured content
+	content := ContentLine{
+		Icon:      icon,
+		IconColor: iconColor,
+		TextColor: "",
+	}
+
+	// Determine what text to show
+	summary := ls.Summary
+	if summary == "" {
+		summary = c.currentSummary
+		c.currentSummary = ""
+	}
+	switch {
+	case displayErr != nil:
+		content.Text = fmt.Sprintf("%s %s: %v", ls.Name, durationStr, displayErr)
+	case summary != "":
+		content.Text = fmt.Sprintf("%s %s", summary, durationStr)
+	case ls.Description != "":
+		content.Text = fmt.Sprintf("%s %s", ls.Description, durationStr)
+	default:
+		content.Text = fmt.Sprintf("%s %s", ls.Name, durationStr)
+	}
+
+	c.PrintSectionContentLine(content)
+
+	// Close the section box
+	c.PrintSectionFooter()
+
+	return SectionResult{
+		Name:     ls.Name,
+		Status:   status,
+		Duration: duration,
+		Err:      displayErr,
+		Summary:  summary,
+	}
+}
+
 // RunSection executes a single section and returns its result.
 // It prints a section header, runs the work function, and prints
 // a one-line summary with status icon and duration.

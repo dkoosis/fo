@@ -256,3 +256,64 @@ func TestLiveSection_GetRows_When_ExpandedContent(t *testing.T) {
 	expandedContent[0] = "Modified"
 	assert.Equal(t, []string{"Detail 1", "Detail 2"}, rows[0].ExpandedContent)
 }
+
+func TestConsole_RunLiveSection_When_Successful(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	console := NewConsole(ConsoleConfig{Out: &buf})
+
+	ls := NewLiveSection("Test Section", func(ls *LiveSection) error {
+		ls.AddRow("row1", "Row 1 content")
+		ls.AddRow("row2", "Row 2 content")
+		return nil
+	})
+
+	result := console.RunLiveSection(ls)
+
+	assert.Equal(t, SectionOK, result.Status)
+	assert.Nil(t, result.Err)
+	assert.Equal(t, "Test Section", result.Name)
+	assert.Contains(t, buf.String(), "Test Section")
+	assert.Contains(t, buf.String(), "Row 1 content")
+	assert.Contains(t, buf.String(), "Row 2 content")
+}
+
+func TestConsole_RunLiveSection_When_WithExpandedRows(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	console := NewConsole(ConsoleConfig{Out: &buf})
+
+	ls := NewLiveSection("Test Section", func(ls *LiveSection) error {
+		ls.AddRowWithExpansion("row1", "Row 1 summary", []string{"Detail 1", "Detail 2"})
+		ls.ExpandRow("row1")
+		return nil
+	})
+
+	result := console.RunLiveSection(ls)
+
+	assert.Equal(t, SectionOK, result.Status)
+	output := buf.String()
+	assert.Contains(t, output, "Row 1 summary")
+	assert.Contains(t, output, "Detail 1")
+	assert.Contains(t, output, "Detail 2")
+}
+
+func TestConsole_RunLiveSection_When_WithError(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	console := NewConsole(ConsoleConfig{Out: &buf})
+
+	ls := NewLiveSection("Test Section", func(ls *LiveSection) error {
+		ls.AddRow("row1", "Row 1 content")
+		return fmt.Errorf("test error")
+	})
+
+	result := console.RunLiveSection(ls)
+
+	assert.Equal(t, SectionError, result.Status)
+	assert.NotNil(t, result.Err)
+	assert.Contains(t, result.Err.Error(), "test error")
+}
