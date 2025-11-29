@@ -2,10 +2,13 @@ package fo
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/mattn/go-runewidth"
+	"github.com/stretchr/testify/assert"
 )
 
 // stripANSICodes removes ANSI escape sequences from a string to calculate visual width.
@@ -108,4 +111,63 @@ func TestConsole_PreservesSectionWidth_When_TextFillsContentArea(t *testing.T) {
 	if !strings.HasSuffix(stripped, box.BorderChars.Vertical) {
 		t.Fatalf("expected rendered line to end with border %q, got %q", box.BorderChars.Vertical, stripped)
 	}
+}
+
+func TestLiveSection_AddRow_When_NewRow(t *testing.T) {
+	t.Parallel()
+
+	ls := NewLiveSection("Test Section", func(*LiveSection) error { return nil })
+	ls.AddRow("row1", "Content 1")
+
+	rows := ls.GetRows()
+	assert.Len(t, rows, 1)
+	assert.Equal(t, "row1", rows[0].ID)
+	assert.Equal(t, "Content 1", rows[0].Content)
+	assert.False(t, rows[0].Expanded)
+}
+
+func TestLiveSection_UpdateRow_When_ExistingRow(t *testing.T) {
+	t.Parallel()
+
+	ls := NewLiveSection("Test Section", func(*LiveSection) error { return nil })
+	ls.AddRow("row1", "Content 1")
+	ls.UpdateRow("row1", "Updated Content")
+
+	rows := ls.GetRows()
+	assert.Len(t, rows, 1)
+	assert.Equal(t, "Updated Content", rows[0].Content)
+}
+
+func TestLiveSection_RemoveRow_When_ExistingRow(t *testing.T) {
+	t.Parallel()
+
+	ls := NewLiveSection("Test Section", func(*LiveSection) error { return nil })
+	ls.AddRow("row1", "Content 1")
+	ls.AddRow("row2", "Content 2")
+	ls.RemoveRow("row1")
+
+	rows := ls.GetRows()
+	assert.Len(t, rows, 1)
+	assert.Equal(t, "row2", rows[0].ID)
+}
+
+func TestLiveSection_GetRows_When_ConcurrentAccess(t *testing.T) {
+	t.Parallel()
+
+	ls := NewLiveSection("Test Section", func(*LiveSection) error { return nil })
+
+	// Add rows concurrently
+	const numGoroutines = 10
+	var wg sync.WaitGroup
+	wg.Add(numGoroutines)
+	for i := 0; i < numGoroutines; i++ {
+		go func(id int) {
+			defer wg.Done()
+			ls.AddRow(fmt.Sprintf("row%d", id), fmt.Sprintf("Content %d", id))
+		}(i)
+	}
+	wg.Wait()
+
+	rows := ls.GetRows()
+	assert.Len(t, rows, numGoroutines)
 }

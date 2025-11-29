@@ -242,7 +242,7 @@ func (b *BoxLayout) RenderTopBorder(title string) string {
 
 		// Render with side borders (no top border, as it's rendered separately)
 		titleLineStyle := b.BorderStyle.
-			BorderTop(false).  // Top border rendered separately above
+			BorderTop(false). // Top border rendered separately above
 			BorderBottom(false).
 			BorderLeft(true).
 			BorderRight(true).
@@ -841,9 +841,10 @@ func getProcessLabel(intent string) string {
 // The components are joined with proper alignment and spacing.
 //
 // Example:
-//   summary := renderSummary()
-//   testTable := renderTestTable()
-//   combined := JoinVertical(summary, testTable)
+//
+//	summary := renderSummary()
+//	testTable := renderTestTable()
+//	combined := JoinVertical(summary, testTable)
 func JoinVertical(components ...string) string {
 	if len(components) == 0 {
 		return ""

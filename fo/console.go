@@ -373,6 +373,75 @@ type Section struct {
 	Run         SectionFunc // Work to perform for this section
 }
 
+// LiveRow represents a single row in a LiveSection that can be updated dynamically.
+type LiveRow struct {
+	ID      string // Unique identifier for the row
+	Content string // Current content of the row
+	Expanded bool  // Whether the row is expanded (for future use in #151)
+}
+
+// LiveSection represents a section that can update its content in real-time.
+// Rows can be added, updated, or removed dynamically during execution.
+type LiveSection struct {
+	Name        string              // Human-readable section name, shown in header
+	Description string              // Optional description
+	Summary     string              // Optional summary message
+	Rows        map[string]*LiveRow // Map of row ID to row content
+	Run         func(*LiveSection) error // Work function that receives the LiveSection for updates
+	mu          sync.RWMutex        // Protects Rows map
+}
+
+// NewLiveSection creates a new LiveSection with the given name and run function.
+func NewLiveSection(name string, run func(*LiveSection) error) *LiveSection {
+	return &LiveSection{
+		Name: name,
+		Rows: make(map[string]*LiveRow),
+		Run:  run,
+	}
+}
+
+// AddRow adds or updates a row in the LiveSection.
+func (ls *LiveSection) AddRow(id, content string) {
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
+	ls.Rows[id] = &LiveRow{
+		ID:      id,
+		Content: content,
+		Expanded: false,
+	}
+}
+
+// UpdateRow updates the content of an existing row.
+func (ls *LiveSection) UpdateRow(id, content string) {
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
+	if row, exists := ls.Rows[id]; exists {
+		row.Content = content
+	}
+}
+
+// RemoveRow removes a row from the LiveSection.
+func (ls *LiveSection) RemoveRow(id string) {
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
+	delete(ls.Rows, id)
+}
+
+// GetRows returns a snapshot of all rows in the LiveSection.
+func (ls *LiveSection) GetRows() []*LiveRow {
+	ls.mu.RLock()
+	defer ls.mu.RUnlock()
+	rows := make([]*LiveRow, 0, len(ls.Rows))
+	for _, row := range ls.Rows {
+		rows = append(rows, &LiveRow{
+			ID:       row.ID,
+			Content:  row.Content,
+			Expanded: row.Expanded,
+		})
+	}
+	return rows
+}
+
 // SectionResult contains the outcome of running a section.
 type SectionResult struct {
 	Name     string
