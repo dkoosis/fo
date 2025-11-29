@@ -1740,3 +1740,9 @@ func getThemeNames(themes map[string]*design.Config) []string {
 func (c *Console) ProcessStdin(task *design.Task, input []byte) {
 	c.processor.ProcessOutput(task, input, "stdin", nil)
 }
+
+// ProcessStdinStream processes streaming stdin input, calling back for each line.
+// This enables live rendering as output arrives.
+func (c *Console) ProcessStdinStream(input io.Reader, onLine LineCallback) error {
+	return c.processor.ProcessStream(input, "stdin", nil, onLine)
+}

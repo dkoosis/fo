@@ -4,11 +4,16 @@ package fo
 import (
 	"bufio"
 	"bytes"
+	"io"
 	"strings"
 
 	"github.com/dkoosis/fo/pkg/adapter"
 	"github.com/dkoosis/fo/pkg/design"
 )
+
+// LineCallback is called for each processed line during streaming.
+// It receives the line content, its classified type, and context.
+type LineCallback func(line string, lineType string, ctx design.LineContext)
 
 // Processor handles processing of command output, including classification
 // and adapter-based parsing.
@@ -98,4 +103,76 @@ func extractFirstLines(output string, count int) []string {
 		lines = lines[:count]
 	}
 	return lines
+}
+
+// ProcessStream processes input from an io.Reader line-by-line, calling onLine
+// for each classified line. This enables live rendering as output arrives.
+//
+// The processor buffers the first N lines for adapter detection. If an adapter
+// matches, it processes buffered lines through the adapter, then streams the rest.
+// Otherwise, it falls back to line-by-line classification.
+func (p *Processor) ProcessStream(
+	input io.Reader,
+	command string,
+	args []string,
+	onLine LineCallback,
+) error {
+	const adapterDetectionLineCount = 15
+
+	scanner := bufio.NewScanner(input)
+	buf := make([]byte, 0, bufio.MaxScanTokenSize)
+	scanner.Buffer(buf, p.maxLineLength)
+
+	// Buffer first N lines for adapter detection
+	var bufferedLines []string
+	for scanner.Scan() && len(bufferedLines) < adapterDetectionLineCount {
+		bufferedLines = append(bufferedLines, scanner.Text())
+	}
+
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+
+	// Try adapter detection on buffered lines
+	detectedAdapter := p.adapterRegistry.Detect(bufferedLines)
+
+	if detectedAdapter != nil {
+		// Collect remaining lines for adapter parsing
+		for scanner.Scan() {
+			bufferedLines = append(bufferedLines, scanner.Text())
+		}
+		if err := scanner.Err(); err != nil {
+			return err
+		}
+
+		// Parse with adapter
+		allContent := strings.Join(bufferedLines, "\n")
+		pattern, parseErr := detectedAdapter.Parse(strings.NewReader(allContent))
+		if parseErr == nil && pattern != nil {
+			// For adapter output, emit as single rendered block
+			// (adapters produce their own formatted output)
+			onLine(pattern.Render(nil), design.TypeDetail, design.LineContext{
+				CognitiveLoad: design.LoadLow,
+				Importance:    4,
+				IsInternal:    false,
+			})
+			return nil
+		}
+		// Adapter failed - fall through to line-by-line
+	}
+
+	// Line-by-line classification for buffered lines
+	for _, line := range bufferedLines {
+		lineType, lineContext := p.patternMatcher.ClassifyOutputLine(line, command, args)
+		onLine(line, lineType, lineContext)
+	}
+
+	// Continue with remaining lines from scanner
+	for scanner.Scan() {
+		line := scanner.Text()
+		lineType, lineContext := p.patternMatcher.ClassifyOutputLine(line, command, args)
+		onLine(line, lineType, lineContext)
+	}
+
+	return scanner.Err()
 }
