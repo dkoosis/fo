@@ -347,9 +347,23 @@ func TestLiveSection_ExpandAll_When_MultipleRows(t *testing.T) {
 
 	rows := ls.GetRows()
 	assert.Len(t, rows, 3)
-	assert.True(t, rows[0].Expanded)  // Has expanded content
-	assert.True(t, rows[1].Expanded)  // Has expanded content
-	assert.False(t, rows[2].Expanded) // No expanded content, should remain false
+
+	// Count expanded vs not expanded - order is non-deterministic from map
+	expandedCount := 0
+	notExpandedCount := 0
+	for _, row := range rows {
+		if row.Expanded {
+			expandedCount++
+			// Expanded rows should have content
+			assert.NotEmpty(t, row.ExpandedContent, "Expanded row should have expanded content")
+		} else {
+			notExpandedCount++
+			// Non-expanded row should have no content
+			assert.Empty(t, row.ExpandedContent, "Non-expanded row should have no expanded content")
+		}
+	}
+	assert.Equal(t, 2, expandedCount, "Two rows with content should be expanded")
+	assert.Equal(t, 1, notExpandedCount, "One row without content should not be expanded")
 }
 
 func TestLiveSection_DefaultExpanded_When_True(t *testing.T) {
