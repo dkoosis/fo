@@ -204,81 +204,107 @@ func (c *Config) resolveBorderColor() lipgloss.Color {
 }
 
 // RenderTopBorder renders the top border line with optional title.
+// Uses lipgloss for consistent border rendering.
 func (b *BoxLayout) RenderTopBorder(title string) string {
 	if !b.Config.Style.UseBoxes {
 		return ""
 	}
 
-	var sb strings.Builder
-	sb.WriteString(b.BorderChars.TopLeft)
-	sb.WriteString(b.BorderChars.Horizontal)
+	// Use lipgloss to render top border with optional title
+	// Create a style that shows top border with left/right borders for corners
+	topBorderStyle := b.BorderStyle.
+		BorderTop(true).
+		BorderBottom(false).
+		BorderLeft(true).  // Need left border for top-left corner
+		BorderRight(true). // Need right border for top-right corner
+		PaddingTop(0).
+		PaddingBottom(0).
+		PaddingLeft(0).
+		PaddingRight(0).
+		Width(b.TotalWidth - 2) // Content width; borders add 2 for total
 
 	if title != "" {
-		// Add title with padding
-		titleWidth := VisualWidth(title)
+		// Render title line with borders on all sides except bottom
+		// Calculate desired header width
 		desiredWidth := b.Config.Style.HeaderWidth
 		if desiredWidth <= 0 {
 			desiredWidth = 40
 		}
-		repeatCount := desiredWidth - titleWidth - 1 // -1 for space after title
-		if repeatCount < 0 {
-			repeatCount = 0
+
+		// Build title content with padding
+		titleWidth := VisualWidth(title)
+		remainingWidth := desiredWidth - titleWidth - 1 // -1 for space after title
+		if remainingWidth < 0 {
+			remainingWidth = 0
 		}
-		sb.WriteString(" ")
-		sb.WriteString(title)
-		sb.WriteString(strings.Repeat(b.BorderChars.Horizontal, repeatCount))
-	} else {
-		// Fill header line
-		headerWidth := b.TotalWidth - 2 // -2 for corner chars
-		if headerWidth > 0 {
-			sb.WriteString(strings.Repeat(b.BorderChars.Horizontal, headerWidth))
-		}
+
+		titleContent := " " + title + strings.Repeat(b.BorderChars.Horizontal, remainingWidth)
+
+		// Render with side borders (no top border, as it's rendered separately)
+		titleLineStyle := b.BorderStyle.
+			BorderTop(false).  // Top border rendered separately above
+			BorderBottom(false).
+			BorderLeft(true).
+			BorderRight(true).
+			PaddingTop(0).
+			PaddingBottom(0).
+			Width(b.TotalWidth - 2)
+
+		// First render the top border line (empty content)
+		topBorder := topBorderStyle.Render("")
+		// Then render the title line with side borders
+		titleLine := titleLineStyle.Render(titleContent)
+
+		// Return both lines joined with newline (no trailing newline - caller handles that)
+		return topBorder + "\n" + titleLine
 	}
 
-	sb.WriteString(b.BorderChars.TopRight)
-	return sb.String()
+	// No title: just render top border (no trailing newline - caller handles that)
+	return topBorderStyle.Render("")
 }
 
 // RenderContentLine renders a single content line with proper padding and borders.
+// Uses lipgloss for consistent rendering with automatic width handling.
 func (b *BoxLayout) RenderContentLine(content string) string {
 	if !b.Config.Style.UseBoxes {
 		return content
 	}
 
-	var sb strings.Builder
-	sb.WriteString(b.BorderChars.Vertical)
-	sb.WriteString(strings.Repeat(" ", b.LeftPadding))
-	sb.WriteString(content)
-	// Pad to content width
-	contentWidth := VisualWidth(content)
-	if contentWidth < b.ContentWidth {
-		sb.WriteString(strings.Repeat(" ", b.ContentWidth-contentWidth))
-	}
-	sb.WriteString(strings.Repeat(" ", b.RightPadding))
-	sb.WriteString(b.BorderChars.Vertical)
+	// Use lipgloss to render content line with side borders
+	// BorderStyle already has proper padding and width configured
+	contentLineStyle := b.BorderStyle.
+		BorderTop(false).
+		BorderBottom(false).
+		BorderLeft(true).
+		BorderRight(true).
+		PaddingTop(0).
+		PaddingBottom(0)
+		// Width and Padding are inherited from BorderStyle
 
-	return sb.String()
+	return contentLineStyle.Render(content)
 }
 
 // RenderBottomBorder renders the bottom border line.
+// Uses lipgloss for consistent border rendering.
 func (b *BoxLayout) RenderBottomBorder() string {
 	if !b.Config.Style.UseBoxes {
 		return ""
 	}
 
-	horizontal := b.BorderChars.Horizontal
-	if horizontal == "" {
-		horizontal = "─"
-	}
+	// Use lipgloss to render bottom border
+	// Create a style that shows bottom border with left/right borders for corners
+	bottomBorderStyle := b.BorderStyle.
+		BorderTop(false).
+		BorderBottom(true).
+		BorderLeft(true).  // Need left border for bottom-left corner
+		BorderRight(true). // Need right border for bottom-right corner
+		PaddingTop(0).
+		PaddingBottom(0).
+		PaddingLeft(0).
+		PaddingRight(0).
+		Width(b.TotalWidth - 2) // Content width; borders add 2 for total
 
-	var sb strings.Builder
-	sb.WriteString(b.BorderChars.BottomLeft)
-	footerWidth := b.TotalWidth - 2 // -2 for corner chars
-	if footerWidth > 0 {
-		sb.WriteString(strings.Repeat(horizontal, footerWidth))
-	}
-	sb.WriteString(b.BorderChars.BottomRight)
-	return sb.String()
+	return bottomBorderStyle.Render("")
 }
 
 // getTerminalWidth returns the terminal width, defaulting to 80 if unavailable.

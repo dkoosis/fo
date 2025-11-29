@@ -320,15 +320,9 @@ func (c *Console) PrintSectionFooter() {
 
 	box := c.calculateBoxLayout()
 
-	// Manually construct the bottom border to ensure full width
-	// This ensures consistent rendering regardless of lipgloss's internal calculations
-	// and fixes the "hole" issue where the border wasn't rendering at full width
-	leftCorner := box.BorderChars.BottomLeft
-	rightCorner := box.BorderChars.BottomRight
-	horizontal := box.BorderChars.Horizontal
-	width := box.TotalWidth - 2 // Width of horizontal line between corners
-	fullBorderLine := leftCorner + strings.Repeat(horizontal, width) + rightCorner
-	_, _ = c.cfg.Out.Write([]byte(fullBorderLine + "\n"))
+	// Use BoxLayout's RenderBottomBorder which now uses lipgloss
+	bottomBorder := box.RenderBottomBorder()
+	_, _ = c.cfg.Out.Write([]byte(bottomBorder + "\n"))
 }
 
 // SectionStatus represents the outcome status of a section execution.
