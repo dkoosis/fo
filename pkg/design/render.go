@@ -342,9 +342,20 @@ func (t *Task) RenderStartLine() string {
 			topBorder := box.RenderTopBorder(styledLabel)
 			sb.WriteString(topBorder)
 			sb.WriteString("\n")
-			sb.WriteString(box.Config.Border.VerticalChar + "\n")
-			sb.WriteString(box.Config.Border.VerticalChar + " ")
-			sb.WriteString(t.Config.GetIndentation(1))
+			// Use RenderContentLine for proper left and right borders
+			sb.WriteString(box.RenderContentLine(""))
+			sb.WriteString("\n")
+			// Build the process indicator line content
+			processLabelText := getProcessLabel(t.Intent)
+			processStyle := t.Config.BuildStyle("Task_StartIndicator_Line", "Process")
+			startIndicatorStyle := t.Config.GetElementStyle("Task_StartIndicator_Line")
+			icon := t.Config.GetIcon(startIndicatorStyle.IconKey)
+			if icon == "" {
+				icon = t.Config.GetIcon("Start")
+			}
+			processText := t.Config.GetIndentation(1) + icon + " " + processLabelText + "..."
+			sb.WriteString(box.RenderContentLine(processStyle.Render(processText)))
+			return sb.String()
 		} else {
 			h2Style := t.Config.GetElementStyle("H2_Target_Title")
 			labelStyle := t.Config.BuildStyle("H2_Target_Title")
@@ -516,30 +527,45 @@ func (t *Task) RenderEndLine() string {
 		statusTextWithStyle := styledStatusTextBuilder.String()
 
 		if t.Config.Style.UseBoxes {
-			sb.WriteString(t.Config.Border.VerticalChar + " ")
-		}
-		if t.Config.Style.UseBoxes || statusStyle.Prefix == "" {
-			sb.WriteString(t.Config.GetIndentation(1))
-		}
-		if statusStyle.Prefix != "" && !t.Config.Style.UseBoxes {
-			sb.WriteString(statusStyle.Prefix)
-		}
-
-		sb.WriteString(icon)
-		sb.WriteString(" ")
-		sb.WriteString(string(colorCode))
-		sb.WriteString(statusTextWithStyle)
-		sb.WriteString(string(t.Config.ResetColor()))
-		sb.WriteString(durationStr)
-		sb.WriteString("\n")
-
-		if t.Config.Style.UseBoxes {
-			// Use BoxLayout for consistent bottom border rendering
+			// Use BoxLayout for consistent rendering with proper borders
 			box := t.Config.NewBoxLayout(getTerminalWidth())
+
+			// Build status line content
+			var statusLineContent strings.Builder
+			statusLineContent.WriteString(t.Config.GetIndentation(1))
+			statusLineContent.WriteString(icon)
+			statusLineContent.WriteString(" ")
+			statusLineContent.WriteString(string(colorCode))
+			statusLineContent.WriteString(statusTextWithStyle)
+			statusLineContent.WriteString(string(t.Config.ResetColor()))
+			statusLineContent.WriteString(durationStr)
+
+			// Render status line with proper borders
+			sb.WriteString(box.RenderContentLine(statusLineContent.String()))
+			sb.WriteString("\n")
+
+			// Render bottom border (empty line is already part of lipgloss padding)
 			bottomBorder := box.RenderBottomBorder()
 			sb.WriteString(bottomBorder)
 			sb.WriteString("\n")
 		} else {
+			if statusStyle.Prefix == "" {
+				sb.WriteString(t.Config.GetIndentation(1))
+			}
+			if statusStyle.Prefix != "" {
+				sb.WriteString(statusStyle.Prefix)
+			}
+
+			sb.WriteString(icon)
+			sb.WriteString(" ")
+			sb.WriteString(string(colorCode))
+			sb.WriteString(statusTextWithStyle)
+			sb.WriteString(string(t.Config.ResetColor()))
+			sb.WriteString(durationStr)
+			sb.WriteString("\n")
+		}
+
+		if !t.Config.Style.UseBoxes {
 			footerStyle := t.Config.GetElementStyle("H2_Target_Footer_Line")
 			if footerStyle.LineChar != "" {
 				headerWidth := t.Config.Style.HeaderWidth

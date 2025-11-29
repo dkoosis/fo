@@ -203,55 +203,37 @@ func (r *TestRenderer) RenderTableHeader() {
 
 	_, _ = fmt.Fprintf(r.writer, "\n")
 
-	// Use lipgloss to render top border
-	topBorderStyle := r.boxStyle.
-		BorderTop(true).
-		BorderBottom(false).
-		BorderLeft(true).
-		BorderRight(true).
-		PaddingTop(0).
-		PaddingBottom(0).
-		PaddingLeft(0).
-		PaddingRight(0)
-	topBorder := topBorderStyle.Render("")
-	_, _ = fmt.Fprintf(r.writer, "%s\n", topBorder)
-
-	// Header line with borders: │  STATUS  PATH... │
+	// Render complete header box using lipgloss
 	headerContent := "  STATUS  PATH                             TESTS   TIME    COVERAGE"
-	headerLineStyle := r.boxStyle.
-		BorderTop(false).
-		BorderBottom(false).
+
+	// Use a custom border that has the separator line at the bottom
+	// Use HeaderChar for top if TableHChar is not set
+	topChar := cfg.Border.TableHChar
+	if topChar == "" {
+		topChar = cfg.Border.HeaderChar
+	}
+	headerBorder := lipgloss.Border{
+		Top:         topChar,
+		Bottom:      cfg.Border.HeaderChar,
+		Left:        cfg.Border.VerticalChar,
+		Right:       cfg.Border.VerticalChar,
+		TopLeft:     cfg.Border.TopCornerChar,
+		TopRight:    cfg.Border.TopRightChar,
+		BottomLeft:  r.getSeparatorChar(cfg, true),
+		BottomRight: r.getSeparatorChar(cfg, false),
+	}
+
+	headerStyle := r.boxStyle.
+		Border(headerBorder).
+		BorderTop(true).
+		BorderBottom(true).
 		BorderLeft(true).
 		BorderRight(true).
 		PaddingTop(0).
 		PaddingBottom(0)
-	headerLine := headerLineStyle.Render(headerContent)
-	_, _ = fmt.Fprintf(r.writer, "%s\n", headerLine)
 
-	// Separator line using lipgloss
-	// Create a border style for the separator (horizontal line with left/right borders)
-	separatorBorder := lipgloss.Border{
-		Top:         cfg.Border.HeaderChar,
-		Bottom:      "",
-		Left:        cfg.Border.VerticalChar,
-		Right:       cfg.Border.VerticalChar,
-		TopLeft:     r.getSeparatorChar(cfg, true),
-		TopRight:    r.getSeparatorChar(cfg, false),
-		BottomLeft:  "",
-		BottomRight: "",
-	}
-	separatorStyle := r.boxStyle.
-		Border(separatorBorder).
-		BorderTop(true).
-		BorderBottom(false).
-		BorderLeft(true).
-		BorderRight(true).
-		PaddingTop(0).
-		PaddingBottom(0).
-		PaddingLeft(0).
-		PaddingRight(0)
-	separatorLine := separatorStyle.Render("")
-	_, _ = fmt.Fprintf(r.writer, "%s\n", separatorLine)
+	headerBox := headerStyle.Render(headerContent)
+	_, _ = fmt.Fprintf(r.writer, "%s\n", headerBox)
 }
 
 // getSeparatorChar returns the appropriate separator character based on theme.
@@ -273,8 +255,19 @@ func (r *TestRenderer) RenderGroupHeader(dirName string) {
 	blueColor := r.console.GetBlueFgColor()
 	reset := r.console.ResetColor()
 
-	// Start a new box for the group
+	// Start a new box for the group - render top border
 	r.inGroupBox = true
+	topBorderStyle := r.boxStyle.
+		BorderTop(true).
+		BorderBottom(false).
+		BorderLeft(true).
+		BorderRight(true).
+		PaddingTop(0).
+		PaddingBottom(0).
+		PaddingLeft(0).
+		PaddingRight(0)
+	topBorder := topBorderStyle.Render("")
+	_, _ = fmt.Fprintf(r.writer, "%s\n", topBorder)
 
 	// Group header line with borders: │  ⊙ dirname/ │
 	groupContent := fmt.Sprintf("  %s%s%s %s/", blueColor, "⊙", reset, dirName)

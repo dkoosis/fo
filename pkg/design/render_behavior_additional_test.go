@@ -10,7 +10,6 @@ func TestTask_ProvidesStatusBlockData_When_StatusChanges(t *testing.T) {
 	t.Parallel()
 
 	cfg := UnicodeVibrantTheme()
-	task := &Task{Label: "build", Config: cfg}
 
 	tests := []struct {
 		name      string
@@ -53,7 +52,8 @@ func TestTask_ProvidesStatusBlockData_When_StatusChanges(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			task.Status = tc.status
+			// Create a fresh task per subtest to avoid race conditions
+			task := &Task{Label: "build", Config: cfg, Status: tc.status}
 			data := task.getStatusBlockData()
 
 			assert.Equal(t, tc.wantText, data.text)
