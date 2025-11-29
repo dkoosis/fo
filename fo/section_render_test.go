@@ -317,3 +317,61 @@ func TestConsole_RunLiveSection_When_WithError(t *testing.T) {
 	assert.NotNil(t, result.Err)
 	assert.Contains(t, result.Err.Error(), "test error")
 }
+
+func TestLiveSection_CollapseAll_When_MultipleRows(t *testing.T) {
+	t.Parallel()
+
+	ls := NewLiveSection("Test Section", func(*LiveSection) error { return nil })
+	ls.AddRowWithExpansion("row1", "Summary 1", []string{"Detail 1"})
+	ls.AddRowWithExpansion("row2", "Summary 2", []string{"Detail 2"})
+	ls.ExpandRow("row1")
+	ls.ExpandRow("row2")
+	
+	ls.CollapseAll()
+	
+	rows := ls.GetRows()
+	assert.Len(t, rows, 2)
+	assert.False(t, rows[0].Expanded)
+	assert.False(t, rows[1].Expanded)
+}
+
+func TestLiveSection_ExpandAll_When_MultipleRows(t *testing.T) {
+	t.Parallel()
+
+	ls := NewLiveSection("Test Section", func(*LiveSection) error { return nil })
+	ls.AddRowWithExpansion("row1", "Summary 1", []string{"Detail 1"})
+	ls.AddRowWithExpansion("row2", "Summary 2", []string{"Detail 2"})
+	ls.AddRow("row3", "Summary 3") // No expanded content
+	
+	ls.ExpandAll()
+	
+	rows := ls.GetRows()
+	assert.Len(t, rows, 3)
+	assert.True(t, rows[0].Expanded)  // Has expanded content
+	assert.True(t, rows[1].Expanded)  // Has expanded content
+	assert.False(t, rows[2].Expanded) // No expanded content, should remain false
+}
+
+func TestLiveSection_DefaultExpanded_When_True(t *testing.T) {
+	t.Parallel()
+
+	ls := NewLiveSection("Test Section", func(*LiveSection) error { return nil })
+	ls.DefaultExpanded = true
+	ls.AddRowWithExpansion("row1", "Summary", []string{"Detail 1"})
+	
+	rows := ls.GetRows()
+	assert.Len(t, rows, 1)
+	assert.True(t, rows[0].Expanded) // Should be expanded by default
+}
+
+func TestLiveSection_DefaultExpanded_When_False(t *testing.T) {
+	t.Parallel()
+
+	ls := NewLiveSection("Test Section", func(*LiveSection) error { return nil })
+	ls.DefaultExpanded = false // Explicitly set to false (default)
+	ls.AddRowWithExpansion("row1", "Summary", []string{"Detail 1"})
+	
+	rows := ls.GetRows()
+	assert.Len(t, rows, 1)
+	assert.False(t, rows[0].Expanded) // Should be collapsed by default
+}

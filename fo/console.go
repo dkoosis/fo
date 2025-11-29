@@ -384,12 +384,13 @@ type LiveRow struct {
 // LiveSection represents a section that can update its content in real-time.
 // Rows can be added, updated, or removed dynamically during execution.
 type LiveSection struct {
-	Name        string              // Human-readable section name, shown in header
-	Description string              // Optional description
-	Summary     string              // Optional summary message
-	Rows        map[string]*LiveRow // Map of row ID to row content
-	Run         func(*LiveSection) error // Work function that receives the LiveSection for updates
-	mu          sync.RWMutex        // Protects Rows map
+	Name           string              // Human-readable section name, shown in header
+	Description    string              // Optional description
+	Summary        string              // Optional summary message
+	Rows           map[string]*LiveRow // Map of row ID to row content
+	Run            func(*LiveSection) error // Work function that receives the LiveSection for updates
+	DefaultExpanded bool               // Default expansion state for new rows (default: false, collapsed)
+	mu             sync.RWMutex        // Protects Rows map
 }
 
 // NewLiveSection creates a new LiveSection with the given name and run function.
@@ -408,6 +409,7 @@ func (ls *LiveSection) AddRow(id, content string) {
 
 // AddRowWithExpansion adds or updates a row with expandable content.
 // If expandedContent is provided, the row can be expanded to show additional details.
+// New rows default to collapsed state unless DefaultExpanded is true.
 func (ls *LiveSection) AddRowWithExpansion(id, content string, expandedContent []string) {
 	ls.mu.Lock()
 	defer ls.mu.Unlock()
@@ -417,7 +419,7 @@ func (ls *LiveSection) AddRowWithExpansion(id, content string, expandedContent [
 	ls.Rows[id] = &LiveRow{
 		ID:             id,
 		Content:        content,
-		Expanded:       false,
+		Expanded:       ls.DefaultExpanded, // Use section's default expansion state
 		ExpandedContent: expandedContent,
 	}
 }
@@ -474,6 +476,26 @@ func (ls *LiveSection) SetExpandedContent(id string, expandedContent []string) {
 			expandedContent = []string{}
 		}
 		row.ExpandedContent = expandedContent
+	}
+}
+
+// CollapseAll collapses all rows in the LiveSection.
+func (ls *LiveSection) CollapseAll() {
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
+	for _, row := range ls.Rows {
+		row.Expanded = false
+	}
+}
+
+// ExpandAll expands all rows in the LiveSection that have expanded content.
+func (ls *LiveSection) ExpandAll() {
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
+	for _, row := range ls.Rows {
+		if len(row.ExpandedContent) > 0 {
+			row.Expanded = true
+		}
 	}
 }
 
