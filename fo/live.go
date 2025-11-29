@@ -41,7 +41,7 @@ func (r *LiveRenderer) Start() {
 	defer r.mu.Unlock()
 
 	if r.isTTY && !r.cursorHidden {
-		fmt.Fprint(r.out, "\033[?25l") // Hide cursor
+		_, _ = fmt.Fprint(r.out, "\033[?25l") // Hide cursor
 		r.cursorHidden = true
 	}
 	r.lineCount = 0
@@ -54,7 +54,7 @@ func (r *LiveRenderer) Complete() {
 	defer r.mu.Unlock()
 
 	if r.cursorHidden {
-		fmt.Fprint(r.out, "\033[?25h") // Show cursor
+		_, _ = fmt.Fprint(r.out, "\033[?25h") // Show cursor
 		r.cursorHidden = false
 	}
 }
@@ -70,7 +70,7 @@ func (r *LiveRenderer) Clear() {
 
 	// Move cursor up and clear each line
 	for i := 0; i < r.lineCount; i++ {
-		fmt.Fprint(r.out, "\033[A\033[K") // Up one line, clear to end
+		_, _ = fmt.Fprint(r.out, "\033[A\033[K") // Up one line, clear to end
 	}
 	r.lineCount = 0
 }
@@ -107,7 +107,7 @@ func (r *LiveRenderer) Render(lines []string) {
 	}
 
 	// Single atomic write
-	fmt.Fprint(r.out, sb.String())
+	_, _ = fmt.Fprint(r.out, sb.String())
 	r.lineCount = len(lines)
 }
 
@@ -117,7 +117,7 @@ func (r *LiveRenderer) AppendLine(line string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	fmt.Fprintln(r.out, line)
+	_, _ = fmt.Fprintln(r.out, line)
 	r.lineCount++
 }
 
@@ -129,16 +129,16 @@ func (r *LiveRenderer) UpdateLastLine(line string) {
 
 	if !r.isTTY {
 		// Non-TTY: just append
-		fmt.Fprintln(r.out, line)
+		_, _ = fmt.Fprintln(r.out, line)
 		r.lineCount++
 		return
 	}
 
 	if r.lineCount > 0 {
 		// Move up one line, clear it, write new content
-		fmt.Fprintf(r.out, "\033[A\033[K%s\n", line)
+		_, _ = fmt.Fprintf(r.out, "\033[A\033[K%s\n", line)
 	} else {
-		fmt.Fprintln(r.out, line)
+		_, _ = fmt.Fprintln(r.out, line)
 		r.lineCount = 1
 	}
 }
