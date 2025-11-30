@@ -38,6 +38,7 @@ func NewRegistry() *Registry {
 	r := &Registry{}
 	// Register built-in adapters
 	r.Register(&GoTestJSONAdapter{})
+	r.Register(&MCPInterviewerAdapter{})
 	return r
 }
 

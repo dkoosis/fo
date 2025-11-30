@@ -64,6 +64,7 @@ func AllPatternTypes() []PatternType {
 		PatternTypeSummary,
 		PatternTypeComparison,
 		PatternTypeInventory,
+		PatternTypeQualityReport,
 	}
 }
 

@@ -421,19 +421,20 @@ func TestPattern_Interface(t *testing.T) {
 
 func TestPatternType_AllPatternTypes(t *testing.T) {
 	types := AllPatternTypes()
-	expectedCount := 6
+	expectedCount := 7
 	if len(types) != expectedCount {
 		t.Errorf("AllPatternTypes() returned %d types, want %d", len(types), expectedCount)
 	}
 
 	// Verify all expected types are present
 	expectedTypes := map[PatternType]bool{
-		PatternTypeSparkline:   true,
-		PatternTypeLeaderboard: true,
-		PatternTypeTestTable:   true,
-		PatternTypeSummary:     true,
-		PatternTypeComparison:  true,
-		PatternTypeInventory:   true,
+		PatternTypeSparkline:     true,
+		PatternTypeLeaderboard:   true,
+		PatternTypeTestTable:     true,
+		PatternTypeSummary:       true,
+		PatternTypeComparison:    true,
+		PatternTypeInventory:     true,
+		PatternTypeQualityReport: true,
 	}
 
 	for _, pt := range types {
