@@ -400,6 +400,9 @@ func TestPattern_Interface(t *testing.T) {
 	var _ Pattern = &Summary{}
 	var _ Pattern = &Comparison{}
 	var _ Pattern = &Inventory{}
+	var _ Pattern = &QualityReport{}
+	var _ Pattern = &ComplexityDashboard{}
+	var _ Pattern = &Housekeeping{}
 
 	// Verify they can all be rendered
 	patterns := []Pattern{
@@ -409,6 +412,9 @@ func TestPattern_Interface(t *testing.T) {
 		&Summary{Metrics: []SummaryItem{{Label: "test", Value: "1"}}},
 		&Comparison{Changes: []ComparisonItem{{Label: "test", Before: "1", After: "2"}}},
 		&Inventory{Items: []InventoryItem{{Name: "test", Size: "1MB"}}},
+		&QualityReport{ServerName: "test", Categories: []QualityCategory{{Name: "test", Passed: 1, Total: 1}}},
+		&ComplexityDashboard{Metrics: []ComplexityMetric{{Label: "test", Current: 10}}},
+		&Housekeeping{Checks: []HousekeepingCheck{{Name: "test", Status: "pass"}}},
 	}
 
 	for i, p := range patterns {
@@ -421,20 +427,22 @@ func TestPattern_Interface(t *testing.T) {
 
 func TestPatternType_AllPatternTypes(t *testing.T) {
 	types := AllPatternTypes()
-	expectedCount := 7
+	expectedCount := 9 // Updated to include ComplexityDashboard and Housekeeping
 	if len(types) != expectedCount {
 		t.Errorf("AllPatternTypes() returned %d types, want %d", len(types), expectedCount)
 	}
 
 	// Verify all expected types are present
 	expectedTypes := map[PatternType]bool{
-		PatternTypeSparkline:     true,
-		PatternTypeLeaderboard:   true,
-		PatternTypeTestTable:     true,
-		PatternTypeSummary:       true,
-		PatternTypeComparison:    true,
-		PatternTypeInventory:     true,
-		PatternTypeQualityReport: true,
+		PatternTypeSparkline:           true,
+		PatternTypeLeaderboard:         true,
+		PatternTypeTestTable:           true,
+		PatternTypeSummary:             true,
+		PatternTypeComparison:          true,
+		PatternTypeInventory:           true,
+		PatternTypeQualityReport:       true,
+		PatternTypeComplexityDashboard: true,
+		PatternTypeHousekeeping:        true,
 	}
 
 	for _, pt := range types {
@@ -461,6 +469,9 @@ func TestPatternType_IsValidPatternType(t *testing.T) {
 		{"valid summary", "summary", true},
 		{"valid comparison", "comparison", true},
 		{"valid inventory", "inventory", true},
+		{"valid quality-report", "quality-report", true},
+		{"valid complexity-dashboard", "complexity-dashboard", true},
+		{"valid housekeeping", "housekeeping", true},
 		{"invalid type", "invalid", false},
 		{"empty string", "", false},
 		{"case sensitive", "Sparkline", false},
@@ -488,6 +499,9 @@ func TestPattern_PatternType(t *testing.T) {
 		{"Summary", &Summary{}, PatternTypeSummary},
 		{"Comparison", &Comparison{}, PatternTypeComparison},
 		{"Inventory", &Inventory{}, PatternTypeInventory},
+		{"QualityReport", &QualityReport{}, PatternTypeQualityReport},
+		{"ComplexityDashboard", &ComplexityDashboard{}, PatternTypeComplexityDashboard},
+		{"Housekeeping", &Housekeeping{}, PatternTypeHousekeeping},
 	}
 
 	for _, tt := range tests {

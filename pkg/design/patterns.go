@@ -55,7 +55,7 @@ const (
 	PatternTypeInventory PatternType = "inventory"
 )
 
-// AllPatternTypes returns all six standard pattern types.
+// AllPatternTypes returns all standard pattern types.
 func AllPatternTypes() []PatternType {
 	return []PatternType{
 		PatternTypeSparkline,
@@ -65,6 +65,8 @@ func AllPatternTypes() []PatternType {
 		PatternTypeComparison,
 		PatternTypeInventory,
 		PatternTypeQualityReport,
+		PatternTypeComplexityDashboard,
+		PatternTypeHousekeeping,
 	}
 }
 

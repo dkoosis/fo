@@ -33,7 +33,7 @@ func (a *MCPInterviewerAdapter) Detect(firstLines []string) bool {
 	// Join first lines and look for MCP Interviewer markers
 	// This handles both compact and pretty-printed JSON
 	combined := strings.Join(firstLines, " ")
-	
+
 	// MCP Interviewer JSON has these characteristic fields
 	hasInitialize := strings.Contains(combined, `"initialize_result"`)
 	hasProtocol := strings.Contains(combined, `"protocolVersion"`)
@@ -45,7 +45,7 @@ func (a *MCPInterviewerAdapter) Detect(firstLines []string) bool {
 	if hasInitialize && hasProtocol {
 		return true
 	}
-	
+
 	// Or if we see tools/scorecards with any MCP marker
 	if (hasTools || hasScorecards) && (hasInitialize || hasServerInfo) {
 		return true
@@ -64,9 +64,9 @@ type mcpInterviewerJSON struct {
 			Version string `json:"version"`
 		} `json:"serverInfo"`
 	} `json:"initialize_result"`
-	Tools          []mcpTool        `json:"tools"`
-	Resources      []mcpResource    `json:"resources"`
-	ToolScorecards []toolScorecard  `json:"tool_scorecards"`
+	Tools          []mcpTool       `json:"tools"`
+	Resources      []mcpResource   `json:"resources"`
+	ToolScorecards []toolScorecard `json:"tool_scorecards"`
 }
 
 type mcpTool struct {
@@ -81,8 +81,8 @@ type mcpResource struct {
 
 type toolScorecard struct {
 	ToolName struct {
-		Length         scoreEntry `json:"length"`
-		Uniqueness     scoreEntry `json:"uniqueness"`
+		Length          scoreEntry `json:"length"`
+		Uniqueness      scoreEntry `json:"uniqueness"`
 		Descriptiveness scoreEntry `json:"descriptiveness"`
 	} `json:"tool_name"`
 	ToolDescription struct {
@@ -180,9 +180,9 @@ func (a *MCPInterviewerAdapter) Parse(output io.Reader) (design.Pattern, error) 
 	// Convert failure types to issues list
 	for failureType, tools := range failureTypes {
 		report.Issues = append(report.Issues, design.QualityIssue{
-			Category:   failureType,
-			ToolCount:  len(tools),
-			ToolNames:  tools,
+			Category:  failureType,
+			ToolCount: len(tools),
+			ToolNames: tools,
 		})
 	}
 

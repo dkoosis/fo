@@ -15,13 +15,13 @@ const PatternTypeQualityReport PatternType = "quality-report"
 // QualityReport represents a quality assessment with category scores and issues.
 // Designed for MCP Interviewer tool scorecards but generalizable to other quality metrics.
 type QualityReport struct {
-	ServerName    string              // Server or project name being assessed
-	ServerVersion string              // Version of the server/project
-	Protocol      string              // Protocol version (for MCP)
-	ToolCount     int                 // Number of tools assessed
-	ResourceCount int                 // Number of resources
-	Categories    []QualityCategory   // Score categories (Name, Description, Schema, etc.)
-	Issues        []QualityIssue      // Grouped failures that need attention
+	ServerName    string                // Server or project name being assessed
+	ServerVersion string                // Version of the server/project
+	Protocol      string                // Protocol version (for MCP)
+	ToolCount     int                   // Number of tools assessed
+	ResourceCount int                   // Number of resources
+	Categories    []QualityCategory     // Score categories (Name, Description, Schema, etc.)
+	Issues        []QualityIssue        // Grouped failures that need attention
 	Constraints   []ConstraintViolation // Constraint violations (limits exceeded)
 }
 
