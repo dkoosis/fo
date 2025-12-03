@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/term"
 )
 
@@ -249,15 +248,12 @@ func (r *TestRenderer) RenderAll() {
 		lines = append(lines, fmt.Sprintf("%s✓%s  ALL TESTS PASSED", successColor, reset))
 	}
 
-	// Render in a box using lipgloss
-	boxStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("238")).
-		Padding(0, 1).
-		Width(r.width - 4)
-
-	content := strings.Join(lines, "\n")
-	_, _ = fmt.Fprintf(r.writer, "%s\n", boxStyle.Render(content))
+	// Render as a complete box using the console's section system
+	r.console.PrintSectionHeader("Tests")
+	for _, line := range lines {
+		r.console.PrintSectionLine(line)
+	}
+	r.console.PrintSectionFooter()
 }
 
 func (r *TestRenderer) renderGroupLines(g groupData) []string {
