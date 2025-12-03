@@ -78,13 +78,37 @@ func (b *Box) String() string {
 		return b.renderPlain()
 	}
 
-	// Build the inner content
+	// Build styled content parts
+	parts := b.buildContentParts(true)
+
+	// Join all content
+	innerContent := strings.Join(parts, "\n")
+
+	// Apply box style - lipgloss handles borders, padding, width
+	// Width calculation: subtract 2 for borders + 2 for horizontal padding (Padding(0,1) = 1 each side)
+	boxStyle := b.theme.Styles.Box.Width(b.width - 4)
+
+	return boxStyle.Render(innerContent)
+}
+
+// renderPlain renders content without box styling.
+func (b *Box) renderPlain() string {
+	parts := b.buildContentParts(false)
+	return strings.Join(parts, "\n")
+}
+
+// buildContentParts assembles the content parts (title, content, footer).
+// When styled=true, applies theme styles to title and footer.
+func (b *Box) buildContentParts(styled bool) []string {
 	var parts []string
 
 	// Title line (if set)
 	if b.title != "" {
-		titleLine := b.theme.Styles.Header.Render(b.title)
-		parts = append(parts, titleLine)
+		if styled && b.theme != nil {
+			parts = append(parts, b.theme.Styles.Header.Render(b.title))
+		} else {
+			parts = append(parts, b.title)
+		}
 		parts = append(parts, "") // Empty line after title
 	}
 
@@ -94,35 +118,14 @@ func (b *Box) String() string {
 	// Footer (if set)
 	if b.footer != "" {
 		parts = append(parts, "") // Empty line before footer
-		parts = append(parts, b.footer)
+		if styled && b.theme != nil {
+			parts = append(parts, b.theme.Styles.TextMuted.Render(b.footer))
+		} else {
+			parts = append(parts, b.footer)
+		}
 	}
 
-	// Join all content
-	innerContent := strings.Join(parts, "\n")
-
-	// Apply box style - lipgloss handles borders, padding, width
-	boxStyle := b.theme.Styles.Box.Width(b.width - 2) // -2 for border chars
-
-	return boxStyle.Render(innerContent)
-}
-
-// renderPlain renders content without box styling.
-func (b *Box) renderPlain() string {
-	var parts []string
-
-	if b.title != "" {
-		parts = append(parts, b.title)
-		parts = append(parts, "")
-	}
-
-	parts = append(parts, b.content...)
-
-	if b.footer != "" {
-		parts = append(parts, "")
-		parts = append(parts, b.footer)
-	}
-
-	return strings.Join(parts, "\n")
+	return parts
 }
 
 // terminalWidth returns the current terminal width, defaulting to 80.
@@ -161,12 +164,12 @@ func RenderInlineStatus(theme *Theme, status, message, duration string) string {
 		style = theme.Styles.TextNormal
 	}
 
-	result := style.Render(icon + " " + message)
+	statusPart := style.Render(icon + " " + message)
 
 	if duration != "" {
-		durationStyle := theme.Styles.TextMuted
-		result += " " + durationStyle.Render("("+duration+")")
+		durationPart := theme.Styles.TextMuted.Render(" (" + duration + ")")
+		return lipgloss.JoinHorizontal(lipgloss.Top, statusPart, durationPart)
 	}
 
-	return result
+	return statusPart
 }

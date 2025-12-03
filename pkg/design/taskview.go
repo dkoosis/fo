@@ -150,7 +150,7 @@ func (v *TaskView) renderStatusLine(data TaskData) string {
 	if data.Duration > 0 {
 		durationStr := formatDurationCompact(data.Duration)
 		durationPart := v.theme.Styles.TextMuted.Render(" (" + durationStr + ")")
-		return statusPart + durationPart
+		return lipgloss.JoinHorizontal(lipgloss.Top, statusPart, durationPart)
 	}
 
 	return statusPart
