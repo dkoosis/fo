@@ -215,19 +215,15 @@ func (f *TestFormatter) renderFinalSummary() {
 		}
 	}
 
-	// Render table header using theme
-	f.renderer.RenderTableHeader()
-
-	// Render each group using theme-driven renderer
+	// Collect all groups into renderer
 	for _, dir := range groupOrder {
 		pkgs := groups[dir]
 
-		// Render group header
+		// Start group
 		f.renderer.RenderGroupHeader(dir)
 
-		// Render packages in this group
+		// Add packages in this group
 		for _, pkg := range pkgs {
-			// Convert internal PackageResult to fo's TestPackageResult
 			testPkg := fo.TestPackageResult{
 				Name:        f.getPackageBaseName(pkg.Name),
 				Passed:      pkg.Passed,
@@ -241,9 +237,12 @@ func (f *TestFormatter) renderFinalSummary() {
 			f.renderer.RenderPackageLine(testPkg)
 		}
 
-		// Render group footer
+		// End group
 		f.renderer.RenderGroupFooter()
 	}
+
+	// Render everything at once
+	f.renderer.RenderAll()
 }
 
 func (f *TestFormatter) getTopLevelDir(name string) string {

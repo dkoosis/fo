@@ -29,6 +29,9 @@ const (
 	// DefaultTerminalWidth is the fallback terminal width when detection fails.
 	DefaultTerminalWidth = 80
 
+	// defaultSuccessIcon is the fallback success icon.
+	defaultSuccessIcon = "✓"
+
 	// DefaultHeaderWidth is the default header width when not specified in theme.
 	DefaultHeaderWidth = 60
 
