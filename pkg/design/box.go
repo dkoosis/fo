@@ -109,7 +109,6 @@ func (b *Box) buildContentParts(styled bool) []string {
 		} else {
 			parts = append(parts, b.title)
 		}
-		parts = append(parts, "") // Empty line after title
 	}
 
 	// Content lines

@@ -98,7 +98,6 @@ func (v *TaskView) RenderStart(data TaskData) string {
 	box := NewBox(v.theme).
 		Width(v.width).
 		Title(strings.ToUpper(data.Label)).
-		AddLine("").
 		AddLine(runningLine)
 
 	return box.String()
@@ -116,15 +115,13 @@ func (v *TaskView) RenderComplete(data TaskData) string {
 	// Build the box with all content
 	box := NewBox(v.theme).
 		Width(v.width).
-		Title(strings.ToUpper(data.Label)).
-		AddLine("")
+		Title(strings.ToUpper(data.Label))
 
 	// Add output lines if requested
 	if data.ShowLines && len(data.Lines) > 0 {
 		for _, line := range data.Lines {
 			box.AddLine(v.renderLine(line))
 		}
-		box.AddLine("")
 	}
 
 	box.AddLine(statusLine)
