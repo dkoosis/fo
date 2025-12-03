@@ -197,3 +197,67 @@ func MonochromeTheme() *Theme {
 		},
 	)
 }
+
+// ThemeFromConfig creates a Theme from an existing Config.
+// This bridges the old Config system to the new Theme system during migration.
+func ThemeFromConfig(cfg *Config) *Theme {
+	if cfg == nil {
+		return DefaultTheme()
+	}
+
+	if cfg.IsMonochrome {
+		return MonochromeTheme()
+	}
+
+	// Map old theme names to new themes
+	switch cfg.ThemeName {
+	case "orca":
+		return OrcaTheme2()
+	case "ascii_minimal":
+		return MonochromeTheme()
+	}
+
+	// For other themes, build from config values
+	// Use proper lipgloss color format (256-color numbers)
+	colors := ThemeColors{
+		Primary: lipgloss.Color("39"),  // Default bright blue
+		Success: lipgloss.Color("120"), // Light green
+		Warning: lipgloss.Color("214"), // Orange
+		Error:   lipgloss.Color("196"), // Red
+		Text:    lipgloss.Color("252"), // Light gray
+		Muted:   lipgloss.Color("242"), // Dark gray
+		Subtle:  lipgloss.Color("238"), // Very dark gray
+		Inverse: lipgloss.Color("231"), // White
+	}
+
+	icons := ThemeIcons{
+		Running: cfg.Icons.Start,
+		Success: cfg.Icons.Success,
+		Warning: cfg.Icons.Warning,
+		Error:   cfg.Icons.Error,
+		Info:    cfg.Icons.Info,
+		Bullet:  cfg.Icons.Bullet,
+	}
+
+	// Use defaults for empty icons
+	if icons.Running == "" {
+		icons.Running = "▶"
+	}
+	if icons.Success == "" {
+		icons.Success = "✓"
+	}
+	if icons.Warning == "" {
+		icons.Warning = "⚠"
+	}
+	if icons.Error == "" {
+		icons.Error = "✗"
+	}
+	if icons.Info == "" {
+		icons.Info = "ℹ"
+	}
+	if icons.Bullet == "" {
+		icons.Bullet = "•"
+	}
+
+	return NewTheme(cfg.ThemeName, colors, icons)
+}

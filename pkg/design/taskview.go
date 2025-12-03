@@ -25,6 +25,30 @@ type TaskData struct {
 	ShowLines bool // Whether to show output lines
 }
 
+// TaskDataFromTask converts a Task to TaskData for rendering.
+// This bridges the existing Task type to the new rendering system.
+func TaskDataFromTask(t *Task, showLines bool) TaskData {
+	data := TaskData{
+		Label:     t.Label,
+		Status:    t.Status,
+		Duration:  t.Duration,
+		ShowLines: showLines,
+	}
+
+	// Convert OutputLines to LineData
+	t.ProcessOutputLines(func(lines []OutputLine) {
+		for _, line := range lines {
+			data.Lines = append(data.Lines, LineData{
+				Content: line.Content,
+				Type:    line.Type,
+				Indent:  line.Indentation,
+			})
+		}
+	})
+
+	return data
+}
+
 // LineData holds data for a single output line.
 type LineData struct {
 	Content string

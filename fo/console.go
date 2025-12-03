@@ -129,6 +129,8 @@ func (r *TaskResult) ToJSON() ([]byte, error) {
 type Console struct {
 	cfg             ConsoleConfig
 	designConf      *design.Config
+	theme           *design.Theme    // New lipgloss-idiomatic theme
+	taskView        *design.TaskView // New task renderer
 	adapterRegistry *adapter.Registry
 	processor       *Processor
 	profiler        *Profiler
@@ -147,9 +149,16 @@ func NewConsole(cfg ConsoleConfig) *Console {
 	adapterRegistry := adapter.NewRegistry()
 	patternMatcher := design.NewPatternMatcher(designConf)
 	processor := NewProcessor(patternMatcher, adapterRegistry, normalized.MaxLineLength, normalized.Debug)
+
+	// Create new theme and task view from config
+	theme := design.ThemeFromConfig(designConf)
+	taskView := design.NewTaskView(theme).UseBoxes(designConf.Style.UseBoxes)
+
 	return &Console{
 		cfg:             normalized,
 		designConf:      designConf,
+		theme:           theme,
+		taskView:        taskView,
 		adapterRegistry: adapterRegistry,
 		processor:       processor,
 		profiler:        profiler,
@@ -1112,7 +1121,9 @@ func (c *Console) runContext(
 
 	if !c.inSection {
 		// Suppress start line when in a section - section header already shows context
-		_, _ = c.cfg.Out.Write([]byte(task.RenderStartLine() + "\n"))
+		// Use new lipgloss-idiomatic TaskView for rendering
+		taskData := design.TaskData{Label: labelToUse, Status: "running"}
+		_, _ = c.cfg.Out.Write([]byte(c.taskView.RenderStart(taskData) + "\n"))
 	}
 
 	cmd := exec.CommandContext(ctx, command, args...)
@@ -1236,7 +1247,9 @@ func (c *Console) runContext(
 		}
 		// Don't render - section summary will be shown instead
 	} else {
-		_, _ = c.cfg.Out.Write([]byte(task.RenderEndLine() + "\n"))
+		// Use new lipgloss-idiomatic TaskView for rendering
+		taskData := design.TaskDataFromTask(task, false)
+		_, _ = c.cfg.Out.Write([]byte(c.taskView.RenderComplete(taskData) + "\n"))
 	}
 
 	// Convert design.OutputLine to Line
