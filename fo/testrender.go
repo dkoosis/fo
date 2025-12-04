@@ -248,12 +248,10 @@ func (r *TestRenderer) RenderAll() {
 		lines = append(lines, fmt.Sprintf("%s✓%s  ALL TESTS PASSED", successColor, reset))
 	}
 
-	// Render as a complete box using the console's section system
-	r.console.PrintSectionHeader("Tests")
+	// Render lines within the existing section (no nested section header)
 	for _, line := range lines {
 		r.console.PrintSectionLine(line)
 	}
-	r.console.PrintSectionFooter()
 }
 
 func (r *TestRenderer) renderGroupLines(g groupData) []string {
