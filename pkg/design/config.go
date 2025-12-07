@@ -80,6 +80,7 @@ var defaultColorValues = map[string]lipgloss.Color{
 	"greenfg": "120", // Light green
 	"bluefg":  "39",  // Bright blue
 	"bluebg":  "4",   // Blue
+	"spinner": "111", // Pale blue (Claude-style)
 	"bold":    "",    // Style, not color
 	"italic":  "",    // Style, not color
 }
@@ -297,6 +298,7 @@ type Config struct {
 		BlueFg   lipgloss.Color `yaml:"blue_fg,omitempty"`
 		BlueBg   lipgloss.Color `yaml:"blue_bg,omitempty"`
 		PaleBlue lipgloss.Color `yaml:"pale_blue,omitempty"`
+		Spinner  lipgloss.Color `yaml:"spinner,omitempty"`
 		Bold     lipgloss.Color `yaml:"bold,omitempty"`
 		Italic   lipgloss.Color `yaml:"italic,omitempty"`
 	} `yaml:"colors"`
@@ -805,6 +807,8 @@ func (c *Config) resolveColorName(name string) lipgloss.Color {
 		color = c.Colors.BlueBg
 	case "paleblue":
 		color = c.Colors.PaleBlue
+	case "spinner":
+		color = c.Colors.Spinner
 	case colorNameBold:
 		color = c.Colors.Bold
 	case colorNameItalic:

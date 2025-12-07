@@ -668,8 +668,31 @@ func (c *Console) RunSection(s Section) SectionResult {
 		fmt.Fprintf(os.Stderr, "[DEBUG RunSection] Starting section '%s', inSection=%v\n", s.Name, c.inSection)
 	}
 
+	// 2.5) Start spinner if enabled
+	var spinner *Spinner
+	if !c.designConf.Style.NoSpinner && !c.cfg.Monochrome {
+		spinnerColor := c.getSpinnerColor()
+		interval := time.Duration(c.designConf.Style.SpinnerInterval) * time.Millisecond
+		if interval == 0 {
+			interval = 80 * time.Millisecond
+		}
+		spinner = NewSpinner(SpinnerConfig{
+			Style:    "dots",
+			Interval: interval,
+			Message:  s.Name + "...",
+			Color:    spinnerColor,
+			Writer:   c.cfg.Out,
+		})
+		spinner.Start()
+	}
+
 	// 3) Run the actual work
 	err := s.Run()
+
+	// Stop spinner
+	if spinner != nil {
+		spinner.Stop()
+	}
 
 	// Restore previous section state
 	c.inSection = wasInSection
@@ -877,6 +900,19 @@ func (c *Console) GetWarningColor() string {
 // GetErrorColor returns the Error color code from the theme.
 func (c *Console) GetErrorColor() string {
 	return string(c.designConf.GetColor("Error"))
+}
+
+// getSpinnerColor returns the ANSI escape sequence for spinner color.
+func (c *Console) getSpinnerColor() string {
+	color := c.designConf.GetColor("Spinner")
+	if color == "" {
+		color = c.designConf.GetColor("Process")
+	}
+	if color == "" {
+		return ""
+	}
+	// Convert lipgloss color to ANSI escape sequence
+	return fmt.Sprintf("\033[38;5;%sm", color)
 }
 
 // GetIcon returns an icon from the theme by key.

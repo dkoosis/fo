@@ -9,14 +9,62 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/dkoosis/fo/fo"
+	"github.com/dkoosis/fo/internal/config"
+	"github.com/dkoosis/fo/pkg/design"
 )
 
-// themeNames defines all themes to generate outputs for
-var themeNames = []string{"unicode_vibrant", "orca", "ascii_minimal"}
+// builtinThemes are always available
+var builtinThemes = []string{"unicode_vibrant", "orca", "ascii_minimal"}
+
+// getThemeNames returns all available themes (builtin + from .fo.yaml)
+func getThemeNames() []string {
+	themes := make(map[string]bool)
+
+	// Add builtin themes
+	for _, t := range builtinThemes {
+		themes[t] = true
+	}
+
+	// Load custom themes from .fo.yaml
+	appCfg := config.LoadConfig()
+	if appCfg != nil && appCfg.Themes != nil {
+		for name := range appCfg.Themes {
+			themes[name] = true
+		}
+	}
+
+	// Convert to sorted slice
+	result := make([]string, 0, len(themes))
+	for t := range themes {
+		result = append(result, t)
+	}
+	sort.Strings(result)
+	return result
+}
+
+// getDesignConfig returns the design config for a theme name
+func getDesignConfig(themeName string) *design.Config {
+	// Check custom themes first
+	appCfg := config.LoadConfig()
+	if appCfg != nil && appCfg.Themes != nil {
+		if cfg, ok := appCfg.Themes[themeName]; ok {
+			return cfg
+		}
+	}
+
+	// Fall back to builtin
+	builtins := design.DefaultThemes()
+	if cfg, ok := builtins[themeName]; ok {
+		return cfg
+	}
+
+	return design.UnicodeVibrantTheme()
+}
 
 // scenarios defines all visual test cases
 var scenarios = []struct {
@@ -82,6 +130,7 @@ func main() {
 }
 
 func printUsage() {
+	themes := getThemeNames()
 	fmt.Fprintf(os.Stderr, `Usage: %s <command> [args]
 
 Commands:
@@ -90,20 +139,47 @@ Commands:
                     Options: --theme <name>  (default: unicode_vibrant)
   save <dir>        Save all scenarios for all themes to subdirectories
 
-Themes: unicode_vibrant, orca, ascii_minimal
+Themes: %s
+  (add custom themes in .fo.yaml)
 
 Examples:
   %s list
   %s show fail
   %s show headers --theme orca
   %s save visual_test_outputs
-`, os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0])
+`, os.Args[0], strings.Join(themes, ", "), os.Args[0], os.Args[0], os.Args[0], os.Args[0])
 }
 
 func listScenarios() {
 	fmt.Println("Available scenarios:")
 	for _, s := range scenarios {
 		fmt.Printf("  %-12s  %s\n", s.key, s.name)
+	}
+
+	themes := getThemeNames()
+	fmt.Printf("\nAvailable themes (%d):\n", len(themes))
+	for _, t := range themes {
+		source := "builtin"
+		for _, b := range builtinThemes {
+			if t == b {
+				break
+			}
+			source = ".fo.yaml"
+		}
+		// Check if it's actually from .fo.yaml
+		isBuiltin := false
+		for _, b := range builtinThemes {
+			if t == b {
+				isBuiltin = true
+				break
+			}
+		}
+		if isBuiltin {
+			source = "builtin"
+		} else {
+			source = ".fo.yaml"
+		}
+		fmt.Printf("  %-20s  (%s)\n", t, source)
 	}
 }
 
@@ -112,7 +188,7 @@ func showScenario(key, themeName string) {
 		if s.key == key || strings.EqualFold(s.name, key) {
 			// Run directly to stdout with colors
 			console := fo.NewConsole(fo.ConsoleConfig{
-				ThemeName: themeName,
+				Design: getDesignConfig(themeName),
 			})
 			var buf bytes.Buffer
 			if err := s.run(console, &buf); err != nil {
@@ -133,12 +209,14 @@ func saveAll(outputDir string) {
 		os.Exit(1)
 	}
 
-	fmt.Printf("Running visual test suite, saving outputs to: %s\n\n", outputDir)
+	themes := getThemeNames()
+	fmt.Printf("Running visual test suite, saving outputs to: %s\n", outputDir)
+	fmt.Printf("Themes: %s\n\n", strings.Join(themes, ", "))
 
-	totalScenarios := len(themeNames) * len(scenarios)
+	totalScenarios := len(themes) * len(scenarios)
 	current := 0
 
-	for _, themeName := range themeNames {
+	for _, themeName := range themes {
 		themeDir := filepath.Join(outputDir, themeName)
 		if err := os.MkdirAll(themeDir, 0755); err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating theme directory %s: %v\n", themeName, err)
@@ -153,9 +231,8 @@ func saveAll(outputDir string) {
 
 			var buf bytes.Buffer
 			console := fo.NewConsole(fo.ConsoleConfig{
-				Out:        &buf,
-				ThemeName:  themeName,
-				Monochrome: false,
+				Out:    &buf,
+				Design: getDesignConfig(themeName),
 			})
 
 			if err := scenario.run(console, &buf); err != nil {
