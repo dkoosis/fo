@@ -31,20 +31,21 @@ themes:
       bullet: "•"
     
     colors:
-      # ANSI color codes (use \033 for ESC character)
-      process: "\033[38;5;117m"   # Light blue
-      success: "\033[38;5;120m"   # Light green
-      warning: "\033[0;33m"       # Yellow
-      error: "\033[0;31m"         # Red
-      detail: "\033[0m"           # Reset
-      muted: "\033[2m"            # Dim
-      reset: "\033[0m"            # Reset
-      white: "\033[0;97m"        # Bright white
-      blue_fg: "\033[38;5;117m"  # Light blue foreground
-      green_fg: "\033[38;5;120m" # Light green foreground
-      blue_bg: "\033[44m"        # Blue background
-      bold: "\033[1m"            # Bold
-      italic: "\033[3m"          # Italic
+      # Use 256-color numbers (simpler) or ANSI escape codes
+      process: "117"              # Light blue (256-color)
+      success: "120"              # Light green
+      warning: "214"              # Orange
+      error: "196"                # Red
+      detail: ""                  # Reset (empty = no color)
+      muted: "242"                # Dark gray
+      reset: ""                   # Reset
+      spinner: "111"              # Pale blue (Claude-style spinner)
+      white: "231"                # Bright white
+      blue_fg: "117"              # Light blue foreground
+      green_fg: "120"             # Light green foreground
+      blue_bg: "4"                # Blue background
+      bold: ""                    # Bold (style, not color)
+      italic: ""                  # Italic (style, not color)
     
     border:
       task_style: header_box  # Options: none, left, left_double, header_box
@@ -104,21 +105,22 @@ themes:
       info: "ℹ"                          # Info indicator
       bullet: "•"                        # Bullet point
     
-    # Colors (ANSI escape sequences)
+    # Colors (256-color numbers or ANSI escape sequences)
     colors:
-      process: "\033[38;5;117m"          # Process/task color
-      success: "\033[38;5;120m"         # Success color
-      warning: "\033[0;33m"              # Warning color (yellow)
-      error: "\033[0;31m"                # Error color (red)
-      detail: "\033[0m"                  # Detail text color
-      muted: "\033[2m"                   # Muted/dim color
-      reset: "\033[0m"                   # Reset color
-      white: "\033[0;97m"                # White color
-      blue_fg: "\033[38;5;117m"          # Blue foreground
-      green_fg: "\033[38;5;120m"        # Green foreground
-      blue_bg: "\033[44m"                # Blue background
-      bold: "\033[1m"                    # Bold style
-      italic: "\033[3m"                  # Italic style
+      process: "117"                     # Process/task color (light blue)
+      success: "120"                     # Success color (green)
+      warning: "214"                     # Warning color (orange)
+      error: "196"                       # Error color (red)
+      detail: ""                         # Detail text color (reset)
+      muted: "242"                       # Muted/dim color (gray)
+      reset: ""                          # Reset color
+      spinner: "111"                     # Spinner animation color (pale blue)
+      white: "231"                       # White color
+      blue_fg: "117"                     # Blue foreground
+      green_fg: "120"                    # Green foreground
+      blue_bg: "4"                       # Blue background
+      bold: ""                           # Bold style
+      italic: ""                         # Italic style
     
     # Border characters
     border:
@@ -403,21 +405,22 @@ Here's a complete list of all available theme fields:
 - `info` (string)
 - `bullet` (string)
 
-### `colors` (13 fields)
-- `process` (string, ANSI code)
-- `success` (string, ANSI code)
-- `warning` (string, ANSI code)
-- `error` (string, ANSI code)
-- `detail` (string, ANSI code)
-- `muted` (string, ANSI code)
+### `colors` (14 fields)
+- `process` (string, ANSI code or 256-color number)
+- `success` (string, ANSI code or 256-color number)
+- `warning` (string, ANSI code or 256-color number)
+- `error` (string, ANSI code or 256-color number)
+- `detail` (string, ANSI code or 256-color number)
+- `muted` (string, ANSI code or 256-color number)
 - `reset` (string, ANSI code)
-- `white` (string, ANSI code, optional)
-- `green_fg` (string, ANSI code, optional)
-- `blue_fg` (string, ANSI code, optional)
-- `blue_bg` (string, ANSI code, optional)
-- `bold` (string, ANSI code, optional)
-- `italic` (string, ANSI code, optional)
-- `pale_blue` (string, ANSI code, optional)
+- `white` (string, optional)
+- `green_fg` (string, optional)
+- `blue_fg` (string, optional)
+- `blue_bg` (string, optional)
+- `spinner` (string, optional) - spinner animation color (default: "111" pale blue)
+- `bold` (string, optional)
+- `italic` (string, optional)
+- `pale_blue` (string, optional)
 
 ### `border` (19 fields)
 - `task_style` (string: "none" | "left" | "left_double" | "header_box")
