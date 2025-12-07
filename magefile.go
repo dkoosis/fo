@@ -112,6 +112,15 @@ func (Test) Race() error {
 	return magetasks.TestRace()
 }
 
+// Visual runs the visual test suite for rendering validation
+func (Test) Visual() error {
+	console.PrintH1Header("Visual Test Suite")
+	if err := os.MkdirAll("visual_test_outputs", 0755); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+	return sh.RunV("go", "run", "cmd/visual_test_main.go", "visual_test_outputs")
+}
+
 // Quality namespace for quality check commands
 type Quality mg.Namespace
 
