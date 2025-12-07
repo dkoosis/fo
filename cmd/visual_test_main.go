@@ -15,6 +15,9 @@ import (
 	"github.com/dkoosis/fo/fo"
 )
 
+// themeNames defines all themes to generate outputs for
+var themeNames = []string{"unicode_vibrant", "orca", "ascii_minimal"}
+
 // scenarios defines all visual test cases
 var scenarios = []struct {
 	name     string
@@ -33,7 +36,6 @@ var scenarios = []struct {
 	{"Live Sections", "live", testLiveSections, "09_live_sections.txt"},
 	{"Error Scenarios", "errors", testErrorScenarios, "10_error_scenarios.txt"},
 	{"Long Content", "long", testLongContent, "11_long_content.txt"},
-	{"Multiple Themes", "themes", testMultipleThemes, "12_multiple_themes.txt"},
 }
 
 // stripANSI removes ANSI escape codes from a string
@@ -54,10 +56,19 @@ func main() {
 		listScenarios()
 	case "show":
 		if len(os.Args) < 3 {
-			fmt.Fprintf(os.Stderr, "Usage: %s show <scenario-key>\n", os.Args[0])
+			fmt.Fprintf(os.Stderr, "Usage: %s show <scenario-key> [--theme <name>]\n", os.Args[0])
 			os.Exit(1)
 		}
-		showScenario(os.Args[2])
+		themeName := "unicode_vibrant" // default
+		scenarioKey := os.Args[2]
+		// Check for --theme flag
+		for i := 3; i < len(os.Args)-1; i++ {
+			if os.Args[i] == "--theme" {
+				themeName = os.Args[i+1]
+				break
+			}
+		}
+		showScenario(scenarioKey, themeName)
 	case "save":
 		if len(os.Args) < 3 {
 			fmt.Fprintf(os.Stderr, "Usage: %s save <output-dir>\n", os.Args[0])
@@ -74,15 +85,19 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, `Usage: %s <command> [args]
 
 Commands:
-  list              List all available scenarios
+  list              List all available scenarios and themes
   show <key>        Run a single scenario and print to stdout (with colors)
-  save <dir>        Save all scenarios to files (ANSI stripped)
+                    Options: --theme <name>  (default: unicode_vibrant)
+  save <dir>        Save all scenarios for all themes to subdirectories
+
+Themes: unicode_vibrant, orca, ascii_minimal
 
 Examples:
   %s list
   %s show fail
+  %s show headers --theme orca
   %s save visual_test_outputs
-`, os.Args[0], os.Args[0], os.Args[0], os.Args[0])
+`, os.Args[0], os.Args[0], os.Args[0], os.Args[0], os.Args[0])
 }
 
 func listScenarios() {
@@ -92,11 +107,13 @@ func listScenarios() {
 	}
 }
 
-func showScenario(key string) {
+func showScenario(key, themeName string) {
 	for _, s := range scenarios {
 		if s.key == key || strings.EqualFold(s.name, key) {
 			// Run directly to stdout with colors
-			console := fo.DefaultConsole()
+			console := fo.NewConsole(fo.ConsoleConfig{
+				ThemeName: themeName,
+			})
 			var buf bytes.Buffer
 			if err := s.run(console, &buf); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -118,40 +135,55 @@ func saveAll(outputDir string) {
 
 	fmt.Printf("Running visual test suite, saving outputs to: %s\n\n", outputDir)
 
-	for i, scenario := range scenarios {
-		fmt.Printf("[%d/%d] Running: %s\n", i+1, len(scenarios), scenario.name)
+	totalScenarios := len(themeNames) * len(scenarios)
+	current := 0
 
-		var buf bytes.Buffer
-		console := fo.NewConsole(fo.ConsoleConfig{
-			Out:        &buf,
-			Monochrome: false,
-		})
-
-		if err := scenario.run(console, &buf); err != nil {
-			fmt.Fprintf(os.Stderr, "  Error: %v\n", err)
+	for _, themeName := range themeNames {
+		themeDir := filepath.Join(outputDir, themeName)
+		if err := os.MkdirAll(themeDir, 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating theme directory %s: %v\n", themeName, err)
 			continue
 		}
 
-		// Save raw ANSI version (view with: cat file.ansi)
-		ansiPath := filepath.Join(outputDir, strings.TrimSuffix(scenario.filename, ".txt")+".ansi")
-		if err := os.WriteFile(ansiPath, buf.Bytes(), 0644); err != nil {
-			fmt.Fprintf(os.Stderr, "  Error writing ansi file: %v\n", err)
-			continue
-		}
+		fmt.Printf("\n── Theme: %s ──\n", themeName)
 
-		// Save stripped version for reading/diffing
-		txtPath := filepath.Join(outputDir, scenario.filename)
-		if err := os.WriteFile(txtPath, []byte(stripANSI(buf.String())), 0644); err != nil {
-			fmt.Fprintf(os.Stderr, "  Error writing txt file: %v\n", err)
-			continue
-		}
+		for _, scenario := range scenarios {
+			current++
+			fmt.Printf("[%d/%d] %s\n", current, totalScenarios, scenario.name)
 
-		fmt.Printf("  ✓ Saved: %s (.ansi + .txt)\n", strings.TrimSuffix(scenario.filename, ".txt"))
+			var buf bytes.Buffer
+			console := fo.NewConsole(fo.ConsoleConfig{
+				Out:        &buf,
+				ThemeName:  themeName,
+				Monochrome: false,
+			})
+
+			if err := scenario.run(console, &buf); err != nil {
+				fmt.Fprintf(os.Stderr, "  Error: %v\n", err)
+				continue
+			}
+
+			// Save raw ANSI version (view with: cat file.ansi)
+			ansiPath := filepath.Join(themeDir, strings.TrimSuffix(scenario.filename, ".txt")+".ansi")
+			if err := os.WriteFile(ansiPath, buf.Bytes(), 0644); err != nil {
+				fmt.Fprintf(os.Stderr, "  Error writing ansi file: %v\n", err)
+				continue
+			}
+
+			// Save stripped version for reading/diffing
+			txtPath := filepath.Join(themeDir, scenario.filename)
+			if err := os.WriteFile(txtPath, []byte(stripANSI(buf.String())), 0644); err != nil {
+				fmt.Fprintf(os.Stderr, "  Error writing txt file: %v\n", err)
+				continue
+			}
+
+			fmt.Printf("  ✓ Saved: %s (.ansi + .txt)\n", strings.TrimSuffix(scenario.filename, ".txt"))
+		}
 	}
 
 	fmt.Printf("\n✓ Visual test suite complete!\n")
-	fmt.Printf("View with colors: cat %s/*.ansi\n", outputDir)
-	fmt.Printf("Read structure:   cat %s/*.txt\n", outputDir)
+	fmt.Printf("View themes:  cat %s/<theme>/*.ansi\n", outputDir)
+	fmt.Printf("Compare:      diff %s/unicode_vibrant/ %s/orca/\n", outputDir, outputDir)
 }
 
 func testSectionHeaders(console *fo.Console, buf *bytes.Buffer) error {
@@ -511,15 +543,3 @@ func testLongContent(console *fo.Console, buf *bytes.Buffer) error {
 	console.PrintSectionFooter()
 	return nil
 }
-
-func testMultipleThemes(console *fo.Console, buf *bytes.Buffer) error {
-	// Note: This would need to be extended to test different themes
-	// For now, we'll just show the current theme
-	console.PrintH1Header("Theme Testing")
-	console.PrintSectionHeader("Current Theme")
-	console.PrintSectionLine("This test shows the current theme configuration")
-	console.PrintSectionLine("To test multiple themes, run this test with different theme configs")
-	console.PrintSectionFooter()
-	return nil
-}
-
