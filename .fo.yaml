@@ -1,39 +1,201 @@
-# fo dogfood theme - visually distinct for testing
-active_theme: dogfood
+active_theme: orca_swiss
 
 themes:
-  dogfood:
+  orca_swiss:
+    # ─────────────────────────────────────────────────────────────
+    # STYLE: Swiss / Tufte – clean lines, no clutter, restrained color
+    # ─────────────────────────────────────────────────────────────
     style:
-      use_boxes: true
-      density: balanced
+      use_boxes: true # fine boxes, not heavy frames
+      indentation: "  "
+      show_timestamps: false
+      density: balanced # leave some air in the layout
+      no_timer: false
+      use_inline_progress: false
       no_spinner: false
-      spinner_style: arc
-      spinner_interval: 100
-      header_width: 55
+      spinner_style: ""  # ignored when spinner_chars is set
+      spinner_chars: "❀ ❁ ❂ ❃ ❄ ❅ ❆ ❇ ❈ ✦ ✧ ✱ ✲ ✳ ✴ ✵ ✶ ✷ ✸ ✹ ✺ ✻ ✼ ✽ ✾ ✿"
+      spinner_interval: 80
+      header_width: 72
 
+    # ─────────────────────────────────────────────────────────────
+    # ICONS: simple, geometric, not shouty
+    # ─────────────────────────────────────────────────────────────
     icons:
-      start: ">"
-      success: "+"
-      warning: "!"
-      error: "x"
+      start: "›"
+      success: "✓"
+      warning: "△"
+      error: "✕"
       info: "i"
-      bullet: "-"
+      bullet: "·"
 
+    # ─────────────────────────────────────────────────────────────
+    # COLORS: muted grays + one teal accent, with gentle warm/cool alerts
+    # (256-color numbers – see guide for references)
+    # ─────────────────────────────────────────────────────────────
     colors:
-      process: "183"      # Lavender
-      success: "84"       # Sea green
-      warning: "221"      # Gold
-      error: "203"        # Salmon
-      muted: "245"        # Medium gray
-      spinner: "147"      # Light purple
-      blue_fg: "75"       # Steel blue
-      green_fg: "84"      # Sea green
+      process: "109" # Teal-ish blue (primary accent)
+      success: "72" # Soft green
+      warning: "178" # Warm amber, not neon
+      error: "160" # Muted red, not fire-engine
+      detail: "250" # Light gray for secondary info
+      muted: "245" # Medium gray, body text
+      reset: "" # Use terminal reset
+      spinner: "110" # Slightly lighter teal for motion
+      white: "231" # True white highlight
+      blue_fg: "67" # Deep blue for rare emphasis
+      green_fg: "71" # Green accent variant
+      blue_bg: "24" # Dark blue background for rare banners
+      bold: "" # Style handled by terminal
+      italic: "" # Style handled by terminal
 
+    # ─────────────────────────────────────────────────────────────
+    # BORDERS: fine-weight box drawing, grid-friendly
+    # ─────────────────────────────────────────────────────────────
     border:
       task_style: header_box
-      header_char: "="
-      vertical_char: "|"
-      top_corner_char: "+"
-      top_right_char: "+"
-      bottom_corner_char: "+"
-      bottom_right_char: "+"
+      header_char: "─"
+      vertical_char: "│"
+      top_corner_char: "╭"
+      top_right_char: "╮"
+      bottom_corner_char: "╰"
+      bottom_right_char: "╯"
+      footer_continuation_char: "─"
+
+      # Tables (thin, Swiss-style grids)
+      table_h_char: "─"
+      table_v_char: "│"
+      table_x_char: "┼"
+      table_corner_tl: "┌"
+      table_corner_tr: "┐"
+      table_corner_bl: "└"
+      table_corner_br: "┘"
+      table_t_down: "┬"
+      table_t_up: "┴"
+      table_t_left: "┤"
+      table_t_right: "├"
+
+    # ─────────────────────────────────────────────────────────────
+    # ELEMENT-SPECIFIC STYLING
+    # ─────────────────────────────────────────────────────────────
+    elements:
+      # Top-level section headings (e.g., “TESTS & QUALITY”)
+      H1_Major_Header:
+        text_case: upper
+        text_style: [ "bold" ]
+        color_fg: Process
+
+      # Individual task labels (e.g., “DEPENDENCIES”, “FILE SIZES”)
+      Task_Label_Header:
+        text_case: upper
+        text_style: [ "bold" ]
+        color_fg: Muted
+
+      # “> Running X” line
+      Task_StartIndicator_Line:
+        icon_key: Start
+        color_fg: Process
+
+      # Success / failure status blocks
+      Task_Status_Success_Block:
+        icon_key: Success
+        text_content: "OK"
+        color_fg: Success
+
+      Task_Status_Failed_Block:
+        icon_key: Error
+        text_content: "FAIL"
+        color_fg: Error
+
+      Task_Status_Warning_Block:
+        icon_key: Warning
+        text_content: "WARN"
+        color_fg: Warning
+
+      Task_Status_Duration:
+        prefix: "· "
+        suffix: ""
+        color_fg: Detail
+
+      # Section summary heading and items
+      Task_Content_Summary_Heading:
+        text_content: "SUMMARY"
+        text_style: [ "bold" ]
+        color_fg: Process
+
+      Task_Content_Summary_Item_Error:
+        bullet_char: "·"
+        color_fg: Error
+
+      Task_Content_Summary_Item_Warning:
+        bullet_char: "·"
+        color_fg: Warning
+
+      # STDERR prefixes – aligned, but not screaming
+      Stderr_Error_Line_Prefix:
+        icon_key: Error
+        additional_chars: "  "
+        color_fg: Error
+
+      Stderr_Warning_Line_Prefix:
+        icon_key: Warning
+        additional_chars: "  "
+        color_fg: Warning
+
+      Stdout_Line_Prefix:
+        additional_chars: "  "
+        color_fg: Muted
+
+      # Table headers
+      Table_Header_Cell_Text:
+        text_style: [ "bold" ]
+        color_fg: Process
+
+      # Occasional banner highlight (rarely used)
+      Print_Header_Highlight:
+        text_case: none
+        text_style: [ "bold" ]
+        color_fg: White
+        color_bg: BlueBg
+
+      # Generic success style for one-off “✓ done” lines
+      Print_Success_Style:
+        color_fg: Success
+
+    # ─────────────────────────────────────────────────────────────
+    # TEST RENDERING: understated sparkbars, no loud percentages
+    # ─────────────────────────────────────────────────────────────
+    tests:
+      sparkbar_filled: "▮"
+      sparkbar_empty: "▯"
+      sparkbar_length: 10
+      show_percentage: false
+      no_test_icon: "○"
+      no_test_color: Warning
+      coverage_good_min: 75.0
+      coverage_warning_min: 45.0
+
+    # ─────────────────────────────────────────────────────────────
+    # COGNITIVE LOAD + COMPLEXITY (gentle nudges, not alarms)
+    # ─────────────────────────────────────────────────────────────
+    cognitive_load:
+      auto_detect: true
+      default: medium
+
+    complexity_thresholds:
+      very_high: 120
+      high: 60
+      medium: 25
+      error_count_high: 5
+      warning_count_medium: 3
+
+    # ─────────────────────────────────────────────────────────────
+    # (Optional) Pattern hints – very light-touch
+    # ─────────────────────────────────────────────────────────────
+    patterns:
+      intent:
+        build: [ "building", "compiling", "linking" ]
+        test: [ "testing", "running tests", "coverage" ]
+      output:
+        error: [ "error:", "failed", "panic", "fatal" ]
+        warning: [ "warning:", "warn", "deprecated" ]

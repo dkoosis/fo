@@ -1196,6 +1196,31 @@ func (c *Console) runContext(
 		_, _ = c.cfg.Out.Write([]byte(c.taskView.RenderStart(taskData) + "\n"))
 	}
 
+	// Start spinner if enabled (only when not in section and not streaming)
+	var spinner *Spinner
+	if !c.inSection && !c.cfg.LiveStreamOutput && !c.designConf.Style.NoSpinner && !c.cfg.Monochrome {
+		spinnerColor := c.getSpinnerColor()
+		interval := time.Duration(c.designConf.Style.SpinnerInterval) * time.Millisecond
+		if interval == 0 {
+			interval = 80 * time.Millisecond
+		}
+		spinnerStyle := c.designConf.Style.SpinnerStyle
+		if spinnerStyle == "" {
+			spinnerStyle = DefaultSpinnerStyle
+		}
+		customFrames := ParseSpinnerChars(c.designConf.Style.SpinnerChars)
+
+		spinner = NewSpinner(SpinnerConfig{
+			Style:        spinnerStyle,
+			CustomFrames: customFrames,
+			Interval:     interval,
+			Message:      labelToUse + "...",
+			Color:        spinnerColor,
+			Writer:       c.cfg.Out,
+		})
+		spinner.Start()
+	}
+
 	cmd := exec.CommandContext(ctx, command, args...)
 	cmd.Env = os.Environ()
 	setProcessGroup(cmd)
@@ -1286,6 +1311,11 @@ func (c *Console) runContext(
 
 	// Wait for signal handler to finish
 	<-signalHandlerDone
+
+	// Stop spinner before rendering output
+	if spinner != nil {
+		spinner.Stop()
+	}
 
 	task.Complete(exitCode)
 
