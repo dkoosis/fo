@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/dkoosis/fo/pkg/design"
 	"gopkg.in/yaml.v3"
 )
 
@@ -16,7 +17,9 @@ import (
 // This is loaded from .fo.yaml in the project root.
 type ProjectConfig struct {
 	// Theme settings
-	Theme string `yaml:"theme"` // Theme name: "orca", "unicode_vibrant", "ascii_minimal"
+	Theme           string                    `yaml:"theme"`        // Legacy: Theme name (use active_theme instead)
+	ActiveThemeName string                    `yaml:"active_theme"` // Active theme name to use
+	Themes          map[string]*design.Config `yaml:"themes"`       // Custom theme definitions
 
 	// Project metadata (for display in headers)
 	Project struct {
@@ -64,8 +67,10 @@ type ProjectConfig struct {
 // DefaultProjectConfig returns a ProjectConfig with sensible defaults.
 func DefaultProjectConfig() *ProjectConfig {
 	cfg := &ProjectConfig{
-		Theme:       "orca",
-		SnapshotDir: ".fo",
+		Theme:           "",                       // Legacy field, deprecated
+		ActiveThemeName: "unicode_vibrant",        // Default theme
+		Themes:          design.DefaultThemes(),   // Load built-in themes
+		SnapshotDir:     ".fo",
 	}
 
 	cfg.FileSizes.WarnLines = 500
@@ -100,8 +105,50 @@ func LoadProjectConfig() *ProjectConfig {
 		return cfg
 	}
 
-	if err := yaml.Unmarshal(data, cfg); err != nil {
+	// Parse YAML into a temporary struct to handle theme merging
+	var yamlCfg ProjectConfig
+	if err := yaml.Unmarshal(data, &yamlCfg); err != nil {
 		return cfg
+	}
+
+	// Copy non-theme fields
+	if yamlCfg.Theme != "" {
+		cfg.Theme = yamlCfg.Theme
+	}
+	if yamlCfg.ActiveThemeName != "" {
+		cfg.ActiveThemeName = yamlCfg.ActiveThemeName
+	}
+	if yamlCfg.Project.Name != "" {
+		cfg.Project.Name = yamlCfg.Project.Name
+	}
+	if yamlCfg.SnapshotDir != "" {
+		cfg.SnapshotDir = yamlCfg.SnapshotDir
+	}
+	cfg.SkipDirs = yamlCfg.SkipDirs
+	cfg.FileSizes = yamlCfg.FileSizes
+	cfg.Sections = yamlCfg.Sections
+
+	// Merge custom themes (add/override defaults)
+	if yamlCfg.Themes != nil {
+		for name, theme := range yamlCfg.Themes {
+			if theme != nil {
+				copied := design.DeepCopyConfig(theme)
+				if copied != nil {
+					copied.ThemeName = name
+					cfg.Themes[name] = copied
+				}
+			}
+		}
+	}
+
+	// Backward compatibility: if active_theme not set but legacy theme is, use it
+	if cfg.ActiveThemeName == "" && cfg.Theme != "" {
+		cfg.ActiveThemeName = cfg.Theme
+	}
+
+	// Validate active theme exists, fall back to default if not
+	if _, ok := cfg.Themes[cfg.ActiveThemeName]; !ok {
+		cfg.ActiveThemeName = "unicode_vibrant"
 	}
 
 	return cfg
@@ -146,7 +193,17 @@ func (p *ProjectConfig) ToFileSizeConfig() FileSizeConfig {
 // NewConsoleFromProject creates a Console configured from project settings.
 func NewConsoleFromProject() *Console {
 	cfg := LoadProjectConfig()
+
+	// Resolve theme from active_theme → themes map
+	var resolvedTheme *design.Config
+	if theme, ok := cfg.Themes[cfg.ActiveThemeName]; ok {
+		resolvedTheme = design.DeepCopyConfig(theme)
+	} else {
+		// Fall back to default theme
+		resolvedTheme = design.UnicodeVibrantTheme()
+	}
+
 	return NewConsole(ConsoleConfig{
-		ThemeName: cfg.Theme,
+		Design: resolvedTheme,
 	})
 }
