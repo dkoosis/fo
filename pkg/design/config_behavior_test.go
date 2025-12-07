@@ -73,12 +73,12 @@ func TestConfig_ResolvesColors_When_UsingElementOverrides(t *testing.T) {
 			name:        "uses element style override",
 			color:       "process",
 			elementName: "Task_Progress_Line",
-			expected:    "\u001b[0;34m",
+			expected:    "39", // BlueFg - lipgloss color value
 		},
 		{
-			name:     "passes through raw escape",
-			color:    "\u001b[35m",
-			expected: "\u001b[35m",
+			name:     "passes through color value",
+			color:    "120", // Direct lipgloss color value
+			expected: "120",
 		},
 		{
 			name:     "returns input for unknown name",
@@ -97,28 +97,27 @@ func TestConfig_ResolvesColors_When_UsingElementOverrides(t *testing.T) {
 	}
 }
 
-func TestConfig_ReturnsColorWrapper_When_ColorKeyExists(t *testing.T) {
+func TestConfig_ReturnsLipglossColor_When_ColorKeyExists(t *testing.T) {
 	t.Parallel()
 
 	cfg := UnicodeVibrantTheme()
 
-	t.Run("returns ANSI wrapped color", func(t *testing.T) {
+	t.Run("returns lipgloss color value", func(t *testing.T) {
 		t.Parallel()
 
-		color := cfg.GetColorObj(ColorKeyError)
-		require.False(t, color.IsEmpty())
-		assert.Contains(t, color.Sprint("boom"), cfg.Colors.Error)
+		color := cfg.GetColor(ColorKeyError)
+		assert.Equal(t, "196", string(color)) // Red in 256-color palette
 	})
 
-	t.Run("falls back to default escape when color missing", func(t *testing.T) {
+	t.Run("falls back to default when color missing", func(t *testing.T) {
 		t.Parallel()
 
 		cfgCopy := DeepCopyConfig(cfg)
 		cfgCopy.Colors.Error = ""
 
-		color := cfgCopy.GetColorObj(ColorKeyError)
-		// Missing color should use the default ANSI code for errors.
-		assert.Contains(t, color.Sprint("boom"), "[0;31mboom")
+		color := cfgCopy.GetColor(ColorKeyError)
+		// Missing color should use the default lipgloss color for errors
+		assert.Equal(t, "196", string(color))
 	})
 }
 
@@ -256,31 +255,31 @@ func TestConfig_UsesReflection_When_FeatureFlagEnabled(t *testing.T) {
 		name             string
 		enableReflection bool
 		colorName        string
-		expectedPrefix   string
+		expected         string
 	}{
 		{
 			name:             "uses reflection when flag enabled",
 			enableReflection: true,
 			colorName:        "error",
-			expectedPrefix:   "\u001b[0;31m",
+			expected:         "196", // Red in 256-color palette
 		},
 		{
 			name:             "uses switch when flag disabled",
 			enableReflection: false,
 			colorName:        "error",
-			expectedPrefix:   "\u001b[0;31m",
+			expected:         "196",
 		},
 		{
 			name:             "reflection handles paleblue",
 			enableReflection: true,
 			colorName:        "paleblue",
-			expectedPrefix:   "\u001b[38;5;111m",
+			expected:         "111", // Pale blue
 		},
 		{
 			name:             "switch handles paleblue",
 			enableReflection: false,
 			colorName:        "paleblue",
-			expectedPrefix:   "\u001b[38;5;111m",
+			expected:         "111",
 		},
 	}
 
@@ -297,8 +296,8 @@ func TestConfig_UsesReflection_When_FeatureFlagEnabled(t *testing.T) {
 			cfg := UnicodeVibrantTheme()
 			result := string(cfg.GetColor(tc.colorName))
 
-			// Both methods should produce same result
-			assert.Contains(t, result, tc.expectedPrefix)
+			// Both methods should produce same lipgloss color value
+			assert.Equal(t, tc.expected, result)
 		})
 	}
 }

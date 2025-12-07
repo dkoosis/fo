@@ -204,33 +204,24 @@ func (r *TestRenderer) RenderAll() {
 		}
 	}
 
-	// Get colors
-	successColor := r.console.GetSuccessColor()
-	errorColor := r.console.GetErrorColor()
-	mutedColor := r.console.GetMutedColor()
-	reset := r.console.ResetColor()
-
 	// Build all lines into a buffer
 	var lines []string
 
 	// Summary line
+	passedText := r.console.StyleSuccess(fmt.Sprintf("Passed: %d", totalPassed))
 	if totalFailed > 0 {
-		lines = append(lines, fmt.Sprintf("%sPassed: %d%s  |  %sFailed: %d%s  |  Duration: %s",
-			successColor, totalPassed, reset,
-			errorColor, totalFailed, reset,
-			r.formatDuration(totalDuration)))
+		failedText := r.console.StyleError(fmt.Sprintf("Failed: %d", totalFailed))
+		lines = append(lines, fmt.Sprintf("%s  |  %s  |  Duration: %s",
+			passedText, failedText, r.formatDuration(totalDuration)))
 	} else {
-		lines = append(lines, fmt.Sprintf("%sPassed: %d%s  |  Failed: 0  |  Duration: %s",
-			successColor, totalPassed, reset,
-			r.formatDuration(totalDuration)))
+		lines = append(lines, fmt.Sprintf("%s  |  Failed: 0  |  Duration: %s",
+			passedText, r.formatDuration(totalDuration)))
 	}
 	lines = append(lines, "")
 
 	// Column header
-	lines = append(lines, fmt.Sprintf("%sSTATUS   PACKAGE                    TESTS      TIME     COVERAGE%s",
-		mutedColor, reset))
-	lines = append(lines, fmt.Sprintf("%s────────────────────────────────────────────────────────────────────%s",
-		mutedColor, reset))
+	lines = append(lines, r.console.StyleMuted("STATUS   PACKAGE                    TESTS      TIME     COVERAGE"))
+	lines = append(lines, r.console.StyleMuted("────────────────────────────────────────────────────────────────────"))
 
 	// Render each group
 	for _, g := range r.allGroups {
@@ -238,14 +229,13 @@ func (r *TestRenderer) RenderAll() {
 	}
 
 	// Footer line
-	lines = append(lines, fmt.Sprintf("%s────────────────────────────────────────────────────────────────────%s",
-		mutedColor, reset))
+	lines = append(lines, r.console.StyleMuted("────────────────────────────────────────────────────────────────────"))
 
 	// Final status
 	if totalFailed > 0 {
-		lines = append(lines, fmt.Sprintf("%s✗%s  TESTS FAILED", errorColor, reset))
+		lines = append(lines, r.console.StyleError("✗")+"  TESTS FAILED")
 	} else {
-		lines = append(lines, fmt.Sprintf("%s✓%s  ALL TESTS PASSED", successColor, reset))
+		lines = append(lines, r.console.StyleSuccess("✓")+"  ALL TESTS PASSED")
 	}
 
 	// Render lines within the existing section (no nested section header)
@@ -255,15 +245,12 @@ func (r *TestRenderer) RenderAll() {
 }
 
 func (r *TestRenderer) renderGroupLines(g groupData) []string {
-	mutedColor := r.console.GetMutedColor()
-	reset := r.console.ResetColor()
-
 	var lines []string
 
 	// Check if this is a multi-package group (needs tree structure)
 	if len(g.packages) > 1 || r.needsGroupHeader(g) {
 		// Group header (directory name)
-		lines = append(lines, fmt.Sprintf("         %s%s/%s", mutedColor, g.name, reset))
+		lines = append(lines, fmt.Sprintf("         %s", r.console.StyleMuted(g.name+"/")))
 
 		// Render packages with tree chars
 		for i, pkg := range g.packages {
@@ -292,8 +279,7 @@ func (r *TestRenderer) needsGroupHeader(g groupData) bool {
 }
 
 func (r *TestRenderer) renderPackageFlatLine(pkg TestPackageResult) string {
-	statusIcon, statusColor := r.getStatusIconAndColor(pkg)
-	reset := r.console.ResetColor()
+	statusIcon, colorKey := r.getStatusIconAndColorKey(pkg)
 
 	total := pkg.Passed + pkg.Failed + pkg.Skipped
 	testCount := fmt.Sprintf("%d/%d", pkg.Passed, total)
@@ -301,8 +287,8 @@ func (r *TestRenderer) renderPackageFlatLine(pkg TestPackageResult) string {
 	sparkbar := r.renderSparkbar(pkg.Coverage)
 	coverage := fmt.Sprintf("%3.0f%%", pkg.Coverage)
 
-	return fmt.Sprintf("%s%s%s  %-24s %8s %8s     %s  %s",
-		statusColor, statusIcon, reset,
+	return fmt.Sprintf("%s  %-24s %8s %8s     %s  %s",
+		r.console.StyleWithColor(colorKey, statusIcon),
 		pkg.Name,
 		testCount,
 		duration,
@@ -311,9 +297,7 @@ func (r *TestRenderer) renderPackageFlatLine(pkg TestPackageResult) string {
 }
 
 func (r *TestRenderer) renderPackageWithTreeLine(pkg TestPackageResult, isLast bool) string {
-	statusIcon, statusColor := r.getStatusIconAndColor(pkg)
-	reset := r.console.ResetColor()
-	mutedColor := r.console.GetMutedColor()
+	statusIcon, colorKey := r.getStatusIconAndColorKey(pkg)
 
 	treeChar := "├─"
 	if isLast {
@@ -326,9 +310,9 @@ func (r *TestRenderer) renderPackageWithTreeLine(pkg TestPackageResult, isLast b
 	sparkbar := r.renderSparkbar(pkg.Coverage)
 	coverage := fmt.Sprintf("%3.0f%%", pkg.Coverage)
 
-	return fmt.Sprintf("%s%s%s  %s%s%s %-20s %8s %8s     %s  %s",
-		statusColor, statusIcon, reset,
-		mutedColor, treeChar, reset,
+	return fmt.Sprintf("%s  %s %-20s %8s %8s     %s  %s",
+		r.console.StyleWithColor(colorKey, statusIcon),
+		r.console.StyleMuted(treeChar),
 		pkg.Name,
 		testCount,
 		duration,
@@ -341,31 +325,28 @@ func (r *TestRenderer) renderFailedTestLines(pkg TestPackageResult, indent strin
 		return nil
 	}
 
-	errorColor := r.console.GetErrorColor()
-	reset := r.console.ResetColor()
-
 	var lines []string
 	for _, testName := range pkg.FailedTests {
 		displayName := testName
 		if r.config.SubtestConfig.HumanizeNames {
 			displayName = HumanizeTestName(testName)
 		}
-		lines = append(lines, fmt.Sprintf("%s     %s✗ %s%s",
-			indent, errorColor, displayName, reset))
+		lines = append(lines, fmt.Sprintf("%s     %s",
+			indent, r.console.StyleError("✗ "+displayName)))
 	}
 	return lines
 }
 
-func (r *TestRenderer) getStatusIconAndColor(pkg TestPackageResult) (string, string) {
+func (r *TestRenderer) getStatusIconAndColorKey(pkg TestPackageResult) (string, string) {
 	total := pkg.Passed + pkg.Failed + pkg.Skipped
 
 	switch {
 	case pkg.Failed > 0:
-		return "✗", r.console.GetErrorColor()
+		return "✗", "Error"
 	case total == 0:
-		return r.config.NoTestIcon, r.console.GetColor(r.config.NoTestColor)
+		return r.config.NoTestIcon, r.config.NoTestColor
 	default:
-		return "✓", r.console.GetSuccessColor()
+		return "✓", "Success"
 	}
 }
 
@@ -376,35 +357,22 @@ func (r *TestRenderer) renderSparkbar(coverage float64) string {
 		filled = length
 	}
 
-	// Determine color based on coverage thresholds
-	var filledColor string
+	// Determine color key based on coverage thresholds
+	filledColorKey := "Muted"
 	for _, threshold := range r.config.CoverageThresholds {
 		if coverage >= threshold.Min && coverage <= threshold.Max {
-			filledColor = r.console.GetColor(threshold.ColorKey)
+			filledColorKey = threshold.ColorKey
 			break
 		}
 	}
-	if filledColor == "" {
-		filledColor = r.console.GetMutedColor()
-	}
-
-	emptyColor := r.console.GetMutedColor()
-	reset := r.console.ResetColor()
 
 	if coverage == 0 {
-		return fmt.Sprintf("%s%s%s",
-			emptyColor,
-			strings.Repeat(r.config.SparkbarEmpty, length),
-			reset)
+		return r.console.StyleMuted(strings.Repeat(r.config.SparkbarEmpty, length))
 	}
 
-	return fmt.Sprintf("%s%s%s%s%s%s",
-		filledColor,
-		strings.Repeat(r.config.SparkbarFilled, filled),
-		reset,
-		emptyColor,
-		strings.Repeat(r.config.SparkbarEmpty, length-filled),
-		reset)
+	filledPart := r.console.StyleWithColor(filledColorKey, strings.Repeat(r.config.SparkbarFilled, filled))
+	emptyPart := r.console.StyleMuted(strings.Repeat(r.config.SparkbarEmpty, length-filled))
+	return filledPart + emptyPart
 }
 
 func (r *TestRenderer) formatDuration(d time.Duration) string {

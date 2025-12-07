@@ -428,24 +428,22 @@ func UnicodeVibrantTheme() *Config {
 	cfg.Icons.Bullet = "•"
 
 	// Initialize Design Tokens (Phase 1: centralized, semantic values)
-	// Using lipgloss.Color with ANSI codes (for Phase 1 manual concatenation)
-	// In Phase 2, we'll switch to lipgloss.Style which handles color format conversion
+	// lipgloss.Color takes color values: names ("red"), hex ("#ff0000"), or 256-color numbers ("111")
 	cfg.Tokens = &DesignTokens{}
-	escChar := string([]byte{27})
-	cfg.Tokens.Colors.Process = lipgloss.Color(escChar + "[0;97m")     // Bright white
-	cfg.Tokens.Colors.Success = lipgloss.Color(escChar + "[0;97m")     // Bright white
-	cfg.Tokens.Colors.Warning = lipgloss.Color(escChar + "[0;33m")     // Yellow
-	cfg.Tokens.Colors.Error = lipgloss.Color(escChar + "[0;31m")       // Red
-	cfg.Tokens.Colors.Detail = lipgloss.Color(escChar + "[0m")         // Reset
-	cfg.Tokens.Colors.Muted = lipgloss.Color(escChar + "[2m")          // Dim
-	cfg.Tokens.Colors.Reset = lipgloss.Color(escChar + "[0m")          // Reset
-	cfg.Tokens.Colors.White = lipgloss.Color(escChar + "[0;97m")       // Bright white
-	cfg.Tokens.Colors.GreenFg = lipgloss.Color(escChar + "[38;5;120m") // Light green (256-color)
-	cfg.Tokens.Colors.BlueFg = lipgloss.Color(escChar + "[0;34m")      // Blue
-	cfg.Tokens.Colors.BlueBg = lipgloss.Color(escChar + "[44m")        // Blue background
-	cfg.Tokens.Colors.Spinner = lipgloss.Color(escChar + "[38;5;111m") // Pale blue (256-color, semantic: Spinner, was PaleBlue)
-	cfg.Tokens.Colors.Bold = lipgloss.Color(escChar + "[1m")           // Bold
-	cfg.Tokens.Colors.Italic = lipgloss.Color(escChar + "[3m")         // Italic
+	cfg.Tokens.Colors.Process = lipgloss.Color("231") // Bright white
+	cfg.Tokens.Colors.Success = lipgloss.Color("120") // Light green
+	cfg.Tokens.Colors.Warning = lipgloss.Color("214") // Orange
+	cfg.Tokens.Colors.Error = lipgloss.Color("196")   // Red
+	cfg.Tokens.Colors.Detail = lipgloss.Color("252")  // Light gray
+	cfg.Tokens.Colors.Muted = lipgloss.Color("242")   // Dark gray
+	cfg.Tokens.Colors.Reset = lipgloss.Color("")      // No color (reset)
+	cfg.Tokens.Colors.White = lipgloss.Color("231")   // Bright white
+	cfg.Tokens.Colors.GreenFg = lipgloss.Color("120") // Light green
+	cfg.Tokens.Colors.BlueFg = lipgloss.Color("39")   // Bright blue
+	cfg.Tokens.Colors.BlueBg = lipgloss.Color("4")    // Blue (for background)
+	cfg.Tokens.Colors.Spinner = lipgloss.Color("111") // Pale blue
+	cfg.Tokens.Colors.Bold = lipgloss.Color("")       // TODO: Bold is a style, not a color
+	cfg.Tokens.Colors.Italic = lipgloss.Color("")     // TODO: Italic is a style, not a color
 	cfg.Tokens.Spacing.Progress = 0
 	cfg.Tokens.Spacing.Indent = 2
 	cfg.Tokens.Typography.HeaderWidth = 40
@@ -530,22 +528,22 @@ func OrcaTheme() *Config {
 
 	// Initialize Design Tokens (Phase 1: centralized, semantic values)
 	// Using Lip Gloss Color types for proper color handling
-	// Note: lipgloss.Color accepts ANSI codes as strings, so we store full ANSI sequences
+	// lipgloss.Color takes color values: names ("red"), hex ("#ff0000"), or 256-color numbers ("111")
 	cfg.Tokens = &DesignTokens{}
-	cfg.Tokens.Colors.Process = lipgloss.Color("\033[38;5;111m") // Pale blue for process/task/headings
-	cfg.Tokens.Colors.Success = lipgloss.Color("\033[38;5;120m") // Pale green for success
-	cfg.Tokens.Colors.Warning = lipgloss.Color("\033[0;33m")     // Yellow for warnings
-	cfg.Tokens.Colors.Error = lipgloss.Color("\033[0;31m")       // Red for errors
-	cfg.Tokens.Colors.Detail = lipgloss.Color("\033[0m")         // Reset for detail text
-	cfg.Tokens.Colors.Muted = lipgloss.Color("\033[2m")          // Dim for muted text
-	cfg.Tokens.Colors.Reset = lipgloss.Color("\033[0m")          // Reset
-	cfg.Tokens.Colors.White = lipgloss.Color("\033[0;97m")       // Bright white
-	cfg.Tokens.Colors.GreenFg = lipgloss.Color("\033[38;5;120m") // Light green
-	cfg.Tokens.Colors.BlueFg = lipgloss.Color("\033[38;5;39m")   // Bright blue (ocean-like)
-	cfg.Tokens.Colors.BlueBg = lipgloss.Color("\033[44m")        // Blue background
-	cfg.Tokens.Colors.Spinner = lipgloss.Color("\033[38;5;111m") // Pale blue for spinner (semantic naming)
-	cfg.Tokens.Colors.Bold = lipgloss.Color("\033[1m")           // Bold
-	cfg.Tokens.Colors.Italic = lipgloss.Color("\033[3m")         // Italic
+	cfg.Tokens.Colors.Process = lipgloss.Color("111") // Pale blue for process/task/headings
+	cfg.Tokens.Colors.Success = lipgloss.Color("120") // Pale green for success
+	cfg.Tokens.Colors.Warning = lipgloss.Color("214") // Orange for warnings
+	cfg.Tokens.Colors.Error = lipgloss.Color("196")   // Red for errors
+	cfg.Tokens.Colors.Detail = lipgloss.Color("252")  // Light gray for detail text
+	cfg.Tokens.Colors.Muted = lipgloss.Color("242")   // Dark gray for muted text
+	cfg.Tokens.Colors.Reset = lipgloss.Color("")      // No color (reset)
+	cfg.Tokens.Colors.White = lipgloss.Color("231")   // Bright white
+	cfg.Tokens.Colors.GreenFg = lipgloss.Color("120") // Light green
+	cfg.Tokens.Colors.BlueFg = lipgloss.Color("39")   // Bright blue
+	cfg.Tokens.Colors.BlueBg = lipgloss.Color("4")    // Blue (for background use)
+	cfg.Tokens.Colors.Spinner = lipgloss.Color("111") // Pale blue for spinner
+	cfg.Tokens.Colors.Bold = lipgloss.Color("")       // TODO: Bold is a style, not a color
+	cfg.Tokens.Colors.Italic = lipgloss.Color("")     // TODO: Italic is a style, not a color
 	cfg.Tokens.Spacing.Progress = 0
 	cfg.Tokens.Spacing.Indent = 2
 	cfg.Tokens.Typography.HeaderWidth = 50
@@ -794,36 +792,34 @@ func (c *Config) resolveColorName(name string) lipgloss.Color {
 		}
 	}
 
-	// If color is empty, use defaults as ANSI codes (for Phase 1 manual concatenation)
+	// If color is empty, use default color values (256-color palette)
+	// lipgloss.Color takes color values, not ANSI escape sequences
 	if color == "" {
-		escChar := string([]byte{27})
 		switch lowerName {
 		case colorNameProcess, colorNameWhite:
-			color = lipgloss.Color(escChar + "[0;97m")
+			color = lipgloss.Color("231") // Bright white
 		case colorNameSuccess:
-			color = lipgloss.Color(escChar + "[0;32m") // Green
+			color = lipgloss.Color("120") // Light green
 		case colorNameWarning:
-			color = lipgloss.Color(escChar + "[0;33m")
+			color = lipgloss.Color("214") // Orange
 		case colorNameError:
-			color = lipgloss.Color(escChar + "[0;31m")
+			color = lipgloss.Color("196") // Red
 		case colorNameDetail, colorNameReset:
-			color = lipgloss.Color(escChar + "[0m")
+			color = lipgloss.Color("") // No color (reset)
 		case colorNameMuted:
-			color = lipgloss.Color(escChar + "[2m")
+			color = lipgloss.Color("242") // Dark gray
 		case colorNameGreenFg:
-			color = lipgloss.Color(escChar + "[38;5;120m")
+			color = lipgloss.Color("120") // Light green
 		case colorNameBlueFg:
-			color = lipgloss.Color(escChar + "[0;34m")
+			color = lipgloss.Color("39") // Bright blue
 		case colorNameBlueBg:
-			color = lipgloss.Color(escChar + "[44m")
-		case colorNameBold:
-			color = lipgloss.Color(escChar + "[1m")
-		case colorNameItalic:
-			color = lipgloss.Color(escChar + "[3m")
+			color = lipgloss.Color("4") // Blue
+		case colorNameBold, colorNameItalic:
+			color = lipgloss.Color("") // Styles, not colors
 		default:
-			color = lipgloss.Color(escChar + "[0m")
+			color = lipgloss.Color("")
 			if os.Getenv("FO_DEBUG") != "" {
-				fmt.Fprintf(os.Stderr, "[DEBUG resolveColorName] Color key/name '%s' not found in theme or defaults, using reset.\n", name)
+				fmt.Fprintf(os.Stderr, "[DEBUG resolveColorName] Color key/name '%s' not found in theme or defaults.\n", name)
 			}
 		}
 	}
@@ -894,35 +890,32 @@ func (c *Config) resolveColorNameByReflection(name string) lipgloss.Color {
 
 	field := colorsValue.FieldByName(fieldName)
 	if !field.IsValid() {
-		// Field not found, try fallback defaults as ANSI codes
-		escChar := string([]byte{27})
+		// Field not found, try fallback defaults (256-color palette)
 		switch lowerName {
 		case "process", "white":
-			return lipgloss.Color(escChar + "[0;97m")
+			return lipgloss.Color("231") // Bright white
 		case "success":
-			return lipgloss.Color(escChar + "[0;32m")
+			return lipgloss.Color("120") // Light green
 		case "warning":
-			return lipgloss.Color(escChar + "[0;33m")
+			return lipgloss.Color("214") // Orange
 		case "error":
-			return lipgloss.Color(escChar + "[0;31m")
+			return lipgloss.Color("196") // Red
 		case "detail", "reset":
-			return lipgloss.Color(escChar + "[0m")
+			return lipgloss.Color("") // No color
 		case "muted":
-			return lipgloss.Color(escChar + "[2m")
+			return lipgloss.Color("242") // Dark gray
 		case "greenfg":
-			return lipgloss.Color(escChar + "[38;5;120m")
+			return lipgloss.Color("120") // Light green
 		case "bluefg":
-			return lipgloss.Color(escChar + "[0;34m")
+			return lipgloss.Color("39") // Bright blue
 		case "bluebg":
-			return lipgloss.Color(escChar + "[44m")
-		case "bold":
-			return lipgloss.Color(escChar + "[1m")
-		case "italic":
-			return lipgloss.Color(escChar + "[3m")
+			return lipgloss.Color("4") // Blue
+		case "bold", "italic":
+			return lipgloss.Color("") // Styles, not colors
 		default:
 			if os.Getenv("FO_DEBUG") != "" {
 				fmt.Fprintf(os.Stderr,
-					"[DEBUG resolveColorNameByReflection] Color field '%s' (from '%s') not found in Colors struct (type: %s), using reset.\n",
+					"[DEBUG resolveColorNameByReflection] Color field '%s' (from '%s') not found in Colors struct (type: %s).\n",
 					fieldName, name, colorsType.Name())
 			}
 			// Try to use the name directly as a lipgloss color (supports hex, color names, etc.)
@@ -933,33 +926,30 @@ func (c *Config) resolveColorNameByReflection(name string) lipgloss.Color {
 	// Get the color value - field is now lipgloss.Color which is a string type
 	colorValue := lipgloss.Color(field.String())
 	if colorValue == "" {
-		// Empty color, use fallback defaults as ANSI codes
-		escChar := string([]byte{27})
+		// Empty color, use fallback defaults (256-color palette)
 		switch lowerName {
 		case "process", "white":
-			return lipgloss.Color(escChar + "[0;97m")
+			return lipgloss.Color("231") // Bright white
 		case "success":
-			return lipgloss.Color(escChar + "[0;32m")
+			return lipgloss.Color("120") // Light green
 		case "warning":
-			return lipgloss.Color(escChar + "[0;33m")
+			return lipgloss.Color("214") // Orange
 		case "error":
-			return lipgloss.Color(escChar + "[0;31m")
+			return lipgloss.Color("196") // Red
 		case "detail", "reset":
-			return lipgloss.Color(escChar + "[0m")
+			return lipgloss.Color("") // No color
 		case "muted":
-			return lipgloss.Color(escChar + "[2m")
+			return lipgloss.Color("242") // Dark gray
 		case "greenfg":
-			return lipgloss.Color(escChar + "[38;5;120m")
+			return lipgloss.Color("120") // Light green
 		case "bluefg":
-			return lipgloss.Color(escChar + "[0;34m")
+			return lipgloss.Color("39") // Bright blue
 		case "bluebg":
-			return lipgloss.Color(escChar + "[44m")
-		case "bold":
-			return lipgloss.Color(escChar + "[1m")
-		case "italic":
-			return lipgloss.Color(escChar + "[3m")
+			return lipgloss.Color("4") // Blue
+		case "bold", "italic":
+			return lipgloss.Color("") // Styles, not colors
 		default:
-			return lipgloss.Color(escChar + "[0m")
+			return lipgloss.Color("")
 		}
 	}
 
