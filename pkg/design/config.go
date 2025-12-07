@@ -66,6 +66,31 @@ const (
 	colorNameItalic  = "italic"
 )
 
+// defaultColorValues maps color names to their default 256-color palette values.
+// This centralizes color defaults to avoid duplication across resolution functions.
+var defaultColorValues = map[string]lipgloss.Color{
+	"process": "231", // Bright white
+	"white":   "231", // Bright white
+	"success": "120", // Light green
+	"warning": "214", // Orange
+	"error":   "196", // Red
+	"detail":  "",    // No color (reset)
+	"reset":   "",    // No color (reset)
+	"muted":   "242", // Dark gray
+	"greenfg": "120", // Light green
+	"bluefg":  "39",  // Bright blue
+	"bluebg":  "4",   // Blue
+	"bold":    "",    // Style, not color
+	"italic":  "",    // Style, not color
+}
+
+// getDefaultColor returns the default color value for a color name.
+// Returns the color and true if found, or empty string and false if not.
+func getDefaultColor(name string) (lipgloss.Color, bool) {
+	color, ok := defaultColorValues[strings.ToLower(name)]
+	return color, ok
+}
+
 // Default spinner characters for ASCII mode.
 const DefaultSpinnerChars = "-\\|/"
 
@@ -793,34 +818,11 @@ func (c *Config) resolveColorName(name string) lipgloss.Color {
 	}
 
 	// If color is empty, use default color values (256-color palette)
-	// lipgloss.Color takes color values, not ANSI escape sequences
 	if color == "" {
-		switch lowerName {
-		case colorNameProcess, colorNameWhite:
-			color = lipgloss.Color("231") // Bright white
-		case colorNameSuccess:
-			color = lipgloss.Color("120") // Light green
-		case colorNameWarning:
-			color = lipgloss.Color("214") // Orange
-		case colorNameError:
-			color = lipgloss.Color("196") // Red
-		case colorNameDetail, colorNameReset:
-			color = lipgloss.Color("") // No color (reset)
-		case colorNameMuted:
-			color = lipgloss.Color("242") // Dark gray
-		case colorNameGreenFg:
-			color = lipgloss.Color("120") // Light green
-		case colorNameBlueFg:
-			color = lipgloss.Color("39") // Bright blue
-		case colorNameBlueBg:
-			color = lipgloss.Color("4") // Blue
-		case colorNameBold, colorNameItalic:
-			color = lipgloss.Color("") // Styles, not colors
-		default:
-			color = lipgloss.Color("")
-			if os.Getenv("FO_DEBUG") != "" {
-				fmt.Fprintf(os.Stderr, "[DEBUG resolveColorName] Color key/name '%s' not found in theme or defaults.\n", name)
-			}
+		if defaultColor, ok := getDefaultColor(lowerName); ok {
+			color = defaultColor
+		} else if os.Getenv("FO_DEBUG") != "" {
+			fmt.Fprintf(os.Stderr, "[DEBUG resolveColorName] Color key/name '%s' not found in theme or defaults.\n", name)
 		}
 	}
 	return color
@@ -890,67 +892,27 @@ func (c *Config) resolveColorNameByReflection(name string) lipgloss.Color {
 
 	field := colorsValue.FieldByName(fieldName)
 	if !field.IsValid() {
-		// Field not found, try fallback defaults (256-color palette)
-		switch lowerName {
-		case "process", "white":
-			return lipgloss.Color("231") // Bright white
-		case "success":
-			return lipgloss.Color("120") // Light green
-		case "warning":
-			return lipgloss.Color("214") // Orange
-		case "error":
-			return lipgloss.Color("196") // Red
-		case "detail", "reset":
-			return lipgloss.Color("") // No color
-		case "muted":
-			return lipgloss.Color("242") // Dark gray
-		case "greenfg":
-			return lipgloss.Color("120") // Light green
-		case "bluefg":
-			return lipgloss.Color("39") // Bright blue
-		case "bluebg":
-			return lipgloss.Color("4") // Blue
-		case "bold", "italic":
-			return lipgloss.Color("") // Styles, not colors
-		default:
-			if os.Getenv("FO_DEBUG") != "" {
-				fmt.Fprintf(os.Stderr,
-					"[DEBUG resolveColorNameByReflection] Color field '%s' (from '%s') not found in Colors struct (type: %s).\n",
-					fieldName, name, colorsType.Name())
-			}
-			// Try to use the name directly as a lipgloss color (supports hex, color names, etc.)
-			return lipgloss.Color(name)
+		// Field not found, try fallback defaults
+		if defaultColor, ok := getDefaultColor(lowerName); ok {
+			return defaultColor
 		}
+		if os.Getenv("FO_DEBUG") != "" {
+			fmt.Fprintf(os.Stderr,
+				"[DEBUG resolveColorNameByReflection] Color field '%s' (from '%s') not found in Colors struct (type: %s).\n",
+				fieldName, name, colorsType.Name())
+		}
+		// Try to use the name directly as a lipgloss color (supports hex, color names, etc.)
+		return lipgloss.Color(name)
 	}
 
 	// Get the color value - field is now lipgloss.Color which is a string type
 	colorValue := lipgloss.Color(field.String())
 	if colorValue == "" {
-		// Empty color, use fallback defaults (256-color palette)
-		switch lowerName {
-		case "process", "white":
-			return lipgloss.Color("231") // Bright white
-		case "success":
-			return lipgloss.Color("120") // Light green
-		case "warning":
-			return lipgloss.Color("214") // Orange
-		case "error":
-			return lipgloss.Color("196") // Red
-		case "detail", "reset":
-			return lipgloss.Color("") // No color
-		case "muted":
-			return lipgloss.Color("242") // Dark gray
-		case "greenfg":
-			return lipgloss.Color("120") // Light green
-		case "bluefg":
-			return lipgloss.Color("39") // Bright blue
-		case "bluebg":
-			return lipgloss.Color("4") // Blue
-		case "bold", "italic":
-			return lipgloss.Color("") // Styles, not colors
-		default:
-			return lipgloss.Color("")
+		// Empty color, use fallback defaults
+		if defaultColor, ok := getDefaultColor(lowerName); ok {
+			return defaultColor
 		}
+		return lipgloss.Color("")
 	}
 
 	return colorValue

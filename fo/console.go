@@ -895,7 +895,7 @@ func (c *Console) StyleWithColor(colorKey, text string) string {
 	if colorValue == "" {
 		return text
 	}
-	style := lipgloss.NewStyle().Foreground(lipgloss.Color(colorValue))
+	style := lipgloss.NewStyle().Foreground(colorValue)
 	return style.Render(text)
 }
 
