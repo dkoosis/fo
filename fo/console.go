@@ -66,6 +66,7 @@ type ConsoleConfig struct {
 	Design           *design.Config
 	Out              io.Writer // Output writer, defaults to os.Stdout
 	Err              io.Writer // Error writer, defaults to os.Stderr
+	CaptureDir       string    // Directory to save raw command output (or set FO_CAPTURE_DIR env)
 }
 
 // Line represents a classified line of command output.
@@ -1676,6 +1677,11 @@ func (c *Console) tryAdapterMode(
 	// Get combined output for detection
 	combinedOutput := append(stdoutBuffer.Bytes(), stderrBuffer.Bytes()...)
 
+	// Save capture if enabled
+	if c.cfg.CaptureDir != "" {
+		c.saveCapture(task, stdoutBuffer.Bytes(), stderrBuffer.Bytes(), getExitCode(runErr, c.cfg.Debug))
+	}
+
 	// Use Processor to handle output processing (adapter detection and line-by-line fallback)
 	processStart := c.profiler.StartStage("process")
 	c.processor.ProcessOutput(task, combinedOutput, task.Command, task.Args)
@@ -1779,6 +1785,10 @@ func normalizeConfig(cfg ConsoleConfig) ConsoleConfig {
 	}
 	if normalized.Err == nil {
 		normalized.Err = os.Stderr
+	}
+	// Check FO_CAPTURE_DIR env var if not set in config
+	if normalized.CaptureDir == "" {
+		normalized.CaptureDir = os.Getenv("FO_CAPTURE_DIR")
 	}
 	return normalized
 }
@@ -1896,4 +1906,67 @@ func (c *Console) RunLive(input io.Reader) error {
 	})
 
 	return err
+}
+
+// saveCapture saves raw command output to the capture directory for debugging/replay.
+// Files are saved with timestamps and metadata in JSON format.
+func (c *Console) saveCapture(task *design.Task, stdout, stderr []byte, exitCode int) {
+	if c.cfg.CaptureDir == "" {
+		return
+	}
+
+	// Create capture directory if needed
+	if err := os.MkdirAll(c.cfg.CaptureDir, 0755); err != nil {
+		if c.cfg.Debug {
+			fmt.Fprintf(os.Stderr, "[DEBUG saveCapture] Failed to create capture dir: %v\n", err)
+		}
+		return
+	}
+
+	// Generate filename with timestamp and label
+	ts := time.Now().Format("2006-01-02_150405")
+	label := task.Label
+	if label == "" {
+		label = filepath.Base(task.Command)
+	}
+	// Sanitize label for filename
+	label = strings.Map(func(r rune) rune {
+		if r == '/' || r == '\\' || r == ':' || r == ' ' {
+			return '_'
+		}
+		return r
+	}, label)
+
+	baseName := fmt.Sprintf("%s_%s", ts, label)
+	capturePath := filepath.Join(c.cfg.CaptureDir, baseName+".json")
+
+	// Build capture data
+	capture := map[string]interface{}{
+		"timestamp": time.Now().Format(time.RFC3339),
+		"label":     task.Label,
+		"command":   task.Command,
+		"args":      task.Args,
+		"exit_code": exitCode,
+		"stdout":    string(stdout),
+		"stderr":    string(stderr),
+	}
+
+	data, err := json.MarshalIndent(capture, "", "  ")
+	if err != nil {
+		if c.cfg.Debug {
+			fmt.Fprintf(os.Stderr, "[DEBUG saveCapture] Failed to marshal capture: %v\n", err)
+		}
+		return
+	}
+
+	if err := os.WriteFile(capturePath, data, 0644); err != nil {
+		if c.cfg.Debug {
+			fmt.Fprintf(os.Stderr, "[DEBUG saveCapture] Failed to write capture: %v\n", err)
+		}
+		return
+	}
+
+	if c.cfg.Debug {
+		fmt.Fprintf(os.Stderr, "[DEBUG saveCapture] Saved capture to: %s\n", capturePath)
+	}
 }

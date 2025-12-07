@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -46,6 +47,9 @@ func run(args []string) int {
 			if command == "print" {
 				handlePrintCommand(args[2:]) // Pass remaining args to print handler
 				return 0
+			}
+			if command == "replay" {
+				return handleReplayCommand(args[2:]) // Pass remaining args to replay handler
 			}
 			// Add other subcommands here if needed
 		}
@@ -350,6 +354,153 @@ func handlePrintCommand(args []string) {
 	output := design.RenderDirectMessage(finalDesignConfig, *typeFlag, *iconFlag, message, *indentFlag)
 	_, _ = os.Stdout.WriteString(output) // Print directly to stdout
 	os.Exit(0)
+}
+
+// handleReplayCommand replays captured output through the adapter detection system.
+// This is useful for debugging adapters and refining output rendering without re-running commands.
+func handleReplayCommand(args []string) int {
+	replayFlagSet := flag.NewFlagSet("replay", flag.ExitOnError)
+	themeFlag := replayFlagSet.String("theme", "", "Select visual theme for replay")
+	debugFlag := replayFlagSet.Bool("debug", false, "Enable debug output")
+	patternFlag := replayFlagSet.String("pattern", "", "Force specific visualization pattern")
+	showOnlyFlag := replayFlagSet.String("show", "all", "Show: all, stdout, stderr")
+
+	replayFlagSet.Usage = func() {
+		fmt.Fprintln(os.Stderr, "Usage: fo replay [flags] <capture-file.json>")
+		fmt.Fprintln(os.Stderr, "\nReplays captured command output through fo's adapter detection system.")
+		fmt.Fprintln(os.Stderr, "\nFlags:")
+		replayFlagSet.PrintDefaults()
+		fmt.Fprintln(os.Stderr, "\nExamples:")
+		fmt.Fprintln(os.Stderr, "  fo replay /tmp/fo-captures/2025-01-01_120000_Build.json")
+		fmt.Fprintln(os.Stderr, "  fo replay --theme ascii_minimal capture.json")
+		fmt.Fprintln(os.Stderr, "  fo replay --pattern test-table test-output.json")
+	}
+
+	if err := replayFlagSet.Parse(args); err != nil {
+		return 1
+	}
+
+	remainingArgs := replayFlagSet.Args()
+	if len(remainingArgs) == 0 {
+		fmt.Fprintln(os.Stderr, "[fo replay] Error: No capture file specified")
+		replayFlagSet.Usage()
+		return 1
+	}
+
+	captureFile := remainingArgs[0]
+
+	// Read capture file
+	data, err := os.ReadFile(captureFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[fo replay] Error reading capture file: %v\n", err)
+		return 1
+	}
+
+	// Parse capture JSON
+	var capture struct {
+		Args      []string `json:"args"`
+		Command   string   `json:"command"`
+		ExitCode  int      `json:"exit_code"`
+		Label     string   `json:"label"`
+		Stderr    string   `json:"stderr"`
+		Stdout    string   `json:"stdout"`
+		Timestamp string   `json:"timestamp"`
+	}
+
+	if err := json.Unmarshal(data, &capture); err != nil {
+		fmt.Fprintf(os.Stderr, "[fo replay] Error parsing capture file: %v\n", err)
+		return 1
+	}
+
+	// Build CLI flags for config resolution
+	var cliFlags config.CliFlags
+	if *themeFlag != "" {
+		cliFlags.ThemeName = *themeFlag
+	}
+	if *debugFlag {
+		cliFlags.Debug = true
+		cliFlags.DebugSet = true
+	}
+	if *patternFlag != "" {
+		if !validPatterns[*patternFlag] {
+			fmt.Fprintf(os.Stderr, "[fo replay] Error: Invalid pattern '%s'\n", *patternFlag)
+			return 1
+		}
+		cliFlags.PatternHint = *patternFlag
+		cliFlags.PatternHintSet = true
+	}
+
+	// Resolve configuration
+	resolvedCfg, err := config.ResolveConfig(cliFlags)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[fo replay] Error resolving configuration: %v\n", err)
+		return 1
+	}
+
+	// Print replay header
+	fmt.Printf("─── Replaying: %s ───\n", capture.Label)
+	fmt.Printf("Command: %s %s\n", capture.Command, strings.Join(capture.Args, " "))
+	fmt.Printf("Captured: %s\n", capture.Timestamp)
+	fmt.Printf("Exit code: %d\n", capture.ExitCode)
+	fmt.Printf("Theme: %s\n\n", resolvedCfg.Theme.ThemeName)
+
+	// Create console for replay
+	consoleCfg := fo.ConsoleConfig{
+		ThemeName:      resolvedCfg.Theme.ThemeName,
+		UseBoxes:       resolvedCfg.Theme.Style.UseBoxes,
+		UseBoxesSet:    true,
+		Monochrome:     resolvedCfg.Theme.IsMonochrome,
+		ShowTimer:      false, // No timer for replay
+		ShowTimerSet:   true,
+		ShowOutputMode: "always",
+		PatternHint:    cliFlags.PatternHint,
+		Debug:          *debugFlag,
+		Design:         resolvedCfg.Theme,
+	}
+
+	console := fo.NewConsole(consoleCfg)
+
+	// Create task for processing
+	task := design.NewTask(capture.Label, capture.Command, "replay", capture.Args, resolvedCfg.Theme)
+
+	// Process based on show flag
+	switch *showOnlyFlag {
+	case "stdout":
+		if capture.Stdout != "" {
+			console.ProcessStdin(task, []byte(capture.Stdout))
+		}
+	case "stderr":
+		if capture.Stderr != "" {
+			console.ProcessStdin(task, []byte(capture.Stderr))
+		}
+	default: // "all"
+		// Process stdout first, then stderr
+		if capture.Stdout != "" {
+			console.ProcessStdin(task, []byte(capture.Stdout))
+		}
+		if capture.Stderr != "" {
+			// Process stderr lines - classify as error/warning based on content
+			for _, line := range strings.Split(strings.TrimSuffix(capture.Stderr, "\n"), "\n") {
+				if line != "" {
+					lineType := "error"
+					if strings.Contains(strings.ToLower(line), "warning") ||
+						strings.Contains(strings.ToLower(line), "warn") {
+						lineType = "warning"
+					}
+					task.AddOutputLine(line, lineType, design.LineContext{})
+				}
+			}
+		}
+	}
+
+	// Render output
+	fmt.Println("─── Rendered Output ───")
+	for _, line := range task.OutputLines {
+		rendered := task.RenderOutputLine(line)
+		fmt.Println(rendered)
+	}
+
+	return 0
 }
 
 func parseGlobalFlags() (config.CliFlags, bool) {
