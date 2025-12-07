@@ -7,7 +7,7 @@ This guide shows you how to create your own custom theme for fo's output renderi
 Add a `themes:` section to your `.fo.yaml` file and define your custom theme:
 
 ```yaml
-theme: my_custom_theme  # Set this as the active theme
+active_theme: my_custom_theme  # Set this as the active theme
 
 themes:
   my_custom_theme:
@@ -19,6 +19,8 @@ themes:
       no_timer: false
       use_inline_progress: false
       no_spinner: false
+      spinner_style: dots    # Options: dots, line, arc, star, bounce, grow, arrows, clock, moon, ascii
+      spinner_chars: ""      # Custom spinner chars (e.g., "⠋ ⠙ ⠹ ⠸" or "/-\\|")
       spinner_interval: 80
       header_width: 50
     
@@ -80,7 +82,7 @@ themes:
 Here's a comprehensive example with all available fields:
 
 ```yaml
-theme: my_theme
+active_theme: my_theme
 
 themes:
   my_theme:
@@ -93,6 +95,8 @@ themes:
       no_timer: false                    # Hide execution time
       use_inline_progress: false         # Use inline progress indicators
       no_spinner: false                  # Disable spinner animations
+      spinner_style: dots                # Spinner animation style
+      spinner_chars: ""                  # Custom spinner characters (overrides style)
       spinner_interval: 80               # Spinner update interval (ms)
       header_width: 50                   # Width of header content
     
@@ -280,6 +284,36 @@ themes:
       coverage_warning_min: 40.0          # Minimum coverage for "warning" (yellow)
 ```
 
+## Spinner Styles Reference
+
+Available built-in spinner styles:
+
+| Style | Characters | Description |
+|-------|------------|-------------|
+| `dots` | ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ | Claude-style braille dots (default) |
+| `line` | -\|/ | Simple ASCII spinner |
+| `arc` | ◜◠◝◞◡◟ | Smooth arc animation |
+| `star` | ✶✸✹✺✹✸ | Twinkling star |
+| `bounce` | ⠁⠂⠄⠂ | Bouncing dot |
+| `grow` | ▁▃▄▅▆▇█▇▆▅▄▃ | Growing/shrinking bar |
+| `arrows` | ←↖↑↗→↘↓↙ | Rotating arrow |
+| `clock` | 🕛🕐🕑🕒🕓🕔🕕🕖🕗🕘🕙🕚 | Clock face animation |
+| `moon` | 🌑🌒🌓🌔🌕🌖🌗🌘 | Moon phases |
+| `ascii` | -\|/ | ASCII-safe (same as line) |
+
+### Custom Spinner Characters
+
+You can define your own spinner characters using `spinner_chars`:
+
+```yaml
+style:
+  # Space-separated characters
+  spinner_chars: "⣾ ⣽ ⣻ ⢿ ⡿ ⣟ ⣯ ⣷"
+
+  # Or individual Unicode characters (no spaces)
+  spinner_chars: "◐◓◑◒"
+```
+
 ## ANSI Color Codes Reference
 
 Common ANSI color codes you can use:
@@ -331,7 +365,7 @@ You can also create a separate theme file and reference it:
 
 ```yaml
 # .fo.yaml
-theme: my_theme
+active_theme: my_theme
 themes:
   my_theme:
     # ... theme definition ...
@@ -350,7 +384,7 @@ Or use the `--theme-file` flag when running `fo` commands (for CLI usage).
 ## Example: Minimal Dark Theme
 
 ```yaml
-theme: dark_minimal
+active_theme: dark_minimal
 
 themes:
   dark_minimal:
@@ -386,7 +420,7 @@ themes:
 
 Here's a complete list of all available theme fields:
 
-### `style` (9 fields)
+### `style` (11 fields)
 - `use_boxes` (bool)
 - `indentation` (string)
 - `show_timestamps` (bool)
@@ -394,6 +428,8 @@ Here's a complete list of all available theme fields:
 - `no_timer` (bool)
 - `use_inline_progress` (bool)
 - `no_spinner` (bool)
+- `spinner_style` (string: "dots" | "line" | "arc" | "star" | "bounce" | "grow" | "arrows" | "clock" | "moon" | "ascii")
+- `spinner_chars` (string: custom spinner characters, space-separated or individual chars)
 - `spinner_interval` (int, milliseconds)
 - `header_width` (int)
 

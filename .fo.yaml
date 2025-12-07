@@ -1,0 +1,39 @@
+# fo dogfood theme - visually distinct for testing
+active_theme: dogfood
+
+themes:
+  dogfood:
+    style:
+      use_boxes: true
+      density: balanced
+      no_spinner: false
+      spinner_style: arc
+      spinner_interval: 100
+      header_width: 55
+
+    icons:
+      start: ">"
+      success: "+"
+      warning: "!"
+      error: "x"
+      info: "i"
+      bullet: "-"
+
+    colors:
+      process: "183"      # Lavender
+      success: "84"       # Sea green
+      warning: "221"      # Gold
+      error: "203"        # Salmon
+      muted: "245"        # Medium gray
+      spinner: "147"      # Light purple
+      blue_fg: "75"       # Steel blue
+      green_fg: "84"      # Sea green
+
+    border:
+      task_style: header_box
+      header_char: "="
+      vertical_char: "|"
+      top_corner_char: "+"
+      top_right_char: "+"
+      bottom_corner_char: "+"
+      bottom_right_char: "+"

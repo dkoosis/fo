@@ -676,12 +676,21 @@ func (c *Console) RunSection(s Section) SectionResult {
 		if interval == 0 {
 			interval = 80 * time.Millisecond
 		}
+		// Get spinner style from config, default to "dots"
+		spinnerStyle := c.designConf.Style.SpinnerStyle
+		if spinnerStyle == "" {
+			spinnerStyle = DefaultSpinnerStyle
+		}
+		// Parse custom spinner chars if provided
+		customFrames := ParseSpinnerChars(c.designConf.Style.SpinnerChars)
+
 		spinner = NewSpinner(SpinnerConfig{
-			Style:    "dots",
-			Interval: interval,
-			Message:  s.Name + "...",
-			Color:    spinnerColor,
-			Writer:   c.cfg.Out,
+			Style:        spinnerStyle,
+			CustomFrames: customFrames,
+			Interval:     interval,
+			Message:      s.Name + "...",
+			Color:        spinnerColor,
+			Writer:       c.cfg.Out,
 		})
 		spinner.Start()
 	}

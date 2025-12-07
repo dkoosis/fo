@@ -3,20 +3,48 @@ package fo
 import (
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
 )
 
 // SpinnerFrames defines available spinner styles
 var SpinnerFrames = map[string][]string{
-	"dots": {"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"},
-	"line": {"-", "\\", "|", "/"},
-	"arc":  {"◜", "◠", "◝", "◞", "◡", "◟"},
-	"star": {"✶", "✸", "✹", "✺", "✹", "✸"},
+	"dots":    {"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"},
+	"line":    {"-", "\\", "|", "/"},
+	"arc":     {"◜", "◠", "◝", "◞", "◡", "◟"},
+	"star":    {"✶", "✸", "✹", "✺", "✹", "✸"},
+	"bounce":  {"⠁", "⠂", "⠄", "⠂"},
+	"grow":    {"▁", "▃", "▄", "▅", "▆", "▇", "█", "▇", "▆", "▅", "▄", "▃"},
+	"arrows":  {"←", "↖", "↑", "↗", "→", "↘", "↓", "↙"},
+	"clock":   {"🕛", "🕐", "🕑", "🕒", "🕓", "🕔", "🕕", "🕖", "🕗", "🕘", "🕙", "🕚"},
+	"moon":    {"🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"},
+	"ascii":   {"-", "\\", "|", "/"},
 }
 
 // DefaultSpinnerStyle is the Claude-style dots spinner
 const DefaultSpinnerStyle = "dots"
+
+// ParseSpinnerChars parses a custom spinner chars string into frames.
+// Accepts space-separated strings or individual Unicode characters.
+func ParseSpinnerChars(chars string) []string {
+	chars = strings.TrimSpace(chars)
+	if chars == "" {
+		return nil
+	}
+
+	// Try space-separated first
+	if strings.Contains(chars, " ") {
+		return strings.Fields(chars)
+	}
+
+	// Otherwise treat as individual runes
+	var frames []string
+	for _, r := range chars {
+		frames = append(frames, string(r))
+	}
+	return frames
+}
 
 // Spinner provides an animated loading indicator
 type Spinner struct {
@@ -35,16 +63,23 @@ type Spinner struct {
 
 // SpinnerConfig configures the spinner
 type SpinnerConfig struct {
-	Style    string        // "dots", "line", "arc", "star"
-	Interval time.Duration // Frame interval (default 80ms)
-	Message  string        // Text to show after spinner
-	Color    string        // ANSI color code for spinner
-	Writer   io.Writer     // Output destination
+	Style        string        // "dots", "line", "arc", "star", etc.
+	CustomFrames []string      // Custom frames override Style if provided
+	Interval     time.Duration // Frame interval (default 80ms)
+	Message      string        // Text to show after spinner
+	Color        string        // ANSI color code for spinner
+	Writer       io.Writer     // Output destination
 }
 
 // NewSpinner creates a new spinner with the given config
 func NewSpinner(cfg SpinnerConfig) *Spinner {
-	frames := SpinnerFrames[cfg.Style]
+	// Priority: CustomFrames > Style > Default
+	var frames []string
+	if len(cfg.CustomFrames) > 0 {
+		frames = cfg.CustomFrames
+	} else if cfg.Style != "" {
+		frames = SpinnerFrames[cfg.Style]
+	}
 	if frames == nil {
 		frames = SpinnerFrames[DefaultSpinnerStyle]
 	}

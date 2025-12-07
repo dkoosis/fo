@@ -260,7 +260,9 @@ type Config struct {
 		Density         string `yaml:"density"`
 		NoSpinner       bool   `yaml:"no_spinner"`
 		SpinnerInterval int    `yaml:"spinner_interval"`
-		HeaderWidth     int    `yaml:"header_width"` // Visual width of header content (default: 40)
+		SpinnerStyle    string `yaml:"spinner_style"` // "dots", "line", "arc", "star", or custom
+		SpinnerChars    string `yaml:"spinner_chars"` // Custom spinner characters (space-separated or single chars)
+		HeaderWidth     int    `yaml:"header_width"`  // Visual width of header content (default: 40)
 	} `yaml:"style"`
 
 	Border struct {

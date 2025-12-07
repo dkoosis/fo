@@ -52,7 +52,7 @@ func (c *ComplexityDashboard) Render(cfg *Config) string {
 
 	// Get styles from config
 	boxStyle := lipgloss.NewStyle().
-		BorderStyle(lipgloss.RoundedBorder()).
+		BorderStyle(BorderFromConfig(cfg)).
 		BorderForeground(cfg.Colors.Muted).
 		Padding(0, 1)
 

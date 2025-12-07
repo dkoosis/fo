@@ -76,8 +76,62 @@ type ThemeBorder struct {
 	Style lipgloss.Border // lipgloss border definition
 }
 
+// BorderFromConfig creates a lipgloss.Border from Config border settings.
+func BorderFromConfig(cfg *Config) lipgloss.Border {
+	if cfg == nil {
+		return lipgloss.RoundedBorder()
+	}
+
+	// If no custom border chars specified, return rounded
+	if cfg.Border.TopCornerChar == "" && cfg.Border.VerticalChar == "" {
+		return lipgloss.RoundedBorder()
+	}
+
+	// Build custom border from config
+	horizontal := cfg.Border.HeaderChar
+	if horizontal == "" {
+		horizontal = "─"
+	}
+	vertical := cfg.Border.VerticalChar
+	if vertical == "" {
+		vertical = "│"
+	}
+	topLeft := cfg.Border.TopCornerChar
+	if topLeft == "" {
+		topLeft = "╭"
+	}
+	topRight := cfg.Border.TopRightChar
+	if topRight == "" {
+		topRight = "╮"
+	}
+	bottomLeft := cfg.Border.BottomCornerChar
+	if bottomLeft == "" {
+		bottomLeft = "╰"
+	}
+	bottomRight := cfg.Border.BottomRightChar
+	if bottomRight == "" {
+		bottomRight = "╯"
+	}
+
+	return lipgloss.Border{
+		Top:         horizontal,
+		Bottom:      horizontal,
+		Left:        vertical,
+		Right:       vertical,
+		TopLeft:     topLeft,
+		TopRight:    topRight,
+		BottomLeft:  bottomLeft,
+		BottomRight: bottomRight,
+	}
+}
+
 // NewTheme creates a theme with computed styles from colors.
 func NewTheme(name string, colors ThemeColors, icons ThemeIcons) *Theme {
+	return NewThemeWithBorder(name, colors, icons, lipgloss.RoundedBorder())
+}
+
+// NewThemeWithBorder creates a theme with custom border style.
+func NewThemeWithBorder(name string, colors ThemeColors, icons ThemeIcons, border lipgloss.Border) *Theme {
 	t := &Theme{
 		Name:   name,
 		Colors: colors,
@@ -87,7 +141,7 @@ func NewTheme(name string, colors ThemeColors, icons ThemeIcons) *Theme {
 	// Build styles from colors
 	t.Styles = ThemeStyles{
 		Box: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
+			Border(border).
 			BorderForeground(colors.Subtle).
 			Padding(0, 1),
 
@@ -116,7 +170,7 @@ func NewTheme(name string, colors ThemeColors, icons ThemeIcons) *Theme {
 	}
 
 	t.Border = ThemeBorder{
-		Style: lipgloss.RoundedBorder(),
+		Style: border,
 	}
 
 	return t
@@ -218,16 +272,16 @@ func ThemeFromConfig(cfg *Config) *Theme {
 	}
 
 	// For other themes, build from config values
-	// Use proper lipgloss color format (256-color numbers)
+	// Use config colors with fallbacks to defaults
 	colors := ThemeColors{
-		Primary: lipgloss.Color("39"),  // Default bright blue
-		Success: lipgloss.Color("120"), // Light green
-		Warning: lipgloss.Color("214"), // Orange
-		Error:   lipgloss.Color("196"), // Red
-		Text:    lipgloss.Color("252"), // Light gray
-		Muted:   lipgloss.Color("242"), // Dark gray
-		Subtle:  lipgloss.Color("238"), // Very dark gray
-		Inverse: lipgloss.Color("231"), // White
+		Primary: colorOrDefault(cfg.Colors.Process, "39"),   // Bright blue
+		Success: colorOrDefault(cfg.Colors.Success, "120"),  // Light green
+		Warning: colorOrDefault(cfg.Colors.Warning, "214"),  // Orange
+		Error:   colorOrDefault(cfg.Colors.Error, "196"),    // Red
+		Text:    colorOrDefault(cfg.Colors.White, "252"),    // Light gray
+		Muted:   colorOrDefault(cfg.Colors.Muted, "242"),    // Dark gray
+		Subtle:  lipgloss.Color("238"),                      // Very dark gray (border)
+		Inverse: lipgloss.Color("231"),                      // White
 	}
 
 	icons := ThemeIcons{
@@ -259,5 +313,16 @@ func ThemeFromConfig(cfg *Config) *Theme {
 		icons.Bullet = "•"
 	}
 
-	return NewTheme(cfg.ThemeName, colors, icons)
+	// Build border from config
+	border := BorderFromConfig(cfg)
+
+	return NewThemeWithBorder(cfg.ThemeName, colors, icons, border)
+}
+
+// colorOrDefault returns the config color if set, otherwise the default.
+func colorOrDefault(c lipgloss.Color, def string) lipgloss.Color {
+	if c == "" {
+		return lipgloss.Color(def)
+	}
+	return c
 }
