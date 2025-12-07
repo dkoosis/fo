@@ -300,24 +300,22 @@ func (c *Console) PrintSectionContentLine(content ContentLine) {
 		return
 	}
 
-	// Build the content line with icon and text
+	// Build the content line with icon and text using lipgloss for styling
 	var contentBuilder strings.Builder
 	if content.Icon != "" {
 		if content.IconColor != "" {
-			contentBuilder.WriteString(content.IconColor)
-		}
-		contentBuilder.WriteString(content.Icon)
-		if content.IconColor != "" {
-			contentBuilder.WriteString(string(cfg.ResetColor()))
+			iconStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(content.IconColor))
+			contentBuilder.WriteString(iconStyle.Render(content.Icon))
+		} else {
+			contentBuilder.WriteString(content.Icon)
 		}
 		contentBuilder.WriteString(" ") // Space after icon
 	}
 	if content.TextColor != "" {
-		contentBuilder.WriteString(content.TextColor)
-	}
-	contentBuilder.WriteString(content.Text)
-	if content.TextColor != "" {
-		contentBuilder.WriteString(string(cfg.ResetColor()))
+		textStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(content.TextColor))
+		contentBuilder.WriteString(textStyle.Render(content.Text))
+	} else {
+		contentBuilder.WriteString(content.Text)
 	}
 
 	box := c.calculateBoxLayout()
@@ -891,13 +889,43 @@ func (c *Console) GetColor(colorKey string) string {
 	return string(c.designConf.GetColor(colorKey))
 }
 
+// StyleWithColor returns text styled with the specified color key using lipgloss.
+func (c *Console) StyleWithColor(colorKey, text string) string {
+	colorValue := c.designConf.GetColor(colorKey)
+	if colorValue == "" {
+		return text
+	}
+	style := lipgloss.NewStyle().Foreground(lipgloss.Color(colorValue))
+	return style.Render(text)
+}
+
+// StyleSuccess returns text styled with the success color.
+func (c *Console) StyleSuccess(text string) string {
+	return c.StyleWithColor("Success", text)
+}
+
+// StyleError returns text styled with the error color.
+func (c *Console) StyleError(text string) string {
+	return c.StyleWithColor("Error", text)
+}
+
+// StyleWarning returns text styled with the warning color.
+func (c *Console) StyleWarning(text string) string {
+	return c.StyleWithColor("Warning", text)
+}
+
+// StyleMuted returns text styled with the muted color.
+func (c *Console) StyleMuted(text string) string {
+	return c.StyleWithColor("Muted", text)
+}
+
 // FormatStatusIcon returns a fully styled icon string for the given status.
 // Status can be "PASS", "FAIL", "SKIP", "SUCCESS", "ERROR", "WARNING", or "MUTED".
-// Returns the icon with appropriate color and reset code.
+// Returns the icon with appropriate color styling via lipgloss.
 func (c *Console) FormatStatusIcon(status string) string {
 	statusUpper := strings.ToUpper(status)
 	var icon string
-	var color string
+	var colorKey string
 
 	switch statusUpper {
 	case "PASS", "SUCCESS":
@@ -905,57 +933,51 @@ func (c *Console) FormatStatusIcon(status string) string {
 		if icon == "" {
 			icon = defaultSuccessIcon
 		}
-		color = c.GetSuccessColor()
+		colorKey = "Success"
 	case "FAIL", "ERROR":
 		icon = c.GetIcon("Error")
 		if icon == "" {
 			icon = "✗"
 		}
-		color = c.GetErrorColor()
+		colorKey = "Error"
 	case "WARNING":
 		icon = c.GetIcon("Warning")
 		if icon == "" {
 			icon = "⚠"
 		}
-		color = c.GetWarningColor()
+		colorKey = "Warning"
 	case "SKIP", "MUTED":
 		icon = "▫"
-		color = c.GetMutedColor()
+		colorKey = "Muted"
 	default:
 		icon = "▫"
-		color = c.GetMutedColor()
+		colorKey = "Muted"
 	}
 
-	if color == "" {
-		return icon
-	}
-	return color + icon + c.ResetColor()
+	return c.StyleWithColor(colorKey, icon)
 }
 
 // FormatStatusText returns a fully styled text string for the given status.
 // Status can be "PASS", "FAIL", "SKIP", "SUCCESS", "ERROR", "WARNING", or "MUTED".
-// Returns the text with appropriate color and reset code.
+// Returns the text with appropriate color styling via lipgloss.
 func (c *Console) FormatStatusText(text, status string) string {
 	statusUpper := strings.ToUpper(status)
-	var color string
+	var colorKey string
 
 	switch statusUpper {
 	case "PASS", "SUCCESS":
-		color = c.GetSuccessColor()
+		colorKey = "Success"
 	case "FAIL", "ERROR":
-		color = c.GetErrorColor()
+		colorKey = "Error"
 	case "WARNING":
-		color = c.GetWarningColor()
+		colorKey = "Warning"
 	case "SKIP", "MUTED":
-		color = c.GetMutedColor()
+		colorKey = "Muted"
 	default:
-		color = c.GetMutedColor()
+		colorKey = "Muted"
 	}
 
-	if color == "" {
-		return text
-	}
-	return color + text + c.ResetColor()
+	return c.StyleWithColor(colorKey, text)
 }
 
 // FormatTestName returns a fully styled test name for the given status.
