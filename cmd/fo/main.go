@@ -12,6 +12,7 @@ import (
 	config "github.com/dkoosis/fo/internal/config"
 	"github.com/dkoosis/fo/internal/version"
 	"github.com/dkoosis/fo/pkg/design"
+	"github.com/dkoosis/fo/pkg/sarif"
 )
 
 // validPatterns defines the supported pattern names for the --pattern flag.
@@ -273,6 +274,11 @@ func runEditorMode(cliFlags config.CliFlags, fileAppConfig *config.AppConfig) in
 		return 0
 	}
 
+	// Check if input is SARIF format
+	if sarif.IsSARIF(input) {
+		return renderSARIF(input, resolvedCfg.Theme)
+	}
+
 	// Create a task for the stdin processing
 	task := design.NewTask("stdin", "stream", "pipe", nil, resolvedCfg.Theme)
 
@@ -283,6 +289,26 @@ func runEditorMode(cliFlags config.CliFlags, fileAppConfig *config.AppConfig) in
 	for _, line := range task.OutputLines {
 		rendered := task.RenderOutputLine(line)
 		fmt.Println(rendered)
+	}
+
+	return 0
+}
+
+// renderSARIF parses and renders SARIF input using the sarif renderer.
+func renderSARIF(input []byte, theme *design.Config) int {
+	doc, err := sarif.ReadBytes(input)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[fo] Error parsing SARIF: %v\n", err)
+		return 1
+	}
+
+	// Use default SARIF renderer config
+	rendererCfg := sarif.DefaultRendererConfig()
+	renderer := sarif.NewRenderer(rendererCfg, theme)
+
+	output := renderer.Render(doc)
+	if output != "" {
+		fmt.Print(output)
 	}
 
 	return 0

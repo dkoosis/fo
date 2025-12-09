@@ -11,9 +11,29 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dkoosis/fo/fo"
 	"github.com/dkoosis/fo/pkg/design"
 )
+
+// spinnerFrames defines available spinner styles (duplicated from fo to avoid import cycle)
+var spinnerFrames = map[string][]string{
+	"dots": {"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"},
+}
+
+// parseSpinnerChars parses a custom spinner chars string into frames.
+func parseSpinnerChars(chars string) []string {
+	chars = strings.TrimSpace(chars)
+	if chars == "" {
+		return nil
+	}
+	if strings.Contains(chars, " ") {
+		return strings.Fields(chars)
+	}
+	var frames []string
+	for _, r := range chars {
+		frames = append(frames, string(r))
+	}
+	return frames
+}
 
 // ToolSpec defines a tool to run that emits SARIF output.
 type ToolSpec struct {
@@ -220,24 +240,23 @@ func truncateOutput(output []byte, maxLen int) string {
 
 // multiSpinner manages multiple spinner lines.
 type multiSpinner struct {
-	tools    []ToolSpec
-	spinners []*fo.Spinner
-	statuses []string
+	tools     []ToolSpec
+	statuses  []string
 	durations []time.Duration
-	mu       sync.Mutex
-	writer   io.Writer
-	running  bool
-	stopCh   chan struct{}
-	doneCh   chan struct{}
-	frames   []string
-	interval time.Duration
-	frameIdx int
+	mu        sync.Mutex
+	writer    io.Writer
+	running   bool
+	stopCh    chan struct{}
+	doneCh    chan struct{}
+	frames    []string
+	interval  time.Duration
+	frameIdx  int
 }
 
 func (o *Orchestrator) newMultiSpinner(tools []ToolSpec) *multiSpinner {
-	frames := fo.SpinnerFrames["dots"]
+	frames := spinnerFrames["dots"]
 	if o.spinnerCh != "" {
-		if parsed := fo.ParseSpinnerChars(o.spinnerCh); len(parsed) > 0 {
+		if parsed := parseSpinnerChars(o.spinnerCh); len(parsed) > 0 {
 			frames = parsed
 		}
 	}
