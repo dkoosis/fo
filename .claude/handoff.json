@@ -1,14 +1,13 @@
 {
   "_v": "0.9",
-  "ts": "2025-12-09T06:10:00Z",
+  "ts": "2025-12-09T07:00:00Z",
   "who": "claude-opus",
 
   "active": null,
 
   "next": [
-    {"task": "Fix remaining lint issues", "pri": 1, "notes": "115 issues from golangci-lint"},
-    {"task": "Add coverage to test output", "pri": 2, "notes": "Coverage shows 0% - need -cover flag"},
-    {"task": "Add .fo.yaml SARIF config section", "pri": 3, "notes": "Wire config loading to renderer"}
+    {"task": "Fix remaining lint issues", "pri": 1, "notes": "Run golangci-lint and fix issues"},
+    {"task": "Add .fo.yaml SARIF config section", "pri": 2, "notes": "Wire config loading to renderer"}
   ],
 
   "done": [
@@ -21,7 +20,10 @@
     "✓ Added renderTestJSONOutput() using TestRenderer",
     "✓ Updated orca magefile: golangci-lint --output.sarif.path=stdout",
     "✓ Updated orca magefile: go test -json ./...",
-    "✓ All output now flows through fo for beautiful rendering"
+    "✓ All output now flows through fo for beautiful rendering",
+    "✓ Fixed build path ./cmd → ./cmd/fo after main.go move",
+    "✓ Added SARIF detection to stdin pipe mode (cmd/fo/main.go)",
+    "✓ Fixed import cycle in orchestrator by duplicating spinner frames"
   ],
 
   "context": [
@@ -29,7 +31,8 @@
     "◯ SARIF: Tools may append text after JSON (handled by extractSARIF)",
     "◯ go test -json: NDJSON with TestEvent objects (Time, Action, Package, Test, Elapsed, Output)",
     "◯ TestRenderer: Already uses lipgloss, groups by directory, shows coverage bars",
-    "◯ Spinner TTY check: Prevents ANSI escape codes in piped output"
+    "◯ Spinner TTY check: Prevents ANSI escape codes in piped output",
+    "◯ mage passes: 437 tests, all green"
   ],
 
   "blockers": [],
@@ -39,7 +42,8 @@
     "fo/testjson.go - ParseTestJSON(), TestPackageAggregator, RenderTestResults()",
     "fo/console.go - renderSARIFOutput(), renderTestJSONOutput(), TTY check for spinner",
     "fo/testrender.go - TestRenderer with lipgloss formatting",
-    "pkg/sarif/renderer.go - SARIF to visual patterns"
+    "pkg/sarif/renderer.go - SARIF to visual patterns",
+    "cmd/fo/main.go - SARIF detection in stdin pipe mode"
   ],
 
   "design": {

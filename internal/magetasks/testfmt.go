@@ -183,6 +183,10 @@ func (f *TestFormatter) renderPackageResult(pkg *PackageResult) {
 }
 
 func (f *TestFormatter) renderFinalSummary() {
+	// Stop any active section spinner from the global Console before rendering
+	// This prevents spinner frames from bleeding into the test output
+	Console().StopActiveSpinner()
+
 	// Group packages by top-level directory
 	groups := make(map[string][]*PackageResult)
 	var groupOrder []string

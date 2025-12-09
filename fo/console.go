@@ -134,8 +134,10 @@ type Console struct {
 	taskView       *design.TaskView // New task renderer
 	processor      *Processor
 	profiler       *Profiler
-	currentSummary string // Summary message for current section being executed
-	inSection      bool   // Whether we're currently executing a section (suppresses individual Run() outputs)
+	currentSummary string   // Summary message for current section being executed
+	inSection      bool     // Whether we're currently executing a section (suppresses individual Run() outputs)
+	activeSpinner  *Spinner // Currently active section spinner (for pausing during output)
+	spinnerMu      sync.Mutex
 }
 
 func DefaultConsole() *Console {
@@ -160,6 +162,20 @@ func NewConsole(cfg ConsoleConfig) *Console {
 		taskView:   taskView,
 		processor:  processor,
 		profiler:   profiler,
+	}
+}
+
+// StopActiveSpinner stops any currently running section spinner.
+// This should be called before rendering multi-line output to prevent
+// spinner frames from bleeding into the output.
+func (c *Console) StopActiveSpinner() {
+	c.spinnerMu.Lock()
+	spinner := c.activeSpinner
+	c.activeSpinner = nil
+	c.spinnerMu.Unlock()
+
+	if spinner != nil {
+		spinner.Stop()
 	}
 }
 
@@ -663,9 +679,13 @@ func (c *Console) RunSection(s Section) SectionResult {
 		fmt.Fprintf(os.Stderr, "[DEBUG RunSection] Starting section '%s', inSection=%v\n", s.Name, c.inSection)
 	}
 
-	// 2.5) Start spinner if enabled
+	// 2.5) Start spinner if enabled (only when output is a TTY)
 	var spinner *Spinner
-	if !c.designConf.Style.NoSpinner && !c.cfg.Monochrome {
+	isTTY := false
+	if f, ok := c.cfg.Out.(*os.File); ok {
+		isTTY = term.IsTerminal(int(f.Fd()))
+	}
+	if !c.designConf.Style.NoSpinner && !c.cfg.Monochrome && isTTY {
 		spinnerColor := c.getSpinnerColor()
 		interval := time.Duration(c.designConf.Style.SpinnerInterval) * time.Millisecond
 		if interval == 0 {
@@ -688,12 +708,20 @@ func (c *Console) RunSection(s Section) SectionResult {
 			Writer:       c.cfg.Out,
 		})
 		spinner.Start()
+
+		// Track as active spinner so it can be stopped before rendering output
+		c.spinnerMu.Lock()
+		c.activeSpinner = spinner
+		c.spinnerMu.Unlock()
 	}
 
 	// 3) Run the actual work
 	err := s.Run()
 
-	// Stop spinner
+	// Stop spinner (also clears activeSpinner reference)
+	c.spinnerMu.Lock()
+	c.activeSpinner = nil
+	c.spinnerMu.Unlock()
 	if spinner != nil {
 		spinner.Stop()
 	}
@@ -1397,6 +1425,12 @@ func (c *Console) renderCapturedOutput(task *design.Task, exitCode int, isActual
 		if exitCode != 0 {
 			showCaptured = true
 		}
+	}
+
+	// Stop any active section spinner before rendering multi-line output
+	// This prevents spinner frames from bleeding into the rendered content
+	if showCaptured && !isActualFoStartupFailure {
+		c.StopActiveSpinner()
 	}
 
 	// SARIF output is always shown when captured (it's the primary output format)
