@@ -36,7 +36,7 @@ func NewProcessor(
 }
 
 // ProcessOutput processes buffered output.
-// SARIF format is detected and stored for specialized rendering.
+// SARIF and go test JSON formats are detected and stored for specialized rendering.
 // Other formats go through line-by-line classification.
 func (p *Processor) ProcessOutput(
 	task *design.Task,
@@ -51,6 +51,14 @@ func (p *Processor) ProcessOutput(
 		task.SARIFData = extractSARIF(output)
 		return
 	}
+
+	// Go test -json gets specialized rendering
+	if IsGoTestJSON(output) {
+		task.IsTestJSON = true
+		task.TestJSONData = output
+		return
+	}
+
 	p.processLineByLine(task, string(output), command, args)
 }
 

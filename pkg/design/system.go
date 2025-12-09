@@ -38,6 +38,10 @@ type Task struct {
 	IsSARIF   bool   // True if output is SARIF format
 	SARIFData []byte // Raw SARIF data for rendering
 
+	// Go test JSON support
+	IsTestJSON   bool   // True if output is go test -json format
+	TestJSONData []byte // Raw test JSON data for rendering
+
 	// Configuration and context
 	Config  *Config
 	Context TaskContext

@@ -1405,6 +1405,12 @@ func (c *Console) renderCapturedOutput(task *design.Task, exitCode int, isActual
 		return
 	}
 
+	// Go test JSON output gets specialized rendering
+	if task.IsTestJSON && showCaptured && !isActualFoStartupFailure {
+		c.renderTestJSONOutput(task)
+		return
+	}
+
 	if showCaptured && !isActualFoStartupFailure {
 		summary := task.RenderSummary()
 		if summary != "" {
@@ -1467,6 +1473,22 @@ func (c *Console) renderSARIFOutput(task *design.Task) {
 	if output != "" {
 		_, _ = c.cfg.Out.Write([]byte(output))
 	}
+}
+
+// renderTestJSONOutput renders go test -json data using the TestRenderer.
+func (c *Console) renderTestJSONOutput(task *design.Task) {
+	if len(task.TestJSONData) == 0 {
+		return
+	}
+
+	results, err := ParseTestJSON(task.TestJSONData)
+	if err != nil {
+		// Fall back to raw output on parse error
+		_, _ = c.cfg.Out.Write([]byte(fmt.Sprintf("Test JSON parse error: %v\n", err)))
+		return
+	}
+
+	RenderTestResults(c.cfg.Out, results, c)
 }
 
 func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task, cmdDone chan struct{}) (int, error) {
