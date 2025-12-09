@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/dkoosis/fo/pkg/adapter"
 	"github.com/dkoosis/fo/pkg/design"
 	"golang.org/x/term"
 )
@@ -37,9 +36,6 @@ const (
 
 	// ReadBufferSize is the buffer size for reading from pipes (4KB).
 	ReadBufferSize = 4096
-
-	// AdapterDetectionLineCount is the number of lines to buffer for adapter detection.
-	AdapterDetectionLineCount = 15
 
 	// SignalTimeout is the timeout for graceful process termination before force kill.
 	SignalTimeout = 2 * time.Second
@@ -131,15 +127,14 @@ func (r *TaskResult) ToJSON() ([]byte, error) {
 }
 
 type Console struct {
-	cfg             ConsoleConfig
-	designConf      *design.Config
-	theme           *design.Theme    // New lipgloss-idiomatic theme
-	taskView        *design.TaskView // New task renderer
-	adapterRegistry *adapter.Registry
-	processor       *Processor
-	profiler        *Profiler
-	currentSummary  string // Summary message for current section being executed
-	inSection       bool   // Whether we're currently executing a section (suppresses individual Run() outputs)
+	cfg            ConsoleConfig
+	designConf     *design.Config
+	theme          *design.Theme    // New lipgloss-idiomatic theme
+	taskView       *design.TaskView // New task renderer
+	processor      *Processor
+	profiler       *Profiler
+	currentSummary string // Summary message for current section being executed
+	inSection      bool   // Whether we're currently executing a section (suppresses individual Run() outputs)
 }
 
 func DefaultConsole() *Console {
@@ -150,22 +145,20 @@ func NewConsole(cfg ConsoleConfig) *Console {
 	normalized := normalizeConfig(cfg)
 	profiler := NewProfiler(normalized.Profile, normalized.ProfileOutput)
 	designConf := resolveDesignConfig(normalized)
-	adapterRegistry := adapter.NewRegistry()
 	patternMatcher := design.NewPatternMatcher(designConf)
-	processor := NewProcessor(patternMatcher, adapterRegistry, normalized.MaxLineLength, normalized.Debug)
+	processor := NewProcessor(patternMatcher, normalized.MaxLineLength, normalized.Debug)
 
 	// Create new theme and task view from config
 	theme := design.ThemeFromConfig(designConf)
 	taskView := design.NewTaskView(theme).UseBoxes(designConf.Style.UseBoxes)
 
 	return &Console{
-		cfg:             normalized,
-		designConf:      designConf,
-		theme:           theme,
-		taskView:        taskView,
-		adapterRegistry: adapterRegistry,
-		processor:       processor,
-		profiler:        profiler,
+		cfg:        normalized,
+		designConf: designConf,
+		theme:      theme,
+		taskView:   taskView,
+		processor:  processor,
+		profiler:   profiler,
 	}
 }
 

@@ -94,6 +94,11 @@ func (Lint) Fix() error {
 	return magetasks.LintGolangciFix()
 }
 
+// Sarif runs linters with SARIF output and visual rendering
+func (Lint) Sarif() error {
+	return magetasks.LintSARIF()
+}
+
 // Test namespace for testing commands
 type Test mg.Namespace
 

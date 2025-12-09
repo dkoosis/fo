@@ -1,0 +1,65 @@
+{
+  "_v": "0.9",
+  "ts": "2025-12-08T03:15:00Z",
+  "who": "claude-opus",
+
+  "active": null,
+
+  "next": [
+    {"task": "Fix 113 lint issues", "pri": 1, "notes": "See pkg/sarif/testdata/*.sarif for details"},
+    {"task": "Add .fo.yaml SARIF config section", "pri": 2, "notes": "Wire config loading to renderer"},
+    {"task": "Add go test JSON→SARIF converter", "pri": 3, "notes": "Unified rendering for test results"}
+  ],
+
+  "done": [
+    "✓ Explored fo codebase structure",
+    "✓ Identified existing patterns: Sparkline, Leaderboard, TestTable, Summary, Comparison, Inventory",
+    "✓ Designed new architecture: SARIF-first, parallel tools, spinners",
+    "✓ Updated .golangci.yml with stricter orca-style config",
+    "✓ Enabled SARIF output in golangci-lint config",
+    "✓ Created pkg/sarif/ package with types, reader, config, mapper, renderer",
+    "✓ Built parallel orchestrator with multi-spinner display",
+    "✓ Added mage lint:sarif target",
+    "✓ Deleted pkg/adapter/ (old line-parsing system)"
+  ],
+
+  "context": [
+    "◯ New architecture: tools emit SARIF → fo renders (no custom parsing)",
+    "◯ Parallel execution: run all tools at once, spinner per tool, render as each completes",
+    "◯ golangci-lint has native SARIF (--output.sarif.path)",
+    "◯ Tool-specific config: how to map SARIF results to visual patterns",
+    "◯ Keep charmbracelet/lipgloss for borders, headers, colors"
+  ],
+
+  "blockers": [],
+
+  "refs": [
+    "pkg/sarif/types.go - SARIF 2.1.0 document structure",
+    "pkg/sarif/config.go - RendererConfig, ToolRenderConfig, PatternConfig",
+    "pkg/sarif/reader.go - ReadFile, ComputeStats, TopFiles, GroupByFile/Rule",
+    "pkg/sarif/mapper.go - SARIF → fo patterns (Summary, Leaderboard, TestTable)",
+    "pkg/sarif/renderer.go - ties it together",
+    "pkg/sarif/orchestrator.go - parallel tool runner with multi-spinner",
+    "pkg/sarif/testdata/ - test fixtures with 121/113 issues"
+  ],
+
+  "design": {
+    "architecture": "SARIF-first rendering with parallel tool execution",
+    "flow": "[tools in parallel] → SARIF files → fo renders as each completes → final summary",
+    "ux": "Spinners for running tools, replace with rendered results on completion",
+    "sarif_to_pattern_mapping": {
+      "summary": "Counts by severity or rule (12 errors, 39 warnings)",
+      "leaderboard": "Files with most issues (top N)",
+      "issue_list": "Results grouped by file or ruleId (TestTable pattern)"
+    }
+  },
+
+  "previous_work": {
+    "hygiene_cli": {
+      "status": "scaffolded",
+      "issue": "#168",
+      "files": ["cmd/hygiene/main.go", "cmd/hygiene/cruft.go", "cmd/hygiene/orphan.go", "cmd/hygiene/config.go"],
+      "notes": "Paused - pivot to SARIF-first architecture"
+    }
+  }
+}

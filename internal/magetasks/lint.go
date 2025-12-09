@@ -1,8 +1,14 @@
 package magetasks
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"os"
+	"time"
+
+	"github.com/dkoosis/fo/pkg/design"
+	"github.com/dkoosis/fo/pkg/sarif"
 )
 
 // LintAll runs all linters.
@@ -63,12 +69,14 @@ func LintStaticcheck() error {
 	return nil
 }
 
-// LintGolangci runs golangci-lint.
+// LintGolangci runs golangci-lint (outputs SARIF to build/golangci.sarif).
 func LintGolangci() error {
-	if err := Run("Golangci-lint", "golangci-lint", "run",
-		"--disable=exhaustruct,varnamelen,ireturn,wrapcheck,nlreturn,gochecknoglobals,mnd,depguard,tagalign",
-		"--timeout=5m",
-		"./..."); err != nil {
+	// Ensure build directory exists for SARIF output
+	if err := os.MkdirAll("build", 0755); err != nil {
+		return fmt.Errorf("failed to create build directory: %w", err)
+	}
+
+	if err := Run("Golangci-lint", "golangci-lint", "run", "./..."); err != nil {
 		if IsCommandNotFound(err) {
 			PrintWarning("Golangci-lint not found (install: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)")
 			return err
@@ -80,15 +88,71 @@ func LintGolangci() error {
 
 // LintGolangciFix runs golangci-lint with auto-fixes.
 func LintGolangciFix() error {
-	if err := Run("Golangci-lint Fix", "golangci-lint", "run", "--fix",
-		"--disable=exhaustruct,varnamelen,ireturn,wrapcheck,nlreturn,gochecknoglobals,mnd,depguard,tagalign",
-		"--timeout=5m",
-		"./..."); err != nil {
+	if err := Run("Golangci-lint Fix", "golangci-lint", "run", "--fix", "./..."); err != nil {
 		if IsCommandNotFound(err) {
 			PrintWarning("Golangci-lint not found (install: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)")
 			return err
 		}
 		return fmt.Errorf("golangci-lint failed: %w", err)
 	}
+	return nil
+}
+
+// LintSARIF runs linters with SARIF output and renders results using fo patterns.
+// This is the new SARIF-first linting approach with parallel execution and spinners.
+func LintSARIF() error {
+	// Ensure build directory exists
+	if err := os.MkdirAll("build", 0755); err != nil {
+		return fmt.Errorf("create build dir: %w", err)
+	}
+
+	// Configure renderer
+	config := sarif.DefaultRendererConfig()
+	config.Tools["golangci-lint"] = sarif.GolangciLintConfig()
+
+	foConfig := design.DefaultConfig()
+
+	// Create orchestrator
+	orch := sarif.NewOrchestrator(config, foConfig)
+	orch.SetBuildDir("build")
+
+	// Define tools to run
+	tools := []sarif.ToolSpec{
+		{
+			Name:      "golangci-lint",
+			Command:   "golangci-lint",
+			Args:      []string{"run", "./..."},
+			SARIFPath: "build/golangci.sarif",
+		},
+	}
+
+	// Run with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	results, err := orch.Run(ctx, tools)
+	if err != nil {
+		return fmt.Errorf("lint orchestrator: %w", err)
+	}
+
+	// Check for errors
+	var hasErrors bool
+	for _, r := range results {
+		if r.Error != nil {
+			hasErrors = true
+			continue
+		}
+		if r.Document != nil {
+			stats := sarif.ComputeStats(r.Document)
+			if stats.ByLevel["error"] > 0 {
+				hasErrors = true
+			}
+		}
+	}
+
+	if hasErrors {
+		return fmt.Errorf("linting found issues")
+	}
+
 	return nil
 }

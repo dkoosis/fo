@@ -124,3 +124,4 @@ All outputs are saved as text files with ANSI color codes preserved. This allows
 - [Architecture](../design/architecture.md) - Understanding fo's architecture
 - [Patterns](../design/pattern-types.md) - Available rendering patterns
 
+

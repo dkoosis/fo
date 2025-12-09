@@ -1,62 +1,156 @@
+# golangci-lint configuration for fo (strict mode)
 version: "2"
 
 run:
   timeout: 5m
-  go: '1.22'
+  tests: true
+  modules-download-mode: readonly
+
+output:
+  formats:
+    text:
+      print-linter-name: true
+      print-issued-lines: true
+      colors: true
+    sarif:
+      path: build/golangci.sarif
 
 linters:
+  enable:
+    # --- Must Haves ---
+    - staticcheck   # The gold standard
+    - errcheck      # Unchecked errors
+    - gosec         # Security
+    - testifylint   # Correct testify usage
+
+    # --- Architecture & Style ---
+    - revive        # Replaces golint
+    - gocyclo       # Cyclomatic complexity
+    - unconvert     # Remove unnecessary type conversions
+    - prealloc      # Slice pre-allocation
+    - goconst       # Magic strings
+
+    # --- Correctness ---
+    - bodyclose     # HTTP body leaks
+    - errorlint     # Go 1.13+ error wrapping
+
   disable:
-    # Overly strict style linters
-    - wsl        # whitespace style is too opinionated
-    - paralleltest  # requires careful analysis of each test
+    - depguard      # Not needed
+    - funlen        # Relying on gocyclo instead
+    - godox         # TODOs are acceptable
+    - wsl           # Too aggressive on whitespace
+    - exhaustruct   # Too strict for config structs
+    - varnamelen    # Short names are fine in Go
+    - ireturn       # Returning interfaces is fine
+    - wrapcheck     # Not all errors need wrapping
+    - nlreturn      # Whitespace before return is optional
+    - gochecknoglobals  # Globals are sometimes needed
+    - mnd           # Magic number detection too noisy
+    - tagalign      # Tag alignment is optional
+    - paralleltest  # Requires careful analysis of each test
     - tagliatelle   # snake_case is standard for yaml configs
 
 linters-settings:
+  # Complexity: strict but realistic
+  gocyclo:
+    min-complexity: 20
+
+  # Architecture & Idioms
   revive:
+    ignore-generated-header: true
+    severity: warning
     rules:
+      - name: exported
+        disabled: true
+      - name: package-comments
+        disabled: true
+      - name: var-naming
+        disabled: false
+      - name: context-as-argument
+        disabled: false
+      - name: error-return
+        disabled: false
+      - name: dot-imports
+        disabled: false
+      - name: bare-return
+        disabled: false
+      - name: waitgroup-by-value
+        disabled: false
       - name: unused-parameter
         disabled: false
-  goconst:
-    min-occurrences: 4
+
+  # Security
   gosec:
     excludes:
-      - G306
-  # Set reasonable complexity thresholds for this codebase
-  gocognit:
-    min-complexity: 85
-  cyclop:
-    max-complexity: 50
-  gocyclo:
-    min-complexity: 50
-  funlen:
-    lines: 170
-    statements: 100
+      - G104  # errcheck handles this
+      - G304  # File inclusion (CLI tool)
+      - G306  # Loose file perms ok for build outputs
+
+  # Testify
+  testifylint:
+    enable-all: true
+
+  # Errcheck - exclude common false positives
+  errcheck:
+    exclude-functions:
+      - (io.Closer).Close
+      - (*os.File).Close
+      - fmt.Fprintf
+      - fmt.Printf
+      - fmt.Print
+      - fmt.Println
+      - fmt.Fprint
+      - fmt.Fprintln
+
+  # Staticcheck
+  staticcheck:
+    checks:
+      - all
+      - -SA1019  # Deprecated warnings (too noisy during transitions)
+
+  # Magic strings
+  goconst:
+    min-occurrences: 4
+
+  # Keep some complexity thresholds for edge cases
   lll:
     line-length: 140
   nestif:
-    min-complexity: 35
-  maintidx:
-    under: 15
+    min-complexity: 20
 
 issues:
   exclude-rules:
-    # Allow os.Chdir in tests (usetesting linter)
+    # Allow loose security in tests
+    - path: '(_test\.go)'
+      linters: [gosec]
+      text: "G101|G204|G404|G301|G302"
+
+    # Allow loose security in CLI/build tools
+    - path: '(cmd/.*|internal/magetasks/.*)'
+      linters: [gosec]
+      text: "G204|G301|G302|G306"
+
+    # Allow higher complexity in main.go files
+    - path: 'cmd/.*/main\.go'
+      linters: [gocyclo]
+
+    # Allow print statements in magetasks (build output)
+    - path: 'internal/magetasks/'
+      linters: [forbidigo]
+
+    # Exclude errcheck from test defer cleanup
+    - path: '(_test\.go)'
+      linters: [errcheck]
+      text: "Close"
+
+    # Allow os.Chdir in tests
     - path: _test\.go
-      linters:
-        - usetesting
+      linters: [usetesting]
+
     # Allow test packages to use same package name
     - path: _test\.go
-      linters:
-        - testpackage
-    # Allow gosec G306 in tests
-    - path: _test\.go
-      linters:
-        - gosec
+      linters: [testpackage]
+
     # Exclude dupword for comments
-    - linters:
-        - dupword
+    - linters: [dupword]
       source: "^\\s*//"
-    # Allow fmt.Print* in magetasks - build tools need console output
-    - path: internal/magetasks/
-      linters:
-        - forbidigo
