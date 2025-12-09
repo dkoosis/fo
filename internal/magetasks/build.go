@@ -17,7 +17,7 @@ func BuildAll() error {
 		ModulePath, version, ModulePath, commit, ModulePath, date,
 	)
 
-	if err := Run("Build fo", "go", "build", "-ldflags", ldflags, "-o", BinPath, "./cmd"); err != nil {
+	if err := Run("Build fo", "go", "build", "-ldflags", ldflags, "-o", BinPath, "./cmd/fo"); err != nil {
 		return err
 	}
 
