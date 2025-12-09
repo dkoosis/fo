@@ -34,6 +34,10 @@ type Task struct {
 	errorCount   int
 	warningCount int
 
+	// SARIF support
+	IsSARIF   bool   // True if output is SARIF format
+	SARIFData []byte // Raw SARIF data for rendering
+
 	// Configuration and context
 	Config  *Config
 	Context TaskContext

@@ -20,6 +20,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dkoosis/fo/pkg/design"
+	"github.com/dkoosis/fo/pkg/sarif"
 	"golang.org/x/term"
 )
 
@@ -1190,9 +1191,13 @@ func (c *Console) runContext(
 		_, _ = c.cfg.Out.Write([]byte(c.taskView.RenderStart(taskData) + "\n"))
 	}
 
-	// Start spinner if enabled (only when not in section and not streaming)
+	// Start spinner if enabled (only when not in section, not streaming, and output is a TTY)
 	var spinner *Spinner
-	if !c.inSection && !c.cfg.LiveStreamOutput && !c.designConf.Style.NoSpinner && !c.cfg.Monochrome {
+	isTTY := false
+	if f, ok := c.cfg.Out.(*os.File); ok {
+		isTTY = term.IsTerminal(int(f.Fd()))
+	}
+	if !c.inSection && !c.cfg.LiveStreamOutput && !c.designConf.Style.NoSpinner && !c.cfg.Monochrome && isTTY {
 		spinnerColor := c.getSpinnerColor()
 		interval := time.Duration(c.designConf.Style.SpinnerInterval) * time.Millisecond
 		if interval == 0 {
@@ -1394,6 +1399,12 @@ func (c *Console) renderCapturedOutput(task *design.Task, exitCode int, isActual
 		}
 	}
 
+	// SARIF output is always shown when captured (it's the primary output format)
+	if task.IsSARIF && showCaptured && !isActualFoStartupFailure {
+		c.renderSARIFOutput(task)
+		return
+	}
+
 	if showCaptured && !isActualFoStartupFailure {
 		summary := task.RenderSummary()
 		if summary != "" {
@@ -1433,6 +1444,28 @@ func (c *Console) renderCapturedOutput(task *design.Task, exitCode int, isActual
 		if summary != "" {
 			_, _ = c.cfg.Out.Write([]byte(summary))
 		}
+	}
+}
+
+// renderSARIFOutput renders SARIF data using the SARIF renderer.
+func (c *Console) renderSARIFOutput(task *design.Task) {
+	if len(task.SARIFData) == 0 {
+		return
+	}
+
+	doc, err := sarif.ReadBytes(task.SARIFData)
+	if err != nil {
+		// Fall back to raw output on parse error
+		_, _ = c.cfg.Out.Write([]byte(fmt.Sprintf("SARIF parse error: %v\n", err)))
+		return
+	}
+
+	rendererCfg := sarif.DefaultRendererConfig()
+	renderer := sarif.NewRenderer(rendererCfg, task.Config)
+
+	output := renderer.Render(doc)
+	if output != "" {
+		_, _ = c.cfg.Out.Write([]byte(output))
 	}
 }
 
@@ -1667,20 +1700,25 @@ func (c *Console) tryAdapterMode(
 	wgRead.Wait()
 	close(cmdDone)
 
-	// Get combined output for detection
-	combinedOutput := append(stdoutBuffer.Bytes(), stderrBuffer.Bytes()...)
-
 	// Save capture if enabled
 	if c.cfg.CaptureDir != "" {
 		c.saveCapture(task, stdoutBuffer.Bytes(), stderrBuffer.Bytes(), getExitCode(runErr, c.cfg.Debug))
 	}
 
-	// Use Processor to handle output processing (adapter detection and line-by-line fallback)
+	// Check stdout for SARIF first (tools like golangci-lint output SARIF to stdout,
+	// with text summary on stderr - combining them breaks JSON parsing)
 	processStart := c.profiler.StartStage("process")
-	c.processor.ProcessOutput(task, combinedOutput, task.Command, task.Args)
+	stdoutBytes := stdoutBuffer.Bytes()
+	if isSARIF(stdoutBytes) {
+		c.processor.ProcessOutput(task, stdoutBytes, task.Command, task.Args)
+	} else {
+		// Fall back to combined output for non-SARIF
+		combinedOutput := append(stdoutBytes, stderrBuffer.Bytes()...)
+		c.processor.ProcessOutput(task, combinedOutput, task.Command, task.Args)
+	}
 	c.profiler.EndStage("process", processStart, map[string]interface{}{
-		"line_count":  len(strings.Split(string(combinedOutput), "\n")),
-		"buffer_size": int64(len(combinedOutput)),
+		"line_count":  len(strings.Split(string(stdoutBytes), "\n")),
+		"buffer_size": int64(len(stdoutBytes)),
 	})
 
 	// Report any capture errors
@@ -1697,7 +1735,7 @@ func (c *Console) tryAdapterMode(
 	}
 
 	c.profiler.EndStage("capture", captureStart, map[string]interface{}{
-		"buffer_size": int64(len(combinedOutput)),
+		"buffer_size": int64(len(stdoutBytes)) + int64(stderrBuffer.Len()),
 	})
 
 	exitCode := getExitCode(runErr, c.cfg.Debug)

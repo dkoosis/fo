@@ -33,6 +33,34 @@ func Read(r io.Reader) (*Document, error) {
 	return &doc, nil
 }
 
+// ReadBytes parses SARIF from a byte slice.
+func ReadBytes(data []byte) (*Document, error) {
+	var doc Document
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return nil, fmt.Errorf("decode sarif: %w", err)
+	}
+
+	if doc.Version == "" {
+		return nil, fmt.Errorf("missing sarif version")
+	}
+
+	return &doc, nil
+}
+
+// IsSARIF checks if data looks like a SARIF document.
+// Returns true if it's valid JSON with a SARIF version field.
+func IsSARIF(data []byte) bool {
+	var probe struct {
+		Version string `json:"version"`
+		Schema  string `json:"$schema"`
+	}
+	if err := json.Unmarshal(data, &probe); err != nil {
+		return false
+	}
+	// SARIF version is typically "2.1.0"
+	return probe.Version != "" || probe.Schema != ""
+}
+
 // Stats aggregates statistics from SARIF results.
 type Stats struct {
 	TotalIssues int

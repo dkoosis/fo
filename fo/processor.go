@@ -3,6 +3,8 @@ package fo
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/json"
 	"io"
 	"strings"
 
@@ -33,14 +35,84 @@ func NewProcessor(
 	}
 }
 
-// ProcessOutput processes buffered output with line-by-line classification.
+// ProcessOutput processes buffered output.
+// SARIF format is detected and stored for specialized rendering.
+// Other formats go through line-by-line classification.
 func (p *Processor) ProcessOutput(
 	task *design.Task,
 	output []byte,
 	command string,
 	args []string,
 ) {
+	// SARIF gets stored for specialized rendering - skip line-by-line
+	if isSARIF(output) {
+		// Extract just the SARIF JSON (tools may append text after it)
+		task.IsSARIF = true
+		task.SARIFData = extractSARIF(output)
+		return
+	}
 	p.processLineByLine(task, string(output), command, args)
+}
+
+// isSARIF checks if data looks like a SARIF document.
+// It handles tools like golangci-lint that append text after the SARIF JSON.
+func isSARIF(data []byte) bool {
+	// Check if data starts with '{' (JSON object)
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 || data[0] != '{' {
+		return false
+	}
+
+	// Find the end of the JSON object by counting braces
+	depth := 0
+	jsonEnd := -1
+	for i, b := range data {
+		if b == '{' {
+			depth++
+		} else if b == '}' {
+			depth--
+			if depth == 0 {
+				jsonEnd = i + 1
+				break
+			}
+		}
+	}
+
+	if jsonEnd <= 0 {
+		return false
+	}
+
+	// Parse just the JSON portion
+	var probe struct {
+		Version string `json:"version"`
+		Schema  string `json:"$schema"`
+	}
+	if err := json.Unmarshal(data[:jsonEnd], &probe); err != nil {
+		return false
+	}
+	return probe.Version != "" || probe.Schema != ""
+}
+
+// extractSARIF extracts just the SARIF JSON from data that may have trailing text.
+func extractSARIF(data []byte) []byte {
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 || data[0] != '{' {
+		return nil
+	}
+
+	// Find the end of the JSON object
+	depth := 0
+	for i, b := range data {
+		if b == '{' {
+			depth++
+		} else if b == '}' {
+			depth--
+			if depth == 0 {
+				return data[:i+1]
+			}
+		}
+	}
+	return nil
 }
 
 // processLineByLine processes output with line-by-line classification.
