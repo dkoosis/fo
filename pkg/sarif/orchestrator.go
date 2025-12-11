@@ -2,6 +2,7 @@ package sarif
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -28,8 +29,9 @@ func parseSpinnerChars(chars string) []string {
 	if strings.Contains(chars, " ") {
 		return strings.Fields(chars)
 	}
-	var frames []string
-	for _, r := range chars {
+	runes := []rune(chars)
+	frames := make([]string, 0, len(runes))
+	for _, r := range runes {
 		frames = append(frames, string(r))
 	}
 	return frames
@@ -174,7 +176,8 @@ func (o *Orchestrator) runTool(ctx context.Context, spec ToolSpec) ToolResult {
 	result.Duration = time.Since(start)
 
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
 			result.ExitCode = exitErr.ExitCode()
 			// Non-zero exit is expected for linters with findings
 			// Only treat as error if SARIF wasn't produced

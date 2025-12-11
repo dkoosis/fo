@@ -219,7 +219,7 @@ func (c *ComplexityDashboard) renderMetricLine(cfg *Config, m ComplexityMetric, 
 }
 
 // formatMetricValue formats a numeric value with optional unit.
-func formatMetricValue(value float64, unit string) string {
+func formatMetricValue(value float64, _ string) string {
 	// Check if value is a whole number
 	if value == float64(int(value)) {
 		return fmt.Sprintf("%d", int(value))

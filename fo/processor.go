@@ -111,9 +111,10 @@ func extractSARIF(data []byte) []byte {
 	// Find the end of the JSON object
 	depth := 0
 	for i, b := range data {
-		if b == '{' {
+		switch b {
+		case '{':
 			depth++
-		} else if b == '}' {
+		case '}':
 			depth--
 			if depth == 0 {
 				return data[:i+1]

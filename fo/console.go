@@ -1496,7 +1496,7 @@ func (c *Console) renderSARIFOutput(task *design.Task) {
 	doc, err := sarif.ReadBytes(task.SARIFData)
 	if err != nil {
 		// Fall back to raw output on parse error
-		_, _ = c.cfg.Out.Write([]byte(fmt.Sprintf("SARIF parse error: %v\n", err)))
+		fmt.Fprintf(c.cfg.Out, "SARIF parse error: %v\n", err)
 		return
 	}
 
@@ -1518,7 +1518,7 @@ func (c *Console) renderTestJSONOutput(task *design.Task) {
 	results, err := ParseTestJSON(task.TestJSONData)
 	if err != nil {
 		// Fall back to raw output on parse error
-		_, _ = c.cfg.Out.Write([]byte(fmt.Sprintf("Test JSON parse error: %v\n", err)))
+		fmt.Fprintf(c.cfg.Out, "Test JSON parse error: %v\n", err)
 		return
 	}
 

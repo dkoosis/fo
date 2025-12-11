@@ -222,9 +222,10 @@ func (m *Mapper) groupToTestTable(g GroupedResults, pc PatternConfig) *design.Te
 	}
 
 	density := design.DensityDetailed
-	if pc.Detail == "compact" {
+	switch pc.Detail {
+	case "compact":
 		density = design.DensityCompact
-	} else if pc.Detail == "balanced" {
+	case "balanced":
 		density = design.DensityBalanced
 	}
 

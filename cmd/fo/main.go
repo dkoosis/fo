@@ -226,7 +226,7 @@ func findCommandArgs() []string {
 // runEditorMode processes piped stdin input through fo's formatting pipeline.
 // This is the "Editor" mode - fo receives messy output and transforms it into
 // clear, beautiful signal.
-func runEditorMode(cliFlags config.CliFlags, fileAppConfig *config.AppConfig) int {
+func runEditorMode(cliFlags config.CliFlags, _ *config.AppConfig) int {
 	// Resolve configuration with priority order
 	resolvedCfg, err := config.ResolveConfig(cliFlags)
 	if err != nil {

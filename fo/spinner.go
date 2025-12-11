@@ -39,8 +39,9 @@ func ParseSpinnerChars(chars string) []string {
 	}
 
 	// Otherwise treat as individual runes
-	var frames []string
-	for _, r := range chars {
+	runes := []rune(chars)
+	frames := make([]string, 0, len(runes))
+	for _, r := range runes {
 		frames = append(frames, string(r))
 	}
 	return frames

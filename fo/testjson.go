@@ -114,7 +114,7 @@ func (a *TestPackageAggregator) processEvent(event TestEvent) {
 		// Parse coverage from output
 		if strings.Contains(event.Output, "coverage:") && strings.Contains(event.Output, "% of statements") {
 			var cov float64
-			fmt.Sscanf(event.Output, "coverage: %f%% of statements", &cov)
+			_, _ = fmt.Sscanf(event.Output, "coverage: %f%% of statements", &cov)
 			if cov > 0 {
 				pkg.coverage = cov
 			}
@@ -134,7 +134,7 @@ func (a *TestPackageAggregator) getOrCreatePackage(name string) *packageState {
 
 // Results returns the aggregated test results.
 func (a *TestPackageAggregator) Results() []TestPackageResult {
-	var results []TestPackageResult
+	results := make([]TestPackageResult, 0, len(a.order))
 	for _, name := range a.order {
 		pkg := a.packages[name]
 		// Skip packages with no tests

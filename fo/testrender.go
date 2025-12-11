@@ -233,9 +233,9 @@ func (r *TestRenderer) RenderAll() {
 
 	// Final status
 	if totalFailed > 0 {
-		lines = append(lines, r.console.StyleError("✗")+"  TESTS FAILED")
+		lines = append(lines, r.console.StyleError("✗")+" TESTS FAILED")
 	} else {
-		lines = append(lines, r.console.StyleSuccess("✓")+"  ALL TESTS PASSED")
+		lines = append(lines, r.console.StyleSuccess("✓")+" ALL TESTS PASSED")
 	}
 
 	// Render lines within the existing section (no nested section header)
@@ -249,8 +249,15 @@ func (r *TestRenderer) renderGroupLines(g groupData) []string {
 
 	// Check if this is a multi-package group (needs tree structure)
 	if len(g.packages) > 1 || r.needsGroupHeader(g) {
-		// Group header (directory name)
-		lines = append(lines, fmt.Sprintf("         %s", r.console.StyleMuted(g.name+"/")))
+		// Group header (directory name) - align so last char appears above tree connector
+		// Tree connector ├─/└─ appears at position 4 (after "✓  ")
+		const treeConnectorPos = 4
+		name := g.name
+		padding := ""
+		if len(name) < treeConnectorPos {
+			padding = strings.Repeat(" ", treeConnectorPos-len(name))
+		}
+		lines = append(lines, r.console.StyleMuted(padding+name))
 
 		// Render packages with tree chars
 		for i, pkg := range g.packages {
@@ -325,7 +332,7 @@ func (r *TestRenderer) renderFailedTestLines(pkg TestPackageResult, indent strin
 		return nil
 	}
 
-	var lines []string
+	lines := make([]string, 0, len(pkg.FailedTests))
 	for _, testName := range pkg.FailedTests {
 		displayName := testName
 		if r.config.SubtestConfig.HumanizeNames {

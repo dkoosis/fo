@@ -132,7 +132,7 @@ func (v *TaskView) RenderComplete(data TaskData) string {
 // RenderUpdate renders an in-progress update (for live mode).
 // Returns just the content lines without the box frame.
 func (v *TaskView) RenderUpdate(data TaskData) string {
-	var lines []string
+	lines := make([]string, 0, len(data.Lines))
 
 	for _, line := range data.Lines {
 		lines = append(lines, v.renderLine(line))

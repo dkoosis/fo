@@ -50,73 +50,76 @@ linters:
     - paralleltest  # Requires careful analysis of each test
     - tagliatelle   # snake_case is standard for yaml configs
 
-linters-settings:
-  # Complexity: strict but realistic
-  gocyclo:
-    min-complexity: 20
+  settings:
+    # Complexity: strict but realistic
+    gocyclo:
+      min-complexity: 20
 
-  # Architecture & Idioms
-  revive:
-    ignore-generated-header: true
-    severity: warning
-    rules:
-      - name: exported
-        disabled: true
-      - name: package-comments
-        disabled: true
-      - name: var-naming
-        disabled: false
-      - name: context-as-argument
-        disabled: false
-      - name: error-return
-        disabled: false
-      - name: dot-imports
-        disabled: false
-      - name: bare-return
-        disabled: false
-      - name: waitgroup-by-value
-        disabled: false
-      - name: unused-parameter
-        disabled: false
+    # Architecture & Idioms
+    revive:
+      ignore-generated-header: true
+      severity: warning
+      rules:
+        - name: exported
+          disabled: true
+        - name: package-comments
+          disabled: true
+        - name: var-naming
+          disabled: false
+        - name: context-as-argument
+          disabled: false
+        - name: error-return
+          disabled: false
+        - name: dot-imports
+          disabled: false
+        - name: bare-return
+          disabled: false
+        - name: waitgroup-by-value
+          disabled: false
+        - name: unused-parameter
+          disabled: false
 
-  # Security
-  gosec:
-    excludes:
-      - G104  # errcheck handles this
-      - G304  # File inclusion (CLI tool)
-      - G306  # Loose file perms ok for build outputs
+    # Security
+    gosec:
+      excludes:
+        - G104  # errcheck handles this
+        - G304  # File inclusion (CLI tool)
+        - G306  # Loose file perms ok for build outputs
 
-  # Testify
-  testifylint:
-    enable-all: true
+    # Testify
+    testifylint:
+      enable-all: true
 
-  # Errcheck - exclude common false positives
-  errcheck:
-    exclude-functions:
-      - (io.Closer).Close
-      - (*os.File).Close
-      - fmt.Fprintf
-      - fmt.Printf
-      - fmt.Print
-      - fmt.Println
-      - fmt.Fprint
-      - fmt.Fprintln
+    # Errcheck - exclude common false positives
+    errcheck:
+      exclude-functions:
+        - (io.Closer).Close
+        - (*os.File).Close
+        - fmt.Fprintf
+        - fmt.Printf
+        - fmt.Print
+        - fmt.Println
+        - fmt.Fprint
+        - fmt.Fprintln
 
-  # Staticcheck
-  staticcheck:
-    checks:
-      - all
-      - -SA1019  # Deprecated warnings (too noisy during transitions)
+    # Staticcheck
+    staticcheck:
+      checks:
+        - all
+        - -SA1019  # Deprecated warnings (too noisy during transitions)
+        - -ST1000  # Package comments - too noisy
+        - -ST1020  # Comment format on exported funcs
+        - -ST1022  # Comment format on exported consts
 
-  # Magic strings
-  goconst:
-    min-occurrences: 4
+    # Magic strings
+    goconst:
+      min-occurrences: 4
 
-  # Keep some complexity thresholds for edge cases
-  lll:
-    line-length: 140
-  nestif:
-    min-complexity: 20
+    # Keep some complexity thresholds for edge cases
+    lll:
+      line-length: 140
+    nestif:
+      min-complexity: 20
 
 issues:
   exclude-rules:
@@ -154,3 +157,8 @@ issues:
     # Exclude dupword for comments
     - linters: [dupword]
       source: "^\\s*//"
+
+    # Allow unused test parameters (convention to keep t *testing.T)
+    - path: '(_test\.go)'
+      linters: [revive]
+      text: "unused-parameter"

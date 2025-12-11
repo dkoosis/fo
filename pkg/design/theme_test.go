@@ -57,7 +57,7 @@ func TestMonochromeTheme(t *testing.T) {
 	}
 }
 
-func TestNewTheme_BuildsStyles(t *testing.T) {
+func TestNewTheme_BuildsStyles(_ *testing.T) {
 	colors := ThemeColors{
 		Primary: lipgloss.Color("39"),
 		Success: lipgloss.Color("120"),
