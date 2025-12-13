@@ -31,13 +31,15 @@ func TestHelperProcess(_ *testing.T) {
 	mode := os.Getenv("FO_HELPER_MODE")
 	switch mode {
 	case "parseGlobalFlags":
-		// Use an isolated FlagSet to avoid leaking state.
-		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-		flag.CommandLine.SetOutput(io.Discard)
-		os.Args = append([]string{os.Args[0]}, helperArgs...)
-		parseGlobalFlags()
+		// Use parseGlobalFlagsFromArgs with constructed args
+		args := append([]string{"fo"}, helperArgs...)
+		_, _, _, err := parseGlobalFlagsFromArgs(args)
+		if err != nil {
+			os.Exit(1)
+		}
 	case "printCommand":
-		handlePrintCommand(helperArgs)
+		exitCode := runPrintSubcommand(helperArgs)
+		os.Exit(exitCode)
 	}
 	os.Exit(0)
 }
@@ -72,6 +74,8 @@ func TestConvertAppConfigToLocal_MirrorsValues_When_AppConfigHasOverrides(t *tes
 }
 
 func TestFindCommandArgs_ReturnsExpected_When_DelimiterScenariosVary(t *testing.T) {
+	t.Parallel() // Now safe for parallel since we don't mutate os.Args
+
 	tests := []struct {
 		name string
 		args []string
@@ -96,22 +100,20 @@ func TestFindCommandArgs_ReturnsExpected_When_DelimiterScenariosVary(t *testing.
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			// Global os.Args use makes tests unsafe for parallel execution.
-			originalArgs := os.Args
-			os.Args = tc.args
-			defer func() { os.Args = originalArgs }()
-
-			got := findCommandArgs()
+			t.Parallel()
+			got := findCommandArgsFromSlice(tc.args)
 			assert.Equal(t, tc.want, got)
 		})
 	}
 }
 
 func TestParseGlobalFlags_SetsCliFields_When_ValidInputsProvided(t *testing.T) {
+	t.Parallel() // Now safe for parallel since we use FlagSet
+
 	tests := []struct {
 		name       string
 		args       []string
-		assertFunc func(t *testing.T, flags config.CliFlags, version bool)
+		assertFunc func(t *testing.T, flags config.CliFlags, version bool, cmdArgs []string)
 	}{
 		{
 			name: "ParsesAllFlags_When_ValuesAreValid",
@@ -121,7 +123,7 @@ func TestParseGlobalFlags_SetsCliFields_When_ValidInputsProvided(t *testing.T) {
 				"--no-color", "--ci", "--debug", "--max-buffer-size", "2",
 				"--max-line-length", "1",
 			},
-			assertFunc: func(t *testing.T, flags config.CliFlags, version bool) {
+			assertFunc: func(t *testing.T, flags config.CliFlags, version bool, _ []string) {
 				t.Helper()
 				require.False(t, version)
 				assert.Equal(t, "task", flags.Label)
@@ -144,24 +146,24 @@ func TestParseGlobalFlags_SetsCliFields_When_ValidInputsProvided(t *testing.T) {
 				assert.Equal(t, 1*1024, flags.MaxLineLength)
 			},
 		},
+		{
+			name: "ParsesCommandArgs_When_DoubleDashPresent",
+			args: []string{"fo", "--debug", "--", "echo", "hello"},
+			assertFunc: func(t *testing.T, flags config.CliFlags, version bool, cmdArgs []string) {
+				t.Helper()
+				require.False(t, version)
+				assert.True(t, flags.Debug)
+				assert.Equal(t, []string{"echo", "hello"}, cmdArgs)
+			},
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			// parseGlobalFlags mutates global flag state; isolate per subtest.
-			originalArgs := os.Args
-			originalCommandLine := flag.CommandLine
-			os.Args = tc.args
-			flag.CommandLine = flag.NewFlagSet(tc.args[0], flag.ContinueOnError)
-			flag.CommandLine.SetOutput(io.Discard)
-
-			t.Cleanup(func() {
-				os.Args = originalArgs
-				flag.CommandLine = originalCommandLine
-			})
-
-			flags, version := parseGlobalFlags()
-			tc.assertFunc(t, flags, version)
+			t.Parallel()
+			flags, version, cmdArgs, err := parseGlobalFlagsFromArgs(tc.args)
+			require.NoError(t, err)
+			tc.assertFunc(t, flags, version, cmdArgs)
 		})
 	}
 }
