@@ -38,31 +38,37 @@ type LocalAppConfig struct {
 	MaxLineLength    int   // Max size for a single line from stdout/stderr
 }
 
+// subcommand represents a named subcommand with its handler.
+type subcommand struct {
+	name string
+	run  func(args []string) int
+}
+
+// subcommands is the dispatch table for known subcommands.
+var subcommands = map[string]subcommand{
+	"print":  {name: "print", run: runPrintSubcommand},
+	"replay": {name: "replay", run: handleReplayCommand},
+}
+
 // run executes the application logic and returns the exit code.
 // This allows integration tests to invoke the logic without os.Exit() terminating the test runner.
 func run(args []string) int {
 	// Check for subcommand first
 	if len(args) > 1 {
-		command := args[1]
-		if !strings.HasPrefix(command, "-") { // It's a potential subcommand
-			if command == "print" {
-				handlePrintCommand(args[2:]) // Pass remaining args to print handler
-				return 0
+		cmdName := args[1]
+		if !strings.HasPrefix(cmdName, "-") {
+			if sub, ok := subcommands[cmdName]; ok {
+				return sub.run(args[2:])
 			}
-			if command == "replay" {
-				return handleReplayCommand(args[2:]) // Pass remaining args to replay handler
-			}
-			// Add other subcommands here if needed
 		}
 	}
 
-	// Temporarily override os.Args for flag parsing
-	originalArgs := os.Args
-	os.Args = args
-	defer func() { os.Args = originalArgs }()
-
-	// If not a recognized subcommand, proceed as command wrapper
-	cliFlags, versionFlag := parseGlobalFlags()
+	// Parse global flags using FlagSet (no os.Args mutation)
+	cliFlags, versionFlag, cmdArgs, err := parseGlobalFlagsFromArgs(args)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[fo] %v\n", err)
+		return 1
+	}
 
 	// Handle version flag
 	if versionFlag {
@@ -74,9 +80,6 @@ func run(args []string) int {
 
 	// Load application configuration from .fo.yaml
 	fileAppConfig := config.LoadConfig()
-
-	// Find the command and arguments to be executed (must be after "--")
-	cmdArgs := findCommandArgs()
 	if len(cmdArgs) == 0 {
 		// No command specified - check if data is being piped via stdin
 		stat, _ := os.Stdin.Stat()
@@ -210,8 +213,9 @@ func convertAppConfigToLocal(appCfg *config.AppConfig) LocalAppConfig {
 	}
 }
 
-func findCommandArgs() []string {
-	args := os.Args
+// findCommandArgsFromSlice extracts command arguments after "--" from the given args slice.
+// Returns the command and its arguments, or empty slice if none found.
+func findCommandArgsFromSlice(args []string) []string {
 	for i, arg := range args {
 		if arg == "--" {
 			if i < len(args)-1 {
@@ -314,7 +318,8 @@ func renderSARIF(input []byte, theme *design.Config) int {
 	return 0
 }
 
-func handlePrintCommand(args []string) {
+// runPrintSubcommand handles the "fo print" subcommand.
+func runPrintSubcommand(args []string) int {
 	printFlagSet := flag.NewFlagSet("print", flag.ExitOnError)
 	typeFlag := printFlagSet.String("type", "info", "Type of message (info, success, warning, error, header, raw)")
 	iconFlag := printFlagSet.String("icon", "", "Custom icon to use (overrides type default)")
@@ -329,7 +334,7 @@ func handlePrintCommand(args []string) {
 	err := printFlagSet.Parse(args)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[fo] Error parsing 'print' flags: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 	messageParts := printFlagSet.Args()
 	message := strings.Join(messageParts, " ")
@@ -337,7 +342,7 @@ func handlePrintCommand(args []string) {
 	if message == "" && *typeFlag != "raw" { // Allow empty raw for just printing newline or control chars
 		fmt.Fprintln(os.Stderr, "[fo] Error: No message provided for 'fo print'.")
 		printFlagSet.Usage()
-		os.Exit(1)
+		return 1
 	}
 
 	// Create a config.CliFlags with just the print-relevant flags
@@ -365,21 +370,21 @@ func handlePrintCommand(args []string) {
 	resolvedCfg, err := config.ResolveConfig(globalCliFlagsForPrint)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[fo] Error resolving configuration: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 	finalDesignConfig := resolvedCfg.Theme
 
 	if debug {
-		fmt.Fprintf(os.Stderr, "[DEBUG handlePrintCommand] Type: %s, Icon: %s, Indent: %d, Message: '%s'\n",
+		fmt.Fprintf(os.Stderr, "[DEBUG runPrintSubcommand] Type: %s, Icon: %s, Indent: %d, Message: '%s'\n",
 			*typeFlag, *iconFlag, *indentFlag, message)
-		fmt.Fprintf(os.Stderr, "[DEBUG handlePrintCommand] finalDesignConfig.ThemeName: %s, IsMonochrome: %t\n",
+		fmt.Fprintf(os.Stderr, "[DEBUG runPrintSubcommand] finalDesignConfig.ThemeName: %s, IsMonochrome: %t\n",
 			finalDesignConfig.ThemeName, finalDesignConfig.IsMonochrome)
 	}
 
 	// Use the new render function for direct messages
 	output := design.RenderDirectMessage(finalDesignConfig, *typeFlag, *iconFlag, message, *indentFlag)
 	_, _ = os.Stdout.WriteString(output) // Print directly to stdout
-	os.Exit(0)
+	return 0
 }
 
 // handleReplayCommand replays captured output through the adapter detection system.
@@ -529,49 +534,79 @@ func handleReplayCommand(args []string) int {
 	return 0
 }
 
-func parseGlobalFlags() (config.CliFlags, bool) {
+// parseGlobalFlagsFromArgs parses global flags from the given args slice using flag.FlagSet.
+// This avoids mutating os.Args and allows proper testing.
+// Returns (cliFlags, versionFlag, cmdArgs, error) where cmdArgs are the arguments after "--".
+func parseGlobalFlagsFromArgs(args []string) (config.CliFlags, bool, []string, error) {
 	var cliFlags config.CliFlags
 	var versionFlag bool
 
-	// Define flags for version and help
-	flag.BoolVar(&versionFlag, "version", false, "Print fo version and exit.")
-	flag.BoolVar(&versionFlag, "v", false, "Print fo version and exit (shorthand).")
+	// Skip program name (args[0]) for flag parsing
+	flagArgs := args[1:]
 
-	// These are global flags, also potentially usable by 'print' if implemented
-	flag.BoolVar(&cliFlags.Debug, "debug", false, "Enable debug output.")
-	flag.BoolVar(&cliFlags.Debug, "d", false, "Enable debug output (shorthand).")
-	flag.StringVar(&cliFlags.ThemeName, "theme", "", "Select visual theme (e.g., 'ascii_minimal', 'unicode_vibrant').")
-	flag.StringVar(&cliFlags.ThemeFile, "theme-file", "", "Load custom theme from YAML file.")
-	flag.BoolVar(&cliFlags.NoColor, "no-color", false, "Disable ANSI color/styling output.")
-	flag.BoolVar(&cliFlags.CI, "ci", false, "Enable CI-friendly, plain-text output.")
+	// Find "--" separator and split args
+	var flagsToparse []string
+	var cmdArgs []string
+	for i, arg := range flagArgs {
+		if arg == "--" {
+			flagsToparse = flagArgs[:i]
+			if i+1 < len(flagArgs) {
+				cmdArgs = flagArgs[i+1:]
+			}
+			break
+		}
+	}
+	if cmdArgs == nil {
+		// No "--" found, all args are flags
+		flagsToparse = flagArgs
+	}
+
+	// Create a FlagSet for global flags
+	fs := flag.NewFlagSet("fo", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+
+	// Define flags for version and help
+	fs.BoolVar(&versionFlag, "version", false, "Print fo version and exit.")
+	fs.BoolVar(&versionFlag, "v", false, "Print fo version and exit (shorthand).")
+
+	// Global flags
+	fs.BoolVar(&cliFlags.Debug, "debug", false, "Enable debug output.")
+	fs.BoolVar(&cliFlags.Debug, "d", false, "Enable debug output (shorthand).")
+	fs.StringVar(&cliFlags.ThemeName, "theme", "", "Select visual theme (e.g., 'ascii_minimal', 'unicode_vibrant').")
+	fs.StringVar(&cliFlags.ThemeFile, "theme-file", "", "Load custom theme from YAML file.")
+	fs.BoolVar(&cliFlags.NoColor, "no-color", false, "Disable ANSI color/styling output.")
+	fs.BoolVar(&cliFlags.CI, "ci", false, "Enable CI-friendly, plain-text output.")
 
 	// Flags specific to command wrapping mode
-	flag.StringVar(&cliFlags.Label, "l", "", "Label for the task.")
-	flag.StringVar(&cliFlags.Label, "label", "", "Label for the task.")
-	flag.BoolVar(&cliFlags.LiveStreamOutput, "s", false, "Live stream output mode - print command's stdout/stderr live.")
-	flag.BoolVar(&cliFlags.LiveStreamOutput, "stream", false, "Live stream output mode.")
-	flag.StringVar(&cliFlags.ShowOutput, "show-output", "", "When to show captured output: on-fail, always, never.")
-	flag.StringVar(&cliFlags.PatternHint, "pattern", "",
+	fs.StringVar(&cliFlags.Label, "l", "", "Label for the task.")
+	fs.StringVar(&cliFlags.Label, "label", "", "Label for the task.")
+	fs.BoolVar(&cliFlags.LiveStreamOutput, "s", false, "Live stream output mode - print command's stdout/stderr live.")
+	fs.BoolVar(&cliFlags.LiveStreamOutput, "stream", false, "Live stream output mode.")
+	fs.StringVar(&cliFlags.ShowOutput, "show-output", "", "When to show captured output: on-fail, always, never.")
+	fs.StringVar(&cliFlags.PatternHint, "pattern", "",
 		"Force specific visualization pattern (test-table, sparkline, leaderboard, inventory, summary, comparison).")
-	flag.StringVar(&cliFlags.Format, "format", "text",
+	fs.StringVar(&cliFlags.Format, "format", "text",
 		"Output format: 'text' (default) or 'json' (structured output for AI/automation).")
-	flag.BoolVar(&cliFlags.Profile, "profile", false, "Enable performance profiling.")
-	flag.StringVar(&cliFlags.ProfileOutput, "profile-output", "stderr",
+	fs.BoolVar(&cliFlags.Profile, "profile", false, "Enable performance profiling.")
+	fs.StringVar(&cliFlags.ProfileOutput, "profile-output", "stderr",
 		"Profile output destination: 'stderr' (default) or file path.")
-	flag.BoolVar(&cliFlags.NoTimer, "no-timer", false, "Disable showing the duration.")
+	fs.BoolVar(&cliFlags.NoTimer, "no-timer", false, "Disable showing the duration.")
 
 	var maxBufferSizeMB int
 	var maxLineLengthKB int
 	defaultBufferMB := config.DefaultMaxBufferSize / (1024 * 1024)
 	defaultLineKB := config.DefaultMaxLineLength / 1024
-	flag.IntVar(&maxBufferSizeMB, "max-buffer-size", 0,
+	fs.IntVar(&maxBufferSizeMB, "max-buffer-size", 0,
 		fmt.Sprintf("Maximum total buffer size in MB (per stream). Default: %dMB", defaultBufferMB))
-	flag.IntVar(&maxLineLengthKB, "max-line-length", 0,
+	fs.IntVar(&maxLineLengthKB, "max-line-length", 0,
 		fmt.Sprintf("Maximum length in KB for a single line. Default: %dKB", defaultLineKB))
 
-	flag.Parse()
+	if err := fs.Parse(flagsToparse); err != nil {
+		return cliFlags, false, nil, err
+	}
 
-	flag.Visit(func(f *flag.Flag) {
+	// Track which flags were explicitly set
+	fs.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "s", "stream":
 			cliFlags.LiveStreamOutputSet = true
@@ -597,36 +632,32 @@ func parseGlobalFlags() (config.CliFlags, bool) {
 		cliFlags.MaxLineLength = maxLineLengthKB * 1024
 	}
 
+	// Validate flag values
 	if cliFlags.ShowOutput != "" {
 		validValues := map[string]bool{"on-fail": true, "always": true, "never": true}
 		if !validValues[cliFlags.ShowOutput] {
-			fmt.Fprintf(os.Stderr,
-				"[fo] Error: Invalid value for --show-output: %s\n[fo] Valid values are: on-fail, always, never\n",
+			return cliFlags, false, nil, fmt.Errorf(
+				"invalid value for --show-output: %s (valid: on-fail, always, never)",
 				cliFlags.ShowOutput)
-			flag.Usage()
-			os.Exit(1)
 		}
 	}
 
 	if cliFlags.Format != "" {
 		validFormats := map[string]bool{"text": true, "json": true}
 		if !validFormats[cliFlags.Format] {
-			fmt.Fprintf(os.Stderr, "[fo] Error: Invalid value for --format: %s\n[fo] Valid values are: text, json\n", cliFlags.Format)
-			flag.Usage()
-			os.Exit(1)
+			return cliFlags, false, nil, fmt.Errorf(
+				"invalid value for --format: %s (valid: text, json)",
+				cliFlags.Format)
 		}
 	}
 
 	if cliFlags.PatternHint != "" {
 		if !validPatterns[cliFlags.PatternHint] {
-			fmt.Fprintf(os.Stderr,
-				"[fo] Error: Invalid value for --pattern: %s\n"+
-					"[fo] Valid values are: test-table, sparkline, leaderboard, inventory, summary, comparison\n",
+			return cliFlags, false, nil, fmt.Errorf(
+				"invalid value for --pattern: %s (valid: test-table, sparkline, leaderboard, inventory, summary, comparison)",
 				cliFlags.PatternHint)
-			flag.Usage()
-			os.Exit(1)
 		}
 	}
 
-	return cliFlags, versionFlag
+	return cliFlags, versionFlag, cmdArgs, nil
 }
