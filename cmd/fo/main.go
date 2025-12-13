@@ -11,7 +11,9 @@ import (
 	"github.com/dkoosis/fo/fo"
 	config "github.com/dkoosis/fo/internal/config"
 	"github.com/dkoosis/fo/internal/version"
+	"github.com/dkoosis/fo/pkg/archlint"
 	"github.com/dkoosis/fo/pkg/design"
+	"github.com/dkoosis/fo/pkg/gofmt"
 	"github.com/dkoosis/fo/pkg/sarif"
 )
 
@@ -283,6 +285,16 @@ func runEditorMode(cliFlags config.CliFlags, _ *config.AppConfig) int {
 		return renderSARIF(input, resolvedCfg.Theme)
 	}
 
+	// Check if input is go-arch-lint JSON format
+	if archlint.IsArchLintJSON(input) {
+		return renderArchLint(input, resolvedCfg.Theme)
+	}
+
+	// Check if input is gofmt -l output (list of .go files)
+	if gofmt.IsGofmtOutput(input) {
+		return renderGofmt(input, resolvedCfg.Theme)
+	}
+
 	// Create a task for the stdin processing
 	task := design.NewTask("stdin", "stream", "pipe", nil, resolvedCfg.Theme)
 
@@ -315,6 +327,48 @@ func renderSARIF(input []byte, theme *design.Config) int {
 		fmt.Print(output)
 	}
 
+	return 0
+}
+
+// renderArchLint parses and renders go-arch-lint JSON output.
+func renderArchLint(input []byte, theme *design.Config) int {
+	adapter := archlint.NewAdapter(theme)
+	result, err := adapter.ParseBytes(input)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[fo] Error parsing go-arch-lint JSON: %v\n", err)
+		return 1
+	}
+
+	output := adapter.Render(result)
+	if output != "" {
+		fmt.Print(output)
+	}
+
+	// Return non-zero if there were violations
+	if result.Payload.ArchHasWarnings {
+		return 1
+	}
+	return 0
+}
+
+// renderGofmt parses and renders gofmt -l output.
+func renderGofmt(input []byte, theme *design.Config) int {
+	adapter := gofmt.NewAdapter(theme)
+	result, err := adapter.ParseString(string(input))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[fo] Error parsing gofmt output: %v\n", err)
+		return 1
+	}
+
+	output := adapter.Render(result)
+	if output != "" {
+		fmt.Print(output)
+	}
+
+	// Return non-zero if files need formatting
+	if len(result.Files) > 0 {
+		return 1
+	}
 	return 0
 }
 
