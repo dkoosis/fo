@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dkoosis/fo/pkg/design"
@@ -313,121 +314,126 @@ func MergeThemes(base *design.Config, overrides *ThemeOverrides) *design.Config 
 		return base
 	}
 
-	// Merge colors (simple field override, convert to lipgloss.Color)
-	if overrides.Colors.Process != nil {
-		merged.Tokens.Colors.Process = lipgloss.Color(*overrides.Colors.Process)
-	}
-	if overrides.Colors.Success != nil {
-		merged.Tokens.Colors.Success = lipgloss.Color(*overrides.Colors.Success)
-	}
-	if overrides.Colors.Warning != nil {
-		merged.Tokens.Colors.Warning = lipgloss.Color(*overrides.Colors.Warning)
-	}
-	if overrides.Colors.Error != nil {
-		merged.Tokens.Colors.Error = lipgloss.Color(*overrides.Colors.Error)
-	}
-	if overrides.Colors.Detail != nil {
-		merged.Tokens.Colors.Detail = lipgloss.Color(*overrides.Colors.Detail)
-	}
-	if overrides.Colors.Muted != nil {
-		merged.Tokens.Colors.Muted = lipgloss.Color(*overrides.Colors.Muted)
-	}
-	if overrides.Colors.Spinner != nil {
-		merged.Tokens.Colors.Spinner = lipgloss.Color(*overrides.Colors.Spinner)
-	}
-	if overrides.Colors.White != nil {
-		merged.Tokens.Colors.White = lipgloss.Color(*overrides.Colors.White)
-	}
-	if overrides.Colors.GreenFg != nil {
-		merged.Tokens.Colors.GreenFg = lipgloss.Color(*overrides.Colors.GreenFg)
-	}
-	if overrides.Colors.BlueFg != nil {
-		merged.Tokens.Colors.BlueFg = lipgloss.Color(*overrides.Colors.BlueFg)
-	}
-	if overrides.Colors.BlueBg != nil {
-		merged.Tokens.Colors.BlueBg = lipgloss.Color(*overrides.Colors.BlueBg)
-	}
-	if overrides.Colors.Bold != nil {
-		merged.Tokens.Colors.Bold = lipgloss.Color(*overrides.Colors.Bold)
-	}
-	if overrides.Colors.Italic != nil {
-		merged.Tokens.Colors.Italic = lipgloss.Color(*overrides.Colors.Italic)
-	}
+	// Merge colors using reflection
+	mergeColors(merged, overrides)
 
-	// Merge style settings
-	if overrides.Style.UseBoxes != nil {
-		merged.Style.UseBoxes = *overrides.Style.UseBoxes
-	}
-	if overrides.Style.Indentation != nil {
-		merged.Style.Indentation = *overrides.Style.Indentation
-	}
-	if overrides.Style.ShowTimestamps != nil {
-		merged.Style.ShowTimestamps = *overrides.Style.ShowTimestamps
-	}
-	if overrides.Style.NoTimer != nil {
-		merged.Style.NoTimer = *overrides.Style.NoTimer
-	}
-	if overrides.Style.Density != nil {
-		merged.Style.Density = *overrides.Style.Density
-	}
-	if overrides.Style.HeaderWidth != nil {
-		merged.Style.HeaderWidth = *overrides.Style.HeaderWidth
-	}
+	// Merge style settings using reflection
+	mergeStyle(merged, overrides)
 
-	// Merge border settings
-	if overrides.Border.HeaderChar != nil {
-		merged.Border.HeaderChar = *overrides.Border.HeaderChar
-	}
-	if overrides.Border.VerticalChar != nil {
-		merged.Border.VerticalChar = *overrides.Border.VerticalChar
-	}
-	if overrides.Border.TopCornerChar != nil {
-		merged.Border.TopCornerChar = *overrides.Border.TopCornerChar
-	}
-	// Note: TopRightChar and BottomRightChar will be available after #122 is merged
-	// For now, skip these fields
-	if overrides.Border.BottomCornerChar != nil {
-		merged.Border.BottomCornerChar = *overrides.Border.BottomCornerChar
-	}
-	if overrides.Border.FooterContinuationChar != nil {
-		merged.Border.FooterContinuationChar = *overrides.Border.FooterContinuationChar
-	}
+	// Merge border settings using reflection
+	mergeBorder(merged, overrides)
 
-	// Sync tokens to colors for backwards compatibility
-	// Note: syncTokensToColors is unexported, but it's called automatically
-	// when Config is used. We'll rely on that behavior.
-
-	// Use Lip Gloss style inheritance for Styles struct
-	// Base styles inherit from base theme, overrides inherit from base
-	if merged.Tokens != nil {
-		// Box style: inherit border settings
-		if merged.Border.TopCornerChar != "" {
-			border := lipgloss.Border{
-				Top:        merged.Border.HeaderChar,
-				Bottom:     merged.Border.FooterContinuationChar,
-				Left:       merged.Border.VerticalChar,
-				Right:      merged.Border.VerticalChar,
-				TopLeft:    merged.Border.TopCornerChar,
-				BottomLeft: merged.Border.BottomCornerChar,
-				// TopRight and BottomRight will be added after #122 is merged
-			}
-			baseBoxStyle := lipgloss.NewStyle().Border(border)
-			merged.Tokens.Styles.Box = baseBoxStyle.Inherit(merged.Tokens.Styles.Box)
-		}
-
-		// Header style: inherit from Process color
-		headerStyle := lipgloss.NewStyle().
-			Foreground(merged.Tokens.Colors.Process).
-			Bold(true)
-		merged.Tokens.Styles.Header = headerStyle.Inherit(merged.Tokens.Styles.Header)
-
-		// Content style: inherit from Detail color
-		contentStyle := lipgloss.NewStyle().
-			Foreground(merged.Tokens.Colors.Detail)
-		merged.Tokens.Styles.Content = contentStyle.Inherit(merged.Tokens.Styles.Content)
-	}
+	// Apply lipgloss style inheritance
+	applyStyleInheritance(merged)
 
 	return merged
+}
+
+// mergeColors merges color overrides into the merged config using reflection.
+func mergeColors(merged *design.Config, overrides *ThemeOverrides) {
+	if merged.Tokens == nil {
+		return
+	}
+
+	overridesVal := reflect.ValueOf(overrides.Colors)
+	colorsVal := reflect.ValueOf(&merged.Tokens.Colors).Elem()
+
+	for i := 0; i < overridesVal.NumField(); i++ {
+		field := overridesVal.Field(i)
+		fieldName := overridesVal.Type().Field(i).Name
+
+		// Skip if pointer is nil
+		if field.Kind() == reflect.Ptr && field.IsNil() {
+			continue
+		}
+
+		// Get the string value from the pointer
+		strVal := field.Elem().String()
+
+		// Find and set the corresponding field in merged.Tokens.Colors
+		targetField := colorsVal.FieldByName(fieldName)
+		if targetField.IsValid() && targetField.CanSet() {
+			targetField.Set(reflect.ValueOf(lipgloss.Color(strVal)))
+		}
+	}
+}
+
+// mergeStyle merges style overrides into the merged config using reflection.
+func mergeStyle(merged *design.Config, overrides *ThemeOverrides) {
+	overridesVal := reflect.ValueOf(overrides.Style)
+	styleVal := reflect.ValueOf(&merged.Style).Elem()
+
+	for i := 0; i < overridesVal.NumField(); i++ {
+		field := overridesVal.Field(i)
+		fieldName := overridesVal.Type().Field(i).Name
+
+		// Skip if pointer is nil
+		if field.Kind() == reflect.Ptr && field.IsNil() {
+			continue
+		}
+
+		// Find and set the corresponding field in merged.Style
+		targetField := styleVal.FieldByName(fieldName)
+		if targetField.IsValid() && targetField.CanSet() {
+			// Dereference the pointer and set the value
+			targetField.Set(field.Elem())
+		}
+	}
+}
+
+// mergeBorder merges border overrides into the merged config using reflection.
+func mergeBorder(merged *design.Config, overrides *ThemeOverrides) {
+	overridesVal := reflect.ValueOf(overrides.Border)
+	borderVal := reflect.ValueOf(&merged.Border).Elem()
+
+	for i := 0; i < overridesVal.NumField(); i++ {
+		field := overridesVal.Field(i)
+		fieldName := overridesVal.Type().Field(i).Name
+
+		// Skip if pointer is nil
+		if field.Kind() == reflect.Ptr && field.IsNil() {
+			continue
+		}
+
+		// Find and set the corresponding field in merged.Border
+		targetField := borderVal.FieldByName(fieldName)
+		if targetField.IsValid() && targetField.CanSet() {
+			// Dereference the pointer and set the value
+			targetField.Set(field.Elem())
+		}
+	}
+}
+
+// applyStyleInheritance applies lipgloss style inheritance after all merges.
+func applyStyleInheritance(merged *design.Config) {
+	if merged.Tokens == nil {
+		return
+	}
+
+	// Box style: inherit border settings
+	if merged.Border.TopCornerChar != "" {
+		border := lipgloss.Border{
+			Top:        merged.Border.HeaderChar,
+			Bottom:     merged.Border.FooterContinuationChar,
+			Left:       merged.Border.VerticalChar,
+			Right:      merged.Border.VerticalChar,
+			TopLeft:    merged.Border.TopCornerChar,
+			BottomLeft: merged.Border.BottomCornerChar,
+		}
+		baseBoxStyle := lipgloss.NewStyle().Border(border)
+		merged.Tokens.Styles.Box = baseBoxStyle.Inherit(merged.Tokens.Styles.Box)
+	}
+
+	// Header style: inherit from Process color
+	headerStyle := lipgloss.NewStyle().
+		Foreground(merged.Tokens.Colors.Process).
+		Bold(true)
+	merged.Tokens.Styles.Header = headerStyle.Inherit(merged.Tokens.Styles.Header)
+
+	// Content style: inherit from Detail color
+	contentStyle := lipgloss.NewStyle().
+		Foreground(merged.Tokens.Colors.Detail)
+	merged.Tokens.Styles.Content = contentStyle.Inherit(merged.Tokens.Styles.Content)
 }
 
 // ApplyCommandPreset modifies the AppConfig based on a preset matching the commandName.
