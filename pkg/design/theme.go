@@ -274,14 +274,14 @@ func ThemeFromConfig(cfg *Config) *Theme {
 	// For other themes, build from config values
 	// Use config colors with fallbacks to defaults
 	colors := ThemeColors{
-		Primary: colorOrDefault(cfg.Colors.Process, "39"),   // Bright blue
-		Success: colorOrDefault(cfg.Colors.Success, "120"),  // Light green
-		Warning: colorOrDefault(cfg.Colors.Warning, "214"),  // Orange
-		Error:   colorOrDefault(cfg.Colors.Error, "196"),    // Red
-		Text:    colorOrDefault(cfg.Colors.White, "252"),    // Light gray
-		Muted:   colorOrDefault(cfg.Colors.Muted, "242"),    // Dark gray
-		Subtle:  lipgloss.Color("238"),                      // Very dark gray (border)
-		Inverse: lipgloss.Color("231"),                      // White
+		Primary: colorOrDefault(cfg.Colors.Process, "39"),  // Bright blue
+		Success: colorOrDefault(cfg.Colors.Success, "120"), // Light green
+		Warning: colorOrDefault(cfg.Colors.Warning, "214"), // Orange
+		Error:   colorOrDefault(cfg.Colors.Error, "196"),   // Red
+		Text:    colorOrDefault(cfg.Colors.White, "252"),   // Light gray
+		Muted:   colorOrDefault(cfg.Colors.Muted, "242"),   // Dark gray
+		Subtle:  lipgloss.Color("238"),                     // Very dark gray (border)
+		Inverse: lipgloss.Color("231"),                     // White
 	}
 
 	icons := ThemeIcons{

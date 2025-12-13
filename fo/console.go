@@ -1138,7 +1138,17 @@ func (c *Console) GetHeaderWidth() int {
 //
 // Use errors.Is(err, exec.ErrNotFound) to check for missing commands.
 func (c *Console) Run(label, command string, args ...string) (*TaskResult, error) {
-	ctx, cancel := context.WithCancel(context.Background())
+	return c.RunWithContext(context.Background(), label, command, args...)
+}
+
+// RunWithContext executes a command with the provided context.
+// The context allows cancellation and timeout control. When the context is
+// cancelled, the command process receives SIGTERM followed by SIGKILL after
+// a grace period.
+//
+// See Run for error semantics documentation.
+func (c *Console) RunWithContext(ctx context.Context, label, command string, args ...string) (*TaskResult, error) {
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	sigChan := make(chan os.Signal, 1)
@@ -1953,14 +1963,28 @@ func (c *Console) ProcessStdin(task *design.Task, input []byte) {
 
 // ProcessStdinStream processes streaming stdin input, calling back for each line.
 // This enables live rendering as output arrives.
+// Deprecated: Use ProcessStdinStreamWithContext instead for cancellation support.
 func (c *Console) ProcessStdinStream(input io.Reader, onLine LineCallback) error {
-	return c.processor.ProcessStream(input, "stdin", nil, onLine)
+	return c.ProcessStdinStreamWithContext(context.Background(), input, onLine)
+}
+
+// ProcessStdinStreamWithContext processes streaming stdin input with context support.
+// The context allows cancellation of stream processing.
+func (c *Console) ProcessStdinStreamWithContext(ctx context.Context, input io.Reader, onLine LineCallback) error {
+	return c.processor.ProcessStream(ctx, input, "stdin", nil, onLine)
 }
 
 // RunLive processes streaming input with live terminal updates.
 // Lines are classified and rendered as they arrive, with in-place updates
 // for status information. Falls back to simple streaming on non-TTY outputs.
+// Deprecated: Use RunLiveWithContext instead for cancellation support.
 func (c *Console) RunLive(input io.Reader) error {
+	return c.RunLiveWithContext(context.Background(), input)
+}
+
+// RunLiveWithContext processes streaming input with live terminal updates and context support.
+// The context allows cancellation of stream processing, enabling graceful shutdown.
+func (c *Console) RunLiveWithContext(ctx context.Context, input io.Reader) error {
 	renderer := NewLiveRenderer(c.cfg.Out)
 	renderer.Start()
 	defer renderer.Complete()
@@ -1969,13 +1993,13 @@ func (c *Console) RunLive(input io.Reader) error {
 	var currentLines []string
 	maxDisplayLines := 20 // Limit visible history for performance
 
-	err := c.processor.ProcessStream(input, "stdin", nil, func(line string, lineType string, ctx design.LineContext) {
+	err := c.processor.ProcessStream(ctx, input, "stdin", nil, func(line string, lineType string, lctx design.LineContext) {
 		// Create a temporary task for rendering this line
 		tempTask := design.NewTask("", "", "", nil, c.designConf)
 		rendered := tempTask.RenderOutputLine(design.OutputLine{
 			Content: line,
 			Type:    lineType,
-			Context: ctx,
+			Context: lctx,
 		})
 
 		if renderer.IsTTY() {

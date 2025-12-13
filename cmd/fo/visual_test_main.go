@@ -336,12 +336,12 @@ func testResultsWithFailures(console *fo.Console, buf *bytes.Buffer) error {
 
 	renderer.RenderGroupHeader("cmd")
 	renderer.RenderPackageLine(fo.TestPackageResult{
-		Name:        "cmd",
-		Passed:      14,
-		Failed:      2,
-		Skipped:     0,
-		Duration:    1 * time.Second,
-		Coverage:    71.0,
+		Name:     "cmd",
+		Passed:   14,
+		Failed:   2,
+		Skipped:  0,
+		Duration: 1 * time.Second,
+		Coverage: 71.0,
 		FailedTests: []string{
 			"TestRun_ManagesExecutionFlow_When_DifferentInputsProvided",
 			"TestRun_ManagesExecutionFlow_When_ArgumentsProvided",
@@ -359,12 +359,12 @@ func testResultsWithFailures(console *fo.Console, buf *bytes.Buffer) error {
 		Coverage: 95.0,
 	})
 	renderer.RenderPackageLine(fo.TestPackageResult{
-		Name:        "design",
-		Passed:      230,
-		Failed:      6,
-		Skipped:     0,
-		Duration:    1 * time.Second,
-		Coverage:    78.0,
+		Name:     "design",
+		Passed:   230,
+		Failed:   6,
+		Skipped:  0,
+		Duration: 1 * time.Second,
+		Coverage: 78.0,
 		FailedTests: []string{
 			"TestRenderPattern_Sparkline_When_EmptyValues",
 			"TestRenderPattern_Leaderboard_When_NoItems",
