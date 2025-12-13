@@ -4,6 +4,7 @@ package fo
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"strings"
@@ -144,7 +145,11 @@ func (p *Processor) processLineByLine(
 
 // ProcessStream processes input from an io.Reader line-by-line, calling onLine
 // for each classified line. This enables live rendering as output arrives.
+//
+// The context parameter allows cancellation of stream processing. When the context
+// is cancelled, ProcessStream stops reading and returns the context error.
 func (p *Processor) ProcessStream(
+	ctx context.Context,
 	input io.Reader,
 	command string,
 	args []string,
@@ -155,6 +160,13 @@ func (p *Processor) ProcessStream(
 	scanner.Buffer(buf, p.maxLineLength)
 
 	for scanner.Scan() {
+		// Check for cancellation before processing each line
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		line := scanner.Text()
 		lineType, lineContext := p.patternMatcher.ClassifyOutputLine(line, command, args)
 		onLine(line, lineType, lineContext)

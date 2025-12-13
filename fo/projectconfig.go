@@ -67,9 +67,9 @@ type ProjectConfig struct {
 // DefaultProjectConfig returns a ProjectConfig with sensible defaults.
 func DefaultProjectConfig() *ProjectConfig {
 	cfg := &ProjectConfig{
-		Theme:           "",                       // Legacy field, deprecated
-		ActiveThemeName: "unicode_vibrant",        // Default theme
-		Themes:          design.DefaultThemes(),   // Load built-in themes
+		Theme:           "",                     // Legacy field, deprecated
+		ActiveThemeName: "unicode_vibrant",      // Default theme
+		Themes:          design.DefaultThemes(), // Load built-in themes
 		SnapshotDir:     ".fo",
 	}
 
