@@ -282,13 +282,17 @@ func (f *GoTestFormatter) Format(lines []string, width int) string {
 			b.WriteString(fmt.Sprintf("  %s %s\n", failStyle.Render("✗"), pkgStyle.Render(shortPkg)))
 
 			// Show failed test names (no icon, minimal indent for more space)
-			for _, testName := range failure.failedTests {
-				displayName := humanizeTestNameWithSubtest(testName)
-				maxNameWidth := width - 4 // minimal indent
-				if len(displayName) > maxNameWidth && maxNameWidth > 20 {
-					displayName = truncateAtWord(displayName, maxNameWidth-3) + "..."
+			if len(failure.failedTests) == 0 {
+				b.WriteString(fmt.Sprintf("    %s\n", mutedStyle.Render("(build/import error)")))
+			} else {
+				for _, testName := range failure.failedTests {
+					displayName := humanizeTestNameWithSubtest(testName)
+					maxNameWidth := width - 4 // minimal indent
+					if len(displayName) > maxNameWidth && maxNameWidth > 20 {
+						displayName = truncateAtWord(displayName, maxNameWidth-3) + "..."
+					}
+					b.WriteString(fmt.Sprintf("    %s\n", testStyle.Render(displayName)))
 				}
-				b.WriteString(fmt.Sprintf("    %s\n", testStyle.Render(displayName)))
 			}
 		}
 	}
