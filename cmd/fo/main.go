@@ -11,7 +11,7 @@ import (
 
 	"github.com/dkoosis/fo/fo"
 	config "github.com/dkoosis/fo/internal/config"
-	"github.com/dkoosis/fo/internal/dashboard"
+	"github.com/dkoosis/fo/pkg/dashboard"
 	"github.com/dkoosis/fo/internal/version"
 	"github.com/dkoosis/fo/pkg/archlint"
 	"github.com/dkoosis/fo/pkg/design"
