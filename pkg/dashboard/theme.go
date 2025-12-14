@@ -140,15 +140,16 @@ func DefaultDashboardTheme() *DashboardTheme {
 
 // DefaultSubsystems returns the default architectural subsystem configuration.
 // Projects can override this in .fo.yaml to match their package structure.
+// Note: Patterns should NOT have trailing slashes since Go package paths don't.
 func DefaultSubsystems() []SubsystemConfig {
 	return []SubsystemConfig{
-		{Name: "core", Patterns: []string{"/internal/core/", "/core/"}},
-		{Name: "kg", Patterns: []string{"/internal/kg/", "/kg/"}},
-		{Name: "domain", Patterns: []string{"/internal/domain/", "/internal/tools/", "/domain/", "/tools/"}},
-		{Name: "adapter", Patterns: []string{"/internal/mcp/", "/mcp/"}},
-		{Name: "worker", Patterns: []string{"/internal/proc/", "/proc/"}},
-		{Name: "kits", Patterns: []string{"/internal/kits/", "/internal/codekit/", "/internal/testkit/", "/kits/", "/codekit/", "/testkit/"}},
-		{Name: "util", Patterns: []string{"/internal/util/", "/util/", "/pkg/"}},
+		{Name: "core", Patterns: []string{"/internal/core", "/core"}},
+		{Name: "kg", Patterns: []string{"/internal/kg", "/kg"}},
+		{Name: "domain", Patterns: []string{"/internal/domain", "/internal/tools", "/domain", "/tools"}},
+		{Name: "adapter", Patterns: []string{"/internal/mcp", "/mcp"}},
+		{Name: "worker", Patterns: []string{"/internal/proc", "/proc"}},
+		{Name: "kits", Patterns: []string{"/internal/kits", "/internal/codekit", "/internal/testkit", "/kits", "/codekit", "/testkit"}},
+		{Name: "util", Patterns: []string{"/internal/util", "/util", "/pkg"}},
 	}
 }
 

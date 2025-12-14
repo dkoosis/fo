@@ -105,19 +105,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
+		// Subtract 7 chars for scrollbar + window chrome in terminals like VS Code
+		m.width = msg.Width - 7
 		m.height = msg.Height
-		// Calculate list width based on content (auto-fit)
+		// Calculate list width based on content (auto-fit, minimal padding)
 		m.listWidth = m.calculateListWidth()
-		if m.listWidth < 25 {
-			m.listWidth = 25
+		if m.listWidth < 22 {
+			m.listWidth = 22
 		}
-		if m.listWidth > msg.Width/2 {
-			m.listWidth = msg.Width / 2
+		if m.listWidth > m.width/2 {
+			m.listWidth = m.width / 2
 		}
-		m.detailWidth = msg.Width - m.listWidth - 1 // 1 for gap
-		m.viewport.Width = m.detailWidth - 6        // account for box padding + border
-		m.viewport.Height = msg.Height - 10         // account for title, header, cmd, status bar, borders
+		m.detailWidth = m.width - m.listWidth - 1 // 1 for gap
+		m.viewport.Width = m.detailWidth - 6      // account for box padding + border
+		m.viewport.Height = msg.Height - 10       // account for title, header, cmd, status bar, borders
 		m.ready = true
 		m.refreshViewport()
 	case tickMsg:
@@ -158,18 +159,18 @@ func (m *model) calculateListWidth() int {
 	maxWidth := 0
 	for _, task := range m.tasks {
 		// Group header: "▸ GroupName"
-		groupLen := len(task.Spec.Group) + 4
+		groupLen := len(task.Spec.Group) + 3
 		if groupLen > maxWidth {
 			maxWidth = groupLen
 		}
 		// Task line: "▶ ✓ taskname 12.3s"
-		taskLen := len(task.Spec.Name) + 15 // icon + status + duration estimate
+		taskLen := len(task.Spec.Name) + 14 // icon + status + duration estimate
 		if taskLen > maxWidth {
 			maxWidth = taskLen
 		}
 	}
-	// Add padding for box borders and internal padding
-	return maxWidth + 8
+	// Add minimal padding for box borders
+	return maxWidth + 4
 }
 
 func (m *model) refreshViewport() {
@@ -188,12 +189,16 @@ func (m model) View() string {
 	}
 
 	// Title bar (full width)
+	// Note: Leading newline ensures title is visible in terminals that clip the first line (VS Code)
 	titleText := activeTheme.TitleIcon + " " + activeTheme.TitleText
-	title := activeTheme.TitleStyle.Width(m.width).Render(titleText)
+	if titleText == " " {
+		titleText = "Dashboard" // Fallback if no title configured
+	}
+	title := "\n" + activeTheme.TitleStyle.Width(m.width + 4).Height(1).Render(titleText)
 
 	// Panel height for content (excluding borders/padding)
-	// Border adds 2 lines, padding adds 2 lines = 4 total chrome
-	contentHeight := m.height - 6 // title(1) + status(1) + box chrome(4)
+	// blank(1) + title(1) + status(2) + box chrome(4) = 8 total
+	contentHeight := m.height - 8
 	if contentHeight < 5 {
 		contentHeight = 5
 	}

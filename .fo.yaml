@@ -23,8 +23,8 @@ dashboard:
     select: "▶"           # Selected item marker
 
   title:
-    text: "Orca"
-    icon: "🐋"
+    text: "fo"
+    icon: "⚡"
 
   spinner:
     frames: "❀ ❁ ❂ ❃ ❄ ❅ ❆ ❇ ❈ ✦ ✧ ✱ ✲ ✳ ✴ ✵ ✶ ✷ ✸ ✹ ✺ ✻ ✼ ✽ ✾ ✿"
@@ -33,24 +33,28 @@ dashboard:
   # ─────────────────────────────────────────────────────────────
   # SUBSYSTEMS: Architecture-specific groupings for test coverage
   # Customize these patterns to match your project's package structure
+  # Note: No trailing slashes - Go package paths don't have them
+  # Note: More specific patterns must come before general ones
   # ─────────────────────────────────────────────────────────────
   subsystems:
     - name: dashboard
-      patterns: ["/pkg/dashboard/"]
+      patterns: ["/pkg/dashboard"]
     - name: sarif
-      patterns: ["/pkg/sarif/"]
+      patterns: ["/pkg/sarif"]
     - name: archlint
-      patterns: ["/pkg/archlint/"]
+      patterns: ["/pkg/archlint"]
     - name: design
-      patterns: ["/pkg/design/"]
+      patterns: ["/pkg/design"]
     - name: gofmt
-      patterns: ["/pkg/gofmt/"]
+      patterns: ["/pkg/gofmt"]
     - name: config
-      patterns: ["/internal/config/"]
+      patterns: ["/internal/config"]
+    - name: magetasks
+      patterns: ["/internal/magetasks"]
     - name: fo
-      patterns: ["/fo/"]
+      patterns: ["/fo/fo"]
     - name: util
-      patterns: ["/internal/", "/pkg/"]
+      patterns: ["/internal", "/pkg", "/cmd"]
 
 themes:
   orca_swiss:

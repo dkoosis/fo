@@ -83,6 +83,7 @@ func (f *GoTestFormatter) Format(lines []string, width int) string {
 	pkgStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6")).Bold(true)
 	testStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
 	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
+	pendingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFDD88")) // Pale yellow for empty subsystems
 
 	// Get spinner frame for running indicator
 	spinnerFrame := "⟳"
@@ -217,35 +218,61 @@ func (f *GoTestFormatter) Format(lines []string, width int) string {
 	b.WriteString(strings.Join(parts, mutedStyle.Render(" | ")))
 	b.WriteString("\n\n")
 
+	// Calculate max widths for alignment
+	maxNameLen := 0
+	maxPassedLen := 0
+	maxTotalLen := 0
+	for _, ss := range subsystems {
+		if len(ss.name) > maxNameLen {
+			maxNameLen = len(ss.name)
+		}
+		totalPkgs := ss.passedCount + ss.failedCount
+		passedStr := fmt.Sprintf("%d", ss.passedCount)
+		totalStr := fmt.Sprintf("%d", totalPkgs)
+		if len(passedStr) > maxPassedLen {
+			maxPassedLen = len(passedStr)
+		}
+		if len(totalStr) > maxTotalLen {
+			maxTotalLen = len(totalStr)
+		}
+	}
+
 	// Subsystem-centric view with pass/fail status and nested failures
 	for _, ss := range subsystems {
 		totalPkgs := ss.passedCount + ss.failedCount
+		nameField := fmt.Sprintf("%-*s", maxNameLen, ss.name)
+
 		if totalPkgs == 0 && ss.pkgCount == 0 {
-			// No packages tested in this subsystem, show minimal line
-			b.WriteString(fmt.Sprintf("  %-8s %s\n", ss.name, mutedStyle.Render("—")))
+			// No packages tested in this subsystem, show minimal line with aligned icon (pale yellow)
+			emptyCount := fmt.Sprintf("%*s %s", maxPassedLen+maxTotalLen+1, "", "—")
+			b.WriteString(fmt.Sprintf("  %s %s  %s\n", pendingStyle.Render("○"), nameField, mutedStyle.Render(emptyCount)))
 			continue
 		}
 
-		// Subsystem status icon and pass/fail count
-		var icon, countStr string
+		// Subsystem status icon and pass/fail count (aligned on /)
+		var icon string
+		var countStr string
+		passedFmt := fmt.Sprintf("%*d", maxPassedLen, ss.passedCount)
+		totalFmt := fmt.Sprintf("%-*d", maxTotalLen, totalPkgs)
+
 		if ss.failedCount > 0 {
 			icon = failStyle.Render("✗")
-			countStr = failStyle.Render(fmt.Sprintf("%d/%d", ss.passedCount, totalPkgs))
+			countStr = failStyle.Render(passedFmt) + mutedStyle.Render("/") + failStyle.Render(totalFmt)
 		} else if totalPkgs > 0 {
 			icon = passStyle.Render("✓")
-			countStr = passStyle.Render(fmt.Sprintf("%d/%d", ss.passedCount, totalPkgs))
+			countStr = passStyle.Render(passedFmt) + mutedStyle.Render("/") + passStyle.Render(totalFmt)
 		} else {
-			icon = mutedStyle.Render("○")
-			countStr = mutedStyle.Render("—")
+			icon = pendingStyle.Render("○")
+			countStr = fmt.Sprintf("%*s %s", maxPassedLen+maxTotalLen+1, "", mutedStyle.Render("—"))
 		}
 
-		// Coverage bar
+		// Coverage bar (show for any subsystem with packages, even if 0% coverage)
 		coverageStr := ""
-		if ss.pkgCount > 0 {
+		if totalPkgs > 0 {
 			coverageStr = "  " + renderCoverageBar(ss.avgCoverage, mutedStyle, passStyle)
 		}
 
-		b.WriteString(fmt.Sprintf("  %s %-8s %s%s\n", icon, ss.name, countStr, coverageStr))
+		b.WriteString(fmt.Sprintf("  %s %s  %s%s\n", icon, nameField, countStr, coverageStr))
 
 		// Show failed packages and tests under failed subsystems
 		for _, failure := range ss.failures {
@@ -534,10 +561,33 @@ func calculateSubsystemStats(packages map[string]*pkgResult) []subsystemResult {
 			a.coverageCount++
 		}
 
+		// Infer package status from tests if not explicitly set
+		status := pr.status
+		if status == "run" && len(pr.tests) > 0 {
+			// Check if any tests failed
+			hasFailed := false
+			allDone := true
+			for _, tr := range pr.tests {
+				if tr.status == "fail" {
+					hasFailed = true
+				}
+				if tr.status == "run" {
+					allDone = false
+				}
+			}
+			if allDone {
+				if hasFailed {
+					status = "fail"
+				} else {
+					status = "pass"
+				}
+			}
+		}
+
 		// Track pass/fail
-		if pr.status == "pass" {
+		if status == "pass" {
 			a.passedCount++
-		} else if pr.status == "fail" {
+		} else if status == "fail" {
 			a.failedCount++
 			// Collect failed test names
 			var failedTests []string
