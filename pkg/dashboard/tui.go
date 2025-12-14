@@ -46,15 +46,18 @@ func RunDashboardWithTheme(ctx context.Context, specs []TaskSpec, theme *Dashboa
 }
 
 type model struct {
-	ctx      context.Context
-	specs    []TaskSpec
-	tasks    []*Task
-	updates  <-chan TaskUpdate
-	selected int
-	detail   bool
-	viewport viewport.Model
-	ready    bool
-	done     bool
+	ctx        context.Context
+	specs      []TaskSpec
+	tasks      []*Task
+	updates    <-chan TaskUpdate
+	selected   int
+	viewport   viewport.Model
+	ready      bool
+	done       bool
+	width      int // terminal width
+	height     int // terminal height
+	listWidth  int // width allocated to task list
+	detailWidth int // width allocated to detail pane
 }
 
 func newModel(ctx context.Context, specs []TaskSpec) model {
@@ -90,30 +93,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.done {
 				return m, tea.Quit
 			}
-		case "esc":
-			m.detail = false
-		case "enter":
-			m.detail = true
-			m.refreshViewport()
 		case "up", "k":
 			if m.selected > 0 {
 				m.selected--
-				if m.detail {
-					m.refreshViewport()
-				}
+				m.refreshViewport()
 			}
 		case "down", "j":
 			if m.selected < len(m.tasks)-1 {
 				m.selected++
-				if m.detail {
-					m.refreshViewport()
-				}
+				m.refreshViewport()
 			}
 		}
 	case tea.WindowSizeMsg:
-		m.viewport.Width = msg.Width
-		m.viewport.Height = msg.Height - 5
+		m.width = msg.Width
+		m.height = msg.Height
+		// Calculate list width based on content (auto-fit)
+		m.listWidth = m.calculateListWidth()
+		if m.listWidth < 25 {
+			m.listWidth = 25
+		}
+		if m.listWidth > msg.Width/2 {
+			m.listWidth = msg.Width / 2
+		}
+		m.detailWidth = msg.Width - m.listWidth - 1 // 1 for gap
+		m.viewport.Width = m.detailWidth - 6        // account for box padding + border
+		m.viewport.Height = msg.Height - 10         // account for title, header, cmd, status bar, borders
 		m.ready = true
+		m.refreshViewport()
 	case tickMsg:
 		return m, tea.Tick(time.Second/8, func(time.Time) tea.Msg { return tickMsg{} })
 	case taskUpdateMsg:
@@ -125,7 +131,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if up.Line != "" {
 				task.appendLine(up.Line)
-				if m.detail && m.selected == up.Index {
+				if m.selected == up.Index {
 					m.refreshViewport()
 				}
 			}
@@ -148,48 +154,93 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *model) calculateListWidth() int {
+	maxWidth := 0
+	for _, task := range m.tasks {
+		// Group header: "▸ GroupName"
+		groupLen := len(task.Spec.Group) + 4
+		if groupLen > maxWidth {
+			maxWidth = groupLen
+		}
+		// Task line: "▶ ✓ taskname 12.3s"
+		taskLen := len(task.Spec.Name) + 15 // icon + status + duration estimate
+		if taskLen > maxWidth {
+			maxWidth = taskLen
+		}
+	}
+	// Add padding for box borders and internal padding
+	return maxWidth + 8
+}
+
 func (m *model) refreshViewport() {
 	if m.selected < 0 || m.selected >= len(m.tasks) {
 		return
 	}
 	task := m.tasks[m.selected]
-	lines := strings.Join(task.Output, "\n")
-	header := fmt.Sprintf("%s/%s: %s\n\n", task.Spec.Group, task.Spec.Name, task.Spec.Command)
-	m.viewport.SetContent(header + lines)
+	// Use formatter to render output based on command type
+	formatted := FormatOutput(task.Spec.Command, task.Output, m.detailWidth)
+	m.viewport.SetContent(formatted)
 }
 
 func (m model) View() string {
 	if !m.ready {
 		return "Loading dashboard..."
 	}
-	var b strings.Builder
 
-	// Title bar
+	// Title bar (full width)
 	titleText := activeTheme.TitleIcon + " " + activeTheme.TitleText
-	title := activeTheme.TitleStyle.Render(titleText)
-	b.WriteString(title)
-	b.WriteString("\n\n")
+	title := activeTheme.TitleStyle.Width(m.width).Render(titleText)
 
-	// Task list
-	b.WriteString(renderList(m.tasks, m.selected, m.viewport.Width))
-	b.WriteString("\n")
-
-	// Detail pane or help
-	if m.detail {
-		task := m.tasks[m.selected]
-		header := activeTheme.DetailHeaderStyle.Render(fmt.Sprintf("\U0001F4CB %s/%s", task.Spec.Group, task.Spec.Name))
-		cmd := lipgloss.NewStyle().Foreground(activeTheme.MutedColor()).Render("$ " + task.Spec.Command)
-		content := header + "\n" + cmd + "\n\n" + m.viewport.View()
-		boxWidth := m.viewport.Width - 4
-		if boxWidth < 40 {
-			boxWidth = 40
-		}
-		b.WriteString(activeTheme.DetailBoxStyle.Width(boxWidth).Render(content))
-	} else {
-		help := activeTheme.StatusBarStyle.Render("\u2191/\u2193 navigate \u2022 Enter view details \u2022 Esc back \u2022 q quit")
-		b.WriteString(help)
+	// Panel height for content (excluding borders/padding)
+	// Border adds 2 lines, padding adds 2 lines = 4 total chrome
+	contentHeight := m.height - 6 // title(1) + status(1) + box chrome(4)
+	if contentHeight < 5 {
+		contentHeight = 5
 	}
-	return b.String()
+
+	// Left panel: Task list
+	listContent := renderList(m.tasks, m.selected, m.listWidth)
+	// Pad or truncate list content to exact height
+	listLines := strings.Split(listContent, "\n")
+	for len(listLines) < contentHeight {
+		listLines = append(listLines, "")
+	}
+	if len(listLines) > contentHeight {
+		listLines = listLines[:contentHeight]
+	}
+	listPanel := activeTheme.TaskListStyle.
+		Width(m.listWidth).
+		Render(strings.Join(listLines, "\n"))
+
+	// Right panel: Detail pane
+	var detailContent string
+	if m.selected >= 0 && m.selected < len(m.tasks) {
+		task := m.tasks[m.selected]
+		header := activeTheme.DetailHeaderStyle.Render(fmt.Sprintf("%s/%s", task.Spec.Group, task.Spec.Name))
+		detailContent = header + "\n\n" + m.viewport.View()
+	} else {
+		detailContent = "Select a task to view output"
+	}
+	// Pad or truncate detail content to exact height
+	detailLines := strings.Split(detailContent, "\n")
+	for len(detailLines) < contentHeight {
+		detailLines = append(detailLines, "")
+	}
+	if len(detailLines) > contentHeight {
+		detailLines = detailLines[:contentHeight]
+	}
+	detailPanel := activeTheme.DetailBoxStyle.
+		Width(m.detailWidth).
+		Render(strings.Join(detailLines, "\n"))
+
+	// Join panels horizontally
+	panels := lipgloss.JoinHorizontal(lipgloss.Top, listPanel, detailPanel)
+
+	// Status bar
+	help := activeTheme.StatusBarStyle.Render("\u2191/\u2193 navigate \u2022 q quit")
+
+	// Use JoinVertical for proper layout
+	return lipgloss.JoinVertical(lipgloss.Left, title, panels, help)
 }
 
 func renderList(tasks []*Task, selected int, width int) string {
@@ -202,31 +253,37 @@ func renderList(tasks []*Task, selected int, width int) string {
 		}
 		grouped[task.Spec.Group] = append(grouped[task.Spec.Group], i)
 	}
+	lineWidth := width - 6 // Account for padding
+	if lineWidth < 20 {
+		lineWidth = 20
+	}
 	for _, g := range groupOrder {
 		lines = append(lines, activeTheme.GroupHeaderStyle.Render(activeTheme.Icons.Group+" "+g))
 		for _, idx := range grouped[g] {
 			task := tasks[idx]
-			duration := ""
-			if task.Status == TaskRunning || task.Status == TaskSuccess || task.Status == TaskFailed {
-				duration = activeTheme.DurationStyle.Render(" " + formatDuration(task.Duration()))
-			}
-			taskName := fmt.Sprintf("%s %s%s", statusIcon(task), task.Spec.Name, duration)
 			if idx == selected {
-				line := activeTheme.SelectedStyle.Render(activeTheme.Icons.Select + " " + taskName)
+				// Selected: use raw icons/text so SelectedStyle controls all styling
+				duration := ""
+				if task.Status == TaskRunning || task.Status == TaskSuccess || task.Status == TaskFailed {
+					duration = " " + formatDuration(task.Duration())
+				}
+				content := fmt.Sprintf("%s %s %s%s", activeTheme.Icons.Select, rawStatusIcon(task), task.Spec.Name, duration)
+				line := activeTheme.SelectedStyle.Width(lineWidth).Render(content)
 				lines = append(lines, line)
 			} else {
+				// Unselected: use styled icons
+				duration := ""
+				if task.Status == TaskRunning || task.Status == TaskSuccess || task.Status == TaskFailed {
+					duration = activeTheme.DurationStyle.Render(" " + formatDuration(task.Duration()))
+				}
+				taskName := fmt.Sprintf("%s %s%s", statusIcon(task), task.Spec.Name, duration)
 				line := activeTheme.UnselectedStyle.Render("  " + taskName)
 				lines = append(lines, line)
 			}
 		}
 		lines = append(lines, "")
 	}
-	content := strings.Join(lines, "\n")
-	boxWidth := width - 4
-	if boxWidth < 40 {
-		boxWidth = 40
-	}
-	return activeTheme.TaskListStyle.Width(boxWidth).Render(content)
+	return strings.Join(lines, "\n")
 }
 
 func statusIcon(task *Task) string {
@@ -242,6 +299,25 @@ func statusIcon(task *Task) string {
 		return activeTheme.SuccessIconStyle.Render(activeTheme.Icons.Success)
 	case TaskFailed:
 		return activeTheme.ErrorIconStyle.Render(activeTheme.Icons.Error)
+	default:
+		return "?"
+	}
+}
+
+// rawStatusIcon returns the icon without styling (for use in selected rows).
+func rawStatusIcon(task *Task) string {
+	switch task.Status {
+	case TaskPending:
+		return activeTheme.Icons.Pending
+	case TaskRunning:
+		frames := activeTheme.SpinnerFrames
+		interval := time.Duration(activeTheme.SpinnerInterval) * time.Millisecond
+		idx := int(time.Since(task.StartedAt)/interval) % len(frames)
+		return frames[idx]
+	case TaskSuccess:
+		return activeTheme.Icons.Success
+	case TaskFailed:
+		return activeTheme.Icons.Error
 	default:
 		return "?"
 	}

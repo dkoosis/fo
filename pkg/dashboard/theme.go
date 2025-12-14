@@ -144,8 +144,7 @@ func (t *DashboardTheme) Compile() *CompiledTheme {
 		Bold(true).
 		Foreground(lipgloss.Color("#FAFAFA")).
 		Background(ct.colorPrimary).
-		Padding(0, 1).
-		MarginBottom(1)
+		Padding(0, 1)
 
 	ct.GroupHeaderStyle = lipgloss.NewStyle().
 		Bold(true).
@@ -174,13 +173,13 @@ func (t *DashboardTheme) Compile() *CompiledTheme {
 	ct.DetailBoxStyle = lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(ct.colorPrimary).
-		Padding(1, 2).
-		MarginTop(1)
+		Padding(1, 2)
 
 	ct.DetailHeaderStyle = lipgloss.NewStyle().
 		Bold(true).
-		Foreground(ct.colorPrimary).
-		MarginBottom(1)
+		Foreground(lipgloss.Color("#FAFAFA")).
+		Background(ct.colorHighlight).
+		Padding(0, 1)
 
 	ct.StatusBarStyle = lipgloss.NewStyle().
 		Foreground(ct.colorMuted).
