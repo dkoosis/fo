@@ -19,7 +19,7 @@ const (
 	TaskFailed
 )
 
-const defaultBufferLines = 5000
+const defaultBufferLines = 50000
 
 // Task represents execution state.
 type Task struct {
