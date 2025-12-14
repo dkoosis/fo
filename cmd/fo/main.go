@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -10,11 +11,13 @@ import (
 
 	"github.com/dkoosis/fo/fo"
 	config "github.com/dkoosis/fo/internal/config"
+	"github.com/dkoosis/fo/internal/dashboard"
 	"github.com/dkoosis/fo/internal/version"
 	"github.com/dkoosis/fo/pkg/archlint"
 	"github.com/dkoosis/fo/pkg/design"
 	"github.com/dkoosis/fo/pkg/gofmt"
 	"github.com/dkoosis/fo/pkg/sarif"
+	"golang.org/x/term"
 )
 
 // validPatterns defines the supported pattern names for the --pattern flag.
@@ -38,6 +41,17 @@ type LocalAppConfig struct {
 	Debug            bool
 	MaxBufferSize    int64 // Max total size for combined stdout/stderr in capture mode
 	MaxLineLength    int   // Max size for a single line from stdout/stderr
+}
+
+type stringSliceFlag []string
+
+func (s *stringSliceFlag) String() string {
+	return strings.Join(*s, ",")
+}
+
+func (s *stringSliceFlag) Set(value string) error {
+	*s = append(*s, value)
+	return nil
 }
 
 // subcommand represents a named subcommand with its handler.
@@ -78,6 +92,10 @@ func run(args []string) int {
 		_, _ = fmt.Fprintf(os.Stdout, "Commit: %s\n", version.CommitHash)
 		_, _ = fmt.Fprintf(os.Stdout, "Built: %s\n", version.BuildDate)
 		return 0
+	}
+
+	if cliFlags.Dashboard {
+		return runDashboardMode(cliFlags)
 	}
 
 	// Load application configuration from .fo.yaml
@@ -199,6 +217,47 @@ func run(args []string) int {
 // It calls run() and exits with the returned exit code.
 func main() {
 	os.Exit(run(os.Args))
+}
+
+// runDashboardMode orchestrates the dashboard workflow.
+func runDashboardMode(cliFlags config.CliFlags) int {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var specs []dashboard.TaskSpec
+	for _, raw := range cliFlags.Tasks {
+		spec, err := dashboard.ParseTaskFlag(raw)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[fo] %v\n", err)
+			return 1
+		}
+		specs = append(specs, spec)
+	}
+
+	stat, _ := os.Stdin.Stat()
+	if (stat.Mode() & os.ModeCharDevice) == 0 {
+		manifestSpecs, err := dashboard.ParseManifest(os.Stdin)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[fo] %v\n", err)
+			return 1
+		}
+		specs = append(specs, manifestSpecs...)
+	}
+
+	if len(specs) == 0 {
+		fmt.Fprintln(os.Stderr, "[fo] Error: No tasks provided for dashboard mode.")
+		return 1
+	}
+
+	if !term.IsTerminal(int(os.Stdout.Fd())) {
+		return dashboard.RunNonTTY(ctx, specs, os.Stdout)
+	}
+
+	code, err := dashboard.RunDashboard(ctx, specs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[fo] dashboard error: %v\n", err)
+	}
+	return code
 }
 
 func convertAppConfigToLocal(appCfg *config.AppConfig) LocalAppConfig {
@@ -594,6 +653,7 @@ func handleReplayCommand(args []string) int {
 func parseGlobalFlagsFromArgs(args []string) (config.CliFlags, bool, []string, error) {
 	var cliFlags config.CliFlags
 	var versionFlag bool
+	var tasksFlag stringSliceFlag
 
 	// Skip program name (args[0]) for flag parsing
 	flagArgs := args[1:]
@@ -630,6 +690,8 @@ func parseGlobalFlagsFromArgs(args []string) (config.CliFlags, bool, []string, e
 	fs.StringVar(&cliFlags.ThemeFile, "theme-file", "", "Load custom theme from YAML file.")
 	fs.BoolVar(&cliFlags.NoColor, "no-color", false, "Disable ANSI color/styling output.")
 	fs.BoolVar(&cliFlags.CI, "ci", false, "Enable CI-friendly, plain-text output.")
+	fs.BoolVar(&cliFlags.Dashboard, "dashboard", false, "Run multiple commands in dashboard mode.")
+	fs.Var(&tasksFlag, "task", "Dashboard task in group/name:command format (repeatable).")
 
 	// Flags specific to command wrapping mode
 	fs.StringVar(&cliFlags.Label, "l", "", "Label for the task.")
@@ -658,6 +720,8 @@ func parseGlobalFlagsFromArgs(args []string) (config.CliFlags, bool, []string, e
 	if err := fs.Parse(flagsToparse); err != nil {
 		return cliFlags, false, nil, err
 	}
+
+	cliFlags.Tasks = tasksFlag
 
 	// Track which flags were explicitly set
 	fs.Visit(func(f *flag.Flag) {
