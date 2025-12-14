@@ -126,6 +126,23 @@ func (Test) Visual() error {
 	return sh.RunV("go", "run", "cmd/visual_test_main.go", "visual_test_outputs")
 }
 
+// Dashboard tests the dashboard TUI with parallel tasks
+func (Test) Dashboard() error {
+	console.PrintH1Header("Dashboard TUI Test")
+	// Build fo first
+	if err := sh.RunV("go", "build", "-o", "/tmp/fo-dashboard", "./cmd/fo"); err != nil {
+		return fmt.Errorf("failed to build fo: %w", err)
+	}
+	// Run dashboard with mixed real and simulated tasks
+	return sh.RunV("/tmp/fo-dashboard", "--dashboard",
+		"--task", "build/compile:go build ./...",
+		"--task", "lint/vet:go vet ./...",
+		"--task", "lint/fmt:gofmt -l .",
+		"--task", "test/unit:go test -count=1 ./pkg/dashboard/...",
+		"--task", "test/slow:sleep 2 && echo done",
+	)
+}
+
 // Quality namespace for quality check commands
 type Quality mg.Namespace
 
