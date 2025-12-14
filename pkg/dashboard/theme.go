@@ -177,11 +177,7 @@ func (t *DashboardTheme) Compile() *CompiledTheme {
 	ct.GroupHeaderStyle = lipgloss.NewStyle().
 		Bold(true).
 		Foreground(ct.colorPrimary).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderBottom(true).
-		BorderForeground(ct.colorBorder).
-		MarginTop(1).
-		PaddingBottom(0)
+		MarginTop(1)
 
 	ct.TaskListStyle = lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).

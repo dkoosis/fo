@@ -72,6 +72,9 @@ type pkgResult struct {
 	testOrder []string
 }
 
+// Debug flag - set to true to see package parsing details
+var DebugTestFormatter = false
+
 func (f *GoTestFormatter) Format(lines []string, width int) string {
 	var b strings.Builder
 
@@ -218,79 +221,61 @@ func (f *GoTestFormatter) Format(lines []string, width int) string {
 	b.WriteString(strings.Join(parts, mutedStyle.Render(" | ")))
 	b.WriteString("\n\n")
 
-	// Calculate max widths for alignment
+	// Calculate max name width for alignment
 	maxNameLen := 0
-	maxPassedLen := 0
-	maxTotalLen := 0
 	for _, ss := range subsystems {
 		if len(ss.name) > maxNameLen {
 			maxNameLen = len(ss.name)
 		}
-		totalPkgs := ss.passedCount + ss.failedCount
-		passedStr := fmt.Sprintf("%d", ss.passedCount)
-		totalStr := fmt.Sprintf("%d", totalPkgs)
-		if len(passedStr) > maxPassedLen {
-			maxPassedLen = len(passedStr)
-		}
-		if len(totalStr) > maxTotalLen {
-			maxTotalLen = len(totalStr)
-		}
 	}
 
-	// Subsystem-centric view with pass/fail status and nested failures
+	// Subsystem-centric view with status and coverage
+	var allFailures []pkgFailure
 	for _, ss := range subsystems {
 		totalPkgs := ss.passedCount + ss.failedCount
 		nameField := fmt.Sprintf("%-*s", maxNameLen, ss.name)
 
-		if totalPkgs == 0 && ss.pkgCount == 0 {
-			// No packages tested in this subsystem, show minimal line with aligned icon (pale yellow)
-			emptyCount := fmt.Sprintf("%*s %s", maxPassedLen+maxTotalLen+1, "", "—")
-			b.WriteString(fmt.Sprintf("  %s %s  %s\n", pendingStyle.Render("○"), nameField, mutedStyle.Render(emptyCount)))
-			continue
-		}
-
-		// Subsystem status icon and pass/fail count (aligned on /)
+		// Determine status icon
 		var icon string
-		var countStr string
-		passedFmt := fmt.Sprintf("%*d", maxPassedLen, ss.passedCount)
-		totalFmt := fmt.Sprintf("%-*d", maxTotalLen, totalPkgs)
-
-		if ss.failedCount > 0 {
-			icon = failStyle.Render("✗")
-			countStr = failStyle.Render(passedFmt) + mutedStyle.Render("/") + failStyle.Render(totalFmt)
-		} else if totalPkgs > 0 {
-			icon = passStyle.Render("✓")
-			countStr = passStyle.Render(passedFmt) + mutedStyle.Render("/") + passStyle.Render(totalFmt)
-		} else {
+		if totalPkgs == 0 && ss.pkgCount == 0 {
 			icon = pendingStyle.Render("○")
-			countStr = fmt.Sprintf("%*s %s", maxPassedLen+maxTotalLen+1, "", mutedStyle.Render("—"))
+		} else if ss.failedCount > 0 {
+			icon = failStyle.Render("✗")
+		} else {
+			icon = passStyle.Render("✓")
 		}
 
-		// Coverage bar (show for any subsystem with packages, even if 0% coverage)
+		// Coverage bar (show for any subsystem with packages)
 		coverageStr := ""
 		if totalPkgs > 0 {
 			coverageStr = "  " + renderCoverageBar(ss.avgCoverage, mutedStyle, passStyle)
 		}
 
-		b.WriteString(fmt.Sprintf("  %s %s  %s%s\n", icon, nameField, countStr, coverageStr))
+		b.WriteString(fmt.Sprintf("  %s %s%s\n", icon, nameField, coverageStr))
 
-		// Show failed packages and tests under failed subsystems
-		for _, failure := range ss.failures {
+		// Collect failures for display in lower section
+		allFailures = append(allFailures, ss.failures...)
+	}
+
+	// Show all failures in lower section
+	if len(allFailures) > 0 {
+		b.WriteString("\n")
+		for _, failure := range allFailures {
 			// Shorten package name
 			shortPkg := failure.pkg
 			if pkgParts := strings.Split(failure.pkg, "/"); len(pkgParts) > 2 {
 				shortPkg = ".../" + strings.Join(pkgParts[len(pkgParts)-2:], "/")
 			}
-			b.WriteString(fmt.Sprintf("      %s %s\n", failStyle.Render("✗"), pkgStyle.Render(shortPkg)))
+			b.WriteString(fmt.Sprintf("  %s %s\n", failStyle.Render("✗"), pkgStyle.Render(shortPkg)))
 
 			// Show failed test names
 			for _, testName := range failure.failedTests {
 				displayName := humanizeTestNameWithSubtest(testName)
-				maxNameWidth := width - 12 // account for deeper indent
+				maxNameWidth := width - 10 // account for indent
 				if len(displayName) > maxNameWidth && maxNameWidth > 20 {
 					displayName = truncateAtWord(displayName, maxNameWidth-3) + "..."
 				}
-				b.WriteString(fmt.Sprintf("        %s %s\n", failStyle.Render("✗"), testStyle.Render(displayName)))
+				b.WriteString(fmt.Sprintf("      %s %s\n", failStyle.Render("✗"), testStyle.Render(displayName)))
 			}
 		}
 	}

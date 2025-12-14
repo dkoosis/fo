@@ -117,7 +117,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.listWidth = m.width / 2
 		}
 		m.detailWidth = m.width - m.listWidth - 1 // 1 for gap
-		m.viewport.Width = m.detailWidth - 6      // account for box padding + border
+		m.viewport.Width = m.detailWidth - 4      // account for box padding + border
 		m.viewport.Height = msg.Height - 10       // account for title, header, cmd, status bar, borders
 		m.ready = true
 		m.refreshViewport()
@@ -194,7 +194,7 @@ func (m model) View() string {
 	if titleText == " " {
 		titleText = "Dashboard" // Fallback if no title configured
 	}
-	title := "\n" + activeTheme.TitleStyle.Width(m.width + 4).Height(1).Render(titleText)
+	title := "\n" + activeTheme.TitleStyle.Width(m.width + 5).Height(1).Render(titleText)
 
 	// Panel height for content (excluding borders/padding)
 	// blank(1) + title(1) + status(2) + box chrome(4) = 8 total
@@ -330,9 +330,14 @@ func rawStatusIcon(task *Task) string {
 
 func formatDuration(d time.Duration) string {
 	if d < time.Second {
-		return d.Round(time.Millisecond).String()
+		// Show milliseconds for sub-second durations
+		ms := d.Milliseconds()
+		return fmt.Sprintf("%dms", ms)
 	}
-	return d.Truncate(10 * time.Millisecond).String()
+	// Show tenths of a second (e.g., 1.2s not 1.34s)
+	tenths := d.Round(100 * time.Millisecond)
+	secs := tenths.Seconds()
+	return fmt.Sprintf("%.1fs", secs)
 }
 
 func (m model) allDone() bool {
