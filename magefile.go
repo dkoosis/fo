@@ -5,10 +5,11 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
-	"github.com/dkoosis/fo/internal/magetasks"
 	"github.com/dkoosis/fo/fo"
+	"github.com/dkoosis/fo/internal/magetasks"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 )
@@ -17,14 +18,35 @@ var (
 	console = fo.DefaultConsole()
 )
 
-// Default target - run build and test workflow
-var Default = Mage
+// Default target - run fo dashboard
+var Default = Dashboard
 
 func init() {
 	if err := magetasks.Initialize(); err != nil {
 		fmt.Fprintf(os.Stderr, "Fatal: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// Dashboard runs the fo dashboard TUI with parallel tasks
+func Dashboard() error {
+	console.PrintH1Header("fo Dashboard")
+	// Build fo first
+	if err := sh.RunV("go", "build", "-o", "/tmp/fo-dashboard", "./cmd/fo"); err != nil {
+		return fmt.Errorf("failed to build fo: %w", err)
+	}
+	// Run dashboard with TTY attached
+	cmd := exec.Command("/tmp/fo-dashboard", "--dashboard",
+		"--task", "build/compile:go build ./...",
+		"--task", "lint/vet:go vet ./...",
+		"--task", "lint/fmt:gofmt -l .",
+		"--task", "test/unit:go test -count=1 ./pkg/dashboard/...",
+		"--task", "test/slow:sleep 2 && echo done",
+	)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 // Mage runs the standard build + test workflow
@@ -133,14 +155,18 @@ func (Test) Dashboard() error {
 	if err := sh.RunV("go", "build", "-o", "/tmp/fo-dashboard", "./cmd/fo"); err != nil {
 		return fmt.Errorf("failed to build fo: %w", err)
 	}
-	// Run dashboard with mixed real and simulated tasks
-	return sh.RunV("/tmp/fo-dashboard", "--dashboard",
+	// Run dashboard with TTY attached (sh.RunV captures stdout, breaking TTY detection)
+	cmd := exec.Command("/tmp/fo-dashboard", "--dashboard",
 		"--task", "build/compile:go build ./...",
 		"--task", "lint/vet:go vet ./...",
 		"--task", "lint/fmt:gofmt -l .",
 		"--task", "test/unit:go test -count=1 ./pkg/dashboard/...",
 		"--task", "test/slow:sleep 2 && echo done",
 	)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 // Quality namespace for quality check commands

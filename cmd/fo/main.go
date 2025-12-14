@@ -249,6 +249,9 @@ func runDashboardMode(cliFlags config.CliFlags) int {
 		return 1
 	}
 
+	// Initialize dashboard theme from config
+	dashboard.InitThemeFromConfig()
+
 	if !term.IsTerminal(int(os.Stdout.Fd())) {
 		return dashboard.RunNonTTY(ctx, specs, os.Stdout)
 	}

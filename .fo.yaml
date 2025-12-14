@@ -1,5 +1,35 @@
 active_theme: orca_swiss
 
+# ─────────────────────────────────────────────────────────────────────────────
+# DASHBOARD TUI THEME
+# Configures the interactive dashboard (fo --dashboard)
+# ─────────────────────────────────────────────────────────────────────────────
+dashboard:
+  colors:
+    primary: "#7D56F4"    # Purple - title bar, selected items, borders
+    success: "#04B575"    # Green - success checkmarks
+    error: "#FF5F56"      # Red - error X marks
+    warning: "#FFBD2E"    # Yellow - running spinner
+    muted: "#626262"      # Gray - secondary text, pending items
+    text: "#CCCCCC"       # Light gray - normal text
+    border: "#444444"     # Dark gray - borders
+    highlight: "#7D56F4"  # Purple - selected item background
+
+  icons:
+    pending: "○"          # Pending task
+    success: "✓"          # Success
+    error: "✗"            # Error
+    group: "▸"            # Group header prefix
+    select: "▶"           # Selected item marker
+
+  title:
+    text: "fo Dashboard"
+    icon: "⚡"
+
+  spinner:
+    frames: "⠋ ⠙ ⠸ ⠴ ⠦ ⠇"  # Braille spinner animation
+    interval: 300           # Milliseconds between frames
+
 themes:
   orca_swiss:
     # ─────────────────────────────────────────────────────────────

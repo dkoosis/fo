@@ -11,8 +11,32 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// RunDashboard launches the interactive dashboard.
+// activeTheme is the compiled theme used by the dashboard.
+// Set via SetTheme before calling RunDashboard.
+var activeTheme *CompiledTheme
+
+func init() {
+	// Initialize with default theme
+	activeTheme = DefaultDashboardTheme().Compile()
+}
+
+// SetTheme sets the active dashboard theme.
+func SetTheme(theme *DashboardTheme) {
+	if theme != nil {
+		activeTheme = theme.Compile()
+	}
+}
+
+// RunDashboard launches the interactive dashboard with the active theme.
 func RunDashboard(ctx context.Context, specs []TaskSpec) (int, error) {
+	return RunDashboardWithTheme(ctx, specs, nil)
+}
+
+// RunDashboardWithTheme launches the interactive dashboard with a specific theme.
+func RunDashboardWithTheme(ctx context.Context, specs []TaskSpec, theme *DashboardTheme) (int, error) {
+	if theme != nil {
+		activeTheme = theme.Compile()
+	}
 	program := tea.NewProgram(newModel(ctx, specs), tea.WithContext(ctx))
 	finalModel, err := program.Run()
 	if err != nil {
@@ -96,7 +120,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		up := TaskUpdate(msg)
 		if up.Index < len(m.tasks) {
 			task := m.tasks[up.Index]
-			if up.StartedAt.IsZero() == false && task.StartedAt.IsZero() {
+			if !up.StartedAt.IsZero() && task.StartedAt.IsZero() {
 				task.StartedAt = up.StartedAt
 			}
 			if up.Line != "" {
@@ -139,17 +163,36 @@ func (m model) View() string {
 		return "Loading dashboard..."
 	}
 	var b strings.Builder
-	b.WriteString(renderList(m.tasks, m.selected))
+
+	// Title bar
+	titleText := activeTheme.TitleIcon + " " + activeTheme.TitleText
+	title := activeTheme.TitleStyle.Render(titleText)
+	b.WriteString(title)
 	b.WriteString("\n\n")
+
+	// Task list
+	b.WriteString(renderList(m.tasks, m.selected, m.viewport.Width))
+	b.WriteString("\n")
+
+	// Detail pane or help
 	if m.detail {
-		b.WriteString(m.viewport.View())
+		task := m.tasks[m.selected]
+		header := activeTheme.DetailHeaderStyle.Render(fmt.Sprintf("\U0001F4CB %s/%s", task.Spec.Group, task.Spec.Name))
+		cmd := lipgloss.NewStyle().Foreground(activeTheme.MutedColor()).Render("$ " + task.Spec.Command)
+		content := header + "\n" + cmd + "\n\n" + m.viewport.View()
+		boxWidth := m.viewport.Width - 4
+		if boxWidth < 40 {
+			boxWidth = 40
+		}
+		b.WriteString(activeTheme.DetailBoxStyle.Width(boxWidth).Render(content))
 	} else {
-		b.WriteString("Press Enter to open details. q to quit when done.")
+		help := activeTheme.StatusBarStyle.Render("\u2191/\u2193 navigate \u2022 Enter view details \u2022 Esc back \u2022 q quit")
+		b.WriteString(help)
 	}
 	return b.String()
 }
 
-func renderList(tasks []*Task, selected int) string {
+func renderList(tasks []*Task, selected int, width int) string {
 	var lines []string
 	groupOrder := make([]string, 0)
 	grouped := make(map[string][]int)
@@ -160,37 +203,45 @@ func renderList(tasks []*Task, selected int) string {
 		grouped[task.Spec.Group] = append(grouped[task.Spec.Group], i)
 	}
 	for _, g := range groupOrder {
-		lines = append(lines, lipgloss.NewStyle().Bold(true).Render(g))
+		lines = append(lines, activeTheme.GroupHeaderStyle.Render(activeTheme.Icons.Group+" "+g))
 		for _, idx := range grouped[g] {
 			task := tasks[idx]
-			line := fmt.Sprintf(" %s %s", statusIcon(task), task.Spec.Name)
+			duration := ""
 			if task.Status == TaskRunning || task.Status == TaskSuccess || task.Status == TaskFailed {
-				line = fmt.Sprintf("%s (%s)", line, formatDuration(task.Duration()))
+				duration = activeTheme.DurationStyle.Render(" " + formatDuration(task.Duration()))
 			}
+			taskName := fmt.Sprintf("%s %s%s", statusIcon(task), task.Spec.Name, duration)
 			if idx == selected {
-				line = lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Render("> " + line)
+				line := activeTheme.SelectedStyle.Render(activeTheme.Icons.Select + " " + taskName)
+				lines = append(lines, line)
 			} else {
-				line = "  " + line
+				line := activeTheme.UnselectedStyle.Render("  " + taskName)
+				lines = append(lines, line)
 			}
-			lines = append(lines, line)
 		}
 		lines = append(lines, "")
 	}
-	return strings.Join(lines, "\n")
+	content := strings.Join(lines, "\n")
+	boxWidth := width - 4
+	if boxWidth < 40 {
+		boxWidth = 40
+	}
+	return activeTheme.TaskListStyle.Width(boxWidth).Render(content)
 }
 
 func statusIcon(task *Task) string {
 	switch task.Status {
 	case TaskPending:
-		return "○"
+		return activeTheme.PendingIconStyle.Render(activeTheme.Icons.Pending)
 	case TaskRunning:
-		frames := []string{"⠋", "⠙", "⠸", "⠴", "⠦", "⠇"}
-		idx := int(time.Since(task.StartedAt)/(150*time.Millisecond)) % len(frames)
-		return frames[idx]
+		frames := activeTheme.SpinnerFrames
+		interval := time.Duration(activeTheme.SpinnerInterval) * time.Millisecond
+		idx := int(time.Since(task.StartedAt)/interval) % len(frames)
+		return activeTheme.RunningIconStyle.Render(frames[idx])
 	case TaskSuccess:
-		return "✓"
+		return activeTheme.SuccessIconStyle.Render(activeTheme.Icons.Success)
 	case TaskFailed:
-		return "✗"
+		return activeTheme.ErrorIconStyle.Render(activeTheme.Icons.Error)
 	default:
 		return "?"
 	}
