@@ -35,20 +35,22 @@ dashboard:
   # Customize these patterns to match your project's package structure
   # ─────────────────────────────────────────────────────────────
   subsystems:
-    - name: core
-      patterns: ["/internal/core/", "/core/"]
-    - name: kg
-      patterns: ["/internal/kg/", "/kg/"]
-    - name: domain
-      patterns: ["/internal/domain/", "/internal/tools/", "/domain/", "/tools/"]
-    - name: adapter
-      patterns: ["/internal/mcp/", "/mcp/"]
-    - name: worker
-      patterns: ["/internal/proc/", "/proc/"]
-    - name: kits
-      patterns: ["/internal/kits/", "/internal/codekit/", "/internal/testkit/", "/kits/", "/codekit/", "/testkit/"]
+    - name: dashboard
+      patterns: ["/pkg/dashboard/"]
+    - name: sarif
+      patterns: ["/pkg/sarif/"]
+    - name: archlint
+      patterns: ["/pkg/archlint/"]
+    - name: design
+      patterns: ["/pkg/design/"]
+    - name: gofmt
+      patterns: ["/pkg/gofmt/"]
+    - name: config
+      patterns: ["/internal/config/"]
+    - name: fo
+      patterns: ["/fo/"]
     - name: util
-      patterns: ["/internal/util/", "/util/", "/pkg/"]
+      patterns: ["/internal/", "/pkg/"]
 
 themes:
   orca_swiss:
