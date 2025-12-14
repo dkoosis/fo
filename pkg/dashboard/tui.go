@@ -286,7 +286,6 @@ func renderList(tasks []*Task, selected int, width int) string {
 				lines = append(lines, line)
 			}
 		}
-		lines = append(lines, "")
 	}
 	return strings.Join(lines, "\n")
 }

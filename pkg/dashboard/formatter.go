@@ -77,6 +77,7 @@ var DebugTestFormatter = false
 
 func (f *GoTestFormatter) Format(lines []string, width int) string {
 	var b strings.Builder
+	var debugLines []string
 
 	// Styles - use theme colors if available
 	passStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
@@ -158,13 +159,25 @@ func (f *GoTestFormatter) Format(lines []string, width int) string {
 				pr.status = "fail"
 				pr.elapsed = event.Elapsed
 			case "output":
-				// Check for coverage info
-				if strings.Contains(event.Output, "coverage:") {
+				// Check for coverage info - line must START with "coverage:"
+				// (the "ok" summary line also contains "coverage:" but we can't parse it)
+				if strings.HasPrefix(event.Output, "coverage:") {
 					var cov float64
 					fmt.Sscanf(event.Output, "coverage: %f%%", &cov)
-					pr.coverage = cov
+					if cov > 0 {
+						pr.coverage = cov
+					}
 				}
 			}
+		}
+	}
+
+	// Debug: show parsed packages and coverage
+	if DebugTestFormatter {
+		debugLines = append(debugLines, fmt.Sprintf("DEBUG: Parsed %d packages from %d lines", len(packages), len(lines)))
+		for _, pkg := range pkgOrder {
+			pr := packages[pkg]
+			debugLines = append(debugLines, fmt.Sprintf("  %s: status=%s cov=%.1f%% tests=%d", pkg, pr.status, pr.coverage, len(pr.tests)))
 		}
 	}
 
@@ -277,6 +290,14 @@ func (f *GoTestFormatter) Format(lines []string, width int) string {
 				}
 				b.WriteString(fmt.Sprintf("    %s\n", testStyle.Render(displayName)))
 			}
+		}
+	}
+
+	// Append debug output at the end
+	if DebugTestFormatter && len(debugLines) > 0 {
+		b.WriteString("\n\n")
+		for _, line := range debugLines {
+			b.WriteString(line + "\n")
 		}
 	}
 
