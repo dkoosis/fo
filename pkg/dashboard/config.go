@@ -126,6 +126,11 @@ func mergeWithDefaults(theme *DashboardTheme) *DashboardTheme {
 		theme.Spinner.Interval = def.Spinner.Interval
 	}
 
+	// Subsystems - use defaults if none specified
+	if len(theme.Subsystems) == 0 {
+		theme.Subsystems = def.Subsystems
+	}
+
 	return theme
 }
 

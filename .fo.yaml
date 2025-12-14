@@ -6,14 +6,14 @@ active_theme: orca_swiss
 # ─────────────────────────────────────────────────────────────────────────────
 dashboard:
   colors:
-    primary: "#7D56F4"    # Purple - title bar, selected items, borders
+    primary: "#0077B6"    # Deep ocean blue - title bar, selected items
     success: "#04B575"    # Green - success checkmarks
     error: "#FF5F56"      # Red - error X marks
-    warning: "#FFBD2E"    # Yellow - running spinner
+    warning: "#48CAE4"    # Light ocean blue - running spinner
     muted: "#626262"      # Gray - secondary text, pending items
     text: "#CCCCCC"       # Light gray - normal text
-    border: "#444444"     # Dark gray - borders
-    highlight: "#7D56F4"  # Purple - selected item background
+    border: "#005F8A"     # Dark ocean blue - borders
+    highlight: "#00A8E8"  # Bright ocean blue - selected item background
 
   icons:
     pending: "○"          # Pending task
@@ -23,12 +23,32 @@ dashboard:
     select: "▶"           # Selected item marker
 
   title:
-    text: "fo Dashboard"
-    icon: "⚡"
+    text: "Orca"
+    icon: "🐋"
 
   spinner:
-    frames: "⠋ ⠙ ⠸ ⠴ ⠦ ⠇"  # Braille spinner animation
-    interval: 300           # Milliseconds between frames
+    frames: "❀ ❁ ❂ ❃ ❄ ❅ ❆ ❇ ❈ ✦ ✧ ✱ ✲ ✳ ✴ ✵ ✶ ✷ ✸ ✹ ✺ ✻ ✼ ✽ ✾ ✿"
+    interval: 80            # Fast floral animation
+
+  # ─────────────────────────────────────────────────────────────
+  # SUBSYSTEMS: Architecture-specific groupings for test coverage
+  # Customize these patterns to match your project's package structure
+  # ─────────────────────────────────────────────────────────────
+  subsystems:
+    - name: core
+      patterns: ["/internal/core/", "/core/"]
+    - name: kg
+      patterns: ["/internal/kg/", "/kg/"]
+    - name: domain
+      patterns: ["/internal/domain/", "/internal/tools/", "/domain/", "/tools/"]
+    - name: adapter
+      patterns: ["/internal/mcp/", "/mcp/"]
+    - name: worker
+      patterns: ["/internal/proc/", "/proc/"]
+    - name: kits
+      patterns: ["/internal/kits/", "/internal/codekit/", "/internal/testkit/", "/kits/", "/codekit/", "/testkit/"]
+    - name: util
+      patterns: ["/internal/util/", "/util/", "/pkg/"]
 
 themes:
   orca_swiss:

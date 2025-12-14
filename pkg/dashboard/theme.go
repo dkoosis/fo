@@ -17,6 +17,15 @@ type DashboardTheme struct {
 
 	// Spinner configuration
 	Spinner DashboardSpinnerConfig `yaml:"spinner"`
+
+	// Subsystems for test coverage grouping (optional, has defaults)
+	Subsystems []SubsystemConfig `yaml:"subsystems,omitempty"`
+}
+
+// SubsystemConfig defines an architectural subsystem for test grouping.
+type SubsystemConfig struct {
+	Name     string   `yaml:"name"`     // Display name (e.g., "core", "domain")
+	Patterns []string `yaml:"patterns"` // Path patterns to match (e.g., "/internal/core/")
 }
 
 // DashboardColors defines the color palette for the dashboard.
@@ -91,6 +100,9 @@ type CompiledTheme struct {
 	// Spinner
 	SpinnerFrames   []string
 	SpinnerInterval int
+
+	// Subsystems for test grouping
+	Subsystems []SubsystemConfig
 }
 
 // DefaultDashboardTheme returns the default dashboard theme configuration.
@@ -122,6 +134,21 @@ func DefaultDashboardTheme() *DashboardTheme {
 			Frames:   "\u280b \u2819 \u2838 \u2834 \u2826 \u2807", // ⠋ ⠙ ⠸ ⠴ ⠦ ⠇
 			Interval: 300,
 		},
+		Subsystems: DefaultSubsystems(),
+	}
+}
+
+// DefaultSubsystems returns the default architectural subsystem configuration.
+// Projects can override this in .fo.yaml to match their package structure.
+func DefaultSubsystems() []SubsystemConfig {
+	return []SubsystemConfig{
+		{Name: "core", Patterns: []string{"/internal/core/", "/core/"}},
+		{Name: "kg", Patterns: []string{"/internal/kg/", "/kg/"}},
+		{Name: "domain", Patterns: []string{"/internal/domain/", "/internal/tools/", "/domain/", "/tools/"}},
+		{Name: "adapter", Patterns: []string{"/internal/mcp/", "/mcp/"}},
+		{Name: "worker", Patterns: []string{"/internal/proc/", "/proc/"}},
+		{Name: "kits", Patterns: []string{"/internal/kits/", "/internal/codekit/", "/internal/testkit/", "/kits/", "/codekit/", "/testkit/"}},
+		{Name: "util", Patterns: []string{"/internal/util/", "/util/", "/pkg/"}},
 	}
 }
 
@@ -203,6 +230,13 @@ func (t *DashboardTheme) Compile() *CompiledTheme {
 	ct.SpinnerInterval = t.Spinner.Interval
 	if ct.SpinnerInterval <= 0 {
 		ct.SpinnerInterval = 300
+	}
+
+	// Copy subsystems (use defaults if empty)
+	if len(t.Subsystems) > 0 {
+		ct.Subsystems = t.Subsystems
+	} else {
+		ct.Subsystems = DefaultSubsystems()
 	}
 
 	return ct

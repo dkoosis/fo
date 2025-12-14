@@ -28,7 +28,7 @@ func init() {
 	}
 }
 
-// Dashboard runs the fo dashboard TUI with parallel tasks
+// Dashboard runs the fo dashboard TUI with parallel tasks (matches orca style)
 func Dashboard() error {
 	console.PrintH1Header("fo Dashboard")
 	// Build fo first
@@ -37,11 +37,14 @@ func Dashboard() error {
 	}
 	// Run dashboard with TTY attached
 	cmd := exec.Command("/tmp/fo-dashboard", "--dashboard",
-		"--task", "build/compile:go build ./...",
-		"--task", "lint/vet:go vet ./...",
-		"--task", "lint/fmt:gofmt -l .",
-		"--task", "test/unit:go test -count=1 ./pkg/dashboard/...",
-		"--task", "test/slow:sleep 2 && echo done",
+		// Build
+		"--task", "Build/compile:go build ./...",
+		// Test
+		"--task", "Test/unit:go test -json -cover ./...",
+		// Lint
+		"--task", "Lint/vet:go vet ./...",
+		"--task", "Lint/gofmt:gofmt -l .",
+		"--task", "Lint/filesize:filesize -dir=. -top=5",
 	)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -148,7 +151,7 @@ func (Test) Visual() error {
 	return sh.RunV("go", "run", "cmd/visual_test_main.go", "visual_test_outputs")
 }
 
-// Dashboard tests the dashboard TUI with parallel tasks
+// Dashboard tests the dashboard TUI with parallel tasks (matches orca style)
 func (Test) Dashboard() error {
 	console.PrintH1Header("Dashboard TUI Test")
 	// Build fo first
@@ -157,11 +160,14 @@ func (Test) Dashboard() error {
 	}
 	// Run dashboard with TTY attached (sh.RunV captures stdout, breaking TTY detection)
 	cmd := exec.Command("/tmp/fo-dashboard", "--dashboard",
-		"--task", "build/compile:go build ./...",
-		"--task", "lint/vet:go vet ./...",
-		"--task", "lint/fmt:gofmt -l .",
-		"--task", "test/unit:go test -count=1 ./pkg/dashboard/...",
-		"--task", "test/slow:sleep 2 && echo done",
+		// Build
+		"--task", "Build/compile:go build ./...",
+		// Test
+		"--task", "Test/unit:go test -json -cover ./...",
+		// Lint
+		"--task", "Lint/vet:go vet ./...",
+		"--task", "Lint/gofmt:gofmt -l .",
+		"--task", "Lint/filesize:filesize -dir=. -top=5",
 	)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout

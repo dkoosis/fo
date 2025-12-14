@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -82,7 +83,6 @@ func (f *GoTestFormatter) Format(lines []string, width int) string {
 	pkgStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6")).Bold(true)
 	testStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
 	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
-	outputStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
 
 	// Get spinner frame for running indicator
 	spinnerFrame := "⟳"
@@ -182,8 +182,8 @@ func (f *GoTestFormatter) Format(lines []string, width int) string {
 		}
 	}
 
-	// Calculate subsystem coverage
-	subsystems := calculateSubsystemCoverage(packages)
+	// Calculate subsystem stats
+	subsystems := calculateSubsystemStats(packages)
 
 	// Header summary - unified format with colored counts
 	totalTests := totalPassed + totalFailed + totalSkipped + totalRunning
@@ -217,99 +217,115 @@ func (f *GoTestFormatter) Format(lines []string, width int) string {
 	b.WriteString(strings.Join(parts, mutedStyle.Render(" | ")))
 	b.WriteString("\n\n")
 
-	// Subsystem coverage summary
-	if len(subsystems) > 0 {
-		b.WriteString(pkgStyle.Render("Coverage by Subsystem") + "\n")
-		for _, ss := range subsystems {
-			if ss.pkgCount > 0 {
-				bar := renderCoverageBar(ss.avgCoverage, mutedStyle, passStyle)
-				b.WriteString(fmt.Sprintf("  %-8s %s\n", ss.name, bar))
-			}
+	// Subsystem-centric view with pass/fail status and nested failures
+	for _, ss := range subsystems {
+		totalPkgs := ss.passedCount + ss.failedCount
+		if totalPkgs == 0 && ss.pkgCount == 0 {
+			// No packages tested in this subsystem, show minimal line
+			b.WriteString(fmt.Sprintf("  %-8s %s\n", ss.name, mutedStyle.Render("—")))
+			continue
 		}
-		b.WriteString("\n")
-	}
 
-	// Package details - show failed packages first
-	failedPkgs := []string{}
-	passedPkgs := []string{}
-	for _, pkg := range pkgOrder {
-		if packages[pkg].status == "fail" {
-			failedPkgs = append(failedPkgs, pkg)
-		} else {
-			passedPkgs = append(passedPkgs, pkg)
-		}
-	}
-	sortedPkgs := append(failedPkgs, passedPkgs...)
-
-	for _, pkg := range sortedPkgs {
-		pr := packages[pkg]
-
-		// Package icon
-		var icon string
-		switch pr.status {
-		case "pass":
-			icon = passStyle.Render("✓")
-		case "fail":
+		// Subsystem status icon and pass/fail count
+		var icon, countStr string
+		if ss.failedCount > 0 {
 			icon = failStyle.Render("✗")
-		default:
-			icon = runStyle.Render(spinnerFrame)
+			countStr = failStyle.Render(fmt.Sprintf("%d/%d", ss.passedCount, totalPkgs))
+		} else if totalPkgs > 0 {
+			icon = passStyle.Render("✓")
+			countStr = passStyle.Render(fmt.Sprintf("%d/%d", ss.passedCount, totalPkgs))
+		} else {
+			icon = mutedStyle.Render("○")
+			countStr = mutedStyle.Render("—")
 		}
 
-		// Shorten package name
-		shortPkg := pkg
-		if parts := strings.Split(pkg, "/"); len(parts) > 2 {
-			shortPkg = ".../" + strings.Join(parts[len(parts)-2:], "/")
-		}
-
-		// Coverage sparkbar
+		// Coverage bar
 		coverageStr := ""
-		if pr.coverage > 0 {
-			coverageStr = " " + renderCoverageBar(pr.coverage, mutedStyle, passStyle)
+		if ss.pkgCount > 0 {
+			coverageStr = "  " + renderCoverageBar(ss.avgCoverage, mutedStyle, passStyle)
 		}
 
-		// Duration
-		elapsed := ""
-		if pr.elapsed > 0 {
-			elapsed = mutedStyle.Render(fmt.Sprintf(" %.2fs", pr.elapsed))
-		}
+		b.WriteString(fmt.Sprintf("  %s %-8s %s%s\n", icon, ss.name, countStr, coverageStr))
 
-		b.WriteString(fmt.Sprintf("%s %s%s%s\n", icon, pkgStyle.Render(shortPkg), coverageStr, elapsed))
+		// Show failed packages and tests under failed subsystems
+		for _, failure := range ss.failures {
+			// Shorten package name
+			shortPkg := failure.pkg
+			if pkgParts := strings.Split(failure.pkg, "/"); len(pkgParts) > 2 {
+				shortPkg = ".../" + strings.Join(pkgParts[len(pkgParts)-2:], "/")
+			}
+			b.WriteString(fmt.Sprintf("      %s %s\n", failStyle.Render("✗"), pkgStyle.Render(shortPkg)))
 
-		// Show failed tests with output
-		if pr.status == "fail" {
-			for _, testName := range pr.testOrder {
-				tr := pr.tests[testName]
-				if tr.status != "fail" {
-					continue
+			// Show failed test names
+			for _, testName := range failure.failedTests {
+				displayName := humanizeTestNameWithSubtest(testName)
+				maxNameWidth := width - 12 // account for deeper indent
+				if len(displayName) > maxNameWidth && maxNameWidth > 20 {
+					displayName = truncateAtWord(displayName, maxNameWidth-3) + "..."
 				}
-
-				// Humanized test name
-				friendlyName := humanizeTestName(tr.name)
-				b.WriteString(fmt.Sprintf("  %s %s\n", failStyle.Render("✗"), testStyle.Render(friendlyName)))
-
-				// Filter and show only useful output
-				var useful []string
-				for _, out := range tr.output {
-					if isUsefulOutput(out) {
-						useful = append(useful, out)
-					}
-				}
-				// Limit to last 5 useful lines
-				if len(useful) > 5 {
-					useful = useful[len(useful)-5:]
-				}
-				for _, out := range useful {
-					// Indent and truncate long lines
-					if len(out) > width-8 {
-						out = out[:width-11] + "..."
-					}
-					b.WriteString(outputStyle.Render("    │ " + out) + "\n")
-				}
+				b.WriteString(fmt.Sprintf("        %s %s\n", failStyle.Render("✗"), testStyle.Render(displayName)))
 			}
 		}
 	}
 
 	return b.String()
+}
+
+// truncateAtWord truncates a string at word boundaries (spaces) to fit within maxLen.
+func truncateAtWord(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	// Find last space before maxLen
+	lastSpace := -1
+	for i := maxLen; i >= maxLen/2; i-- {
+		if s[i] == ' ' {
+			lastSpace = i
+			break
+		}
+	}
+	if lastSpace > 0 {
+		return s[:lastSpace]
+	}
+	// No good break point, hard truncate
+	return s[:maxLen]
+}
+
+// splitCamelCase inserts spaces between camelCase words.
+// e.g., "ReaderLoop" -> "Reader Loop", "HTTPServer" -> "HTTP Server"
+func splitCamelCase(s string) string {
+	if len(s) <= 1 {
+		return s
+	}
+	var result strings.Builder
+	runes := []rune(s)
+	for i, r := range runes {
+		if i > 0 {
+			prev := runes[i-1]
+			// Insert space before uppercase if previous was lowercase
+			// or if this starts a new word after an acronym (e.g., "HTTPServer" -> "HTTP Server")
+			if unicode.IsUpper(r) && unicode.IsLower(prev) {
+				result.WriteRune(' ')
+			} else if i+1 < len(runes) && unicode.IsUpper(r) && unicode.IsUpper(prev) && unicode.IsLower(runes[i+1]) {
+				// Handle "HTTPServer" -> "HTTP Server" (space before 'S')
+				result.WriteRune(' ')
+			}
+		}
+		result.WriteRune(r)
+	}
+	return result.String()
+}
+
+// humanizeTestNameWithSubtest converts test names including subtests to human-friendly format.
+// e.g., "TestClient_ReaderLoop_RoutesMessages/response_message" -> "Client Reader Loop Routes Messages / response message"
+func humanizeTestNameWithSubtest(name string) string {
+	// Handle subtest names (split on /)
+	if idx := strings.Index(name, "/"); idx != -1 {
+		mainTest := humanizeTestName(name[:idx])
+		subtest := splitCamelCase(strings.ReplaceAll(name[idx+1:], "_", " "))
+		return mainTest + " / " + subtest
+	}
+	return humanizeTestName(name)
 }
 
 // humanizeTestName converts TestFoo_Bar_Baz to "Foo Bar Baz" while preserving acronyms
@@ -356,6 +372,9 @@ func humanizeTestName(name string) string {
 	// Replace underscores with spaces
 	name = strings.ReplaceAll(name, "_", " ")
 
+	// Split camelCase: "ReaderLoop" -> "Reader Loop"
+	name = splitCamelCase(name)
+
 	// Split into words and process
 	words := strings.Fields(name)
 	for i, word := range words {
@@ -372,6 +391,35 @@ func humanizeTestName(name string) string {
 		return name
 	}
 	return result
+}
+
+// wrapTestName wraps long test names at natural break points
+func wrapTestName(name string, maxWidth int) string {
+	if len(name) <= maxWidth {
+		return name
+	}
+
+	// Find best break point (underscore or slash) before maxWidth
+	breakPoint := -1
+	for i := maxWidth - 1; i > maxWidth/2; i-- {
+		if name[i] == '_' || name[i] == '/' {
+			breakPoint = i
+			break
+		}
+	}
+
+	if breakPoint == -1 {
+		// No good break point, hard wrap
+		return name[:maxWidth-3] + "..."
+	}
+
+	// Wrap with continuation on next line
+	first := name[:breakPoint+1]
+	rest := name[breakPoint+1:]
+	if len(rest) > maxWidth-4 {
+		rest = rest[:maxWidth-7] + "..."
+	}
+	return first + "\n      " + rest
 }
 
 // isUsefulOutput filters out noisy log lines
@@ -417,81 +465,109 @@ func renderCoverageBar(coverage float64, mutedStyle, goodStyle lipgloss.Style) s
 	return mutedStyle.Render(bar + " " + pct)
 }
 
-// subsystemResult holds aggregated coverage for an architectural subsystem
+// subsystemResult holds aggregated stats for an architectural subsystem
 type subsystemResult struct {
 	name        string
 	avgCoverage float64
 	pkgCount    int
+	passedCount int
+	failedCount int
+	failures    []pkgFailure // failed packages with test details
 }
 
-// architecturalSubsystems defines path patterns for each subsystem
-// Based on .go-arch-lint.yml component definitions
-var architecturalSubsystems = []struct {
-	name     string
-	patterns []string
-}{
-	{"core", []string{"/internal/core/", "/core/"}},
-	{"kg", []string{"/internal/kg/", "/kg/"}},
-	{"domain", []string{"/internal/domain/", "/internal/tools/", "/domain/", "/tools/"}},
-	{"adapter", []string{"/internal/mcp/", "/mcp/"}},
-	{"worker", []string{"/internal/proc/", "/proc/"}},
-	{"kits", []string{"/internal/codekit/", "/internal/testkit/", "/codekit/", "/testkit/"}},
-	{"util", []string{"/internal/util/", "/util/", "/pkg/"}},
+// pkgFailure tracks a failed package and its failed tests
+type pkgFailure struct {
+	pkg         string
+	failedTests []string // test names that failed
 }
 
-// calculateSubsystemCoverage aggregates package coverage by architectural subsystem
-func calculateSubsystemCoverage(packages map[string]*pkgResult) []subsystemResult {
+// getSubsystems returns the configured subsystems from theme, or defaults.
+func getSubsystems() []SubsystemConfig {
+	if activeTheme != nil && len(activeTheme.Subsystems) > 0 {
+		return activeTheme.Subsystems
+	}
+	return DefaultSubsystems()
+}
+
+// getSubsystemForPackage returns the subsystem name for a package path
+func getSubsystemForPackage(pkg string) string {
+	subsystems := getSubsystems()
+	for _, ss := range subsystems {
+		for _, pattern := range ss.Patterns {
+			if strings.Contains(pkg, pattern) {
+				return ss.Name
+			}
+		}
+	}
+	// Default to last subsystem (typically "util") or "other"
+	if len(subsystems) > 0 {
+		return subsystems[len(subsystems)-1].Name
+	}
+	return "other"
+}
+
+// calculateSubsystemStats aggregates package stats by architectural subsystem
+func calculateSubsystemStats(packages map[string]*pkgResult) []subsystemResult {
+	subsystems := getSubsystems()
+
 	// Initialize subsystem accumulators
 	type accumulator struct {
 		totalCoverage float64
-		count         int
+		coverageCount int
+		passedCount   int
+		failedCount   int
+		failures      []pkgFailure
 	}
 	accum := make(map[string]*accumulator)
-	for _, ss := range architecturalSubsystems {
-		accum[ss.name] = &accumulator{}
+	for _, ss := range subsystems {
+		accum[ss.Name] = &accumulator{}
 	}
 
 	// Categorize each package
 	for pkg, pr := range packages {
-		if pr.coverage <= 0 {
-			continue // Skip packages without coverage data
+		subsystem := getSubsystemForPackage(pkg)
+		a := accum[subsystem]
+
+		// Track coverage
+		if pr.coverage > 0 {
+			a.totalCoverage += pr.coverage
+			a.coverageCount++
 		}
 
-		subsystem := ""
-		for _, ss := range architecturalSubsystems {
-			for _, pattern := range ss.patterns {
-				if strings.Contains(pkg, pattern) {
-					subsystem = ss.name
-					break
+		// Track pass/fail
+		if pr.status == "pass" {
+			a.passedCount++
+		} else if pr.status == "fail" {
+			a.failedCount++
+			// Collect failed test names
+			var failedTests []string
+			for _, testName := range pr.testOrder {
+				if tr, ok := pr.tests[testName]; ok && tr.status == "fail" {
+					failedTests = append(failedTests, testName)
 				}
 			}
-			if subsystem != "" {
-				break
-			}
-		}
-
-		if subsystem == "" {
-			subsystem = "util" // Default unmapped packages to util
-		}
-
-		if a, ok := accum[subsystem]; ok {
-			a.totalCoverage += pr.coverage
-			a.count++
+			a.failures = append(a.failures, pkgFailure{
+				pkg:         pkg,
+				failedTests: failedTests,
+			})
 		}
 	}
 
 	// Build results in defined order
 	var results []subsystemResult
-	for _, ss := range architecturalSubsystems {
-		a := accum[ss.name]
+	for _, ss := range subsystems {
+		a := accum[ss.Name]
 		avg := 0.0
-		if a.count > 0 {
-			avg = a.totalCoverage / float64(a.count)
+		if a.coverageCount > 0 {
+			avg = a.totalCoverage / float64(a.coverageCount)
 		}
 		results = append(results, subsystemResult{
-			name:        ss.name,
+			name:        ss.Name,
 			avgCoverage: avg,
-			pkgCount:    a.count,
+			pkgCount:    a.coverageCount,
+			passedCount: a.passedCount,
+			failedCount: a.failedCount,
+			failures:    a.failures,
 		})
 	}
 
