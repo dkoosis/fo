@@ -481,8 +481,8 @@ func isUsefulOutput(line string) bool {
 	return false
 }
 
-// renderCoverageBar creates a sparkbar for coverage percentage
-func renderCoverageBar(coverage float64, mutedStyle, goodStyle lipgloss.Style) string {
+// renderCoverageBar creates a sparkbar for coverage percentage with threshold colors
+func renderCoverageBar(coverage float64, mutedStyle, _ lipgloss.Style) string {
 	barLen := 10
 	filled := int(coverage / 10)
 	if filled > barLen {
@@ -492,10 +492,21 @@ func renderCoverageBar(coverage float64, mutedStyle, goodStyle lipgloss.Style) s
 	bar := strings.Repeat("▮", filled) + strings.Repeat("▯", barLen-filled)
 	pct := fmt.Sprintf("%.0f%%", coverage)
 
+	// Pale threshold colors
+	paleGreen := lipgloss.NewStyle().Foreground(lipgloss.Color("#7CB97C"))  // Good: >= 70%
+	paleYellow := lipgloss.NewStyle().Foreground(lipgloss.Color("#C9B458")) // OK: >= 40%
+	paleRed := lipgloss.NewStyle().Foreground(lipgloss.Color("#C97C7C"))    // Poor: < 40%
+
+	var barStyle lipgloss.Style
 	if coverage >= 70 {
-		return goodStyle.Render(bar) + " " + mutedStyle.Render(pct)
+		barStyle = paleGreen
+	} else if coverage >= 40 {
+		barStyle = paleYellow
+	} else {
+		barStyle = paleRed
 	}
-	return mutedStyle.Render(bar + " " + pct)
+
+	return barStyle.Render(bar) + " " + mutedStyle.Render(pct)
 }
 
 // subsystemResult holds aggregated stats for an architectural subsystem
