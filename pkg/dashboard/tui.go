@@ -140,6 +140,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				task.Status = up.Status
 				task.ExitCode = up.ExitCode
 				task.FinishedAt = up.FinishedAt
+				// Refresh viewport on completion so formatter sees complete output
+				if m.selected == up.Index {
+					m.refreshViewport()
+				}
 			} else {
 				task.Status = up.Status
 			}
