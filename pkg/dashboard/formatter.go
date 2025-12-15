@@ -3,6 +3,7 @@ package dashboard
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -653,6 +654,15 @@ func calculateSubsystemStats(packages map[string]*pkgResult) []subsystemResult {
 // Golangci-lint Formatter (per-linter sections with smart rendering)
 // ============================================================================
 
+// Formatting constants for golangci-lint output.
+const (
+	lintItemsPerSection   = 5  // max items shown per linter section
+	lintComplexityWarn    = 30 // complexity threshold for red highlighting
+	lintMsgTruncateLen    = 50 // max message length before truncation
+	lintFileListMaxLen    = 40 // max length for file list in goconst
+	lintFuncNameColWidth  = 24 // column width for function names
+)
+
 type GolangciLintFormatter struct{}
 
 func (f *GolangciLintFormatter) Matches(command string) bool {
@@ -682,10 +692,10 @@ func (f *GolangciLintFormatter) Format(lines []string, width int) string {
 	// Parse SARIF - extract JSON from mixed output (stdout SARIF + stderr text)
 	var report SARIFReport
 	var parsed bool
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "{") && strings.Contains(line, `"runs"`) {
-			if err := json.Unmarshal([]byte(line), &report); err == nil {
+	for _, rawLine := range lines {
+		trimmed := strings.TrimSpace(rawLine)
+		if strings.HasPrefix(trimmed, "{") && strings.Contains(trimmed, `"runs"`) {
+			if err := json.Unmarshal([]byte(trimmed), &report); err == nil {
 				parsed = true
 				break
 			}
@@ -697,23 +707,25 @@ func (f *GolangciLintFormatter) Format(lines []string, width int) string {
 
 	// Group issues by linter
 	byLinter := make(map[string][]lintIssue)
+	totalIssues := 0
 	for _, run := range report.Runs {
 		for _, result := range run.Results {
-			file := ""
-			line := 0
+			filePath := ""
+			lineNum := 0
 			if len(result.Locations) > 0 {
 				loc := result.Locations[0].PhysicalLocation
-				file = loc.ArtifactLocation.URI
-				line = loc.Region.StartLine
+				filePath = loc.ArtifactLocation.URI
+				lineNum = loc.Region.StartLine
 			}
 			issue := lintIssue{
 				linter:  result.RuleID,
-				file:    file,
-				line:    line,
+				file:    filePath,
+				line:    lineNum,
 				message: result.Message.Text,
 				level:   result.Level,
 			}
 			byLinter[result.RuleID] = append(byLinter[result.RuleID], issue)
+			totalIssues++
 		}
 	}
 
@@ -728,17 +740,13 @@ func (f *GolangciLintFormatter) Format(lines []string, width int) string {
 		name   string
 		issues []lintIssue
 	}
-	var groups []linterGroup
+	groups := make([]linterGroup, 0, len(byLinter))
 	for name, issues := range byLinter {
 		groups = append(groups, linterGroup{name, issues})
 	}
-	for i := 0; i < len(groups)-1; i++ {
-		for j := i + 1; j < len(groups); j++ {
-			if len(groups[j].issues) > len(groups[i].issues) {
-				groups[i], groups[j] = groups[j], groups[i]
-			}
-		}
-	}
+	sort.Slice(groups, func(i, j int) bool {
+		return len(groups[i].issues) > len(groups[j].issues)
+	})
 
 	// Render each linter section
 	for _, g := range groups {
@@ -761,7 +769,7 @@ func (f *GolangciLintFormatter) Format(lines []string, width int) string {
 		case "goconst":
 			f.renderGoconst(&b, g.issues, fileStyle, mutedStyle)
 		default:
-			f.renderDefault(&b, g.issues, fileStyle, mutedStyle, errorStyle, warnStyle, 5)
+			f.renderDefault(&b, g.issues, fileStyle, mutedStyle, errorStyle, warnStyle)
 		}
 		b.WriteString("\n")
 	}
@@ -771,54 +779,45 @@ func (f *GolangciLintFormatter) Format(lines []string, width int) string {
 
 // renderGocyclo renders complexity issues as a ranked list.
 func (f *GolangciLintFormatter) renderGocyclo(b *strings.Builder, issues []lintIssue, fileStyle, errorStyle, warnStyle, mutedStyle lipgloss.Style) {
-	// Parse complexity from message: "cyclomatic complexity N of func `name` is high"
 	type complexityItem struct {
 		funcName   string
 		complexity int
 		file       string
-		line       int
 	}
-	var items []complexityItem
+	items := make([]complexityItem, 0, len(issues))
 
 	for _, iss := range issues {
 		var complexity int
 		var funcName string
 		// Parse: "cyclomatic complexity 25 of func `run` is high (> 20)"
 		if _, err := fmt.Sscanf(iss.message, "cyclomatic complexity %d of func `", &complexity); err == nil {
-			// Extract function name between backticks
-			start := strings.Index(iss.message, "`")
-			end := strings.Index(iss.message[start+1:], "`")
-			if start >= 0 && end >= 0 {
-				funcName = iss.message[start+1 : start+1+end]
+			if start := strings.Index(iss.message, "`"); start >= 0 {
+				if end := strings.Index(iss.message[start+1:], "`"); end >= 0 {
+					funcName = iss.message[start+1 : start+1+end]
+				}
 			}
 		}
 		if funcName == "" {
 			funcName = "?"
 		}
-		items = append(items, complexityItem{funcName, complexity, iss.file, iss.line})
+		items = append(items, complexityItem{funcName, complexity, iss.file})
 	}
 
-	// Sort by complexity descending
-	for i := 0; i < len(items)-1; i++ {
-		for j := i + 1; j < len(items); j++ {
-			if items[j].complexity > items[i].complexity {
-				items[i], items[j] = items[j], items[i]
-			}
-		}
-	}
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].complexity > items[j].complexity
+	})
 
-	// Render top 5
 	for i, item := range items {
-		if i >= 5 {
-			b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", len(items)-5)))
+		if i >= lintItemsPerSection {
+			b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", len(items)-lintItemsPerSection)))
 			break
 		}
 		scoreStyle := warnStyle
-		if item.complexity > 30 {
+		if item.complexity > lintComplexityWarn {
 			scoreStyle = errorStyle
 		}
-		// Right-align function name, then score, then file
-		b.WriteString(fmt.Sprintf("  %-24s %s  %s\n",
+		b.WriteString(fmt.Sprintf("  %-*s %s  %s\n",
+			lintFuncNameColWidth,
 			item.funcName,
 			scoreStyle.Render(fmt.Sprintf("%2d", item.complexity)),
 			fileStyle.Render(shortPath(item.file))))
@@ -827,7 +826,6 @@ func (f *GolangciLintFormatter) renderGocyclo(b *strings.Builder, issues []lintI
 
 // renderGoconst renders magic string issues grouped by literal.
 func (f *GolangciLintFormatter) renderGoconst(b *strings.Builder, issues []lintIssue, fileStyle, mutedStyle lipgloss.Style) {
-	// Parse: 'string `X` has N occurrences'
 	type constItem struct {
 		literal string
 		count   int
@@ -836,7 +834,6 @@ func (f *GolangciLintFormatter) renderGoconst(b *strings.Builder, issues []lintI
 	byLiteral := make(map[string]*constItem)
 
 	for _, iss := range issues {
-		// Extract literal between backticks
 		start := strings.Index(iss.message, "`")
 		if start < 0 {
 			continue
@@ -847,7 +844,6 @@ func (f *GolangciLintFormatter) renderGoconst(b *strings.Builder, issues []lintI
 		}
 		literal := iss.message[start+1 : start+1+end]
 
-		// Extract count
 		var count int
 		fmt.Sscanf(iss.message, "string `"+literal+"` has %d occurrences", &count)
 
@@ -857,29 +853,22 @@ func (f *GolangciLintFormatter) renderGoconst(b *strings.Builder, issues []lintI
 		byLiteral[literal].files = append(byLiteral[literal].files, shortPath(iss.file))
 	}
 
-	// Sort by count descending
-	var items []*constItem
+	items := make([]*constItem, 0, len(byLiteral))
 	for _, item := range byLiteral {
 		items = append(items, item)
 	}
-	for i := 0; i < len(items)-1; i++ {
-		for j := i + 1; j < len(items); j++ {
-			if items[j].count > items[i].count {
-				items[i], items[j] = items[j], items[i]
-			}
-		}
-	}
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].count > items[j].count
+	})
 
-	// Render top 5
 	for i, item := range items {
-		if i >= 5 {
-			b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", len(items)-5)))
+		if i >= lintItemsPerSection {
+			b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", len(items)-lintItemsPerSection)))
 			break
 		}
-		// Show literal, count, and first few files
 		files := strings.Join(item.files, ", ")
-		if len(files) > 40 {
-			files = files[:37] + "..."
+		if len(files) > lintFileListMaxLen {
+			files = files[:lintFileListMaxLen-3] + "..."
 		}
 		b.WriteString(fmt.Sprintf("  %s  %s  %s\n",
 			mutedStyle.Render(fmt.Sprintf("%q", item.literal)),
@@ -889,22 +878,22 @@ func (f *GolangciLintFormatter) renderGoconst(b *strings.Builder, issues []lintI
 }
 
 // renderDefault renders issues as a simple list.
-func (f *GolangciLintFormatter) renderDefault(b *strings.Builder, issues []lintIssue, fileStyle, mutedStyle, errorStyle, warnStyle lipgloss.Style, limit int) {
+func (f *GolangciLintFormatter) renderDefault(b *strings.Builder, issues []lintIssue, fileStyle, mutedStyle, errorStyle, warnStyle lipgloss.Style) {
 	for i, iss := range issues {
-		if i >= limit {
-			b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", len(issues)-limit)))
+		if i >= lintItemsPerSection {
+			b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", len(issues)-lintItemsPerSection)))
 			break
 		}
 		icon := mutedStyle.Render("·")
-		if iss.level == "error" {
+		switch iss.level {
+		case "error":
 			icon = errorStyle.Render("✗")
-		} else if iss.level == "warning" {
+		case "warning":
 			icon = warnStyle.Render("△")
 		}
-		// Truncate message
 		msg := iss.message
-		if len(msg) > 50 {
-			msg = msg[:47] + "..."
+		if len(msg) > lintMsgTruncateLen {
+			msg = msg[:lintMsgTruncateLen-3] + "..."
 		}
 		b.WriteString(fmt.Sprintf("  %s %s %s\n",
 			icon,
