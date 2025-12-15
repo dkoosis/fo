@@ -832,6 +832,13 @@ func (f *GolangciLintFormatter) renderGocyclo(b *strings.Builder, issues []lintI
 	}
 }
 
+// Goconst display limits.
+const (
+	goconstMaxItems      = 15 // max items to show
+	goconstLiteralWidth  = 16 // column width for quoted literals
+	goconstFileListWidth = 40 // max width for file list
+)
+
 // renderGoconst renders magic string issues grouped by literal.
 func (f *GolangciLintFormatter) renderGoconst(b *strings.Builder, issues []lintIssue, fileStyle, mutedStyle lipgloss.Style) {
 	type constItem struct {
@@ -858,7 +865,18 @@ func (f *GolangciLintFormatter) renderGoconst(b *strings.Builder, issues []lintI
 		if byLiteral[literal] == nil {
 			byLiteral[literal] = &constItem{literal: literal, count: count}
 		}
-		byLiteral[literal].files = append(byLiteral[literal].files, shortPath(iss.file))
+		// Dedupe files
+		filename := shortPath(iss.file)
+		found := false
+		for _, f := range byLiteral[literal].files {
+			if f == filename {
+				found = true
+				break
+			}
+		}
+		if !found {
+			byLiteral[literal].files = append(byLiteral[literal].files, filename)
+		}
 	}
 
 	items := make([]*constItem, 0, len(byLiteral))
@@ -869,18 +887,27 @@ func (f *GolangciLintFormatter) renderGoconst(b *strings.Builder, issues []lintI
 		return items[i].count > items[j].count
 	})
 
+	// Format: " 9x "fail"          formatter.go, housekeeping.go"
 	for i, item := range items {
-		if i >= lintItemsPerSection {
-			b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", len(items)-lintItemsPerSection)))
+		if i >= goconstMaxItems {
+			b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", len(items)-goconstMaxItems)))
 			break
 		}
-		files := strings.Join(item.files, ", ")
-		if len(files) > lintFileListMaxLen {
-			files = files[:lintFileListMaxLen-3] + "..."
+		// Quoted literal, truncate if needed
+		quoted := fmt.Sprintf("%q", item.literal)
+		if len(quoted) > goconstLiteralWidth-2 {
+			quoted = quoted[:goconstLiteralWidth-5] + "...\""
 		}
-		b.WriteString(fmt.Sprintf("  %s  %s  %s\n",
-			mutedStyle.Render(fmt.Sprintf("%q", item.literal)),
-			mutedStyle.Render(fmt.Sprintf("%d×", item.count)),
+
+		files := strings.Join(item.files, ", ")
+		if len(files) > goconstFileListWidth {
+			files = files[:goconstFileListWidth-3] + "..."
+		}
+
+		b.WriteString(fmt.Sprintf("  %s %-*s  %s\n",
+			mutedStyle.Render(fmt.Sprintf("%2dx", item.count)),
+			goconstLiteralWidth,
+			mutedStyle.Render(quoted),
 			fileStyle.Render(files)))
 	}
 }
