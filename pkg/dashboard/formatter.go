@@ -813,6 +813,17 @@ func (f *GolangciLintFormatter) renderGocyclo(b *strings.Builder, issues []lintI
 		return items[i].complexity > items[j].complexity
 	})
 
+	// Calculate max filename width for alignment
+	maxFileLen := 0
+	for i, item := range items {
+		if i >= gocycloMaxItems {
+			break
+		}
+		if len(shortPath(item.file)) > maxFileLen {
+			maxFileLen = len(shortPath(item.file))
+		}
+	}
+
 	// Format: "54  formatter.go         (*GoTestFormatter).Format"
 	for i, item := range items {
 		if i >= gocycloMaxItems {
@@ -824,10 +835,11 @@ func (f *GolangciLintFormatter) renderGocyclo(b *strings.Builder, issues []lintI
 			scoreStyle = errorStyle
 		}
 		filename := shortPath(item.file)
-		b.WriteString(fmt.Sprintf("  %s  %-*s  %s\n",
+		// Pad filename before styling to ensure alignment
+		paddedFilename := fmt.Sprintf("%-*s", maxFileLen, filename)
+		b.WriteString(fmt.Sprintf("  %s  %s  %s\n",
 			scoreStyle.Render(fmt.Sprintf("%2d", item.complexity)),
-			gocycloFileColWidth,
-			fileStyle.Render(filename),
+			fileStyle.Render(paddedFilename),
 			mutedStyle.Render(item.funcName)))
 	}
 }
