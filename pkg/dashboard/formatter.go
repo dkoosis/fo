@@ -25,6 +25,8 @@ var formatters = []OutputFormatter{
 	&FilesizeDashboardFormatter{}, // Must be before SARIF to match dashboard format
 	&GolangciLintFormatter{},      // Per-linter sections for golangci-lint
 	&GofmtFormatter{},             // gofmt -l output
+	&GoVetFormatter{},             // go vet output
+	&GoBuildFormatter{},           // go build output
 	&SARIFFormatter{},
 	&PlainFormatter{}, // fallback, always last
 }
@@ -1018,6 +1020,98 @@ func (f *GofmtFormatter) Format(lines []string, width int) string {
 
 	for _, file := range files {
 		b.WriteString(fmt.Sprintf("  %s\n", fileStyle.Render(file)))
+	}
+
+	return b.String()
+}
+
+// ============================================================================
+// Go Vet Formatter (handles go vet output)
+// ============================================================================
+
+type GoVetFormatter struct{}
+
+func (f *GoVetFormatter) Matches(command string) bool {
+	return strings.Contains(command, "go vet")
+}
+
+func (f *GoVetFormatter) Format(lines []string, width int) string {
+	var b strings.Builder
+
+	// Styles
+	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true)
+	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
+	fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
+	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
+
+	// Filter to non-empty lines
+	var issues []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" {
+			issues = append(issues, trimmed)
+		}
+	}
+
+	if len(issues) == 0 {
+		b.WriteString(successStyle.Render("✓ No issues found\n"))
+		return b.String()
+	}
+
+	b.WriteString(errorStyle.Render(fmt.Sprintf("✗ %d issues:\n\n", len(issues))))
+
+	for i, issue := range issues {
+		if i >= 15 {
+			b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", len(issues)-15)))
+			break
+		}
+		b.WriteString(fmt.Sprintf("  %s\n", fileStyle.Render(issue)))
+	}
+
+	return b.String()
+}
+
+// ============================================================================
+// Go Build Formatter (handles go build output)
+// ============================================================================
+
+type GoBuildFormatter struct{}
+
+func (f *GoBuildFormatter) Matches(command string) bool {
+	return strings.Contains(command, "go build")
+}
+
+func (f *GoBuildFormatter) Format(lines []string, width int) string {
+	var b strings.Builder
+
+	// Styles
+	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true)
+	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
+	fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
+	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
+
+	// Filter to non-empty lines (errors)
+	var errors []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" {
+			errors = append(errors, trimmed)
+		}
+	}
+
+	if len(errors) == 0 {
+		b.WriteString(successStyle.Render("✓ Build successful\n"))
+		return b.String()
+	}
+
+	b.WriteString(errorStyle.Render(fmt.Sprintf("✗ Build failed:\n\n")))
+
+	for i, err := range errors {
+		if i >= 20 {
+			b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", len(errors)-20)))
+			break
+		}
+		b.WriteString(fmt.Sprintf("  %s\n", fileStyle.Render(err)))
 	}
 
 	return b.String()
