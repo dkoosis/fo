@@ -42,6 +42,16 @@ func FormatOutput(command string, lines []string, width int) string {
 	return strings.Join(lines, "\n")
 }
 
+// Status constants for test/lint results.
+const (
+	statusRun     = "run"
+	statusPass    = "pass"
+	statusFail    = "fail"
+	statusSkip    = "skip"
+	statusError   = "error"
+	statusWarning = "warning"
+)
+
 // ============================================================================
 // Go Test Formatter (handles go test -json output)
 // ============================================================================
@@ -123,7 +133,7 @@ func (f *GoTestFormatter) Format(lines []string, width int) string {
 
 		if _, ok := packages[pkg]; !ok {
 			packages[pkg] = &pkgResult{
-				status: "run",
+				status: statusRun,
 				tests:  make(map[string]*testResult),
 			}
 			pkgOrder = append(pkgOrder, pkg)
@@ -133,22 +143,22 @@ func (f *GoTestFormatter) Format(lines []string, width int) string {
 		// Handle test-level events
 		if event.Test != "" {
 			if _, ok := pr.tests[event.Test]; !ok {
-				pr.tests[event.Test] = &testResult{name: event.Test, status: "run"}
+				pr.tests[event.Test] = &testResult{name: event.Test, status: statusRun}
 				pr.testOrder = append(pr.testOrder, event.Test)
 			}
 			tr := pr.tests[event.Test]
 
 			switch event.Action {
-			case "run":
-				tr.status = "run"
-			case "pass":
-				tr.status = "pass"
+			case statusRun:
+				tr.status = statusRun
+			case statusPass:
+				tr.status = statusPass
 				tr.elapsed = event.Elapsed
-			case "fail":
-				tr.status = "fail"
+			case statusFail:
+				tr.status = statusFail
 				tr.elapsed = event.Elapsed
-			case "skip":
-				tr.status = "skip"
+			case statusSkip:
+				tr.status = statusSkip
 			case "output":
 				// Capture test output (for failures)
 				out := strings.TrimRight(event.Output, "\n")
@@ -159,11 +169,11 @@ func (f *GoTestFormatter) Format(lines []string, width int) string {
 		} else {
 			// Package-level events
 			switch event.Action {
-			case "pass":
-				pr.status = "pass"
+			case statusPass:
+				pr.status = statusPass
 				pr.elapsed = event.Elapsed
-			case "fail":
-				pr.status = "fail"
+			case statusFail:
+				pr.status = statusFail
 				pr.elapsed = event.Elapsed
 			case "output":
 				// Check for coverage info - line must START with "coverage:"
@@ -194,13 +204,13 @@ func (f *GoTestFormatter) Format(lines []string, width int) string {
 		pr := packages[pkg]
 		for _, tr := range pr.tests {
 			switch tr.status {
-			case "pass":
+			case statusPass:
 				totalPassed++
-			case "fail":
+			case statusFail:
 				totalFailed++
-			case "skip":
+			case statusSkip:
 				totalSkipped++
-			case "run":
+			case statusRun:
 				totalRunning++
 			}
 		}
@@ -538,36 +548,37 @@ func calculateSubsystemStats(packages map[string]*pkgResult) []subsystemResult {
 
 		// Infer package status from tests if not explicitly set
 		status := pr.status
-		if status == "run" && len(pr.tests) > 0 {
+		if status == statusRun && len(pr.tests) > 0 {
 			// Check if any tests failed
 			hasFailed := false
 			allDone := true
 			for _, tr := range pr.tests {
-				if tr.status == "fail" {
+				if tr.status == statusFail {
 					hasFailed = true
 				}
-				if tr.status == "run" {
+				if tr.status == statusRun {
 					allDone = false
 				}
 			}
 			if allDone {
 				if hasFailed {
-					status = "fail"
+					status = statusFail
 				} else {
-					status = "pass"
+					status = statusPass
 				}
 			}
 		}
 
 		// Track pass/fail
-		if status == "pass" {
+		switch status {
+		case statusPass:
 			a.passedCount++
-		} else if status == "fail" {
+		case statusFail:
 			a.failedCount++
 			// Collect failed test names
 			var failedTests []string
 			for _, testName := range pr.testOrder {
-				if tr, ok := pr.tests[testName]; ok && tr.status == "fail" {
+				if tr, ok := pr.tests[testName]; ok && tr.status == statusFail {
 					failedTests = append(failedTests, testName)
 				}
 			}
@@ -701,7 +712,7 @@ func (f *GolangciLintFormatter) Format(lines []string, width int) string {
 	for _, g := range groups {
 		countStyle := warnStyle
 		for _, iss := range g.issues {
-			if iss.level == "error" {
+			if iss.level == statusError {
 				countStyle = errorStyle
 				break
 			}
@@ -786,10 +797,10 @@ func (f *GolangciLintFormatter) renderGocyclo(b *strings.Builder, issues []lintI
 		filename := shortPath(item.file)
 		// Pad filename before styling to ensure alignment
 		paddedFilename := fmt.Sprintf("%-*s", maxFileLen, filename)
-		b.WriteString(fmt.Sprintf("  %s  %s  %s\n",
+		_, _ = fmt.Fprintf(b, "  %s  %s  %s\n",
 			scoreStyle.Render(fmt.Sprintf("%2d", item.complexity)),
 			fileStyle.Render(paddedFilename),
-			mutedStyle.Render(item.funcName)))
+			mutedStyle.Render(item.funcName))
 	}
 }
 
@@ -882,10 +893,10 @@ func (f *GolangciLintFormatter) renderGoconst(b *strings.Builder, issues []lintI
 			files = files[:goconstFileListWidth-3] + "..."
 		}
 
-		b.WriteString(fmt.Sprintf("  %s %s  %s\n",
+		_, _ = fmt.Fprintf(b, "  %s %s  %s\n",
 			mutedStyle.Render(fmt.Sprintf("%2dx", item.count)),
 			mutedStyle.Render(paddedQuoted),
-			fileStyle.Render(files)))
+			fileStyle.Render(files))
 	}
 }
 
@@ -904,9 +915,9 @@ func (f *GolangciLintFormatter) renderDefault(b *strings.Builder, issues []lintI
 		}
 		icon := mutedStyle.Render("·")
 		switch iss.level {
-		case "error":
+		case statusError:
 			icon = errorStyle.Render("✗")
-		case "warning":
+		case statusWarning:
 			icon = warnStyle.Render("△")
 		}
 		msg := iss.message
@@ -914,11 +925,11 @@ func (f *GolangciLintFormatter) renderDefault(b *strings.Builder, issues []lintI
 			msg = msg[:defaultMsgMaxLen-3] + "..."
 		}
 		// Line 1: icon + file:line
-		b.WriteString(fmt.Sprintf("  %s %s\n",
+		_, _ = fmt.Fprintf(b, "  %s %s\n",
 			icon,
-			fileStyle.Render(fmt.Sprintf("%s:%d", shortPath(iss.file), iss.line))))
+			fileStyle.Render(fmt.Sprintf("%s:%d", shortPath(iss.file), iss.line)))
 		// Line 2: indented message
-		b.WriteString(fmt.Sprintf("    %s\n", mutedStyle.Render(msg)))
+		_, _ = fmt.Fprintf(b, "    %s\n", mutedStyle.Render(msg))
 	}
 }
 
@@ -1251,7 +1262,7 @@ func (f *SARIFFormatter) Format(lines []string, width int) string {
 
 	for _, run := range report.Runs {
 		for _, result := range run.Results {
-			if result.Level == "error" {
+			if result.Level == statusError {
 				errors++
 			} else {
 				warnings++
@@ -1300,7 +1311,7 @@ func (f *SARIFFormatter) Format(lines []string, width int) string {
 		}
 
 		icon := warnStyle.Render("△")
-		if iss.level == "error" {
+		if iss.level == statusError {
 			icon = errorStyle.Render("✗")
 		}
 

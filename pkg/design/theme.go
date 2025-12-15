@@ -298,19 +298,19 @@ func ThemeFromConfig(cfg *Config) *Theme {
 		icons.Running = "▶"
 	}
 	if icons.Success == "" {
-		icons.Success = "✓"
+		icons.Success = IconCharSuccess
 	}
 	if icons.Warning == "" {
-		icons.Warning = "⚠"
+		icons.Warning = IconCharWarning
 	}
 	if icons.Error == "" {
-		icons.Error = "✗"
+		icons.Error = IconCharError
 	}
 	if icons.Info == "" {
 		icons.Info = "ℹ"
 	}
 	if icons.Bullet == "" {
-		icons.Bullet = "•"
+		icons.Bullet = IconCharBullet
 	}
 
 	// Build border from config

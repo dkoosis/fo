@@ -135,8 +135,10 @@ const ANSIBrightWhite = "\033[0;97m"
 
 // Icon character constants.
 const (
+	IconCharSuccess = "✓"
 	IconCharError   = "✗"
 	IconCharWarning = "⚠"
+	IconCharBullet  = "•"
 	BorderCharDash  = "─"
 )
 

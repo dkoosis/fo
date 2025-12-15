@@ -38,7 +38,7 @@ func (h *Housekeeping) PatternType() PatternType {
 func (h *Housekeeping) PassCount() int {
 	count := 0
 	for _, c := range h.Checks {
-		if c.Status == "pass" {
+		if c.Status == CheckPass {
 			count++
 		}
 	}
@@ -49,7 +49,7 @@ func (h *Housekeeping) PassCount() int {
 func (h *Housekeeping) WarnCount() int {
 	count := 0
 	for _, c := range h.Checks {
-		if c.Status == "warn" {
+		if c.Status == CheckWarn {
 			count++
 		}
 	}
@@ -60,7 +60,7 @@ func (h *Housekeeping) WarnCount() int {
 func (h *Housekeeping) FailCount() int {
 	count := 0
 	for _, c := range h.Checks {
-		if c.Status == "fail" {
+		if c.Status == CheckFail {
 			count++
 		}
 	}
@@ -138,13 +138,13 @@ func (h *Housekeeping) Render(cfg *Config) string {
 		var style lipgloss.Style
 
 		switch c.Status {
-		case "pass":
+		case CheckPass:
 			icon = cfg.Icons.Success
 			style = successStyle
-		case "warn":
+		case CheckWarn:
 			icon = cfg.Icons.Warning
 			style = warningStyle
-		case "fail":
+		case CheckFail:
 			icon = cfg.Icons.Error
 			style = errorStyle
 		default:
@@ -162,7 +162,7 @@ func (h *Housekeeping) Render(cfg *Config) string {
 		sb.WriteString("  ")
 
 		// Value display
-		if c.Status == "pass" {
+		if c.Status == CheckPass {
 			// Just show as passing
 			sb.WriteString(successStyle.Render("OK"))
 		} else if c.Threshold > 0 {
@@ -184,7 +184,7 @@ func (h *Housekeeping) Render(cfg *Config) string {
 		sb.WriteString("\n")
 
 		// Show specific items if present and check failed/warned
-		if c.Status != "pass" && len(c.Items) > 0 {
+		if c.Status != CheckPass && len(c.Items) > 0 {
 			// Show up to 3 items
 			maxItems := 3
 			for i, item := range c.Items {
@@ -234,23 +234,23 @@ func NewHousekeepingCheck(name string, current, threshold int) HousekeepingCheck
 	// Determine status based on threshold
 	if threshold > 0 {
 		if current <= threshold {
-			check.Status = "pass"
+			check.Status = CheckPass
 		} else {
 			ratio := float64(current) / float64(threshold)
 			if ratio > 1.5 {
-				check.Status = "fail"
+				check.Status = CheckFail
 			} else {
-				check.Status = "warn"
+				check.Status = CheckWarn
 			}
 		}
 	} else {
 		// For checks where 0 is the goal (orphan tests, dead code, etc.)
 		if current == 0 {
-			check.Status = "pass"
+			check.Status = CheckPass
 		} else if current <= 3 {
-			check.Status = "warn"
+			check.Status = CheckWarn
 		} else {
-			check.Status = "fail"
+			check.Status = CheckFail
 		}
 	}
 

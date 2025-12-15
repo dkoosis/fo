@@ -147,15 +147,15 @@ func (v *TaskView) renderStatusLine(data TaskData) string {
 	var style lipgloss.Style
 
 	switch data.Status {
-	case "success":
+	case StatusSuccess:
 		icon = v.theme.Icons.Success
 		text = "Complete"
 		style = v.theme.Styles.StatusSuccess
-	case "warning":
+	case StatusWarning:
 		icon = v.theme.Icons.Warning
 		text = "Completed with warnings"
 		style = v.theme.Styles.StatusWarning
-	case "error":
+	case StatusError:
 		icon = v.theme.Icons.Error
 		text = "Failed"
 		style = v.theme.Styles.StatusError

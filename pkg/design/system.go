@@ -120,6 +120,13 @@ const (
 	StatusError   = "error"   // Task failed or completed with errors.
 )
 
+// CheckStatus constants for housekeeping and lint checks.
+const (
+	CheckPass = "pass" // Check passed.
+	CheckWarn = "warn" // Check has warnings.
+	CheckFail = "fail" // Check failed.
+)
+
 // MessageType constants for RenderDirectMessage to provide type safety and prevent typos.
 const (
 	MessageTypeRaw     = "raw"     // Raw output without any formatting

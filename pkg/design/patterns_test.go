@@ -5,13 +5,11 @@ import (
 	"testing"
 )
 
-const testSuccessIcon = "✓"
-
 func TestSparkline_Render(t *testing.T) {
 	cfg := &Config{
 		IsMonochrome: true,
 	}
-	cfg.Icons.Success = testSuccessIcon
+	cfg.Icons.Success = IconCharSuccess
 
 	tests := []struct {
 		name      string
@@ -91,7 +89,7 @@ func TestLeaderboard_Render(t *testing.T) {
 	cfg := &Config{
 		IsMonochrome: true,
 	}
-	cfg.Icons.Success = testSuccessIcon
+	cfg.Icons.Success = IconCharSuccess
 	cfg.Style.Indentation = "  "
 
 	tests := []struct {
@@ -175,7 +173,7 @@ func TestTestTable_Render(t *testing.T) {
 	cfg := &Config{
 		IsMonochrome: true,
 	}
-	cfg.Icons.Success = testSuccessIcon
+	cfg.Icons.Success = IconCharSuccess
 	cfg.Icons.Error = "✗"
 	cfg.Icons.Warning = "⚠"
 	cfg.Style.Indentation = "  "
@@ -212,7 +210,7 @@ func TestSummary_Render(t *testing.T) {
 	cfg := &Config{
 		IsMonochrome: true,
 	}
-	cfg.Icons.Success = testSuccessIcon
+	cfg.Icons.Success = IconCharSuccess
 	cfg.Icons.Error = "✗"
 	cfg.Icons.Warning = "⚠"
 	cfg.Icons.Info = "ℹ"
@@ -320,7 +318,7 @@ func TestTestTable_RenderCompact(t *testing.T) {
 	cfg := &Config{
 		IsMonochrome: true,
 	}
-	cfg.Icons.Success = testSuccessIcon
+	cfg.Icons.Success = IconCharSuccess
 	cfg.Icons.Error = "✗"
 	cfg.Icons.Warning = "⚠"
 	cfg.Style.Indentation = "  "

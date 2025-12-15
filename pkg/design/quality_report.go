@@ -150,7 +150,7 @@ func (r *QualityReport) Render(cfg *Config) string {
 
 		for _, c := range r.Constraints {
 			icon := cfg.Icons.Warning
-			if c.Severity == "error" {
+			if c.Severity == StatusError {
 				icon = cfg.Icons.Error
 			}
 			line := fmt.Sprintf("  %s %s: %d exceeds %d limit",
