@@ -890,9 +890,9 @@ func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 	if m.Red > 0 {
 		redStyle = errorStyle
 	}
-	b.WriteString(fmt.Sprintf("  %-16s %s %s\n",
-		labelStyle.Render(">1000 LOC:"),
-		redStyle.Render(fmt.Sprintf("%3d", m.Red)),
+	b.WriteString(fmt.Sprintf("  %s %s %s\n",
+		labelStyle.Render(fmt.Sprintf("%14s:", ">1000 LOC")),
+		redStyle.Render(fmt.Sprintf("%4d", m.Red)),
 		redArrow))
 
 	// Yellow (500-999 LOC)
@@ -901,23 +901,19 @@ func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 	if m.Yellow > 0 {
 		yellowStyle = warnStyle
 	}
-	b.WriteString(fmt.Sprintf("  %-16s %s %s\n",
-		labelStyle.Render("500-999 LOC:"),
-		yellowStyle.Render(fmt.Sprintf("%3d", m.Yellow)),
+	b.WriteString(fmt.Sprintf("  %s %s %s\n",
+		labelStyle.Render(fmt.Sprintf("%14s:", "500-999 LOC")),
+		yellowStyle.Render(fmt.Sprintf("%4d", m.Yellow)),
 		yellowArrow))
 
 	// Green (<500 LOC)
 	greenArrow := trendArrow(m.Green, prevGreen, false) // up is good
-	b.WriteString(fmt.Sprintf("  %-16s %s %s\n",
-		labelStyle.Render("<500 LOC:"),
-		successStyle.Render(fmt.Sprintf("%3d", m.Green)),
+	b.WriteString(fmt.Sprintf("  %s %s %s\n",
+		labelStyle.Render(fmt.Sprintf("%14s:", "<500 LOC")),
+		successStyle.Render(fmt.Sprintf("%4d", m.Green)),
 		greenArrow))
 
 	b.WriteString("\n")
-
-	// ── Additional Metrics ───────────────────────────────────────────────
-	b.WriteString(headerStyle.Render("◉ Project Health"))
-	b.WriteString("\n\n")
 
 	// Get previous values for additional metrics
 	var prevTest, prevMD, prevOrphan int
@@ -929,30 +925,27 @@ func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 
 	// Test files (neutral - more is generally good)
 	testArrow := trendArrowNeutral(m.TestFiles, prevTest)
-	b.WriteString(fmt.Sprintf("  %-16s %s %s\n",
-		labelStyle.Render("Test files:"),
-		fileStyle.Render(fmt.Sprintf("%3d", m.TestFiles)),
+	b.WriteString(fmt.Sprintf("  %s %s %s\n",
+		labelStyle.Render(fmt.Sprintf("%14s:", "Test files")),
+		fileStyle.Render(fmt.Sprintf("%4d", m.TestFiles)),
 		testArrow))
 
 	// MD files (neutral)
 	mdArrow := trendArrowNeutral(m.MDFiles, prevMD)
-	b.WriteString(fmt.Sprintf("  %-16s %s %s\n",
-		labelStyle.Render("Docs (.md):"),
-		fileStyle.Render(fmt.Sprintf("%3d", m.MDFiles)),
+	b.WriteString(fmt.Sprintf("  %s %s %s\n",
+		labelStyle.Render(fmt.Sprintf("%14s:", "Markdown files")),
+		fileStyle.Render(fmt.Sprintf("%4d", m.MDFiles)),
 		mdArrow))
 
-	// Orphan MD (fewer is better)
+	// Orphan MD (any > 0 is wrong)
 	orphanArrow := trendArrow(m.OrphanMD, prevOrphan, true) // up is bad
 	orphanStyle := successStyle
-	if m.OrphanMD > 10 {
-		orphanStyle = warnStyle
-	}
-	if m.OrphanMD > 25 {
+	if m.OrphanMD > 0 {
 		orphanStyle = errorStyle
 	}
-	b.WriteString(fmt.Sprintf("  %-16s %s %s\n",
-		labelStyle.Render("Orphan docs:"),
-		orphanStyle.Render(fmt.Sprintf("%3d", m.OrphanMD)),
+	b.WriteString(fmt.Sprintf("  %s %s %s\n",
+		labelStyle.Render(fmt.Sprintf("%14s:", "Orphan docs")),
+		orphanStyle.Render(fmt.Sprintf("%4d", m.OrphanMD)),
 		orphanArrow))
 
 	// ── Weekly Trend (if history available) ──────────────────────────────
