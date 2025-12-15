@@ -807,11 +807,7 @@ func (f *GolangciLintFormatter) renderGocyclo(b *strings.Builder, issues []lintI
 		return items[i].complexity > items[j].complexity
 	})
 
-	for i, item := range items {
-		if i >= lintItemsPerSection {
-			b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", len(items)-lintItemsPerSection)))
-			break
-		}
+	for _, item := range items {
 		scoreStyle := warnStyle
 		if item.complexity > lintComplexityWarn {
 			scoreStyle = errorStyle
