@@ -183,7 +183,8 @@ func (m *model) refreshViewport() {
 	}
 	task := m.tasks[m.selected]
 	// Use formatter to render output based on command type
-	formatted := FormatOutput(task.Spec.Command, task.Output, m.detailWidth)
+	// GetOutput returns a thread-safe copy of the output lines
+	formatted := FormatOutput(task.Spec.Command, task.GetOutput(), m.detailWidth)
 	m.viewport.SetContent(formatted)
 }
 

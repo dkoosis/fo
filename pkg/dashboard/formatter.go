@@ -826,15 +826,6 @@ type FilesizeHistoryEntry struct {
 func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 	var b strings.Builder
 
-	// Styles
-	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true)
-	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFBD2E")).Bold(true)
-	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
-	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6")).Bold(true)
-	fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
-	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
-	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
-
 	// Parse dashboard JSON
 	fullOutput := strings.Join(lines, "\n")
 	var dashboard FilesizeDashboard
@@ -846,6 +837,15 @@ func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 	if dashboard.Metrics.Total == 0 && len(dashboard.TopFiles) == 0 {
 		return (&PlainFormatter{}).Format(lines, width)
 	}
+
+	// Styles
+	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true)
+	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFBD2E")).Bold(true)
+	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
+	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6")).Bold(true)
+	fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
+	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
+	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
 
 	m := dashboard.Metrics
 

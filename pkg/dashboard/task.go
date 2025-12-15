@@ -85,7 +85,8 @@ func runTask(ctx context.Context, index int, task *Task, updates chan<- TaskUpda
 	}()
 
 	for line := range merged {
-		task.appendLine(line)
+		// Don't call appendLine here - the TUI/non-tty handler will do it
+		// when processing the update to avoid duplicate lines
 		updates <- TaskUpdate{Index: index, Status: TaskRunning, Line: line}
 	}
 
@@ -121,6 +122,16 @@ func (t *Task) appendLine(line string) {
 	if len(t.Output) > defaultBufferLines {
 		t.Output = t.Output[len(t.Output)-defaultBufferLines:]
 	}
+}
+
+// GetOutput returns a copy of the output lines (thread-safe).
+func (t *Task) GetOutput() []string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	// Return a copy to avoid data races
+	result := make([]string, len(t.Output))
+	copy(result, t.Output)
+	return result
 }
 
 // Duration returns elapsed time.
