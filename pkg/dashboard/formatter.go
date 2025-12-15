@@ -1016,7 +1016,8 @@ func (f *GofmtFormatter) Format(lines []string, width int) string {
 		return b.String()
 	}
 
-	b.WriteString(errorStyle.Render(fmt.Sprintf("✗ %d files need formatting:\n\n", len(files))))
+	b.WriteString(errorStyle.Render(fmt.Sprintf("✗ %d files need formatting:", len(files))))
+	b.WriteString("\n\n")
 
 	for _, file := range files {
 		b.WriteString(fmt.Sprintf("  %s\n", fileStyle.Render(file)))
@@ -1058,7 +1059,8 @@ func (f *GoVetFormatter) Format(lines []string, width int) string {
 		return b.String()
 	}
 
-	b.WriteString(errorStyle.Render(fmt.Sprintf("✗ %d issues:\n\n", len(issues))))
+	b.WriteString(errorStyle.Render(fmt.Sprintf("✗ %d issues:", len(issues))))
+	b.WriteString("\n\n")
 
 	for i, issue := range issues {
 		if i >= 15 {
@@ -1104,7 +1106,8 @@ func (f *GoBuildFormatter) Format(lines []string, width int) string {
 		return b.String()
 	}
 
-	b.WriteString(errorStyle.Render(fmt.Sprintf("✗ Build failed:\n\n")))
+	b.WriteString(errorStyle.Render("✗ Build failed:"))
+	b.WriteString("\n\n")
 
 	for i, err := range errors {
 		if i >= 20 {
