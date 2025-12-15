@@ -21,8 +21,8 @@ type OutputFormatter interface {
 // FormatterRegistry holds registered formatters.
 var formatters = []OutputFormatter{
 	&GoTestFormatter{},
-	&GolangciLintFormatter{},
-	&FilesizeFormatter{},
+	&FilesizeDashboardFormatter{}, // Must be before SARIF to match dashboard format
+	&SARIFFormatter{},
 	&PlainFormatter{}, // fallback, always last
 }
 
@@ -649,13 +649,16 @@ func calculateSubsystemStats(packages map[string]*pkgResult) []subsystemResult {
 }
 
 // ============================================================================
-// Golangci-lint Formatter (handles SARIF output)
+// SARIF Formatter (handles SARIF output from any static analyzer)
 // ============================================================================
 
-type GolangciLintFormatter struct{}
+type SARIFFormatter struct{}
 
-func (f *GolangciLintFormatter) Matches(command string) bool {
-	return strings.Contains(command, "golangci-lint")
+func (f *SARIFFormatter) Matches(command string) bool {
+	// Match any command that produces SARIF output.
+	// Add new SARIF-producing tools here as needed.
+	return strings.Contains(command, "golangci-lint") ||
+		strings.Contains(command, "filesize")
 }
 
 type SARIFReport struct {
@@ -681,7 +684,7 @@ type SARIFReport struct {
 	} `json:"runs"`
 }
 
-func (f *GolangciLintFormatter) Format(lines []string, width int) string {
+func (f *SARIFFormatter) Format(lines []string, width int) string {
 	var b strings.Builder
 
 	// Styles
@@ -776,43 +779,51 @@ func (f *GolangciLintFormatter) Format(lines []string, width int) string {
 }
 
 // ============================================================================
-// Filesize Formatter (handles filesize dashboard JSON output)
+// Filesize Dashboard Formatter (handles filesize -format=dashboard output)
 // ============================================================================
 
-type FilesizeFormatter struct{}
+type FilesizeDashboardFormatter struct{}
 
-func (f *FilesizeFormatter) Matches(command string) bool {
-	return strings.Contains(command, "filesize")
+func (f *FilesizeDashboardFormatter) Matches(command string) bool {
+	return strings.Contains(command, "filesize") && strings.Contains(command, "-format=dashboard")
 }
 
 // FilesizeDashboard represents the dashboard JSON output from filesize.
 type FilesizeDashboard struct {
-	Metrics struct {
-		Total     int `json:"total"`
-		Green     int `json:"green"`
-		Yellow    int `json:"yellow"`
-		Red       int `json:"red"`
-		TestFiles int `json:"test_files"`
-		MDFiles   int `json:"md_files"`
-		OrphanMD  int `json:"orphan_md"`
-	} `json:"metrics"`
-	TopFiles []struct {
-		Path  string `json:"path"`
-		Lines int    `json:"lines"`
-		Tier  string `json:"tier"`
-	} `json:"top_files"`
-	History []struct {
-		Week      string `json:"week"`
-		Total     int    `json:"total"`
-		Green     int    `json:"green"`
-		Yellow    int    `json:"yellow"`
-		Red       int    `json:"red"`
-		TestFiles int    `json:"test_files"`
-		MDFiles   int    `json:"md_files"`
-	} `json:"history"`
+	Timestamp string                 `json:"timestamp"`
+	Metrics   FilesizeDashboardMetrics `json:"metrics"`
+	TopFiles  []FilesizeDashboardFile  `json:"top_files"`
+	History   []FilesizeHistoryEntry   `json:"history"`
 }
 
-func (f *FilesizeFormatter) Format(lines []string, width int) string {
+type FilesizeDashboardMetrics struct {
+	Total     int `json:"total"`
+	Green     int `json:"green"`
+	Yellow    int `json:"yellow"`
+	Red       int `json:"red"`
+	TestFiles int `json:"test_files"`
+	MDFiles   int `json:"md_files"`
+	OrphanMD  int `json:"orphan_md"`
+}
+
+type FilesizeDashboardFile struct {
+	Path  string `json:"path"`
+	Lines int    `json:"lines"`
+	Tier  string `json:"tier"`
+}
+
+type FilesizeHistoryEntry struct {
+	Week      string `json:"week"`
+	Total     int    `json:"total"`
+	Green     int    `json:"green"`
+	Yellow    int    `json:"yellow"`
+	Red       int    `json:"red"`
+	TestFiles int    `json:"test_files"`
+	MDFiles   int    `json:"md_files"`
+	OrphanMD  int    `json:"orphan_md"`
+}
+
+func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 	var b strings.Builder
 
 	// Styles
@@ -824,17 +835,10 @@ func (f *FilesizeFormatter) Format(lines []string, width int) string {
 	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
 	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
 
-	// Try to parse dashboard JSON
-	// Trim each line and join - handles any extra whitespace
-	var trimmedLines []string
-	for _, line := range lines {
-		trimmedLines = append(trimmedLines, strings.TrimSpace(line))
-	}
-	fullOutput := strings.Join(trimmedLines, "\n")
-
+	// Parse dashboard JSON
+	fullOutput := strings.Join(lines, "\n")
 	var dashboard FilesizeDashboard
 	if err := json.Unmarshal([]byte(fullOutput), &dashboard); err != nil {
-		// Not dashboard JSON, fall back to plain
 		return (&PlainFormatter{}).Format(lines, width)
 	}
 
@@ -845,55 +849,132 @@ func (f *FilesizeFormatter) Format(lines []string, width int) string {
 
 	m := dashboard.Metrics
 
-	// Header: Source File Metrics
-	b.WriteString(headerStyle.Render("◉ Source File Metrics"))
+	// ── Top 5 Largest Files ──────────────────────────────────────────────
+	b.WriteString(headerStyle.Render("◉ Largest Source Files"))
 	b.WriteString("\n\n")
 
-	// Metrics with trends from history
-	var prevRed, prevYellow int
+	for i, f := range dashboard.TopFiles {
+		if i >= 5 {
+			break
+		}
+		var tierStyle lipgloss.Style
+		switch f.Tier {
+		case "red":
+			tierStyle = errorStyle
+		case "yellow":
+			tierStyle = warnStyle
+		default:
+			tierStyle = successStyle
+		}
+		b.WriteString(fmt.Sprintf("  %s  %s\n",
+			tierStyle.Render(fmt.Sprintf("%4d", f.Lines)),
+			fileStyle.Render(f.Path)))
+	}
+	b.WriteString("\n")
+
+	// ── File Size Distribution ───────────────────────────────────────────
+	b.WriteString(headerStyle.Render("◉ Size Distribution"))
+	b.WriteString("\n\n")
+
+	// Get previous values for trends (Week -1 if available)
+	var prevRed, prevYellow, prevGreen int
 	if len(dashboard.History) > 0 {
 		prevRed = dashboard.History[0].Red
 		prevYellow = dashboard.History[0].Yellow
+		prevGreen = dashboard.History[0].Green
 	}
 
-	// Total files
-	b.WriteString(fmt.Sprintf("  %-18s %s\n", labelStyle.Render("Total files:"), fileStyle.Render(fmt.Sprintf("%d", m.Total))))
-
-	// Red files (>1000 LOC) with trend
-	redTrend := formatTrendArrow(m.Red, prevRed)
+	// Red (>1000 LOC)
+	redArrow := trendArrow(m.Red, prevRed, true) // up is bad
 	redStyle := successStyle
 	if m.Red > 0 {
 		redStyle = errorStyle
 	}
-	b.WriteString(fmt.Sprintf("  %-18s %s %s\n", labelStyle.Render(">1000 LOC:"), redStyle.Render(fmt.Sprintf("%d", m.Red)), redTrend))
+	b.WriteString(fmt.Sprintf("  %-16s %s %s\n",
+		labelStyle.Render(">1000 LOC:"),
+		redStyle.Render(fmt.Sprintf("%3d", m.Red)),
+		redArrow))
 
-	// Yellow files (>500 LOC) with trend
-	yellowTrend := formatTrendArrow(m.Yellow, prevYellow)
+	// Yellow (500-999 LOC)
+	yellowArrow := trendArrow(m.Yellow, prevYellow, true) // up is bad
 	yellowStyle := successStyle
 	if m.Yellow > 0 {
 		yellowStyle = warnStyle
 	}
-	b.WriteString(fmt.Sprintf("  %-18s %s %s\n", labelStyle.Render(">500 LOC:"), yellowStyle.Render(fmt.Sprintf("%d", m.Yellow)), yellowTrend))
+	b.WriteString(fmt.Sprintf("  %-16s %s %s\n",
+		labelStyle.Render("500-999 LOC:"),
+		yellowStyle.Render(fmt.Sprintf("%3d", m.Yellow)),
+		yellowArrow))
 
-	// Green files
-	b.WriteString(fmt.Sprintf("  %-18s %s\n", labelStyle.Render("<500 LOC:"), successStyle.Render(fmt.Sprintf("%d", m.Green))))
+	// Green (<500 LOC)
+	greenArrow := trendArrow(m.Green, prevGreen, false) // up is good
+	b.WriteString(fmt.Sprintf("  %-16s %s %s\n",
+		labelStyle.Render("<500 LOC:"),
+		successStyle.Render(fmt.Sprintf("%3d", m.Green)),
+		greenArrow))
 
 	b.WriteString("\n")
 
-	// Weekly distribution sparkline (8 weeks)
+	// ── Additional Metrics ───────────────────────────────────────────────
+	b.WriteString(headerStyle.Render("◉ Project Health"))
+	b.WriteString("\n\n")
+
+	// Get previous values for additional metrics
+	var prevTest, prevMD, prevOrphan int
 	if len(dashboard.History) > 0 {
-		b.WriteString(headerStyle.Render("◉ 8-Week Trend (G/Y/R)"))
+		prevTest = dashboard.History[0].TestFiles
+		prevMD = dashboard.History[0].MDFiles
+		prevOrphan = dashboard.History[0].OrphanMD
+	}
+
+	// Test files (neutral - more is generally good)
+	testArrow := trendArrowNeutral(m.TestFiles, prevTest)
+	b.WriteString(fmt.Sprintf("  %-16s %s %s\n",
+		labelStyle.Render("Test files:"),
+		fileStyle.Render(fmt.Sprintf("%3d", m.TestFiles)),
+		testArrow))
+
+	// MD files (neutral)
+	mdArrow := trendArrowNeutral(m.MDFiles, prevMD)
+	b.WriteString(fmt.Sprintf("  %-16s %s %s\n",
+		labelStyle.Render("Docs (.md):"),
+		fileStyle.Render(fmt.Sprintf("%3d", m.MDFiles)),
+		mdArrow))
+
+	// Orphan MD (fewer is better)
+	orphanArrow := trendArrow(m.OrphanMD, prevOrphan, true) // up is bad
+	orphanStyle := successStyle
+	if m.OrphanMD > 10 {
+		orphanStyle = warnStyle
+	}
+	if m.OrphanMD > 25 {
+		orphanStyle = errorStyle
+	}
+	b.WriteString(fmt.Sprintf("  %-16s %s %s\n",
+		labelStyle.Render("Orphan docs:"),
+		orphanStyle.Render(fmt.Sprintf("%3d", m.OrphanMD)),
+		orphanArrow))
+
+	// ── Weekly Trend (if history available) ──────────────────────────────
+	if len(dashboard.History) > 1 {
+		b.WriteString("\n")
+		b.WriteString(headerStyle.Render("◉ 4-Week Trend"))
 		b.WriteString("\n\n")
 
-		barWidth := 30
-		for i, h := range dashboard.History {
-			if i >= 8 {
-				break
-			}
+		// Show last 4 weeks as mini sparkbars
+		weeksToShow := 4
+		if len(dashboard.History) < weeksToShow {
+			weeksToShow = len(dashboard.History)
+		}
+
+		barWidth := 20
+		for i := 0; i < weeksToShow; i++ {
+			h := dashboard.History[i]
 			total := h.Green + h.Yellow + h.Red
 			if total == 0 {
-				// Empty week
-				b.WriteString(fmt.Sprintf("  %-10s %s\n", mutedStyle.Render(h.Week), mutedStyle.Render(strings.Repeat("□", barWidth))))
+				b.WriteString(fmt.Sprintf("  %-10s %s\n",
+					mutedStyle.Render(h.Week),
+					mutedStyle.Render(strings.Repeat("·", barWidth))))
 				continue
 			}
 
@@ -901,104 +982,54 @@ func (f *FilesizeFormatter) Format(lines []string, width int) string {
 			yellowChars := (h.Yellow * barWidth) / total
 			redChars := barWidth - greenChars - yellowChars
 
-			bar := successStyle.Render(strings.Repeat("■", greenChars)) +
-				warnStyle.Render(strings.Repeat("■", yellowChars)) +
-				errorStyle.Render(strings.Repeat("■", redChars))
+			bar := successStyle.Render(strings.Repeat("█", greenChars)) +
+				warnStyle.Render(strings.Repeat("█", yellowChars)) +
+				errorStyle.Render(strings.Repeat("█", redChars))
 
 			b.WriteString(fmt.Sprintf("  %-10s %s\n", mutedStyle.Render(h.Week), bar))
 		}
-		b.WriteString("\n")
 	}
-
-	// Top 5 largest files
-	if len(dashboard.TopFiles) > 0 {
-		b.WriteString(headerStyle.Render("◉ Largest Files"))
-		b.WriteString("\n\n")
-
-		for i, f := range dashboard.TopFiles {
-			if i >= 5 {
-				break
-			}
-
-			// Color based on tier
-			var tierStyle lipgloss.Style
-			switch f.Tier {
-			case "red":
-				tierStyle = errorStyle
-			case "yellow":
-				tierStyle = warnStyle
-			default:
-				tierStyle = successStyle
-			}
-
-			b.WriteString(fmt.Sprintf("  %d. %s  %s\n",
-				i+1,
-				tierStyle.Render(fmt.Sprintf("%4d", f.Lines)),
-				fileStyle.Render(f.Path)))
-		}
-		b.WriteString("\n")
-	}
-
-	// Additional metrics section
-	b.WriteString(headerStyle.Render("◉ Other Metrics"))
-	b.WriteString("\n\n")
-
-	// Test files with trend
-	var prevTest int
-	if len(dashboard.History) > 0 {
-		prevTest = dashboard.History[0].TestFiles
-	}
-	testTrend := formatTrendArrowNeutral(m.TestFiles, prevTest)
-	b.WriteString(fmt.Sprintf("  %-18s %s %s\n", labelStyle.Render("Test files:"), fileStyle.Render(fmt.Sprintf("%d", m.TestFiles)), testTrend))
-
-	// MD files with trend
-	var prevMD int
-	if len(dashboard.History) > 0 {
-		prevMD = dashboard.History[0].MDFiles
-	}
-	mdTrend := formatTrendArrowNeutral(m.MDFiles, prevMD)
-	b.WriteString(fmt.Sprintf("  %-18s %s %s\n", labelStyle.Render("Markdown files:"), fileStyle.Render(fmt.Sprintf("%d", m.MDFiles)), mdTrend))
-
-	// Orphan MD files
-	orphanStyle := successStyle
-	if m.OrphanMD > 10 {
-		orphanStyle = warnStyle
-	}
-	if m.OrphanMD > 50 {
-		orphanStyle = errorStyle
-	}
-	b.WriteString(fmt.Sprintf("  %-18s %s\n", labelStyle.Render("Orphan docs:"), orphanStyle.Render(fmt.Sprintf("%d", m.OrphanMD))))
 
 	return b.String()
 }
 
-// formatTrendArrow returns a colored trend arrow (up is bad for file counts over threshold).
-func formatTrendArrow(current, previous int) string {
+// trendArrow returns a colored arrow based on direction.
+// upIsBad=true means increasing values are bad (red arrow up, green arrow down).
+func trendArrow(current, previous int, upIsBad bool) string {
 	if previous == 0 {
 		return ""
 	}
 	diff := current - previous
-	if diff > 0 {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Render("↑")
-	} else if diff < 0 {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Render("↓")
+	if diff == 0 {
+		return ""
 	}
-	return ""
+
+	upStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56"))   // red
+	downStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")) // green
+	if !upIsBad {
+		upStyle, downStyle = downStyle, upStyle // swap colors
+	}
+
+	if diff > 0 {
+		return upStyle.Render("↑")
+	}
+	return downStyle.Render("↓")
 }
 
-// formatTrendArrowNeutral returns a trend arrow without good/bad coloring.
-func formatTrendArrowNeutral(current, previous int) string {
+// trendArrowNeutral returns a muted arrow (no good/bad coloring).
+func trendArrowNeutral(current, previous int) string {
 	if previous == 0 {
 		return ""
 	}
 	diff := current - previous
-	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
-	if diff > 0 {
-		return mutedStyle.Render("↑")
-	} else if diff < 0 {
-		return mutedStyle.Render("↓")
+	if diff == 0 {
+		return ""
 	}
-	return ""
+	muted := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
+	if diff > 0 {
+		return muted.Render("↑")
+	}
+	return muted.Render("↓")
 }
 
 // ============================================================================

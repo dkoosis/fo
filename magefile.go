@@ -44,11 +44,13 @@ func Dashboard() error {
 		// Lint
 		"--task", "Lint/vet:go vet ./...",
 		"--task", "Lint/gofmt:gofmt -l .",
-		"--task", "Lint/filesize:filesize -dir=. -top=5",
+		"--task", "Lint/filesize:filesize -dir=. -top=5 -format=dashboard -snapshots=.filesize-history.jsonl",
 	)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	// Ensure GOPATH/bin is in PATH for lintkit tools
+	cmd.Env = append(os.Environ(), "PATH="+os.Getenv("PATH")+":"+os.Getenv("HOME")+"/go/bin")
 	return cmd.Run()
 }
 
@@ -167,11 +169,13 @@ func (Test) Dashboard() error {
 		// Lint
 		"--task", "Lint/vet:go vet ./...",
 		"--task", "Lint/gofmt:gofmt -l .",
-		"--task", "Lint/filesize:filesize -dir=. -top=5",
+		"--task", "Lint/filesize:filesize -dir=. -top=5 -format=dashboard -snapshots=.filesize-history.jsonl",
 	)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	// Ensure GOPATH/bin is in PATH for lintkit tools
+	cmd.Env = append(os.Environ(), "PATH="+os.Getenv("PATH")+":"+os.Getenv("HOME")+"/go/bin")
 	return cmd.Run()
 }
 
