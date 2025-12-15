@@ -825,10 +825,21 @@ func (f *FilesizeFormatter) Format(lines []string, width int) string {
 	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
 
 	// Try to parse dashboard JSON
-	fullOutput := strings.Join(lines, "\n")
+	// Trim each line and join - handles any extra whitespace
+	var trimmedLines []string
+	for _, line := range lines {
+		trimmedLines = append(trimmedLines, strings.TrimSpace(line))
+	}
+	fullOutput := strings.Join(trimmedLines, "\n")
+
 	var dashboard FilesizeDashboard
 	if err := json.Unmarshal([]byte(fullOutput), &dashboard); err != nil {
 		// Not dashboard JSON, fall back to plain
+		return (&PlainFormatter{}).Format(lines, width)
+	}
+
+	// Validate we got actual data
+	if dashboard.Metrics.Total == 0 && len(dashboard.TopFiles) == 0 {
 		return (&PlainFormatter{}).Format(lines, width)
 	}
 
