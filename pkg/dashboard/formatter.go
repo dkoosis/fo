@@ -679,10 +679,19 @@ func (f *GolangciLintFormatter) Format(lines []string, width int) string {
 	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
 	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
 
-	// Parse SARIF
-	fullOutput := strings.Join(lines, "\n")
+	// Parse SARIF - extract JSON from mixed output (stdout SARIF + stderr text)
 	var report SARIFReport
-	if err := json.Unmarshal([]byte(fullOutput), &report); err != nil {
+	var parsed bool
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "{") && strings.Contains(line, `"runs"`) {
+			if err := json.Unmarshal([]byte(line), &report); err == nil {
+				parsed = true
+				break
+			}
+		}
+	}
+	if !parsed {
 		return (&PlainFormatter{}).Format(lines, width)
 	}
 
