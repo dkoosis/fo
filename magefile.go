@@ -44,6 +44,7 @@ func Dashboard() error {
 		// Lint
 		"--task", "Lint/vet:go vet ./...",
 		"--task", "Lint/gofmt:gofmt -l .",
+		"--task", "Lint/golangci:golangci-lint run --output.sarif.path=stdout ./...",
 		"--task", "Lint/filesize:filesize -dir=. -top=5 -format=dashboard -snapshots=.filesize-history.jsonl",
 	)
 	cmd.Stdin = os.Stdin
@@ -169,6 +170,7 @@ func (Test) Dashboard() error {
 		// Lint
 		"--task", "Lint/vet:go vet ./...",
 		"--task", "Lint/gofmt:gofmt -l .",
+		"--task", "Lint/golangci:golangci-lint run --output.sarif.path=stdout ./...",
 		"--task", "Lint/filesize:filesize -dir=. -top=5 -format=dashboard -snapshots=.filesize-history.jsonl",
 	)
 	cmd.Stdin = os.Stdin
