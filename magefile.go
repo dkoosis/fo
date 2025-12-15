@@ -44,7 +44,10 @@ func Dashboard() error {
 		// Lint
 		"--task", "Lint/vet:go vet ./...",
 		"--task", "Lint/gofmt:gofmt -l .",
-		"--task", "Lint/golangci:golangci-lint run --output.sarif.path=stdout ./...",
+		"--task", "Lint/gocyclo:golangci-lint run --enable-only gocyclo --output.sarif.path=stdout ./...",
+		"--task", "Lint/goconst:golangci-lint run --enable-only goconst --output.sarif.path=stdout ./...",
+		"--task", "Lint/gosec:golangci-lint run --enable-only gosec --output.sarif.path=stdout ./...",
+		"--task", "Lint/staticcheck:golangci-lint run --enable-only staticcheck --output.sarif.path=stdout ./...",
 		"--task", "Lint/filesize:filesize -dir=. -top=5 -format=dashboard -snapshots=.filesize-history.jsonl",
 	)
 	cmd.Stdin = os.Stdin
@@ -170,7 +173,10 @@ func (Test) Dashboard() error {
 		// Lint
 		"--task", "Lint/vet:go vet ./...",
 		"--task", "Lint/gofmt:gofmt -l .",
-		"--task", "Lint/golangci:golangci-lint run --output.sarif.path=stdout ./...",
+		"--task", "Lint/gocyclo:golangci-lint run --enable-only gocyclo --output.sarif.path=stdout ./...",
+		"--task", "Lint/goconst:golangci-lint run --enable-only goconst --output.sarif.path=stdout ./...",
+		"--task", "Lint/gosec:golangci-lint run --enable-only gosec --output.sarif.path=stdout ./...",
+		"--task", "Lint/staticcheck:golangci-lint run --enable-only staticcheck --output.sarif.path=stdout ./...",
 		"--task", "Lint/filesize:filesize -dir=. -top=5 -format=dashboard -snapshots=.filesize-history.jsonl",
 	)
 	cmd.Stdin = os.Stdin
