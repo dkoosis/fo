@@ -777,6 +777,12 @@ func (f *GolangciLintFormatter) Format(lines []string, width int) string {
 	return b.String()
 }
 
+// Gocyclo display limits.
+const (
+	gocycloMaxItems     = 15 // max items to show
+	gocycloFileColWidth = 20 // column width for filenames
+)
+
 // renderGocyclo renders complexity issues as a ranked list.
 func (f *GolangciLintFormatter) renderGocyclo(b *strings.Builder, issues []lintIssue, fileStyle, errorStyle, warnStyle, mutedStyle lipgloss.Style) {
 	type complexityItem struct {
@@ -807,16 +813,22 @@ func (f *GolangciLintFormatter) renderGocyclo(b *strings.Builder, issues []lintI
 		return items[i].complexity > items[j].complexity
 	})
 
-	for _, item := range items {
+	// Format: "54  formatter.go         (*GoTestFormatter).Format"
+	for i, item := range items {
+		if i >= gocycloMaxItems {
+			b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", len(items)-gocycloMaxItems)))
+			break
+		}
 		scoreStyle := warnStyle
 		if item.complexity > lintComplexityWarn {
 			scoreStyle = errorStyle
 		}
-		b.WriteString(fmt.Sprintf("  %-*s %s  %s\n",
-			lintFuncNameColWidth,
-			item.funcName,
+		filename := shortPath(item.file)
+		b.WriteString(fmt.Sprintf("  %s  %-*s  %s\n",
 			scoreStyle.Render(fmt.Sprintf("%2d", item.complexity)),
-			fileStyle.Render(shortPath(item.file))))
+			gocycloFileColWidth,
+			fileStyle.Render(filename),
+			mutedStyle.Render(item.funcName)))
 	}
 }
 
