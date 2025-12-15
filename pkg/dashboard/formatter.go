@@ -24,6 +24,7 @@ var formatters = []OutputFormatter{
 	&GoTestFormatter{},
 	&FilesizeDashboardFormatter{}, // Must be before SARIF to match dashboard format
 	&GolangciLintFormatter{},      // Per-linter sections for golangci-lint
+	&GofmtFormatter{},             // gofmt -l output
 	&SARIFFormatter{},
 	&PlainFormatter{}, // fallback, always last
 }
@@ -979,6 +980,47 @@ func shortPath(path string) string {
 		return path[idx+1:]
 	}
 	return path
+}
+
+// ============================================================================
+// Gofmt Formatter (handles gofmt -l output)
+// ============================================================================
+
+type GofmtFormatter struct{}
+
+func (f *GofmtFormatter) Matches(command string) bool {
+	return strings.Contains(command, "gofmt")
+}
+
+func (f *GofmtFormatter) Format(lines []string, width int) string {
+	var b strings.Builder
+
+	// Styles
+	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true)
+	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
+	fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
+
+	// Filter to non-empty lines (actual files)
+	var files []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" && strings.HasSuffix(trimmed, ".go") {
+			files = append(files, trimmed)
+		}
+	}
+
+	if len(files) == 0 {
+		b.WriteString(successStyle.Render("✓ All files formatted correctly\n"))
+		return b.String()
+	}
+
+	b.WriteString(errorStyle.Render(fmt.Sprintf("✗ %d files need formatting:\n\n", len(files))))
+
+	for _, file := range files {
+		b.WriteString(fmt.Sprintf("  %s\n", fileStyle.Render(file)))
+	}
+
+	return b.String()
 }
 
 // ============================================================================
