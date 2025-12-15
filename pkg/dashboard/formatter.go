@@ -899,6 +899,21 @@ func (f *GolangciLintFormatter) renderGoconst(b *strings.Builder, issues []lintI
 		return items[i].count > items[j].count
 	})
 
+	// Calculate max literal width for alignment
+	maxLiteralLen := 0
+	for i, item := range items {
+		if i >= goconstMaxItems {
+			break
+		}
+		quoted := fmt.Sprintf("%q", item.literal)
+		if len(quoted) > goconstLiteralWidth {
+			quoted = quoted[:goconstLiteralWidth-3] + "...\""
+		}
+		if len(quoted) > maxLiteralLen {
+			maxLiteralLen = len(quoted)
+		}
+	}
+
 	// Format: " 9x "fail"          formatter.go, housekeeping.go"
 	for i, item := range items {
 		if i >= goconstMaxItems {
@@ -907,19 +922,20 @@ func (f *GolangciLintFormatter) renderGoconst(b *strings.Builder, issues []lintI
 		}
 		// Quoted literal, truncate if needed
 		quoted := fmt.Sprintf("%q", item.literal)
-		if len(quoted) > goconstLiteralWidth-2 {
-			quoted = quoted[:goconstLiteralWidth-5] + "...\""
+		if len(quoted) > goconstLiteralWidth {
+			quoted = quoted[:goconstLiteralWidth-3] + "...\""
 		}
+		// Pad before styling
+		paddedQuoted := fmt.Sprintf("%-*s", maxLiteralLen, quoted)
 
 		files := strings.Join(item.files, ", ")
 		if len(files) > goconstFileListWidth {
 			files = files[:goconstFileListWidth-3] + "..."
 		}
 
-		b.WriteString(fmt.Sprintf("  %s %-*s  %s\n",
+		b.WriteString(fmt.Sprintf("  %s %s  %s\n",
 			mutedStyle.Render(fmt.Sprintf("%2dx", item.count)),
-			goconstLiteralWidth,
-			mutedStyle.Render(quoted),
+			mutedStyle.Render(paddedQuoted),
 			fileStyle.Render(files)))
 	}
 }
