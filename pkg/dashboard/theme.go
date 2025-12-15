@@ -182,7 +182,8 @@ func (t *DashboardTheme) Compile() *CompiledTheme {
 	ct.TaskListStyle = lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(ct.colorBorder).
-		Padding(1, 2)
+		PaddingLeft(2).
+		PaddingRight(2)
 
 	ct.SelectedStyle = lipgloss.NewStyle().
 		Bold(true).
