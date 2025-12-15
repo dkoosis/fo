@@ -6,29 +6,29 @@ active_theme: orca_swiss
 # ─────────────────────────────────────────────────────────────────────────────
 dashboard:
   colors:
-    primary: "#0077B6"    # Deep ocean blue - title bar, selected items
-    success: "#04B575"    # Green - success checkmarks
-    error: "#FF5F56"      # Red - error X marks
-    warning: "#48CAE4"    # Light ocean blue - running spinner
-    muted: "#626262"      # Gray - secondary text, pending items
-    text: "#CCCCCC"       # Light gray - normal text
-    border: "#005F8A"     # Dark ocean blue - borders
-    highlight: "#00A8E8"  # Bright ocean blue - selected item background
+    primary: "#0077B6" # Deep ocean blue - title bar, selected items
+    success: "#04B575" # Green - success checkmarks
+    error: "#FF5F56" # Red - error X marks
+    warning: "#48CAE4" # Light ocean blue - running spinner
+    muted: "#626262" # Gray - secondary text, pending items
+    text: "#CCCCCC" # Light gray - normal text
+    border: "#005F8A" # Dark ocean blue - borders
+    highlight: "#00A8E8" # Bright ocean blue - selected item background
 
   icons:
-    pending: "○"          # Pending task
-    success: "✓"          # Success
-    error: "✗"            # Error
-    group: "▸"            # Group header prefix
-    select: "▶"           # Selected item marker
+    pending: "○" # Pending task
+    success: "✓" # Success
+    error: "✗" # Error
+    group: "▸" # Group header prefix
+    select: "▶" # Selected item marker
 
   title:
     text: "fo"
     icon: "⚡"
 
   spinner:
-    frames: "❀ ❁ ❂ ❃ ❄ ❅ ❆ ❇ ❈ ✦ ✧ ✱ ✲ ✳ ✴ ✵ ✶ ✷ ✸ ✹ ✺ ✻ ✼ ✽ ✾ ✿"
-    interval: 80            # Fast floral animation
+    frames: "· ✻ ✽ ✶ ✳ ✢ "
+    interval: 100 # Fast floral animation
 
   # ─────────────────────────────────────────────────────────────
   # SUBSYSTEMS: Architecture-specific groupings for test coverage
@@ -37,24 +37,24 @@ dashboard:
   # Note: More specific patterns must come before general ones
   # ─────────────────────────────────────────────────────────────
   subsystems:
-    - name: dashboard
-      patterns: ["/pkg/dashboard"]
-    - name: sarif
-      patterns: ["/pkg/sarif"]
-    - name: archlint
-      patterns: ["/pkg/archlint"]
-    - name: design
-      patterns: ["/pkg/design"]
-    - name: gofmt
-      patterns: ["/pkg/gofmt"]
-    - name: config
-      patterns: ["/internal/config"]
-    - name: magetasks
-      patterns: ["/internal/magetasks"]
-    - name: fo
-      patterns: ["/fo/fo"]
-    - name: util
-      patterns: ["/internal", "/pkg", "/cmd"]
+  - name: dashboard
+    patterns: [ "/pkg/dashboard" ]
+  - name: sarif
+    patterns: [ "/pkg/sarif" ]
+  - name: archlint
+    patterns: [ "/pkg/archlint" ]
+  - name: design
+    patterns: [ "/pkg/design" ]
+  - name: gofmt
+    patterns: [ "/pkg/gofmt" ]
+  - name: config
+    patterns: [ "/internal/config" ]
+  - name: magetasks
+    patterns: [ "/internal/magetasks" ]
+  - name: fo
+    patterns: [ "/fo/fo" ]
+  - name: util
+    patterns: [ "/internal", "/pkg", "/cmd" ]
 
 themes:
   orca_swiss:
@@ -69,7 +69,7 @@ themes:
       no_timer: false
       use_inline_progress: false
       no_spinner: false
-      spinner_style: ""  # ignored when spinner_chars is set
+      spinner_style: "" # ignored when spinner_chars is set
       spinner_chars: "❀ ❁ ❂ ❃ ❄ ❅ ❆ ❇ ❈ ✦ ✧ ✱ ✲ ✳ ✴ ✵ ✶ ✷ ✸ ✹ ✺ ✻ ✼ ✽ ✾ ✿"
       spinner_interval: 80
       header_width: 72
