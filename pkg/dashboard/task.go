@@ -3,6 +3,7 @@ package dashboard
 import (
 	"bufio"
 	"context"
+	"errors"
 	"io"
 	"os/exec"
 	"sync"
@@ -94,7 +95,8 @@ func runTask(ctx context.Context, index int, task *Task, updates chan<- TaskUpda
 	task.FinishedAt = time.Now()
 	if err != nil {
 		task.Status = TaskFailed
-		if exitErr, ok := err.(*exec.ExitError); ok {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
 			task.ExitCode = exitErr.ExitCode()
 		} else {
 			task.ExitCode = 1

@@ -72,10 +72,10 @@ type testResult struct {
 
 // pkgResult tracks package-level results
 type pkgResult struct {
-	status   string // pass, fail, run
-	elapsed  float64
-	coverage float64
-	tests    map[string]*testResult
+	status    string // pass, fail, run
+	elapsed   float64
+	coverage  float64
+	tests     map[string]*testResult
 	testOrder []string
 }
 
@@ -170,7 +170,7 @@ func (f *GoTestFormatter) Format(lines []string, width int) string {
 				// (the "ok" summary line also contains "coverage:" but we can't parse it)
 				if strings.HasPrefix(event.Output, "coverage:") {
 					var cov float64
-					fmt.Sscanf(event.Output, "coverage: %f%%", &cov)
+					_, _ = fmt.Sscanf(event.Output, "coverage: %f%%", &cov)
 					if cov > 0 {
 						pr.coverage = cov
 					}
@@ -437,61 +437,6 @@ func humanizeTestName(name string) string {
 	return result
 }
 
-// wrapTestName wraps long test names at natural break points
-func wrapTestName(name string, maxWidth int) string {
-	if len(name) <= maxWidth {
-		return name
-	}
-
-	// Find best break point (underscore or slash) before maxWidth
-	breakPoint := -1
-	for i := maxWidth - 1; i > maxWidth/2; i-- {
-		if name[i] == '_' || name[i] == '/' {
-			breakPoint = i
-			break
-		}
-	}
-
-	if breakPoint == -1 {
-		// No good break point, hard wrap
-		return name[:maxWidth-3] + "..."
-	}
-
-	// Wrap with continuation on next line
-	first := name[:breakPoint+1]
-	rest := name[breakPoint+1:]
-	if len(rest) > maxWidth-4 {
-		rest = rest[:maxWidth-7] + "..."
-	}
-	return first + "\n      " + rest
-}
-
-// isUsefulOutput filters out noisy log lines
-func isUsefulOutput(line string) bool {
-	// Skip timestamp-heavy log lines
-	if strings.Contains(line, "time=") && strings.Contains(line, "level=") {
-		return false
-	}
-	// Skip empty or whitespace-only
-	if strings.TrimSpace(line) == "" {
-		return false
-	}
-	// Keep error messages, assertions, panics
-	lower := strings.ToLower(line)
-	if strings.Contains(lower, "error") ||
-		strings.Contains(lower, "fail") ||
-		strings.Contains(lower, "panic") ||
-		strings.Contains(lower, "expected") ||
-		strings.Contains(lower, "got") ||
-		strings.Contains(lower, "assert") ||
-		strings.Contains(line, "!=") ||
-		strings.Contains(line, "want") {
-		return true
-	}
-	// Skip most other lines
-	return false
-}
-
 // renderCoverageBar creates a sparkbar for coverage percentage with threshold colors
 func renderCoverageBar(coverage float64, mutedStyle, _ lipgloss.Style) string {
 	barLen := 10
@@ -634,7 +579,7 @@ func calculateSubsystemStats(packages map[string]*pkgResult) []subsystemResult {
 	}
 
 	// Build results in defined order
-	var results []subsystemResult
+	results := make([]subsystemResult, 0, len(subsystems))
 	for _, ss := range subsystems {
 		a := accum[ss.Name]
 		avg := 0.0
@@ -660,11 +605,11 @@ func calculateSubsystemStats(packages map[string]*pkgResult) []subsystemResult {
 
 // Formatting constants for golangci-lint output.
 const (
-	lintItemsPerSection   = 5  // max items shown per linter section
-	lintComplexityWarn    = 30 // complexity threshold for red highlighting
-	lintMsgTruncateLen    = 50 // max message length before truncation
-	lintFileListMaxLen    = 40 // max length for file list in goconst
-	lintFuncNameColWidth  = 24 // column width for function names
+	lintItemsPerSection  = 5  // max items shown per linter section
+	lintComplexityWarn   = 30 // complexity threshold for red highlighting
+	lintMsgTruncateLen   = 50 // max message length before truncation
+	lintFileListMaxLen   = 40 // max length for file list in goconst
+	lintFuncNameColWidth = 24 // column width for function names
 )
 
 type GolangciLintFormatter struct{}
@@ -876,7 +821,7 @@ func (f *GolangciLintFormatter) renderGoconst(b *strings.Builder, issues []lintI
 		literal := iss.message[start+1 : start+1+end]
 
 		var count int
-		fmt.Sscanf(iss.message, "string `"+literal+"` has %d occurrences", &count)
+		_, _ = fmt.Sscanf(iss.message, "string `"+literal+"` has %d occurrences", &count)
 
 		if byLiteral[literal] == nil {
 			byLiteral[literal] = &constItem{literal: literal, count: count}
@@ -946,8 +891,8 @@ func (f *GolangciLintFormatter) renderGoconst(b *strings.Builder, issues []lintI
 
 // Default linter display limits.
 const (
-	defaultMaxItems   = 15 // max items to show
-	defaultMsgMaxLen  = 70 // max message length before truncation
+	defaultMaxItems  = 15 // max items to show
+	defaultMsgMaxLen = 70 // max message length before truncation
 )
 
 // renderDefault renders issues as a two-line format: file:line then message.
@@ -995,7 +940,7 @@ func (f *GofmtFormatter) Matches(command string) bool {
 	return strings.Contains(command, "gofmt")
 }
 
-func (f *GofmtFormatter) Format(lines []string, width int) string {
+func (f *GofmtFormatter) Format(lines []string, _ int) string {
 	var b strings.Builder
 
 	// Styles
@@ -1037,7 +982,7 @@ func (f *GoVetFormatter) Matches(command string) bool {
 	return strings.Contains(command, "go vet")
 }
 
-func (f *GoVetFormatter) Format(lines []string, width int) string {
+func (f *GoVetFormatter) Format(lines []string, _ int) string {
 	var b strings.Builder
 
 	// Styles
@@ -1084,7 +1029,7 @@ func (f *GoBuildFormatter) Matches(command string) bool {
 	return strings.Contains(command, "go build")
 }
 
-func (f *GoBuildFormatter) Format(lines []string, width int) string {
+func (f *GoBuildFormatter) Format(lines []string, _ int) string {
 	var b strings.Builder
 
 	// Styles
@@ -1135,11 +1080,11 @@ func (f *GoArchLintFormatter) Matches(command string) bool {
 type archLintReport struct {
 	Type    string `json:"Type"`
 	Payload struct {
-		ArchHasWarnings        bool `json:"ArchHasWarnings"`
-		ArchWarningsDeps       []struct {
-			ComponentFrom  string `json:"ComponentFrom"`
-			ComponentTo    string `json:"ComponentTo"`
-			FileRelPath    string `json:"FileRelativePath"`
+		ArchHasWarnings  bool `json:"ArchHasWarnings"`
+		ArchWarningsDeps []struct {
+			ComponentFrom string `json:"ComponentFrom"`
+			ComponentTo   string `json:"ComponentTo"`
+			FileRelPath   string `json:"FileRelativePath"`
 		} `json:"ArchWarningsDeps"`
 		ArchWarningsNotMatched []struct {
 			FileRelPath string `json:"FileRelativePath"`
@@ -1381,7 +1326,7 @@ func (f *FilesizeDashboardFormatter) Matches(command string) bool {
 
 // FilesizeDashboard represents the dashboard JSON output from filesize.
 type FilesizeDashboard struct {
-	Timestamp string                 `json:"timestamp"`
+	Timestamp string                   `json:"timestamp"`
 	Metrics   FilesizeDashboardMetrics `json:"metrics"`
 	TopFiles  []FilesizeDashboardFile  `json:"top_files"`
 	History   []FilesizeHistoryEntry   `json:"history"`
@@ -1622,11 +1567,11 @@ func trendArrowNeutral(current, previous int) string {
 
 type PlainFormatter struct{}
 
-func (f *PlainFormatter) Matches(command string) bool {
+func (f *PlainFormatter) Matches(_ string) bool {
 	return true // always matches as fallback
 }
 
-func (f *PlainFormatter) Format(lines []string, width int) string {
+func (f *PlainFormatter) Format(lines []string, _ int) string {
 	// Apply basic styling - highlight errors and warnings
 	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56"))
 	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFBD2E"))

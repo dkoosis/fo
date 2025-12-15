@@ -14,23 +14,23 @@ import (
 
 // CliFlags holds the values of command-line flags.
 type CliFlags struct {
-        Label            string
-        LiveStreamOutput bool
-        ShowOutput       string
-        PatternHint      string // Manual pattern selection (e.g., "test-table", "sparkline", "leaderboard")
-        Format           string // Output format: "text" (default) or "json"
-        Profile          bool   // Enable performance profiling
-        ProfileOutput    string // Profile output destination: "stderr" or file path
-        NoTimer          bool
-        NoColor          bool
-        CI               bool
-        Debug            bool
-        MaxBufferSize    int64 // In bytes, passed from main after parsing
-        MaxLineLength    int   // In bytes, passed from main after parsing
-        Dashboard        bool
-        Tasks            []string
-        ThemeName        string
-        ThemeFile        string // Path to custom theme YAML file
+	Label            string
+	LiveStreamOutput bool
+	ShowOutput       string
+	PatternHint      string // Manual pattern selection (e.g., "test-table", "sparkline", "leaderboard")
+	Format           string // Output format: "text" (default) or "json"
+	Profile          bool   // Enable performance profiling
+	ProfileOutput    string // Profile output destination: "stderr" or file path
+	NoTimer          bool
+	NoColor          bool
+	CI               bool
+	Debug            bool
+	MaxBufferSize    int64 // In bytes, passed from main after parsing
+	MaxLineLength    int   // In bytes, passed from main after parsing
+	Dashboard        bool
+	Tasks            []string
+	ThemeName        string
+	ThemeFile        string // Path to custom theme YAML file
 
 	// Flags to track if they were explicitly set by the user
 	LiveStreamOutputSet bool

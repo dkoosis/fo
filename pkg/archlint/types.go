@@ -9,22 +9,22 @@ type Result struct {
 
 // Payload contains the analysis results.
 type Payload struct {
-	ExecutionWarnings      []string         `json:"ExecutionWarnings"`
-	ArchHasWarnings        bool             `json:"ArchHasWarnings"`
-	ArchWarningsDeps       []DepWarning     `json:"ArchWarningsDeps"`
-	ArchWarningsNotMatched []string         `json:"ArchWarningsNotMatched"`
-	ArchWarningsDeepScan   []DeepScanWarn   `json:"ArchWarningsDeepScan"`
-	OmittedCount           int              `json:"OmittedCount"`
-	ModuleName             string           `json:"ModuleName"`
-	Qualities              []QualityLinter  `json:"Qualities"`
+	ExecutionWarnings      []string        `json:"ExecutionWarnings"`
+	ArchHasWarnings        bool            `json:"ArchHasWarnings"`
+	ArchWarningsDeps       []DepWarning    `json:"ArchWarningsDeps"`
+	ArchWarningsNotMatched []string        `json:"ArchWarningsNotMatched"`
+	ArchWarningsDeepScan   []DeepScanWarn  `json:"ArchWarningsDeepScan"`
+	OmittedCount           int             `json:"OmittedCount"`
+	ModuleName             string          `json:"ModuleName"`
+	Qualities              []QualityLinter `json:"Qualities"`
 }
 
 // DepWarning represents a dependency violation.
 type DepWarning struct {
-	ComponentFrom string   `json:"ComponentFrom"`
-	ComponentTo   string   `json:"ComponentTo"`
-	FileFrom      string   `json:"FileFrom"`
-	FileTo        string   `json:"FileTo"`
+	ComponentFrom string    `json:"ComponentFrom"`
+	ComponentTo   string    `json:"ComponentTo"`
+	FileFrom      string    `json:"FileFrom"`
+	FileTo        string    `json:"FileTo"`
 	Reference     Reference `json:"Reference"`
 }
 

@@ -1,58 +1,44 @@
 {
   "_v": "0.9",
-  "ts": "2025-12-09T07:00:00Z",
+  "ts": "2025-12-15T02:20:00Z",
   "who": "claude-opus",
 
   "active": null,
 
   "next": [
-    {"task": "Fix remaining lint issues", "pri": 1, "notes": "Run golangci-lint and fix issues"},
+    {"task": "Run gofmt on flagged files", "pri": 1, "notes": "formatter.go, tui.go, main.go, etc"},
     {"task": "Add .fo.yaml SARIF config section", "pri": 2, "notes": "Wire config loading to renderer"}
   ],
 
   "done": [
-    "✓ Added SARIF detection in processor (handles trailing text from golangci-lint v2)",
-    "✓ Added extractSARIF() to parse JSON even when tools append text",
-    "✓ Added renderSARIFOutput() for beautiful SARIF rendering",
-    "✓ Check stdout for SARIF before combining with stderr",
-    "✓ Disabled spinner when output is not TTY (fixes ANSI artifacts in pipes)",
-    "✓ Added go test -json detection and TestPackageAggregator",
-    "✓ Added renderTestJSONOutput() using TestRenderer",
-    "✓ Updated orca magefile: golangci-lint --output.sarif.path=stdout",
-    "✓ Updated orca magefile: go test -json ./...",
-    "✓ All output now flows through fo for beautiful rendering",
-    "✓ Fixed build path ./cmd → ./cmd/fo after main.go move",
-    "✓ Added SARIF detection to stdin pipe mode (cmd/fo/main.go)",
-    "✓ Fixed import cycle in orchestrator by duplicating spinner frames"
+    "✓ Fixed filesize dashboard rendering (was showing raw JSON)",
+    "✓ Renamed GolangciLintFormatter → SARIFFormatter (generic SARIF handler)",
+    "✓ Added FilesizeDashboardFormatter for rich visualization",
+    "✓ Dashboard shows: top 5 files, size distribution (red/yellow/green), test/md/orphan counts",
+    "✓ Added trend arrows (↑↓) with week-over-week history",
+    "✓ Added -snapshots flag to magefile for history persistence",
+    "✓ Updated lintkit filesize to trim snapshots to 35 days",
+    "✓ Fixed PATH in magefile to find ~/go/bin tools"
   ],
 
   "context": [
-    "◯ SARIF: golangci-lint v2 uses --output.sarif.path=stdout (new flag syntax)",
-    "◯ SARIF: Tools may append text after JSON (handled by extractSARIF)",
-    "◯ go test -json: NDJSON with TestEvent objects (Time, Action, Package, Test, Elapsed, Output)",
-    "◯ TestRenderer: Already uses lipgloss, groups by directory, shows coverage bars",
-    "◯ Spinner TTY check: Prevents ANSI escape codes in piped output",
-    "◯ mage passes: 437 tests, all green"
+    "◯ filesize outputs SARIF by default, -format=dashboard for rich view",
+    "◯ .filesize-history.jsonl tracks snapshots for trend display",
+    "◯ History trimmed to 35 days on each run",
+    "◯ Trends show as 4-week sparkbars + directional arrows on metrics"
   ],
 
   "blockers": [],
 
   "refs": [
-    "fo/processor.go - isSARIF(), extractSARIF(), IsGoTestJSON(), ProcessOutput()",
-    "fo/testjson.go - ParseTestJSON(), TestPackageAggregator, RenderTestResults()",
-    "fo/console.go - renderSARIFOutput(), renderTestJSONOutput(), TTY check for spinner",
-    "fo/testrender.go - TestRenderer with lipgloss formatting",
-    "pkg/sarif/renderer.go - SARIF to visual patterns",
-    "cmd/fo/main.go - SARIF detection in stdin pipe mode"
+    "pkg/dashboard/formatter.go - FilesizeDashboardFormatter, SARIFFormatter",
+    "magefile.go - Dashboard() with -format=dashboard -snapshots flags",
+    "lintkit/cmd/filesize/main.go - saveSnapshot() with 35-day trim"
   ],
 
   "design": {
-    "architecture": "SARIF + go test -json rendering with beautiful output",
-    "flow": "command → fo wrapper → capture → detect format → specialized renderer",
-    "formats": {
-      "sarif": "golangci-lint --output.sarif.path=stdout → Summary + Leaderboard + Issue list",
-      "test_json": "go test -json → Package table with hierarchy, counts, coverage, failed tests"
-    },
-    "ux": "Spinner in TTY, clean output when piped"
+    "principle": "SARIF for interchange, custom dashboard format for rich visualization",
+    "flow": "filesize -format=dashboard → JSON → FilesizeDashboardFormatter → styled output",
+    "history": ".filesize-history.jsonl accumulates, trimmed to ~1 month"
   }
 }

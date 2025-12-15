@@ -46,17 +46,17 @@ func RunDashboardWithTheme(ctx context.Context, specs []TaskSpec, theme *Dashboa
 }
 
 type model struct {
-	ctx        context.Context
-	specs      []TaskSpec
-	tasks      []*Task
-	updates    <-chan TaskUpdate
-	selected   int
-	viewport   viewport.Model
-	ready      bool
-	done       bool
-	width      int // terminal width
-	height     int // terminal height
-	listWidth  int // width allocated to task list
+	ctx         context.Context
+	specs       []TaskSpec
+	tasks       []*Task
+	updates     <-chan TaskUpdate
+	selected    int
+	viewport    viewport.Model
+	ready       bool
+	done        bool
+	width       int // terminal width
+	height      int // terminal height
+	listWidth   int // width allocated to task list
 	detailWidth int // width allocated to detail pane
 }
 
@@ -199,7 +199,7 @@ func (m model) View() string {
 	if titleText == " " {
 		titleText = "Dashboard" // Fallback if no title configured
 	}
-	title := "\n" + activeTheme.TitleStyle.Width(m.width + 5).Height(1).Render(titleText)
+	title := "\n" + activeTheme.TitleStyle.Width(m.width+5).Height(1).Render(titleText)
 
 	// Panel height for content (excluding borders/padding)
 	// blank(1) + title(1) + status(2) + box chrome(4) = 8 total
@@ -254,7 +254,7 @@ func (m model) View() string {
 }
 
 func renderList(tasks []*Task, selected int, width int) string {
-	var lines []string
+	lines := make([]string, 0, len(tasks)*2) // pre-allocate for tasks + group headers
 	groupOrder := make([]string, 0)
 	grouped := make(map[string][]int)
 	for i, task := range tasks {
