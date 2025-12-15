@@ -22,6 +22,7 @@ type OutputFormatter interface {
 var formatters = []OutputFormatter{
 	&GoTestFormatter{},
 	&FilesizeDashboardFormatter{}, // Must be before SARIF to match dashboard format
+	&GolangciLintFormatter{},      // Per-linter sections for golangci-lint
 	&SARIFFormatter{},
 	&PlainFormatter{}, // fallback, always last
 }
@@ -649,6 +650,269 @@ func calculateSubsystemStats(packages map[string]*pkgResult) []subsystemResult {
 }
 
 // ============================================================================
+// Golangci-lint Formatter (per-linter sections with smart rendering)
+// ============================================================================
+
+type GolangciLintFormatter struct{}
+
+func (f *GolangciLintFormatter) Matches(command string) bool {
+	return strings.Contains(command, "golangci-lint")
+}
+
+// lintIssue represents a single issue from golangci-lint SARIF output.
+type lintIssue struct {
+	linter  string
+	file    string
+	line    int
+	message string
+	level   string
+}
+
+func (f *GolangciLintFormatter) Format(lines []string, width int) string {
+	var b strings.Builder
+
+	// Styles
+	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true)
+	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFBD2E")).Bold(true)
+	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6")).Bold(true)
+	fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
+	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
+	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
+
+	// Parse SARIF
+	fullOutput := strings.Join(lines, "\n")
+	var report SARIFReport
+	if err := json.Unmarshal([]byte(fullOutput), &report); err != nil {
+		return (&PlainFormatter{}).Format(lines, width)
+	}
+
+	// Group issues by linter
+	byLinter := make(map[string][]lintIssue)
+	for _, run := range report.Runs {
+		for _, result := range run.Results {
+			file := ""
+			line := 0
+			if len(result.Locations) > 0 {
+				loc := result.Locations[0].PhysicalLocation
+				file = loc.ArtifactLocation.URI
+				line = loc.Region.StartLine
+			}
+			issue := lintIssue{
+				linter:  result.RuleID,
+				file:    file,
+				line:    line,
+				message: result.Message.Text,
+				level:   result.Level,
+			}
+			byLinter[result.RuleID] = append(byLinter[result.RuleID], issue)
+		}
+	}
+
+	// No issues
+	if len(byLinter) == 0 {
+		b.WriteString(successStyle.Render("✓ No issues found\n"))
+		return b.String()
+	}
+
+	// Sort linters by issue count (descending)
+	type linterGroup struct {
+		name   string
+		issues []lintIssue
+	}
+	var groups []linterGroup
+	for name, issues := range byLinter {
+		groups = append(groups, linterGroup{name, issues})
+	}
+	for i := 0; i < len(groups)-1; i++ {
+		for j := i + 1; j < len(groups); j++ {
+			if len(groups[j].issues) > len(groups[i].issues) {
+				groups[i], groups[j] = groups[j], groups[i]
+			}
+		}
+	}
+
+	// Render each linter section
+	for _, g := range groups {
+		countStyle := warnStyle
+		for _, iss := range g.issues {
+			if iss.level == "error" {
+				countStyle = errorStyle
+				break
+			}
+		}
+
+		b.WriteString(headerStyle.Render(fmt.Sprintf("◉ %s", g.name)))
+		b.WriteString(countStyle.Render(fmt.Sprintf(" (%d)", len(g.issues))))
+		b.WriteString("\n")
+
+		// Dispatch to per-linter renderer
+		switch g.name {
+		case "gocyclo":
+			f.renderGocyclo(&b, g.issues, fileStyle, errorStyle, warnStyle, mutedStyle)
+		case "goconst":
+			f.renderGoconst(&b, g.issues, fileStyle, mutedStyle)
+		default:
+			f.renderDefault(&b, g.issues, fileStyle, mutedStyle, errorStyle, warnStyle, 5)
+		}
+		b.WriteString("\n")
+	}
+
+	return b.String()
+}
+
+// renderGocyclo renders complexity issues as a ranked list.
+func (f *GolangciLintFormatter) renderGocyclo(b *strings.Builder, issues []lintIssue, fileStyle, errorStyle, warnStyle, mutedStyle lipgloss.Style) {
+	// Parse complexity from message: "cyclomatic complexity N of func `name` is high"
+	type complexityItem struct {
+		funcName   string
+		complexity int
+		file       string
+		line       int
+	}
+	var items []complexityItem
+
+	for _, iss := range issues {
+		var complexity int
+		var funcName string
+		// Parse: "cyclomatic complexity 25 of func `run` is high (> 20)"
+		if _, err := fmt.Sscanf(iss.message, "cyclomatic complexity %d of func `", &complexity); err == nil {
+			// Extract function name between backticks
+			start := strings.Index(iss.message, "`")
+			end := strings.Index(iss.message[start+1:], "`")
+			if start >= 0 && end >= 0 {
+				funcName = iss.message[start+1 : start+1+end]
+			}
+		}
+		if funcName == "" {
+			funcName = "?"
+		}
+		items = append(items, complexityItem{funcName, complexity, iss.file, iss.line})
+	}
+
+	// Sort by complexity descending
+	for i := 0; i < len(items)-1; i++ {
+		for j := i + 1; j < len(items); j++ {
+			if items[j].complexity > items[i].complexity {
+				items[i], items[j] = items[j], items[i]
+			}
+		}
+	}
+
+	// Render top 5
+	for i, item := range items {
+		if i >= 5 {
+			b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", len(items)-5)))
+			break
+		}
+		scoreStyle := warnStyle
+		if item.complexity > 30 {
+			scoreStyle = errorStyle
+		}
+		// Right-align function name, then score, then file
+		b.WriteString(fmt.Sprintf("  %-24s %s  %s\n",
+			item.funcName,
+			scoreStyle.Render(fmt.Sprintf("%2d", item.complexity)),
+			fileStyle.Render(shortPath(item.file))))
+	}
+}
+
+// renderGoconst renders magic string issues grouped by literal.
+func (f *GolangciLintFormatter) renderGoconst(b *strings.Builder, issues []lintIssue, fileStyle, mutedStyle lipgloss.Style) {
+	// Parse: 'string `X` has N occurrences'
+	type constItem struct {
+		literal string
+		count   int
+		files   []string
+	}
+	byLiteral := make(map[string]*constItem)
+
+	for _, iss := range issues {
+		// Extract literal between backticks
+		start := strings.Index(iss.message, "`")
+		if start < 0 {
+			continue
+		}
+		end := strings.Index(iss.message[start+1:], "`")
+		if end < 0 {
+			continue
+		}
+		literal := iss.message[start+1 : start+1+end]
+
+		// Extract count
+		var count int
+		fmt.Sscanf(iss.message, "string `"+literal+"` has %d occurrences", &count)
+
+		if byLiteral[literal] == nil {
+			byLiteral[literal] = &constItem{literal: literal, count: count}
+		}
+		byLiteral[literal].files = append(byLiteral[literal].files, shortPath(iss.file))
+	}
+
+	// Sort by count descending
+	var items []*constItem
+	for _, item := range byLiteral {
+		items = append(items, item)
+	}
+	for i := 0; i < len(items)-1; i++ {
+		for j := i + 1; j < len(items); j++ {
+			if items[j].count > items[i].count {
+				items[i], items[j] = items[j], items[i]
+			}
+		}
+	}
+
+	// Render top 5
+	for i, item := range items {
+		if i >= 5 {
+			b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", len(items)-5)))
+			break
+		}
+		// Show literal, count, and first few files
+		files := strings.Join(item.files, ", ")
+		if len(files) > 40 {
+			files = files[:37] + "..."
+		}
+		b.WriteString(fmt.Sprintf("  %s  %s  %s\n",
+			mutedStyle.Render(fmt.Sprintf("%q", item.literal)),
+			mutedStyle.Render(fmt.Sprintf("%d×", item.count)),
+			fileStyle.Render(files)))
+	}
+}
+
+// renderDefault renders issues as a simple list.
+func (f *GolangciLintFormatter) renderDefault(b *strings.Builder, issues []lintIssue, fileStyle, mutedStyle, errorStyle, warnStyle lipgloss.Style, limit int) {
+	for i, iss := range issues {
+		if i >= limit {
+			b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", len(issues)-limit)))
+			break
+		}
+		icon := mutedStyle.Render("·")
+		if iss.level == "error" {
+			icon = errorStyle.Render("✗")
+		} else if iss.level == "warning" {
+			icon = warnStyle.Render("△")
+		}
+		// Truncate message
+		msg := iss.message
+		if len(msg) > 50 {
+			msg = msg[:47] + "..."
+		}
+		b.WriteString(fmt.Sprintf("  %s %s %s\n",
+			icon,
+			fileStyle.Render(fmt.Sprintf("%s:%d", shortPath(iss.file), iss.line)),
+			mutedStyle.Render(msg)))
+	}
+}
+
+// shortPath extracts just the filename from a path.
+func shortPath(path string) string {
+	if idx := strings.LastIndex(path, "/"); idx >= 0 {
+		return path[idx+1:]
+	}
+	return path
+}
+
+// ============================================================================
 // SARIF Formatter (handles SARIF output from any static analyzer)
 // ============================================================================
 
@@ -656,9 +920,9 @@ type SARIFFormatter struct{}
 
 func (f *SARIFFormatter) Matches(command string) bool {
 	// Match any command that produces SARIF output.
+	// Note: golangci-lint has its own dedicated formatter.
 	// Add new SARIF-producing tools here as needed.
-	return strings.Contains(command, "golangci-lint") ||
-		strings.Contains(command, "filesize")
+	return strings.Contains(command, "filesize")
 }
 
 type SARIFReport struct {
