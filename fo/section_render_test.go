@@ -9,6 +9,7 @@ import (
 
 	"github.com/mattn/go-runewidth"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // stripANSICodes removes ANSI escape sequences from a string to calculate visual width.
@@ -272,7 +273,7 @@ func TestConsole_RunLiveSection_When_Successful(t *testing.T) {
 	result := console.RunLiveSection(ls)
 
 	assert.Equal(t, SectionOK, result.Status)
-	assert.Nil(t, result.Err)
+	require.NoError(t, result.Err)
 	assert.Equal(t, "Test Section", result.Name)
 	assert.Contains(t, buf.String(), "Test Section")
 	assert.Contains(t, buf.String(), "Row 1 content")
@@ -314,7 +315,7 @@ func TestConsole_RunLiveSection_When_WithError(t *testing.T) {
 	result := console.RunLiveSection(ls)
 
 	assert.Equal(t, SectionError, result.Status)
-	assert.NotNil(t, result.Err)
+	require.Error(t, result.Err)
 	assert.Contains(t, result.Err.Error(), "test error")
 }
 

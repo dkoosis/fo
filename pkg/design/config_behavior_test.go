@@ -51,10 +51,10 @@ func TestConfig_ResetsToDefault_When_ResetColorMissing(t *testing.T) {
 	cfg.Colors.Reset = ""
 
 	// ResetColor returns empty when reset color is not configured (lipgloss handles reset internally)
-	assert.Equal(t, "", string(cfg.ResetColor()))
+	assert.Empty(t, string(cfg.ResetColor()))
 
 	cfg.IsMonochrome = true
-	assert.Equal(t, "", string(cfg.ResetColor()))
+	assert.Empty(t, string(cfg.ResetColor()))
 }
 
 func TestConfig_ResolvesColors_When_UsingElementOverrides(t *testing.T) {

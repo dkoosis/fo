@@ -106,7 +106,7 @@ func (m *Mapper) mapToLeaderboard(r *Result) *design.Leaderboard {
 		name  string
 		count int
 	}
-	var components []compCount
+	components := make([]compCount, 0, len(stats.ByComponent))
 	for name, count := range stats.ByComponent {
 		components = append(components, compCount{name, count})
 	}

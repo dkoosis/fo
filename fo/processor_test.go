@@ -37,7 +37,7 @@ func TestProcessor_ProcessOutput_When_PlainOutput(t *testing.T) {
 	processor.ProcessOutput(task, []byte(output), "go", []string{"build"})
 
 	outputLines := task.GetOutputLinesSnapshot()
-	assert.Equal(t, 2, len(outputLines), "Expected 2 output lines (one per line)")
+	assert.Len(t, outputLines, 2, "Expected 2 output lines (one per line)")
 	assert.Equal(t, "Building package...", outputLines[0].Content)
 	assert.Equal(t, "Build complete!", outputLines[1].Content)
 }
@@ -54,7 +54,7 @@ func TestProcessor_ProcessOutput_When_EmptyOutput(t *testing.T) {
 	processor.ProcessOutput(task, []byte(""), "go", []string{"build"})
 
 	outputLines := task.GetOutputLinesSnapshot()
-	assert.Equal(t, 0, len(outputLines), "Expected no output lines for empty input")
+	assert.Empty(t, outputLines, "Expected no output lines for empty input")
 }
 
 func TestProcessor_processLineByLine_When_MultipleLines(t *testing.T) {
@@ -71,7 +71,7 @@ func TestProcessor_processLineByLine_When_MultipleLines(t *testing.T) {
 	processor.processLineByLine(task, output, "go", []string{"build"})
 
 	outputLines := task.GetOutputLinesSnapshot()
-	assert.Equal(t, 3, len(outputLines))
+	assert.Len(t, outputLines, 3)
 	assert.Equal(t, "Line 1", outputLines[0].Content)
 	assert.Equal(t, "Line 2", outputLines[1].Content)
 	assert.Equal(t, "Line 3", outputLines[2].Content)
@@ -91,7 +91,7 @@ func TestProcessor_processLineByLine_When_ErrorLines(t *testing.T) {
 	processor.processLineByLine(task, output, "go", []string{"build"})
 
 	outputLines := task.GetOutputLinesSnapshot()
-	assert.Equal(t, 2, len(outputLines))
+	assert.Len(t, outputLines, 2)
 	// PatternMatcher should classify these appropriately
 	assert.NotEmpty(t, outputLines[0].Type)
 	assert.NotEmpty(t, outputLines[1].Type)
@@ -111,9 +111,9 @@ func TestProcessor_processLineByLine_When_EmptyLines(t *testing.T) {
 	processor.processLineByLine(task, output, "go", []string{"build"})
 
 	outputLines := task.GetOutputLinesSnapshot()
-	assert.Equal(t, 3, len(outputLines))
+	assert.Len(t, outputLines, 3)
 	assert.Equal(t, "Line 1", outputLines[0].Content)
-	assert.Equal(t, "", outputLines[1].Content) // Empty line
+	assert.Empty(t, outputLines[1].Content) // Empty line
 	assert.Equal(t, "Line 3", outputLines[2].Content)
 }
 
@@ -135,7 +135,7 @@ func TestProcessor_processLineByLine_When_LongLine(t *testing.T) {
 
 	// Should still process the line (scanner.Buffer allows larger lines)
 	outputLines := task.GetOutputLinesSnapshot()
-	assert.Equal(t, 1, len(outputLines))
+	assert.Len(t, outputLines, 1)
 	assert.Equal(t, longLine, outputLines[0].Content)
 }
 
@@ -154,5 +154,5 @@ func TestProcessor_ProcessOutput_When_DebugEnabled(t *testing.T) {
 	processor.ProcessOutput(task, []byte(output), "go", []string{"build"})
 
 	outputLines := task.GetOutputLinesSnapshot()
-	assert.Equal(t, 1, len(outputLines))
+	assert.Len(t, outputLines, 1)
 }

@@ -224,7 +224,7 @@ func runDashboardMode(cliFlags config.CliFlags) int {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var specs []dashboard.TaskSpec
+	specs := make([]dashboard.TaskSpec, 0, len(cliFlags.Tasks))
 	for _, raw := range cliFlags.Tasks {
 		spec, err := dashboard.ParseTaskFlag(raw)
 		if err != nil {

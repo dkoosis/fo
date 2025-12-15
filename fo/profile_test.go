@@ -68,7 +68,7 @@ func TestProfiler_WritesOutput_When_TogglingEnabledState(t *testing.T) {
 
 				durationMs, err := strconv.ParseInt(columns[2], 10, 64)
 				require.NoError(t, err)
-				assert.Greater(t, durationMs, int64(0), "duration should be recorded in milliseconds")
+				assert.Positive(t, durationMs, "duration should be recorded in milliseconds")
 
 				matches, err := strconv.Atoi(columns[3])
 				require.NoError(t, err)
