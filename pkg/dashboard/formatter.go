@@ -912,11 +912,17 @@ func (f *GolangciLintFormatter) renderGoconst(b *strings.Builder, issues []lintI
 	}
 }
 
-// renderDefault renders issues as a simple list.
+// Default linter display limits.
+const (
+	defaultMaxItems   = 15 // max items to show
+	defaultMsgMaxLen  = 70 // max message length before truncation
+)
+
+// renderDefault renders issues as a two-line format: file:line then message.
 func (f *GolangciLintFormatter) renderDefault(b *strings.Builder, issues []lintIssue, fileStyle, mutedStyle, errorStyle, warnStyle lipgloss.Style) {
 	for i, iss := range issues {
-		if i >= lintItemsPerSection {
-			b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", len(issues)-lintItemsPerSection)))
+		if i >= defaultMaxItems {
+			b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", len(issues)-defaultMaxItems)))
 			break
 		}
 		icon := mutedStyle.Render("·")
@@ -927,13 +933,15 @@ func (f *GolangciLintFormatter) renderDefault(b *strings.Builder, issues []lintI
 			icon = warnStyle.Render("△")
 		}
 		msg := iss.message
-		if len(msg) > lintMsgTruncateLen {
-			msg = msg[:lintMsgTruncateLen-3] + "..."
+		if len(msg) > defaultMsgMaxLen {
+			msg = msg[:defaultMsgMaxLen-3] + "..."
 		}
-		b.WriteString(fmt.Sprintf("  %s %s %s\n",
+		// Line 1: icon + file:line
+		b.WriteString(fmt.Sprintf("  %s %s\n",
 			icon,
-			fileStyle.Render(fmt.Sprintf("%s:%d", shortPath(iss.file), iss.line)),
-			mutedStyle.Render(msg)))
+			fileStyle.Render(fmt.Sprintf("%s:%d", shortPath(iss.file), iss.line))))
+		// Line 2: indented message
+		b.WriteString(fmt.Sprintf("    %s\n", mutedStyle.Render(msg)))
 	}
 }
 
