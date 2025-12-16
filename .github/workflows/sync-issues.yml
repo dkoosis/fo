@@ -13,7 +13,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Sync issues to JSON
         run: |
-          gh issue list --state open --limit 100 \
+          mkdir -p docs
+          gh issue list --state open --limit 500 \
             --json number,title,body,labels,assignees,state,createdAt,updatedAt \
             > docs/issues.json
         env:
