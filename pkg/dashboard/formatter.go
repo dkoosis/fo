@@ -21,6 +21,7 @@ type OutputFormatter interface {
 
 // FormatterRegistry holds registered formatters.
 var formatters = []OutputFormatter{
+	&RaceFormatter{},              // Must be before GoTestFormatter (more specific match)
 	&GoTestFormatter{},
 	&FilesizeDashboardFormatter{}, // Must be before SARIF to match dashboard format
 	&GolangciLintFormatter{},      // Per-linter sections for golangci-lint
@@ -28,6 +29,7 @@ var formatters = []OutputFormatter{
 	&GoVetFormatter{},             // go vet output
 	&GoBuildFormatter{},           // go build output
 	&GoArchLintFormatter{},        // go-arch-lint output
+	&NilawayFormatter{},           // nilaway -json output
 	&SARIFFormatter{},
 	&PlainFormatter{}, // fallback, always last
 }
@@ -1570,6 +1572,243 @@ func trendArrowNeutral(current, previous int) string {
 		return muted.Render("↑")
 	}
 	return muted.Render("↓")
+}
+
+// ============================================================================
+// Nilaway Formatter (handles nilaway -json output)
+// ============================================================================
+
+type NilawayFormatter struct{}
+
+func (f *NilawayFormatter) Matches(command string) bool {
+	return strings.Contains(command, "nilaway")
+}
+
+// nilawayFinding represents a single nilaway finding from JSON.
+type nilawayFinding struct {
+	Posn    string `json:"posn"`
+	Message string `json:"message"`
+	Reason  string `json:"reason"`
+}
+
+// nilawayAnalyzerResult represents the nilaway analyzer output within a package.
+type nilawayAnalyzerResult struct {
+	Nilaway []nilawayFinding `json:"nilaway"`
+}
+
+func (f *NilawayFormatter) Format(lines []string, _ int) string {
+	var b strings.Builder
+
+	// Styles
+	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true)
+	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
+	fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6")).Bold(true)
+	messageStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
+	reasonStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
+	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
+
+	// Combine lines and parse JSON
+	combined := strings.Join(lines, "\n")
+	if strings.TrimSpace(combined) == "" {
+		b.WriteString(successStyle.Render("✓ No nil pointer issues found\n"))
+		return b.String()
+	}
+
+	// Try parsing as nested format: {"pkg": {"nilaway": [...]}}
+	var nested map[string]nilawayAnalyzerResult
+	var allFindings []nilawayFinding
+
+	if err := json.Unmarshal([]byte(combined), &nested); err == nil {
+		for _, ar := range nested {
+			allFindings = append(allFindings, ar.Nilaway...)
+		}
+	}
+
+	if len(allFindings) == 0 {
+		// Check if output looks like an error or empty result
+		if strings.Contains(combined, "error") || strings.Contains(combined, "Error") {
+			b.WriteString(errorStyle.Render("✗ nilaway encountered errors:\n\n"))
+			b.WriteString(messageStyle.Render(combined))
+			return b.String()
+		}
+		b.WriteString(successStyle.Render("✓ No nil pointer issues found\n"))
+		return b.String()
+	}
+
+	b.WriteString(errorStyle.Render(fmt.Sprintf("✗ %d potential nil pointer issues:", len(allFindings))))
+	b.WriteString("\n\n")
+
+	// Group by file for better display
+	byFile := make(map[string][]nilawayFinding)
+	fileOrder := []string{}
+	for _, finding := range allFindings {
+		// Extract file from posn (format: "file.go:line:col")
+		file := finding.Posn
+		if idx := strings.Index(finding.Posn, ":"); idx > 0 {
+			file = finding.Posn[:idx]
+		}
+		if _, exists := byFile[file]; !exists {
+			fileOrder = append(fileOrder, file)
+		}
+		byFile[file] = append(byFile[file], finding)
+	}
+
+	displayed := 0
+	maxDisplay := 15
+
+	for _, file := range fileOrder {
+		if displayed >= maxDisplay {
+			remaining := len(allFindings) - displayed
+			b.WriteString(mutedStyle.Render(fmt.Sprintf("\n  ... and %d more issues\n", remaining)))
+			break
+		}
+
+		findings := byFile[file]
+		b.WriteString(fileStyle.Render(file))
+		b.WriteString("\n")
+
+		for _, finding := range findings {
+			if displayed >= maxDisplay {
+				break
+			}
+
+			// Extract line:col from posn
+			loc := ""
+			if parts := strings.SplitN(finding.Posn, ":", 3); len(parts) >= 2 {
+				loc = parts[1]
+				if len(parts) == 3 {
+					loc = parts[1] + ":" + parts[2]
+				}
+			}
+
+			b.WriteString(fmt.Sprintf("  %s %s\n", mutedStyle.Render(loc+":"), messageStyle.Render(finding.Message)))
+			if finding.Reason != "" {
+				b.WriteString(fmt.Sprintf("      %s\n", reasonStyle.Render(finding.Reason)))
+			}
+			displayed++
+		}
+		b.WriteString("\n")
+	}
+
+	return b.String()
+}
+
+// ============================================================================
+// Race Detector Formatter (handles go test -race output)
+// ============================================================================
+
+type RaceFormatter struct{}
+
+func (f *RaceFormatter) Matches(command string) bool {
+	return strings.Contains(command, "go test") && strings.Contains(command, "-race")
+}
+
+func (f *RaceFormatter) Format(lines []string, width int) string {
+	var b strings.Builder
+
+	// Styles
+	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true)
+	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
+	warningStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFBD2E")).Bold(true)
+	fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6"))
+	funcStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
+	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
+
+	// Parse JSON events and extract race warnings
+	var races []string
+	var testsPassed, testsFailed, testsSkipped int
+	var raceDetected bool
+
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+
+		var event GoTestEvent
+		if err := json.Unmarshal([]byte(line), &event); err != nil {
+			// Not JSON, check for race warning
+			if strings.Contains(line, "WARNING: DATA RACE") {
+				raceDetected = true
+			}
+			continue
+		}
+
+		// Check for race warnings in output
+		if strings.Contains(event.Output, "WARNING: DATA RACE") {
+			raceDetected = true
+		}
+
+		// Collect race-related output
+		if event.Action == "output" && event.Test == "" {
+			output := strings.TrimSpace(event.Output)
+			if strings.Contains(output, "DATA RACE") ||
+				strings.Contains(output, "Read at") ||
+				strings.Contains(output, "Write at") ||
+				strings.Contains(output, "Previous write") ||
+				strings.Contains(output, "Previous read") ||
+				strings.Contains(output, "Goroutine") ||
+				(strings.HasPrefix(output, "  ") && strings.Contains(output, ".go:")) {
+				races = append(races, output)
+			}
+		}
+
+		// Track test results
+		if event.Action == "pass" && event.Test != "" {
+			testsPassed++
+		} else if event.Action == "fail" && event.Test != "" {
+			testsFailed++
+		} else if event.Action == "skip" && event.Test != "" {
+			testsSkipped++
+		}
+	}
+
+	// Build summary
+	if raceDetected {
+		b.WriteString(errorStyle.Render("✗ DATA RACE DETECTED"))
+		b.WriteString("\n\n")
+
+		// Show race details
+		for i, line := range races {
+			if i >= 30 { // Limit output
+				b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more lines\n", len(races)-30)))
+				break
+			}
+
+			// Style different parts of race output
+			if strings.Contains(line, "DATA RACE") {
+				b.WriteString(warningStyle.Render(line))
+			} else if strings.Contains(line, ".go:") {
+				b.WriteString(fileStyle.Render(line))
+			} else if strings.Contains(line, "Read at") || strings.Contains(line, "Write at") ||
+				strings.Contains(line, "Previous") {
+				b.WriteString(funcStyle.Render(line))
+			} else {
+				b.WriteString(mutedStyle.Render(line))
+			}
+			b.WriteString("\n")
+		}
+	} else {
+		b.WriteString(successStyle.Render("✓ No data races detected"))
+		b.WriteString("\n")
+	}
+
+	// Show test summary
+	if testsPassed+testsFailed+testsSkipped > 0 {
+		b.WriteString("\n")
+		total := testsPassed + testsFailed + testsSkipped
+		if testsFailed > 0 {
+			b.WriteString(errorStyle.Render(fmt.Sprintf("Tests: %d passed, %d failed", testsPassed, testsFailed)))
+		} else {
+			b.WriteString(successStyle.Render(fmt.Sprintf("Tests: %d passed", testsPassed)))
+		}
+		if testsSkipped > 0 {
+			b.WriteString(mutedStyle.Render(fmt.Sprintf(", %d skipped", testsSkipped)))
+		}
+		b.WriteString(mutedStyle.Render(fmt.Sprintf(" (total: %d)", total)))
+		b.WriteString("\n")
+	}
+
+	return b.String()
 }
 
 // ============================================================================
