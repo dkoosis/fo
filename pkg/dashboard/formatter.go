@@ -21,7 +21,7 @@ type OutputFormatter interface {
 
 // FormatterRegistry holds registered formatters.
 var formatters = []OutputFormatter{
-	&RaceFormatter{},              // Must be before GoTestFormatter (more specific match)
+	&RaceFormatter{}, // Must be before GoTestFormatter (more specific match)
 	&GoTestFormatter{},
 	&FilesizeDashboardFormatter{}, // Must be before SARIF to match dashboard format
 	&GolangciLintFormatter{},      // Per-linter sections for golangci-lint
@@ -95,27 +95,57 @@ type pkgResult struct {
 var DebugTestFormatter = false
 
 func (f *GoTestFormatter) Format(lines []string, width int) string {
+	styles := newGoTestStyles()
+	spinnerFrame := spinnerFrameForTheme()
+
+	packages, pkgOrder := parseGoTestEvents(lines)
+	debugLines := goTestDebugLines(packages, pkgOrder, len(lines))
+
+	totals := countTestTotals(packages, pkgOrder)
+	subsystems := calculateSubsystemStats(packages)
+
 	var b strings.Builder
-	var debugLines []string
+	renderTestHeader(&b, totals, spinnerFrame, styles)
+	allFailures := renderSubsystems(&b, subsystems, width, styles)
+	renderFailures(&b, allFailures, width, styles)
+	appendDebugLines(&b, debugLines)
 
-	// Styles - use theme colors if available
-	passStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
-	failStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true)
-	skipStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFBD2E"))
-	runStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#48CAE4"))
-	pkgStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6")).Bold(true)
-	testStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
-	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
-	pendingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFDD88")) // Pale yellow for empty subsystems
+	return b.String()
+}
 
-	// Get spinner frame for running indicator
-	spinnerFrame := "⟳"
+type goTestStyles struct {
+	pass    lipgloss.Style
+	fail    lipgloss.Style
+	skip    lipgloss.Style
+	run     lipgloss.Style
+	pkg     lipgloss.Style
+	test    lipgloss.Style
+	muted   lipgloss.Style
+	pending lipgloss.Style
+}
+
+func newGoTestStyles() goTestStyles {
+	return goTestStyles{
+		pass:    lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true),
+		fail:    lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true),
+		skip:    lipgloss.NewStyle().Foreground(lipgloss.Color("#FFBD2E")),
+		run:     lipgloss.NewStyle().Foreground(lipgloss.Color("#48CAE4")),
+		pkg:     lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6")).Bold(true),
+		test:    lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC")),
+		muted:   lipgloss.NewStyle().Foreground(lipgloss.Color("#626262")),
+		pending: lipgloss.NewStyle().Foreground(lipgloss.Color("#FFDD88")),
+	}
+}
+
+func spinnerFrameForTheme() string {
 	if activeTheme != nil && len(activeTheme.SpinnerFrames) > 0 {
 		idx := int(time.Now().UnixMilli()/int64(activeTheme.SpinnerInterval)) % len(activeTheme.SpinnerFrames)
-		spinnerFrame = activeTheme.SpinnerFrames[idx]
+		return activeTheme.SpinnerFrames[idx]
 	}
+	return "⟳"
+}
 
-	// Parse events
+func parseGoTestEvents(lines []string) (map[string]*pkgResult, []string) {
 	packages := make(map[string]*pkgResult)
 	pkgOrder := []string{}
 
@@ -123,208 +153,263 @@ func (f *GoTestFormatter) Format(lines []string, width int) string {
 		if line == "" {
 			continue
 		}
-		var event GoTestEvent
-		if err := json.Unmarshal([]byte(line), &event); err != nil {
+		event, ok := parseGoTestEvent(line)
+		if !ok || event.Package == "" {
 			continue
 		}
 
-		pkg := event.Package
-		if pkg == "" {
-			continue
-		}
+		pr, updatedOrder := ensurePackage(packages, event.Package, pkgOrder)
+		pkgOrder = updatedOrder
 
-		if _, ok := packages[pkg]; !ok {
-			packages[pkg] = &pkgResult{
-				status: statusRun,
-				tests:  make(map[string]*testResult),
-			}
-			pkgOrder = append(pkgOrder, pkg)
-		}
-		pr := packages[pkg]
-
-		// Handle test-level events
 		if event.Test != "" {
-			if _, ok := pr.tests[event.Test]; !ok {
-				pr.tests[event.Test] = &testResult{name: event.Test, status: statusRun}
-				pr.testOrder = append(pr.testOrder, event.Test)
-			}
-			tr := pr.tests[event.Test]
-
-			switch event.Action {
-			case statusRun:
-				tr.status = statusRun
-			case statusPass:
-				tr.status = statusPass
-				tr.elapsed = event.Elapsed
-			case statusFail:
-				tr.status = statusFail
-				tr.elapsed = event.Elapsed
-			case statusSkip:
-				tr.status = statusSkip
-			case "output":
-				// Capture test output (for failures)
-				out := strings.TrimRight(event.Output, "\n")
-				if out != "" && !strings.HasPrefix(out, "=== ") && !strings.HasPrefix(out, "--- ") {
-					tr.output = append(tr.output, out)
-				}
-			}
-		} else {
-			// Package-level events
-			switch event.Action {
-			case statusPass:
-				pr.status = statusPass
-				pr.elapsed = event.Elapsed
-			case statusFail:
-				pr.status = statusFail
-				pr.elapsed = event.Elapsed
-			case "output":
-				// Check for coverage info - line must START with "coverage:"
-				// (the "ok" summary line also contains "coverage:" but we can't parse it)
-				if strings.HasPrefix(event.Output, "coverage:") {
-					var cov float64
-					_, _ = fmt.Sscanf(event.Output, "coverage: %f%%", &cov)
-					if cov > 0 {
-						pr.coverage = cov
-					}
-				}
-			}
+			handleTestEvent(pr, event)
+			continue
 		}
+
+		handlePackageEvent(pr, event)
 	}
 
-	// Debug: show parsed packages and coverage
-	if DebugTestFormatter {
-		debugLines = append(debugLines, fmt.Sprintf("DEBUG: Parsed %d packages from %d lines", len(packages), len(lines)))
-		for _, pkg := range pkgOrder {
-			pr := packages[pkg]
-			debugLines = append(debugLines, fmt.Sprintf("  %s: status=%s cov=%.1f%% tests=%d", pkg, pr.status, pr.coverage, len(pr.tests)))
-		}
-	}
+	return packages, pkgOrder
+}
 
-	// Count totals
-	totalPassed, totalFailed, totalSkipped, totalRunning := 0, 0, 0, 0
+func parseGoTestEvent(line string) (GoTestEvent, bool) {
+	var event GoTestEvent
+	if err := json.Unmarshal([]byte(line), &event); err != nil {
+		return GoTestEvent{}, false
+	}
+	return event, true
+}
+
+func ensurePackage(packages map[string]*pkgResult, pkg string, pkgOrder []string) (*pkgResult, []string) {
+	if pr, ok := packages[pkg]; ok {
+		return pr, pkgOrder
+	}
+	pr := &pkgResult{
+		status: statusRun,
+		tests:  make(map[string]*testResult),
+	}
+	packages[pkg] = pr
+	return pr, append(pkgOrder, pkg)
+}
+
+func handleTestEvent(pr *pkgResult, event GoTestEvent) {
+	tr := ensureTest(pr, event.Test)
+
+	switch event.Action {
+	case statusRun:
+		tr.status = statusRun
+	case statusPass:
+		tr.status = statusPass
+		tr.elapsed = event.Elapsed
+	case statusFail:
+		tr.status = statusFail
+		tr.elapsed = event.Elapsed
+	case statusSkip:
+		tr.status = statusSkip
+	case "output":
+		captureTestOutput(tr, event.Output)
+	}
+}
+
+func ensureTest(pr *pkgResult, testName string) *testResult {
+	if tr, ok := pr.tests[testName]; ok {
+		return tr
+	}
+	tr := &testResult{name: testName, status: statusRun}
+	pr.tests[testName] = tr
+	pr.testOrder = append(pr.testOrder, testName)
+	return tr
+}
+
+func captureTestOutput(tr *testResult, output string) {
+	out := strings.TrimRight(output, "\n")
+	if out == "" || strings.HasPrefix(out, "=== ") || strings.HasPrefix(out, "--- ") {
+		return
+	}
+	tr.output = append(tr.output, out)
+}
+
+func handlePackageEvent(pr *pkgResult, event GoTestEvent) {
+	switch event.Action {
+	case statusPass:
+		pr.status = statusPass
+		pr.elapsed = event.Elapsed
+	case statusFail:
+		pr.status = statusFail
+		pr.elapsed = event.Elapsed
+	case "output":
+		recordCoverage(pr, event.Output)
+	}
+}
+
+func recordCoverage(pr *pkgResult, output string) {
+	if !strings.HasPrefix(output, "coverage:") {
+		return
+	}
+	var cov float64
+	_, _ = fmt.Sscanf(output, "coverage: %f%%", &cov)
+	if cov > 0 {
+		pr.coverage = cov
+	}
+}
+
+func goTestDebugLines(packages map[string]*pkgResult, pkgOrder []string, lineCount int) []string {
+	if !DebugTestFormatter {
+		return nil
+	}
+	debugLines := []string{fmt.Sprintf("DEBUG: Parsed %d packages from %d lines", len(packages), lineCount)}
+	for _, pkg := range pkgOrder {
+		pr := packages[pkg]
+		debugLines = append(debugLines, fmt.Sprintf("  %s: status=%s cov=%.1f%% tests=%d", pkg, pr.status, pr.coverage, len(pr.tests)))
+	}
+	return debugLines
+}
+
+type testTotals struct {
+	passed  int
+	failed  int
+	skipped int
+	running int
+}
+
+func countTestTotals(packages map[string]*pkgResult, pkgOrder []string) testTotals {
+	var totals testTotals
 	for _, pkg := range pkgOrder {
 		pr := packages[pkg]
 		for _, tr := range pr.tests {
 			switch tr.status {
 			case statusPass:
-				totalPassed++
+				totals.passed++
 			case statusFail:
-				totalFailed++
+				totals.failed++
 			case statusSkip:
-				totalSkipped++
+				totals.skipped++
 			case statusRun:
-				totalRunning++
+				totals.running++
 			}
 		}
 	}
+	return totals
+}
 
-	// Calculate subsystem stats
-	subsystems := calculateSubsystemStats(packages)
-
-	// Header summary - unified format with colored counts
-	totalTests := totalPassed + totalFailed + totalSkipped + totalRunning
-
-	// Status indicator and total
-	if totalRunning > 0 {
-		b.WriteString(runStyle.Render(fmt.Sprintf("%s Running %d tests", spinnerFrame, totalTests)))
-	} else if totalFailed > 0 {
-		b.WriteString(failStyle.Render(fmt.Sprintf("✗ %d tests", totalTests)))
-	} else {
-		b.WriteString(passStyle.Render(fmt.Sprintf("✓ %d tests", totalTests)))
+func renderTestHeader(b *strings.Builder, totals testTotals, spinnerFrame string, styles goTestStyles) {
+	totalTests := totals.passed + totals.failed + totals.skipped + totals.running
+	switch {
+	case totals.running > 0:
+		b.WriteString(styles.run.Render(fmt.Sprintf("%s Running %d tests", spinnerFrame, totalTests)))
+	case totals.failed > 0:
+		b.WriteString(styles.fail.Render(fmt.Sprintf("✗ %d tests", totalTests)))
+	default:
+		b.WriteString(styles.pass.Render(fmt.Sprintf("✓ %d tests", totalTests)))
 	}
 
-	// Breakdown with colored counts
-	b.WriteString(mutedStyle.Render(":  "))
-
-	parts := []string{}
-	if totalPassed > 0 {
-		parts = append(parts, passStyle.Render(fmt.Sprintf("%d passed", totalPassed)))
-	}
-	if totalSkipped > 0 {
-		parts = append(parts, skipStyle.Render(fmt.Sprintf("%d skipped", totalSkipped)))
-	}
-	if totalFailed > 0 {
-		parts = append(parts, failStyle.Render(fmt.Sprintf("%d failed", totalFailed)))
-	}
-	if totalRunning > 0 {
-		parts = append(parts, runStyle.Render(fmt.Sprintf("%d running", totalRunning)))
-	}
-
-	b.WriteString(strings.Join(parts, mutedStyle.Render(" | ")))
+	b.WriteString(styles.muted.Render(":  "))
+	b.WriteString(strings.Join(headerParts(totals, styles), styles.muted.Render(" | ")))
 	b.WriteString("\n\n")
+}
 
-	// Calculate max name width for alignment
+func headerParts(totals testTotals, styles goTestStyles) []string {
+	parts := []string{}
+	if totals.passed > 0 {
+		parts = append(parts, styles.pass.Render(fmt.Sprintf("%d passed", totals.passed)))
+	}
+	if totals.skipped > 0 {
+		parts = append(parts, styles.skip.Render(fmt.Sprintf("%d skipped", totals.skipped)))
+	}
+	if totals.failed > 0 {
+		parts = append(parts, styles.fail.Render(fmt.Sprintf("%d failed", totals.failed)))
+	}
+	if totals.running > 0 {
+		parts = append(parts, styles.run.Render(fmt.Sprintf("%d running", totals.running)))
+	}
+	return parts
+}
+
+func renderSubsystems(b *strings.Builder, subsystems []subsystemResult, width int, styles goTestStyles) []pkgFailure {
+	maxNameLen := maxSubsystemNameLength(subsystems)
+	var allFailures []pkgFailure
+	for _, ss := range subsystems {
+		totalPkgs := ss.passedCount + ss.failedCount
+		nameField := fmt.Sprintf("%-*s", maxNameLen, ss.name)
+		icon := subsystemIcon(totalPkgs, ss.failedCount, ss.pkgCount, styles)
+		coverageStr := subsystemCoverage(totalPkgs, ss.avgCoverage, styles)
+
+		b.WriteString(fmt.Sprintf("  %s %s%s\n", icon, nameField, coverageStr))
+		allFailures = append(allFailures, ss.failures...)
+	}
+	return allFailures
+}
+
+func maxSubsystemNameLength(subsystems []subsystemResult) int {
 	maxNameLen := 0
 	for _, ss := range subsystems {
 		if len(ss.name) > maxNameLen {
 			maxNameLen = len(ss.name)
 		}
 	}
+	return maxNameLen
+}
 
-	// Subsystem-centric view with status and coverage
-	var allFailures []pkgFailure
-	for _, ss := range subsystems {
-		totalPkgs := ss.passedCount + ss.failedCount
-		nameField := fmt.Sprintf("%-*s", maxNameLen, ss.name)
-
-		// Determine status icon
-		var icon string
-		if totalPkgs == 0 && ss.pkgCount == 0 {
-			icon = pendingStyle.Render("○")
-		} else if ss.failedCount > 0 {
-			icon = failStyle.Render("✗")
-		} else {
-			icon = passStyle.Render("✓")
-		}
-
-		// Coverage bar (show for any subsystem with packages)
-		coverageStr := ""
-		if totalPkgs > 0 {
-			coverageStr = "  " + renderCoverageBar(ss.avgCoverage, mutedStyle, passStyle)
-		}
-
-		b.WriteString(fmt.Sprintf("  %s %s%s\n", icon, nameField, coverageStr))
-
-		// Collect failures for display in lower section
-		allFailures = append(allFailures, ss.failures...)
+func subsystemIcon(totalPkgs, failedCount, pkgCount int, styles goTestStyles) string {
+	switch {
+	case totalPkgs == 0 && pkgCount == 0:
+		return styles.pending.Render("○")
+	case failedCount > 0:
+		return styles.fail.Render("✗")
+	default:
+		return styles.pass.Render("✓")
 	}
+}
 
-	// Show all failures in lower section
-	if len(allFailures) > 0 {
-		b.WriteString("\n")
-		for _, failure := range allFailures {
-			// Shorten package name
-			shortPkg := failure.pkg
-			if pkgParts := strings.Split(failure.pkg, "/"); len(pkgParts) > 2 {
-				shortPkg = ".../" + strings.Join(pkgParts[len(pkgParts)-2:], "/")
-			}
-			b.WriteString(fmt.Sprintf(" %s %s\n", failStyle.Render("✗"), pkgStyle.Render(shortPkg)))
-
-			// Show failed test names (no icon, minimal indent for more space)
-			if len(failure.failedTests) == 0 {
-				b.WriteString(fmt.Sprintf("   %s\n", mutedStyle.Render("(build/import error)")))
-			} else {
-				for _, testName := range failure.failedTests {
-					displayName := humanizeTestNameWithSubtest(testName)
-					maxNameWidth := width - 3 // minimal indent
-					if len(displayName) > maxNameWidth && maxNameWidth > 20 {
-						displayName = truncateAtWord(displayName, maxNameWidth-3) + "..."
-					}
-					b.WriteString(fmt.Sprintf("   %s\n", testStyle.Render(displayName)))
-				}
-			}
-		}
+func subsystemCoverage(totalPkgs int, avgCoverage float64, styles goTestStyles) string {
+	if totalPkgs == 0 {
+		return ""
 	}
+	return "  " + renderCoverageBar(avgCoverage, styles.muted, styles.pass)
+}
 
-	// Append debug output at the end
-	if DebugTestFormatter && len(debugLines) > 0 {
-		b.WriteString("\n\n")
-		for _, line := range debugLines {
-			b.WriteString(line + "\n")
-		}
+func renderFailures(b *strings.Builder, failures []pkgFailure, width int, styles goTestStyles) {
+	if len(failures) == 0 {
+		return
 	}
+	b.WriteString("\n")
+	for _, failure := range failures {
+		shortPkg := shortenPackageName(failure.pkg)
+		b.WriteString(fmt.Sprintf(" %s %s\n", styles.fail.Render("✗"), styles.pkg.Render(shortPkg)))
+		renderFailedTests(b, failure.failedTests, width, styles)
+	}
+}
 
-	return b.String()
+func shortenPackageName(pkg string) string {
+	if pkgParts := strings.Split(pkg, "/"); len(pkgParts) > 2 {
+		return ".../" + strings.Join(pkgParts[len(pkgParts)-2:], "/")
+	}
+	return pkg
+}
+
+func renderFailedTests(b *strings.Builder, failedTests []string, width int, styles goTestStyles) {
+	if len(failedTests) == 0 {
+		b.WriteString(fmt.Sprintf("   %s\n", styles.muted.Render("(build/import error)")))
+		return
+	}
+	for _, testName := range failedTests {
+		displayName := humanizeTestNameWithSubtest(testName)
+		maxNameWidth := width - 3
+		if len(displayName) > maxNameWidth && maxNameWidth > 20 {
+			displayName = truncateAtWord(displayName, maxNameWidth-3) + "..."
+		}
+		b.WriteString(fmt.Sprintf("   %s\n", styles.test.Render(displayName)))
+	}
+}
+
+func appendDebugLines(b *strings.Builder, debugLines []string) {
+	if len(debugLines) == 0 {
+		return
+	}
+	b.WriteString("\n\n")
+	for _, line := range debugLines {
+		b.WriteString(line + "\n")
+	}
 }
 
 // truncateAtWord truncates a string at word boundaries (spaces) to fit within maxLen.
@@ -524,92 +609,123 @@ func getSubsystemForPackage(pkg string) string {
 func calculateSubsystemStats(packages map[string]*pkgResult) []subsystemResult {
 	subsystems := getSubsystems()
 
-	// Initialize subsystem accumulators
-	type accumulator struct {
-		totalCoverage float64
-		coverageCount int
-		passedCount   int
-		failedCount   int
-		failures      []pkgFailure
-	}
-	accum := make(map[string]*accumulator)
-	for _, ss := range subsystems {
-		accum[ss.Name] = &accumulator{}
-	}
+	accum := initializeSubsystemAccumulators(subsystems)
 
-	// Categorize each package
 	for pkg, pr := range packages {
 		subsystem := getSubsystemForPackage(pkg)
-		a := accum[subsystem]
-
-		// Track coverage
-		if pr.coverage > 0 {
-			a.totalCoverage += pr.coverage
-			a.coverageCount++
-		}
-
-		// Infer package status from tests if not explicitly set
-		status := pr.status
-		if status == statusRun && len(pr.tests) > 0 {
-			// Check if any tests failed
-			hasFailed := false
-			allDone := true
-			for _, tr := range pr.tests {
-				if tr.status == statusFail {
-					hasFailed = true
-				}
-				if tr.status == statusRun {
-					allDone = false
-				}
-			}
-			if allDone {
-				if hasFailed {
-					status = statusFail
-				} else {
-					status = statusPass
-				}
-			}
-		}
-
-		// Track pass/fail
-		switch status {
-		case statusPass:
-			a.passedCount++
-		case statusFail:
-			a.failedCount++
-			// Collect failed test names
-			var failedTests []string
-			for _, testName := range pr.testOrder {
-				if tr, ok := pr.tests[testName]; ok && tr.status == statusFail {
-					failedTests = append(failedTests, testName)
-				}
-			}
-			a.failures = append(a.failures, pkgFailure{
-				pkg:         pkg,
-				failedTests: failedTests,
-			})
-		}
+		a := ensureSubsystemAccumulator(accum, subsystem)
+		updateSubsystemCoverage(a, pr)
+		status := inferPackageStatus(pr)
+		recordSubsystemStatus(a, status, pkg, pr)
 	}
 
-	// Build results in defined order
+	return buildSubsystemResults(subsystems, accum)
+}
+
+type subsystemAccumulator struct {
+	totalCoverage float64
+	coverageCount int
+	passedCount   int
+	failedCount   int
+	failures      []pkgFailure
+}
+
+func initializeSubsystemAccumulators(subsystems []SubsystemConfig) map[string]*subsystemAccumulator {
+	accum := make(map[string]*subsystemAccumulator)
+	for _, ss := range subsystems {
+		accum[ss.Name] = &subsystemAccumulator{}
+	}
+	return accum
+}
+
+func ensureSubsystemAccumulator(accum map[string]*subsystemAccumulator, subsystem string) *subsystemAccumulator {
+	if _, ok := accum[subsystem]; !ok {
+		accum[subsystem] = &subsystemAccumulator{}
+	}
+	return accum[subsystem]
+}
+
+func updateSubsystemCoverage(accum *subsystemAccumulator, pr *pkgResult) {
+	if pr.coverage <= 0 {
+		return
+	}
+	accum.totalCoverage += pr.coverage
+	accum.coverageCount++
+}
+
+func inferPackageStatus(pr *pkgResult) string {
+	status := pr.status
+	if status != statusRun || len(pr.tests) == 0 {
+		return status
+	}
+
+	hasFailed, allDone := packageTestStatus(pr.tests)
+	if !allDone {
+		return status
+	}
+	if hasFailed {
+		return statusFail
+	}
+	return statusPass
+}
+
+func packageTestStatus(tests map[string]*testResult) (hasFailed bool, allDone bool) {
+	allDone = true
+	for _, tr := range tests {
+		if tr.status == statusFail {
+			hasFailed = true
+		}
+		if tr.status == statusRun {
+			allDone = false
+		}
+	}
+	return hasFailed, allDone
+}
+
+func recordSubsystemStatus(accum *subsystemAccumulator, status, pkg string, pr *pkgResult) {
+	switch status {
+	case statusPass:
+		accum.passedCount++
+	case statusFail:
+		accum.failedCount++
+		accum.failures = append(accum.failures, pkgFailure{
+			pkg:         pkg,
+			failedTests: collectFailedTests(pr),
+		})
+	}
+}
+
+func collectFailedTests(pr *pkgResult) []string {
+	var failedTests []string
+	for _, testName := range pr.testOrder {
+		if tr, ok := pr.tests[testName]; ok && tr.status == statusFail {
+			failedTests = append(failedTests, testName)
+		}
+	}
+	return failedTests
+}
+
+func buildSubsystemResults(subsystems []SubsystemConfig, accum map[string]*subsystemAccumulator) []subsystemResult {
 	results := make([]subsystemResult, 0, len(subsystems))
 	for _, ss := range subsystems {
 		a := accum[ss.Name]
-		avg := 0.0
-		if a.coverageCount > 0 {
-			avg = a.totalCoverage / float64(a.coverageCount)
-		}
 		results = append(results, subsystemResult{
 			name:        ss.Name,
-			avgCoverage: avg,
+			avgCoverage: averageCoverage(a),
 			pkgCount:    a.coverageCount,
 			passedCount: a.passedCount,
 			failedCount: a.failedCount,
 			failures:    a.failures,
 		})
 	}
-
 	return results
+}
+
+func averageCoverage(accum *subsystemAccumulator) float64 {
+	if accum.coverageCount == 0 {
+		return 0
+	}
+	return accum.totalCoverage / float64(accum.coverageCount)
 }
 
 // ============================================================================
