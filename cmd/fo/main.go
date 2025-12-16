@@ -16,6 +16,9 @@ import (
 	"github.com/dkoosis/fo/pkg/dashboard"
 	"github.com/dkoosis/fo/pkg/design"
 	"github.com/dkoosis/fo/pkg/gofmt"
+	"github.com/dkoosis/fo/pkg/goleak"
+	"github.com/dkoosis/fo/pkg/nilaway"
+	"github.com/dkoosis/fo/pkg/racedetect"
 	"github.com/dkoosis/fo/pkg/sarif"
 	"golang.org/x/term"
 )
@@ -357,6 +360,21 @@ func runEditorMode(cliFlags config.CliFlags, _ *config.AppConfig) int {
 		return renderGofmt(input, resolvedCfg.Theme)
 	}
 
+	// Check if input is nilaway JSON output
+	if nilaway.IsNilawayOutput(input) {
+		return renderNilaway(input, resolvedCfg.Theme)
+	}
+
+	// Check if input is goleak output
+	if goleak.IsGoleakOutput(input) {
+		return renderGoleak(input, resolvedCfg.Theme)
+	}
+
+	// Check if input is race detector output
+	if racedetect.IsRaceDetectorOutput(input) {
+		return renderRaceDetector(input, resolvedCfg.Theme)
+	}
+
 	// Create a task for the stdin processing
 	task := design.NewTask("stdin", "stream", "pipe", nil, resolvedCfg.Theme)
 
@@ -429,6 +447,69 @@ func renderGofmt(input []byte, theme *design.Config) int {
 
 	// Return non-zero if files need formatting
 	if len(result.Files) > 0 {
+		return 1
+	}
+	return 0
+}
+
+// renderNilaway parses and renders nilaway JSON output.
+func renderNilaway(input []byte, theme *design.Config) int {
+	adapter := nilaway.NewAdapter(theme)
+	result, err := adapter.ParseBytes(input)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[fo] Error parsing nilaway output: %v\n", err)
+		return 1
+	}
+
+	output := adapter.Render(result)
+	if output != "" {
+		fmt.Print(output)
+	}
+
+	// Return non-zero if there were findings
+	if len(result.Findings) > 0 {
+		return 1
+	}
+	return 0
+}
+
+// renderGoleak parses and renders goleak output.
+func renderGoleak(input []byte, theme *design.Config) int {
+	adapter := goleak.NewAdapter(theme)
+	result, err := adapter.ParseBytes(input)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[fo] Error parsing goleak output: %v\n", err)
+		return 1
+	}
+
+	output := adapter.Render(result)
+	if output != "" {
+		fmt.Print(output)
+	}
+
+	// Return non-zero if there were leaked goroutines
+	if len(result.Goroutines) > 0 {
+		return 1
+	}
+	return 0
+}
+
+// renderRaceDetector parses and renders race detector output.
+func renderRaceDetector(input []byte, theme *design.Config) int {
+	adapter := racedetect.NewAdapter(theme)
+	result, err := adapter.ParseBytes(input)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[fo] Error parsing race detector output: %v\n", err)
+		return 1
+	}
+
+	output := adapter.Render(result)
+	if output != "" {
+		fmt.Print(output)
+	}
+
+	// Return non-zero if there were data races
+	if len(result.Races) > 0 {
 		return 1
 	}
 	return 0
