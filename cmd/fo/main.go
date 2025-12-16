@@ -15,6 +15,7 @@ import (
 	"github.com/dkoosis/fo/pkg/archlint"
 	"github.com/dkoosis/fo/pkg/dashboard"
 	"github.com/dkoosis/fo/pkg/design"
+	"github.com/dkoosis/fo/pkg/fuzz"
 	"github.com/dkoosis/fo/pkg/gofmt"
 	"github.com/dkoosis/fo/pkg/goleak"
 	"github.com/dkoosis/fo/pkg/nilaway"
@@ -375,6 +376,11 @@ func runEditorMode(cliFlags config.CliFlags, _ *config.AppConfig) int {
 		return renderRaceDetector(input, resolvedCfg.Theme)
 	}
 
+	// Check if input is fuzz testing output
+	if fuzz.IsFuzzOutput(input) {
+		return renderFuzz(input, resolvedCfg.Theme)
+	}
+
 	// Create a task for the stdin processing
 	task := design.NewTask("stdin", "stream", "pipe", nil, resolvedCfg.Theme)
 
@@ -510,6 +516,27 @@ func renderRaceDetector(input []byte, theme *design.Config) int {
 
 	// Return non-zero if there were data races
 	if len(result.Races) > 0 {
+		return 1
+	}
+	return 0
+}
+
+// renderFuzz parses and renders fuzz testing output.
+func renderFuzz(input []byte, theme *design.Config) int {
+	adapter := fuzz.NewAdapter(theme)
+	result, err := adapter.ParseBytes(input)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[fo] Error parsing fuzz output: %v\n", err)
+		return 1
+	}
+
+	output := adapter.Render(result)
+	if output != "" {
+		fmt.Print(output)
+	}
+
+	// Return non-zero if there were crashes
+	if len(result.Failures) > 0 {
 		return 1
 	}
 	return 0
