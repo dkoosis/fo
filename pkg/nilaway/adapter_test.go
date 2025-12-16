@@ -11,9 +11,59 @@ import (
 	"github.com/dkoosis/fo/pkg/nilaway"
 )
 
-func TestParse_ValidJSON(t *testing.T) {
+func TestParse_NestedJSON(t *testing.T) {
 	t.Parallel()
 
+	// Actual nilaway -json output format
+	input := `{
+	"github.com/foo/bar [github.com/foo/bar.test]": {
+		"nilaway": [
+			{
+				"posn": "/path/to/foo.go:42:15",
+				"message": "potential nil dereference"
+			},
+			{
+				"posn": "/path/to/bar.go:123:8",
+				"message": "nil pointer risk"
+			}
+		]
+	}
+}`
+
+	adapter := nilaway.NewAdapter(design.DefaultConfig())
+	result, err := adapter.ParseString(input)
+
+	require.NoError(t, err)
+	require.Len(t, result.Findings, 2)
+
+	assert.Equal(t, "/path/to/foo.go", result.Findings[0].File)
+	assert.Equal(t, 42, result.Findings[0].Line)
+	assert.Equal(t, 15, result.Findings[0].Column)
+	assert.Equal(t, "potential nil dereference", result.Findings[0].Message)
+
+	assert.Equal(t, "/path/to/bar.go", result.Findings[1].File)
+	assert.Equal(t, 123, result.Findings[1].Line)
+}
+
+func TestParse_NestedJSON_MultiplePackages(t *testing.T) {
+	t.Parallel()
+
+	input := `{
+	"pkg/a": {"nilaway": [{"posn": "a.go:10:5", "message": "nil in pkg a"}]},
+	"pkg/b": {"nilaway": [{"posn": "b.go:20:3", "message": "nil in pkg b"}]}
+}`
+
+	adapter := nilaway.NewAdapter(design.DefaultConfig())
+	result, err := adapter.ParseString(input)
+
+	require.NoError(t, err)
+	require.Len(t, result.Findings, 2)
+}
+
+func TestParse_NDJSON_Fallback(t *testing.T) {
+	t.Parallel()
+
+	// Legacy NDJSON format (one JSON object per line)
 	input := `{"posn":"internal/foo/bar.go:42:15","message":"accessed field on potentially nil value","reason":"field X may be nil when Y is false"}
 {"posn":"pkg/server/handler.go:123:8","message":"nil dereference","reason":"return value not checked"}`
 
@@ -101,12 +151,22 @@ func TestIsNilawayOutput_Valid(t *testing.T) {
 		want  bool
 	}{
 		{
-			name:  "single finding",
+			name:  "nested format",
+			input: `{"pkg/foo": {"nilaway": [{"posn":"foo.go:1:1","message":"nil risk"}]}}`,
+			want:  true,
+		},
+		{
+			name:  "nested format multiple packages",
+			input: `{"pkg/a": {"nilaway": [{"posn":"a.go:1:1","message":"x"}]}, "pkg/b": {"nilaway": [{"posn":"b.go:2:2","message":"y"}]}}`,
+			want:  true,
+		},
+		{
+			name:  "ndjson single finding",
 			input: `{"posn":"foo.go:1:1","message":"nil risk"}`,
 			want:  true,
 		},
 		{
-			name:  "multiple findings",
+			name:  "ndjson multiple findings",
 			input: "{\"posn\":\"a.go:1:1\",\"message\":\"x\"}\n{\"posn\":\"b.go:2:2\",\"message\":\"y\"}",
 			want:  true,
 		},

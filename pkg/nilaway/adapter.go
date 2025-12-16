@@ -46,12 +46,51 @@ func NewAdapter(theme *design.Config) *Adapter {
 	return &Adapter{theme: theme}
 }
 
-// Parse reads nilaway JSON output from a reader.
-// Each line is a separate JSON object.
-func (a *Adapter) Parse(r io.Reader) (*Result, error) {
-	var findings []Finding
-	scanner := bufio.NewScanner(r)
+// AnalyzerResult represents the nilaway analyzer output within a package.
+type AnalyzerResult struct {
+	Nilaway []Finding `json:"nilaway"`
+}
 
+// Parse reads nilaway JSON output from a reader.
+// nilaway -json outputs a nested structure:
+//
+//	{"package.path": {"nilaway": [{"posn":"...", "message":"..."}]}}
+func (a *Adapter) Parse(r io.Reader) (*Result, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	findings, err := parseNestedJSON(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Result{Findings: findings}, nil
+}
+
+// parseNestedJSON parses the nested nilaway JSON format.
+func parseNestedJSON(data []byte) ([]Finding, error) {
+	var findings []Finding
+
+	// Try nested format first: {"pkg": {"nilaway": [...]}}
+	var nested map[string]AnalyzerResult
+	if err := json.Unmarshal(data, &nested); err == nil {
+		for _, ar := range nested {
+			for _, f := range ar.Nilaway {
+				if f.Posn != "" {
+					f.File, f.Line, f.Column = parsePosition(f.Posn)
+				}
+				findings = append(findings, f)
+			}
+		}
+		if len(findings) > 0 {
+			return findings, nil
+		}
+	}
+
+	// Fallback: try NDJSON format (one JSON object per line)
+	scanner := bufio.NewScanner(bytes.NewReader(data))
 	for scanner.Scan() {
 		line := bytes.TrimSpace(scanner.Bytes())
 		if len(line) == 0 {
@@ -60,23 +99,16 @@ func (a *Adapter) Parse(r io.Reader) (*Result, error) {
 
 		var f Finding
 		if err := json.Unmarshal(line, &f); err != nil {
-			// Skip non-JSON lines (might be progress output)
 			continue
 		}
 
-		// Parse position field
 		if f.Posn != "" {
 			f.File, f.Line, f.Column = parsePosition(f.Posn)
 		}
-
 		findings = append(findings, f)
 	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-
-	return &Result{Findings: findings}, nil
+	return findings, scanner.Err()
 }
 
 // parsePosition extracts file, line, column from "file.go:line:col" format.
@@ -96,7 +128,11 @@ func parsePosition(posn string) (file string, line, col int) {
 
 // ParseBytes parses nilaway JSON output from bytes.
 func (a *Adapter) ParseBytes(data []byte) (*Result, error) {
-	return a.Parse(bytes.NewReader(data))
+	findings, err := parseNestedJSON(data)
+	if err != nil {
+		return nil, err
+	}
+	return &Result{Findings: findings}, nil
 }
 
 // ParseString parses nilaway JSON output from a string.
@@ -241,36 +277,45 @@ func QuickRender(output string) (string, error) {
 }
 
 // IsNilawayOutput detects if the data looks like nilaway JSON output.
-// nilaway outputs JSON objects with posn, message, and reason fields.
+// nilaway -json outputs nested structure: {"pkg": {"nilaway": [...]}}
 func IsNilawayOutput(data []byte) bool {
 	if len(data) == 0 {
 		return false
 	}
 
-	lines := bytes.Split(bytes.TrimSpace(data), []byte("\n"))
-	if len(lines) == 0 {
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 || data[0] != '{' {
 		return false
 	}
 
-	// Check if at least one line looks like nilaway JSON
+	// Try nested format: {"pkg.path": {"nilaway": [{"posn":"...", "message":"..."}]}}
+	var nested map[string]AnalyzerResult
+	if err := json.Unmarshal(data, &nested); err == nil {
+		for _, ar := range nested {
+			if len(ar.Nilaway) > 0 {
+				// Verify it has posn field (nilaway-specific)
+				for _, f := range ar.Nilaway {
+					if f.Posn != "" {
+						return true
+					}
+				}
+			}
+		}
+	}
+
+	// Fallback: check for NDJSON format with posn/message fields
+	lines := bytes.Split(data, []byte("\n"))
 	for _, line := range lines {
 		line = bytes.TrimSpace(line)
-		if len(line) == 0 {
+		if len(line) == 0 || line[0] != '{' {
 			continue
 		}
 
-		// Must start with { to be JSON
-		if line[0] != '{' {
-			continue
-		}
-
-		// Check for nilaway-specific fields
 		var obj map[string]interface{}
 		if err := json.Unmarshal(line, &obj); err != nil {
 			continue
 		}
 
-		// nilaway output has posn and message fields
 		_, hasPosn := obj["posn"]
 		_, hasMessage := obj["message"]
 		if hasPosn && hasMessage {
