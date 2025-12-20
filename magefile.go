@@ -1,201 +1,173 @@
 //go:build mage
 
+// Tiered quality checks with fo dashboard rendering.
+//
+// Tiers:
+//
+//	mage     Build, lint, test (default)
+//	mage qa  Full quality: race detection, all linters, govulncheck
+//
+// Set CLI=1 for console output instead of dashboard.
 package main
 
 import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
-
-	"github.com/dkoosis/fo/fo"
-	"github.com/dkoosis/fo/internal/magetasks"
-	"github.com/magefile/mage/mg"
-	"github.com/magefile/mage/sh"
 )
 
-var (
-	console = fo.DefaultConsole()
-)
-
-// Default target - run fo dashboard
-var Default = Dashboard
-
-func init() {
-	if err := magetasks.Initialize(); err != nil {
-		fmt.Fprintf(os.Stderr, "Fatal: %v\n", err)
-		os.Exit(1)
-	}
+// cli returns true if CLI=1 is set (console output instead of dashboard).
+func cli() bool {
+	return os.Getenv("CLI") != ""
 }
 
-// Dashboard runs the fo dashboard TUI with parallel tasks (matches orca style)
-func Dashboard() error {
-	console.PrintH1Header("fo Dashboard")
-	// Build fo first
-	if err := sh.RunV("go", "build", "-o", "/tmp/fo-dashboard", "./cmd/fo"); err != nil {
-		return fmt.Errorf("failed to build fo: %w", err)
+// Default target runs standard build + lint + test.
+var Default = All
+
+// ----------------------------------------------------------------------------
+// Tier 1: Standard (default)
+// ----------------------------------------------------------------------------
+
+// All runs build, lint, and test.
+func All() error {
+	if cli() {
+		return allCLI()
 	}
-	// Run dashboard with TTY attached
-	cmd := exec.Command("/tmp/fo-dashboard", "--dashboard",
+	return allDashboard()
+}
+
+func allDashboard() error {
+	return runFoDashboard(
 		// Build
-		"--task", "Build/compile:go build ./...",
+		"Build/compile:go build ./...",
 		// Test
-		"--task", "Test/unit:go test -json -cover ./...",
-		// Lint
-		"--task", "Lint/vet:go vet ./...",
-		"--task", "Lint/gofmt:gofmt -l .",
-		"--task", "Lint/gocyclo:golangci-lint run --allow-parallel-runners --enable-only gocyclo --output.sarif.path=stdout ./...",
-		"--task", "Lint/goconst:golangci-lint run --allow-parallel-runners --enable-only goconst --output.sarif.path=stdout ./...",
-		"--task", "Lint/gosec:golangci-lint run --allow-parallel-runners --enable-only gosec --output.sarif.path=stdout ./...",
-		"--task", "Lint/staticcheck:golangci-lint run --allow-parallel-runners --enable-only staticcheck --output.sarif.path=stdout ./...",
-		"--task", "Lint/filesize:filesize -dir=. -top=5 -format=dashboard -snapshots=.filesize-history.jsonl",
+		"Test/unit:go test -json -cover ./...",
+		// Lint - essential
+		"Lint/vet:go vet ./...",
+		"Lint/gofmt:gofmt -l .",
+		"Lint/staticcheck:golangci-lint run --allow-parallel-runners --enable-only staticcheck --output.sarif.path=stdout ./...",
+		"Lint/gosec:golangci-lint run --allow-parallel-runners --enable-only gosec --output.sarif.path=stdout ./...",
+		// Metrics
+		"Lint/filesize:filesize -dir=. -top=5 -format=dashboard -snapshots=.filesize-history.jsonl",
 	)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	// Ensure GOPATH/bin is in PATH for lintkit tools
-	cmd.Env = append(os.Environ(), "PATH="+os.Getenv("PATH")+":"+os.Getenv("HOME")+"/go/bin")
-	return cmd.Run()
 }
 
-// Mage runs the standard build + test workflow
-func Mage() error {
-	buildID := getBuildID()
-	if buildID != "" {
-		magetasks.Console().PrintH1Header("fo Build Suite - " + buildID)
+func allCLI() error {
+	fmt.Println("═══ Build + Lint + Test ═══")
+	return runSequential(
+		step{"Build", "go", []string{"build", "./..."}},
+		step{"Test", "go", []string{"test", "-cover", "./..."}},
+		step{"Vet", "go", []string{"vet", "./..."}},
+		step{"Gofmt", "gofmt", []string{"-l", "."}},
+		step{"Staticcheck", "golangci-lint", []string{"run", "--enable-only", "staticcheck", "./..."}},
+		step{"Gosec", "golangci-lint", []string{"run", "--enable-only", "gosec", "./..."}},
+		step{"Filesize", "filesize", []string{"-dir=.", "-top=5"}},
+	)
+}
+
+// ----------------------------------------------------------------------------
+// Tier 2: Full QA
+// ----------------------------------------------------------------------------
+
+// Qa runs comprehensive quality checks: race detection, all linters, govulncheck.
+func Qa() error {
+	if cli() {
+		return qaCLI()
 	}
-	return magetasks.RunAll()
+	return qaDashboard()
 }
 
-// getBuildID returns a meaningful build identifier (git commit hash).
-func getBuildID() string {
-	commit, err := sh.Output("git", "rev-parse", "--short", "HEAD")
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(commit)
+func qaDashboard() error {
+	return runFoDashboard(
+		// Build
+		"Build/compile:go build ./...",
+		// Test - comprehensive
+		"Test/unit:go test -json -cover ./...",
+		"Test/race:go test -race -json -timeout=5m ./...",
+		// Lint - full suite
+		"Lint/vet:go vet ./...",
+		"Lint/gofmt:gofmt -l .",
+		"Lint/gocyclo:golangci-lint run --allow-parallel-runners --enable-only gocyclo --output.sarif.path=stdout ./...",
+		"Lint/goconst:golangci-lint run --allow-parallel-runners --enable-only goconst --output.sarif.path=stdout ./...",
+		"Lint/gosec:golangci-lint run --allow-parallel-runners --enable-only gosec --output.sarif.path=stdout ./...",
+		"Lint/staticcheck:golangci-lint run --allow-parallel-runners --enable-only staticcheck --output.sarif.path=stdout ./...",
+		"Lint/errcheck:golangci-lint run --allow-parallel-runners --enable-only errcheck --output.sarif.path=stdout ./...",
+		"Lint/revive:golangci-lint run --allow-parallel-runners --enable-only revive --output.sarif.path=stdout ./...",
+		// Security
+		"Security/govulncheck:govulncheck ./...",
+		// Metrics
+		"Lint/filesize:filesize -dir=. -top=5 -format=dashboard -snapshots=.filesize-history.jsonl",
+	)
 }
 
-// Build builds the fo binary
-func Build() error {
-	return magetasks.BuildAll()
+func qaCLI() error {
+	fmt.Println("═══ Full QA ═══")
+	return runSequential(
+		step{"Build", "go", []string{"build", "./..."}},
+		step{"Test", "go", []string{"test", "-cover", "./..."}},
+		step{"Race", "go", []string{"test", "-race", "-timeout=5m", "./..."}},
+		step{"Golangci-lint", "golangci-lint", []string{"run", "./..."}},
+		step{"Govulncheck", "govulncheck", []string{"./..."}},
+		step{"Filesize", "filesize", []string{"-dir=.", "-top=5"}},
+	)
 }
 
-// Clean removes build artifacts
+// ----------------------------------------------------------------------------
+// Utility: Clean
+// ----------------------------------------------------------------------------
+
+// Clean removes build artifacts.
 func Clean() error {
-	return magetasks.Clean()
-}
-
-// QA runs all quality assurance checks (uses fo library for better output)
-func QA() error {
-	magetasks.Console().PrintH1Header("fo Quality Assurance")
-	return magetasks.QualityCheck()
-}
-
-// Lint namespace for linting commands
-type Lint mg.Namespace
-
-// All runs all linters
-func (Lint) All() error {
-	return magetasks.LintAll()
-}
-
-// Format checks code formatting
-func (Lint) Format() error {
-	return magetasks.LintFormat()
-}
-
-// Vet runs go vet
-func (Lint) Vet() error {
-	return magetasks.LintVet()
-}
-
-// Staticcheck runs staticcheck
-func (Lint) Staticcheck() error {
-	return magetasks.LintStaticcheck()
-}
-
-// Golangci runs golangci-lint
-func (Lint) Golangci() error {
-	return magetasks.LintGolangci()
-}
-
-// Fix runs golangci-lint with auto-fixes
-func (Lint) Fix() error {
-	return magetasks.LintGolangciFix()
-}
-
-// Sarif runs linters with SARIF output and visual rendering
-func (Lint) Sarif() error {
-	return magetasks.LintSARIF()
-}
-
-// Test namespace for testing commands
-type Test mg.Namespace
-
-// All runs all tests
-func (Test) All() error {
-	return magetasks.TestAll()
-}
-
-// Coverage runs tests with coverage
-func (Test) Coverage() error {
-	return magetasks.TestCoverage()
-}
-
-// Race runs tests with race detector
-func (Test) Race() error {
-	return magetasks.TestRace()
-}
-
-// Visual runs the visual test suite for rendering validation
-func (Test) Visual() error {
-	console.PrintH1Header("Visual Test Suite")
-	if err := os.MkdirAll("visual_test_outputs", 0755); err != nil {
-		return fmt.Errorf("failed to create output directory: %w", err)
+	fmt.Println("Cleaning build artifacts...")
+	for _, f := range []string{"/tmp/fo-dashboard", "/tmp/fo-test"} {
+		_ = os.Remove(f)
 	}
-	return sh.RunV("go", "run", "cmd/visual_test_main.go", "visual_test_outputs")
+	return nil
 }
 
-// Dashboard tests the dashboard TUI with parallel tasks (matches orca style)
-func (Test) Dashboard() error {
-	console.PrintH1Header("Dashboard TUI Test")
+// ----------------------------------------------------------------------------
+// Helpers
+// ----------------------------------------------------------------------------
+
+type step struct {
+	name string
+	cmd  string
+	args []string
+}
+
+func runSequential(steps ...step) error {
+	for _, s := range steps {
+		fmt.Printf("→ %s\n", s.name)
+		cmd := exec.Command(s.cmd, s.args...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("%s failed: %w", s.name, err)
+		}
+	}
+	return nil
+}
+
+func runFoDashboard(tasks ...string) error {
 	// Build fo first
-	if err := sh.RunV("go", "build", "-o", "/tmp/fo-dashboard", "./cmd/fo"); err != nil {
+	buildCmd := exec.Command("go", "build", "-o", "/tmp/fo-dashboard", "./cmd/fo")
+	buildCmd.Stdout = os.Stdout
+	buildCmd.Stderr = os.Stderr
+	if err := buildCmd.Run(); err != nil {
 		return fmt.Errorf("failed to build fo: %w", err)
 	}
-	// Run dashboard with TTY attached (sh.RunV captures stdout, breaking TTY detection)
-	cmd := exec.Command("/tmp/fo-dashboard", "--dashboard",
-		// Build
-		"--task", "Build/compile:go build ./...",
-		// Test
-		"--task", "Test/unit:go test -json -cover ./...",
-		// Lint
-		"--task", "Lint/vet:go vet ./...",
-		"--task", "Lint/gofmt:gofmt -l .",
-		"--task", "Lint/gocyclo:golangci-lint run --allow-parallel-runners --enable-only gocyclo --output.sarif.path=stdout ./...",
-		"--task", "Lint/goconst:golangci-lint run --allow-parallel-runners --enable-only goconst --output.sarif.path=stdout ./...",
-		"--task", "Lint/gosec:golangci-lint run --allow-parallel-runners --enable-only gosec --output.sarif.path=stdout ./...",
-		"--task", "Lint/staticcheck:golangci-lint run --allow-parallel-runners --enable-only staticcheck --output.sarif.path=stdout ./...",
-		"--task", "Lint/filesize:filesize -dir=. -top=5 -format=dashboard -snapshots=.filesize-history.jsonl",
-	)
+
+	// Build task args
+	args := []string{"--dashboard"}
+	for _, t := range tasks {
+		args = append(args, "--task", t)
+	}
+
+	// Run dashboard with TTY attached
+	cmd := exec.Command("/tmp/fo-dashboard", args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	// Ensure GOPATH/bin is in PATH for lintkit tools
 	cmd.Env = append(os.Environ(), "PATH="+os.Getenv("PATH")+":"+os.Getenv("HOME")+"/go/bin")
 	return cmd.Run()
-}
-
-// Quality namespace for quality check commands
-type Quality mg.Namespace
-
-// Check runs the quality validation suite
-func (Quality) Check() error {
-	return magetasks.QualityCheck()
-}
-
-// Report generates the quality report
-func (Quality) Report() error {
-	return magetasks.QualityReport()
 }
