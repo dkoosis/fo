@@ -106,13 +106,22 @@ func (f *GoBuildFormatter) Format(lines []string, _ int) string {
 	fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
 	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
 
-	// Filter to non-empty lines (errors)
+	// Filter to actual errors (exclude go toolchain info messages)
 	var errors []string
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if trimmed != "" {
-			errors = append(errors, trimmed)
+		if trimmed == "" {
+			continue
 		}
+		// Skip info messages from go toolchain
+		if strings.HasPrefix(trimmed, "go: downloading") ||
+			strings.HasPrefix(trimmed, "go: extracting") ||
+			strings.HasPrefix(trimmed, "go: finding") ||
+			strings.HasPrefix(trimmed, "go: upgraded") ||
+			strings.HasPrefix(trimmed, "go: added") {
+			continue
+		}
+		errors = append(errors, trimmed)
 	}
 
 	if len(errors) == 0 {
