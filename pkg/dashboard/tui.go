@@ -70,20 +70,12 @@ func newModel(ctx context.Context, specs []TaskSpec) model {
 	return model{ctx: ctx, specs: specs, tasks: tasks, updates: updates, visualOrder: visualOrder, viewport: vp}
 }
 
-// buildVisualOrder creates a mapping from visual position to task index,
-// ensuring up/down navigation matches the grouped visual display order.
+// buildVisualOrder creates a mapping from visual position to task index.
+// Preserves input order - tasks appear in the order they were specified.
 func buildVisualOrder(tasks []*Task) []int {
-	groupOrder := make([]string, 0)
-	grouped := make(map[string][]int)
-	for i, task := range tasks {
-		if _, ok := grouped[task.Spec.Group]; !ok {
-			groupOrder = append(groupOrder, task.Spec.Group)
-		}
-		grouped[task.Spec.Group] = append(grouped[task.Spec.Group], i)
-	}
-	order := make([]int, 0, len(tasks))
-	for _, g := range groupOrder {
-		order = append(order, grouped[g]...)
+	order := make([]int, len(tasks))
+	for i := range tasks {
+		order[i] = i
 	}
 	return order
 }
@@ -299,46 +291,42 @@ func (m model) View() string {
 
 func renderList(tasks []*Task, selected int, width int) string {
 	lines := make([]string, 0, len(tasks)*2) // pre-allocate for tasks + group headers
-	groupOrder := make([]string, 0)
-	grouped := make(map[string][]int)
-	for i, task := range tasks {
-		if _, ok := grouped[task.Spec.Group]; !ok {
-			groupOrder = append(groupOrder, task.Spec.Group)
-		}
-		grouped[task.Spec.Group] = append(grouped[task.Spec.Group], i)
-	}
-	lineWidth := width - 6 // Account for padding
+	lineWidth := width - 6                   // Account for padding
 	if lineWidth < 20 {
 		lineWidth = 20
 	}
-	for _, g := range groupOrder {
-		lines = append(lines, activeTheme.GroupHeaderStyle.Render(activeTheme.Icons.Group+" "+g))
-		for _, idx := range grouped[g] {
-			task := tasks[idx]
-			metric := extractQuickMetric(task)
-			if idx == selected {
-				// Selected: use raw icons/text so SelectedStyle controls all styling
-				duration := ""
-				if task.Status == TaskRunning || task.Status == TaskSuccess || task.Status == TaskFailed {
-					duration = " " + formatDuration(task.Duration())
-				}
-				content := fmt.Sprintf("%s %s %s%s%s", activeTheme.Icons.Select, rawStatusIcon(task), task.Spec.Name, metric, duration)
-				line := activeTheme.SelectedStyle.Width(lineWidth).Render(content)
-				lines = append(lines, line)
-			} else {
-				// Unselected: use styled icons
-				duration := ""
-				if task.Status == TaskRunning || task.Status == TaskSuccess || task.Status == TaskFailed {
-					duration = activeTheme.DurationStyle.Render(" " + formatDuration(task.Duration()))
-				}
-				styledMetric := ""
-				if metric != "" {
-					styledMetric = activeTheme.DurationStyle.Render(metric)
-				}
-				taskName := fmt.Sprintf("%s %s%s%s", statusIcon(task), task.Spec.Name, styledMetric, duration)
-				line := activeTheme.UnselectedStyle.Render("  " + taskName)
-				lines = append(lines, line)
+
+	// Render in input order, showing group header when group changes
+	lastGroup := ""
+	for idx, task := range tasks {
+		if task.Spec.Group != lastGroup {
+			lines = append(lines, activeTheme.GroupHeaderStyle.Render(activeTheme.Icons.Group+" "+task.Spec.Group))
+			lastGroup = task.Spec.Group
+		}
+
+		metric := extractQuickMetric(task)
+		if idx == selected {
+			// Selected: use raw icons/text so SelectedStyle controls all styling
+			duration := ""
+			if task.Status == TaskRunning || task.Status == TaskSuccess || task.Status == TaskFailed {
+				duration = " " + formatDuration(task.Duration())
 			}
+			content := fmt.Sprintf("%s %s %s%s%s", activeTheme.Icons.Select, rawStatusIcon(task), task.Spec.Name, metric, duration)
+			line := activeTheme.SelectedStyle.Width(lineWidth).Render(content)
+			lines = append(lines, line)
+		} else {
+			// Unselected: use styled icons
+			duration := ""
+			if task.Status == TaskRunning || task.Status == TaskSuccess || task.Status == TaskFailed {
+				duration = activeTheme.DurationStyle.Render(" " + formatDuration(task.Duration()))
+			}
+			styledMetric := ""
+			if metric != "" {
+				styledMetric = activeTheme.DurationStyle.Render(metric)
+			}
+			taskName := fmt.Sprintf("%s %s%s%s", statusIcon(task), task.Spec.Name, styledMetric, duration)
+			line := activeTheme.UnselectedStyle.Render("  " + taskName)
+			lines = append(lines, line)
 		}
 	}
 	return strings.Join(lines, "\n")
