@@ -127,8 +127,8 @@ func DefaultDashboardTheme() *DashboardTheme {
 			Select:  "\u25b6", // ▶
 		},
 		Title: DashboardTitleStyle{
-			Text: "fo Dashboard",
-			Icon: "\u26a1", // ⚡
+			Text: "Dashboard",
+			Icon: "", // Tufte: no decorative icons
 		},
 		Spinner: DashboardSpinnerConfig{
 			Frames:   "\u280b \u2819 \u2838 \u2834 \u2826 \u2807", // ⠋ ⠙ ⠸ ⠴ ⠦ ⠇
@@ -170,8 +170,7 @@ func (t *DashboardTheme) Compile() *CompiledTheme {
 	// Build styles
 	ct.TitleStyle = lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("#FAFAFA")).
-		Background(ct.colorPrimary).
+		Foreground(ct.colorMuted). // Tufte: subtle, not decorative
 		Padding(0, 1)
 
 	ct.GroupHeaderStyle = lipgloss.NewStyle().
@@ -179,9 +178,7 @@ func (t *DashboardTheme) Compile() *CompiledTheme {
 		Foreground(ct.colorPrimary)
 
 	ct.TaskListStyle = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(ct.colorBorder).
-		Padding(0, 1)
+		Padding(1, 1) // Tufte: whitespace over boxes
 
 	ct.SelectedStyle = lipgloss.NewStyle().
 		Bold(true).
