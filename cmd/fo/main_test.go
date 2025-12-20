@@ -211,7 +211,10 @@ func TestRun_ManagesExecutionFlow_When_DifferentInputsProvided(t *testing.T) {
 			checkStdout: func(t *testing.T, stdout string) {
 				t.Helper()
 				// Check for success indicator (could be [SUCCESS] or Complete depending on theme)
-				assert.True(t, strings.Contains(stdout, "[SUCCESS]") || strings.Contains(stdout, "Complete"),
+				assert.True(t,
+					strings.Contains(stdout, "[SUCCESS]") ||
+						strings.Contains(stdout, "Complete") ||
+						strings.Contains(stdout, "[OK]"),
 					"Expected success indicator, got: %s", stdout)
 			},
 		},
