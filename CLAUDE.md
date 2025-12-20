@@ -6,14 +6,12 @@ Language: Go 1.24+
 Workspace: /Users/vcto/Projects/fo
 
 ## Session Start
-1. `set_workspace /Users/vcto/Projects/fo`
-2. `view .claude/handoff.json` — current state, active task, blockers
-3. `search_nugs({tags: ["system", "project:fo"], limit: 10})` — system context
-4. Check `handoff.next[0]` for immediate work
+1. `set_workspace /Users/vcto/Projects/fo` — auto-loads `n:boot:fo`
+2. `search_nugs({tags: ["project:fo"], limit: 10})` — project context
 
 ## Commands
-- `wrap` — end session: give_feedback per tool + update handoff.json
-- `status` — show handoff.active + verify state
+- `wrap` — end session: give_feedback per tool + update `n:boot:fo`
+- `status` — show boot nug focus + verify state
 
 ## Symbol Glossary
 ✓done ∇todo ‡critical †workaround ∅missing φfile →next ◯decision ≈session ∞pattern
@@ -25,9 +23,9 @@ Workspace: /Users/vcto/Projects/fo
 - Minimal formatting unless requested
 
 ## Key Files
-- `.claude/handoff.json` — session state
 - `docs/VISION_REVIEW.md` — design principles
 - `internal/patterns/` — semantic rendering patterns
+- `pkg/dashboard/formatters/` — dashboard output formatters
 
 ## Search Scope
 Skip: vendor, node_modules, build, .trash, dist, .git
