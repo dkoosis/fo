@@ -91,7 +91,7 @@ func (f *MCPErrorsFormatter) Format(lines []string, width int) string {
 			if e.Level == "WARN" {
 				levelStyle = warnStyle
 			}
-			msg := e.Message
+			msg := stripMCPLogPrefix(e.Message)
 			if len(msg) > width-15 && width > 18 {
 				msg = msg[:width-18] + "..."
 			}
@@ -113,4 +113,23 @@ func (f *MCPErrorsFormatter) Format(lines []string, width int) string {
 	}
 
 	return b.String()
+}
+
+// stripMCPLogPrefix removes the verbose MCP log prefix that appears in stderr.
+// Example: "   [ERROR] (https://modelcontextprotocol.io/docs/tools/debugging) actual message"
+func stripMCPLogPrefix(msg string) string {
+	// Remove leading whitespace and [LEVEL] tag since we render our own
+	msg = strings.TrimLeft(msg, " \t")
+	for _, level := range []string{"[ERROR]", "[WARN]", "[WARNING]", "[INFO]"} {
+		if after, found := strings.CutPrefix(msg, level); found {
+			msg = strings.TrimLeft(after, " \t")
+			break
+		}
+	}
+	// Remove the documentation URL prefix
+	const docURL = "(https://modelcontextprotocol.io/docs/tools/debugging)"
+	if after, found := strings.CutPrefix(msg, docURL); found {
+		msg = strings.TrimLeft(after, " \t")
+	}
+	return msg
 }
