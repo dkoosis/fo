@@ -35,9 +35,16 @@ type MCPErrorDetail struct {
 func (f *MCPErrorsFormatter) Format(lines []string, width int) string {
 	var b strings.Builder
 
+	// Find the JSON object in the output (skip any build/download messages)
 	fullOutput := strings.Join(lines, "\n")
+	jsonStart := strings.Index(fullOutput, "{")
+	if jsonStart == -1 {
+		return (&PlainFormatter{}).Format(lines, width)
+	}
+	jsonOutput := fullOutput[jsonStart:]
+
 	var report MCPErrorsReport
-	if err := json.Unmarshal([]byte(fullOutput), &report); err != nil {
+	if err := json.Unmarshal([]byte(jsonOutput), &report); err != nil {
 		return (&PlainFormatter{}).Format(lines, width)
 	}
 

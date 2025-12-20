@@ -16,6 +16,7 @@ var formatters = []OutputFormatter{
 	&GoArchLintFormatter{},        // go-arch-lint output
 	&NilawayFormatter{},           // nilaway -json output
 	&SARIFFormatter{},
+	&JscpdFormatter{},             // jscpd --reporters console output
 	&PlainFormatter{}, // fallback, always last
 }
 
