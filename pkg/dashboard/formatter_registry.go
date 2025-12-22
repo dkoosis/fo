@@ -9,6 +9,9 @@ var formatters = []OutputFormatter{
 	&FilesizeDashboardFormatter{}, // Must be before SARIF to match dashboard format
 	&MCPErrorsFormatter{},         // mcp-errors -format=dashboard output
 	&NugstatsFormatter{},          // nugstats -format=dashboard output
+	&OrcaHygieneFormatter{},       // orca-hygiene -format=dashboard output
+	&TelemetrySignalsFormatter{},  // telemetry-signals -format=dashboard output
+	&GovulncheckFormatter{},       // govulncheck output
 	&GolangciLintFormatter{},      // Per-linter sections for golangci-lint
 	&GofmtFormatter{},             // gofmt -l output
 	&GoVetFormatter{},             // go vet output

@@ -70,9 +70,10 @@ func (f *NugstatsFormatter) Format(lines []string, width int) string {
 	b.WriteString(headerStyle.Render("By Kind"))
 	b.WriteString("\n")
 
-	// Find max width for kind names and counts for alignment
+	// Find max width for kind names, counts, and deltas for alignment
 	maxKindLen := 0
 	maxCount := 0
+	maxDelta := 0
 	for _, k := range report.ByKind {
 		if len(k.Kind) > maxKindLen {
 			maxKindLen = len(k.Kind)
@@ -80,21 +81,27 @@ func (f *NugstatsFormatter) Format(lines []string, width int) string {
 		if k.Count > maxCount {
 			maxCount = k.Count
 		}
+		absDelta := k.Delta
+		if absDelta < 0 {
+			absDelta = -absDelta
+		}
+		if absDelta > maxDelta {
+			maxDelta = absDelta
+		}
 	}
-	countWidth := len(fmt.Sprintf("%d", maxCount))
-	if countWidth < 3 {
-		countWidth = 3
-	}
+	countWidth := max(len(fmt.Sprintf("%d", maxCount)), 3)
+	deltaWidth := max(len(fmt.Sprintf("%d", maxDelta)), 1)
 
 	for _, k := range report.ByKind {
-		delta := ""
+		// Render delta with fixed-width: arrow aligned, number right-aligned
+		delta := strings.Repeat(" ", deltaWidth+2) // space for "↑" + space + number
 		if k.Delta > 0 {
-			delta = deltaUpStyle.Render(fmt.Sprintf(" ↑%d", k.Delta))
+			delta = deltaUpStyle.Render(fmt.Sprintf("↑%*d", deltaWidth, k.Delta))
 		} else if k.Delta < 0 {
-			delta = deltaDownStyle.Render(fmt.Sprintf(" ↓%d", -k.Delta))
+			delta = deltaDownStyle.Render(fmt.Sprintf("↓%*d", deltaWidth, -k.Delta))
 		}
-		// Right-align count column
-		b.WriteString(fmt.Sprintf("  %-*s  %s%s\n",
+		// Right-align count column, then delta column
+		b.WriteString(fmt.Sprintf("  %-*s  %s  %s\n",
 			maxKindLen,
 			kindStyle.Render(k.Kind),
 			countStyle.Render(fmt.Sprintf("%*d", countWidth, k.Count)),
@@ -104,13 +111,7 @@ func (f *NugstatsFormatter) Format(lines []string, width int) string {
 	// Horizontal stacked bar proportional to kind counts
 	if len(report.ByKind) > 0 && report.Total > 0 {
 		b.WriteString("\n  ")
-		barWidth := width - 6 // account for padding
-		if barWidth < 20 {
-			barWidth = 20
-		}
-		if barWidth > 60 {
-			barWidth = 60
-		}
+		barWidth := max(min(width-6, 60), 20) // clamp to [20, 60]
 
 		// Color palette for kinds (cycle through)
 		colors := []lipgloss.Color{
