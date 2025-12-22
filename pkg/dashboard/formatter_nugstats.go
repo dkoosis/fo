@@ -100,11 +100,12 @@ func (f *NugstatsFormatter) Format(lines []string, width int) string {
 		} else if k.Delta < 0 {
 			delta = deltaDownStyle.Render(fmt.Sprintf("↓%*d", deltaWidth, -k.Delta))
 		}
-		// Right-align count column, then delta column
-		b.WriteString(fmt.Sprintf("  %-*s  %s  %s\n",
-			maxKindLen,
-			kindStyle.Render(k.Kind),
-			countStyle.Render(fmt.Sprintf("%*d", countWidth, k.Count)),
+		// Pad raw strings BEFORE styling to avoid ANSI code width issues
+		paddedKind := fmt.Sprintf("%-*s", maxKindLen, k.Kind)
+		paddedCount := fmt.Sprintf("%*d", countWidth, k.Count)
+		b.WriteString(fmt.Sprintf("  %s  %s  %s\n",
+			kindStyle.Render(paddedKind),
+			countStyle.Render(paddedCount),
 			delta))
 	}
 

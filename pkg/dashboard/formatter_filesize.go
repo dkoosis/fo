@@ -209,7 +209,8 @@ func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 				warnStyle.Render(strings.Repeat("█", yellowChars)) +
 				errorStyle.Render(strings.Repeat("█", redChars))
 
-			b.WriteString(fmt.Sprintf("  %-10s %s\n", mutedStyle.Render(h.Week), bar))
+			paddedWeek := fmt.Sprintf("%-10s", h.Week)
+			b.WriteString(fmt.Sprintf("  %s %s\n", mutedStyle.Render(paddedWeek), bar))
 		}
 	}
 
