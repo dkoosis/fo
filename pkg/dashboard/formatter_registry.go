@@ -7,6 +7,7 @@ var formatters = []OutputFormatter{
 	&RaceFormatter{}, // Must be before GoTestFormatter (more specific match)
 	&GoTestFormatter{},
 	&FilesizeDashboardFormatter{}, // Must be before SARIF to match dashboard format
+	&KGBaselineFormatter{},        // kg-baseline.json output
 	&MCPErrorsFormatter{},         // mcp-errors -format=dashboard output
 	&NugstatsFormatter{},          // nugstats -format=dashboard output
 	&OrcaHygieneFormatter{},       // orca-hygiene -format=dashboard output

@@ -19,11 +19,17 @@ func RunNonTTY(ctx context.Context, specs []TaskSpec, out io.Writer) int {
 		for update := range updates {
 			task := tasks[update.Index]
 			if update.Line != "" {
+				// Append to task output for later formatting
+				task.mu.Lock()
+				task.Output = append(task.Output, update.Line)
+				task.mu.Unlock()
+
 				prefix := fmt.Sprintf("[%s/%s] ", task.Spec.Group, task.Spec.Name)
 				fmt.Fprintf(out, "%s%s\n", prefix, update.Line)
 			}
 			if update.Status == TaskSuccess || update.Status == TaskFailed {
 				task.ExitCode = update.ExitCode
+				task.Status = update.Status
 			}
 		}
 	}()
@@ -33,6 +39,20 @@ func RunNonTTY(ctx context.Context, specs []TaskSpec, out io.Writer) int {
 
 func renderSummary(out io.Writer, tasks []*Task) int {
 	failures := 0
+
+	// Format task outputs using formatters
+	for _, task := range tasks {
+		if len(task.Output) > 0 {
+			// Use formatter if available
+			formatted := FormatOutput(task.Spec.Command, task.Output, 100)
+			if formatted != strings.Join(task.Output, "\n") {
+				// Formatter produced different output - use it
+				fmt.Fprintln(out)
+				fmt.Fprintln(out, formatted)
+			}
+		}
+	}
+
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Summary:")
 	for _, task := range tasks {
