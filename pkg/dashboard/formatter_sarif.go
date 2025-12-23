@@ -45,12 +45,10 @@ type SARIFReport struct {
 func (f *SARIFFormatter) Format(lines []string, width int) string {
 	var b strings.Builder
 
-	// Styles
-	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true)
-	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFBD2E")).Bold(true)
+	s := Styles()
+	// Non-bold variants for detail
 	fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6"))
 	ruleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
-	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
 
 	// Try to parse SARIF
 	fullOutput := strings.Join(lines, "\n")
@@ -98,18 +96,18 @@ func (f *SARIFFormatter) Format(lines []string, width int) string {
 
 	// Summary
 	if errors == 0 && warnings == 0 {
-		b.WriteString(successStyle.Render("✓ No issues found\n"))
+		b.WriteString(s.Success.Render("✓ No issues found\n"))
 		return b.String()
 	}
 
 	if errors > 0 {
-		b.WriteString(errorStyle.Render(fmt.Sprintf("✗ %d errors", errors)))
+		b.WriteString(s.Error.Render(fmt.Sprintf("✗ %d errors", errors)))
 	}
 	if warnings > 0 {
 		if errors > 0 {
 			b.WriteString(", ")
 		}
-		b.WriteString(warnStyle.Render(fmt.Sprintf("△ %d warnings", warnings)))
+		b.WriteString(s.Warn.Render(fmt.Sprintf("△ %d warnings", warnings)))
 	}
 	b.WriteString("\n\n")
 
@@ -121,9 +119,9 @@ func (f *SARIFFormatter) Format(lines []string, width int) string {
 			break
 		}
 
-		icon := warnStyle.Render("△")
+		icon := s.Warn.Render("△")
 		if iss.level == statusError {
-			icon = errorStyle.Render("✗")
+			icon = s.Error.Render("✗")
 		}
 
 		location := fileStyle.Render(fmt.Sprintf("%s:%d", iss.file, iss.line))

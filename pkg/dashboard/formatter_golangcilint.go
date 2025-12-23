@@ -37,13 +37,7 @@ type lintIssue struct {
 func (f *GolangciLintFormatter) Format(lines []string, width int) string {
 	var b strings.Builder
 
-	// Styles
-	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true)
-	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFBD2E")).Bold(true)
-	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6")).Bold(true)
-	fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
-	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
-	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
+	s := Styles()
 
 	// Parse SARIF - extract JSON from mixed output (stdout SARIF + stderr text)
 	var report SARIFReport
@@ -87,7 +81,7 @@ func (f *GolangciLintFormatter) Format(lines []string, width int) string {
 
 	// No issues
 	if len(byLinter) == 0 {
-		b.WriteString(successStyle.Render("✓ No issues found\n"))
+		b.WriteString(s.Success.Render("✓ No issues found\n"))
 		return b.String()
 	}
 
@@ -106,26 +100,26 @@ func (f *GolangciLintFormatter) Format(lines []string, width int) string {
 
 	// Render each linter section
 	for _, g := range groups {
-		countStyle := warnStyle
+		countStyle := s.Warn
 		for _, iss := range g.issues {
 			if iss.level == statusError {
-				countStyle = errorStyle
+				countStyle = s.Error
 				break
 			}
 		}
 
-		b.WriteString(headerStyle.Render(fmt.Sprintf("◉ %s", g.name)))
+		b.WriteString(s.Header.Render(fmt.Sprintf("◉ %s", g.name)))
 		b.WriteString(countStyle.Render(fmt.Sprintf(" (%d)", len(g.issues))))
 		b.WriteString("\n")
 
 		// Dispatch to per-linter renderer
 		switch g.name {
 		case "gocyclo":
-			f.renderGocyclo(&b, g.issues, fileStyle, errorStyle, warnStyle, mutedStyle)
+			f.renderGocyclo(&b, g.issues, s.File, s.Error, s.Warn, s.Muted)
 		case "goconst":
-			f.renderGoconst(&b, g.issues, fileStyle, mutedStyle)
+			f.renderGoconst(&b, g.issues, s.File, s.Muted)
 		default:
-			f.renderDefault(&b, g.issues, fileStyle, mutedStyle, errorStyle, warnStyle)
+			f.renderDefault(&b, g.issues, s.File, s.Muted, s.Error, s.Warn)
 		}
 		b.WriteString("\n")
 	}

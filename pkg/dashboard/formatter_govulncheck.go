@@ -38,21 +38,18 @@ func (f *GovulncheckFormatter) Format(lines []string, width int) string {
 
 	fullOutput := strings.Join(lines, "\n")
 
-	// Styles
-	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6")).Bold(true)
-	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
-	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true)
+	s := Styles()
+	// Non-bold variants for secondary info
 	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFBD2E"))
-	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
 	idStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6"))
 
 	// Header
-	b.WriteString(headerStyle.Render("◉ Vulnerability Check"))
+	b.WriteString(s.Header.Render("◉ Vulnerability Check"))
 	b.WriteString("\n\n")
 
 	// Check for simple "no vulnerabilities" message (text mode)
 	if strings.Contains(fullOutput, "No vulnerabilities found") {
-		b.WriteString(successStyle.Render("✓ No vulnerabilities found"))
+		b.WriteString(s.Success.Render("✓ No vulnerabilities found"))
 		b.WriteString("\n")
 		return b.String()
 	}
@@ -75,13 +72,13 @@ func (f *GovulncheckFormatter) Format(lines []string, width int) string {
 	}
 
 	if len(vulns) == 0 {
-		b.WriteString(successStyle.Render("✓ No vulnerabilities found"))
+		b.WriteString(s.Success.Render("✓ No vulnerabilities found"))
 		b.WriteString("\n")
 		return b.String()
 	}
 
 	// Show vulnerability count
-	b.WriteString(errorStyle.Render(fmt.Sprintf("%d vulnerabilities found", len(vulns))))
+	b.WriteString(s.Error.Render(fmt.Sprintf("%d vulnerabilities found", len(vulns))))
 	b.WriteString("\n\n")
 
 	// Show each vulnerability (up to 5)
@@ -117,14 +114,14 @@ func (f *GovulncheckFormatter) Format(lines []string, width int) string {
 			if mod.FixedVersion != "" {
 				fix = warnStyle.Render(fmt.Sprintf(" → fix: %s", mod.FixedVersion))
 			}
-			b.WriteString(fmt.Sprintf("  %s%s\n", mutedStyle.Render(mod.Path+"@"+mod.FoundVersion), fix))
+			b.WriteString(fmt.Sprintf("  %s%s\n", s.Muted.Render(mod.Path+"@"+mod.FoundVersion), fix))
 		}
 		b.WriteString("\n")
 		shown++
 	}
 
 	if len(vulns) > 5 {
-		b.WriteString(mutedStyle.Render(fmt.Sprintf("... and %d more\n", len(vulns)-5)))
+		b.WriteString(s.Muted.Render(fmt.Sprintf("... and %d more\n", len(vulns)-5)))
 	}
 
 	return b.String()

@@ -85,23 +85,19 @@ func (f *TelemetrySignalsFormatter) Format(lines []string, width int) string {
 		return (&PlainFormatter{}).Format(lines, width)
 	}
 
-	// Styles
-	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6")).Bold(true)
-	countStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
-	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
-	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
+	s := Styles()
 
 	m := report.Metrics
 
 	// Header
-	b.WriteString(headerStyle.Render("◉ Telemetry Signals"))
+	b.WriteString(s.Header.Render("◉ Telemetry Signals"))
 	b.WriteString("  ")
-	b.WriteString(countStyle.Render(fmt.Sprintf("%d calls", m.TotalCalls)))
-	b.WriteString(mutedStyle.Render(fmt.Sprintf("  %d sessions", m.Sessions)))
+	b.WriteString(s.Success.Render(fmt.Sprintf("%d calls", m.TotalCalls)))
+	b.WriteString(s.Muted.Render(fmt.Sprintf("  %d sessions", m.Sessions)))
 	b.WriteString("\n\n")
 
 	// Tool Adoption section
-	b.WriteString(headerStyle.Render("Tool Adoption"))
+	b.WriteString(s.Header.Render("Tool Adoption"))
 	b.WriteString("\n")
 	adoptionData := []struct {
 		label string
@@ -119,12 +115,12 @@ func (f *TelemetrySignalsFormatter) Format(lines []string, width int) string {
 		paddedPct := fmt.Sprintf("%3.0f%%", a.pct)
 		note := ""
 		if a.note != "" {
-			note = mutedStyle.Render(fmt.Sprintf("  [%s]", a.note))
+			note = s.Muted.Render(fmt.Sprintf("  [%s]", a.note))
 		}
 		b.WriteString(fmt.Sprintf("  %s  %s  %s%s\n",
-			labelStyle.Render(paddedLabel),
-			countStyle.Render(paddedCount),
-			countStyle.Render(paddedPct),
+			s.File.Render(paddedLabel),
+			s.Success.Render(paddedCount),
+			s.Success.Render(paddedPct),
 			note))
 	}
 
@@ -150,44 +146,44 @@ func (f *TelemetrySignalsFormatter) Format(lines []string, width int) string {
 
 	// Entropy section
 	if len(m.Entropy) > 0 {
-		b.WriteString(headerStyle.Render("Entropy"))
-		b.WriteString(mutedStyle.Render("  (lower = less confusion)"))
+		b.WriteString(s.Header.Render("Entropy"))
+		b.WriteString(s.Muted.Render("  (lower = less confusion)"))
 		b.WriteString("\n")
 		for _, e := range m.Entropy {
 			paddedTool := fmt.Sprintf("%-18s", e.Tool)
 			bar := strings.Repeat("█", int(e.Entropy*3))
 			b.WriteString(fmt.Sprintf("  %s  %s %s\n",
-				labelStyle.Render(paddedTool),
-				countStyle.Render(fmt.Sprintf("%4.2f", e.Entropy)),
-				mutedStyle.Render(bar)))
+				s.File.Render(paddedTool),
+				s.Success.Render(fmt.Sprintf("%4.2f", e.Entropy)),
+				s.Muted.Render(bar)))
 		}
 		b.WriteString("\n")
 	}
 
 	// Self-Repeat section
-	b.WriteString(headerStyle.Render("Self-Repeat"))
-	b.WriteString(mutedStyle.Render("  (search_nugs)"))
+	b.WriteString(s.Header.Render("Self-Repeat"))
+	b.WriteString(s.Muted.Render("  (search_nugs)"))
 	b.WriteString("\n")
 	b.WriteString(fmt.Sprintf("  %s  %s  %s\n",
-		labelStyle.Render(fmt.Sprintf("%-12s", "Refinement")),
-		countStyle.Render(fmt.Sprintf("%5d", m.SelfRepeat.TotalRefinements)),
-		countStyle.Render(fmt.Sprintf("%3.0f%%", m.SelfRepeat.RefinementPct))))
+		s.File.Render(fmt.Sprintf("%-12s", "Refinement")),
+		s.Success.Render(fmt.Sprintf("%5d", m.SelfRepeat.TotalRefinements)),
+		s.Success.Render(fmt.Sprintf("%3.0f%%", m.SelfRepeat.RefinementPct))))
 	b.WriteString(fmt.Sprintf("  %s  %s  %s  %s\n",
-		labelStyle.Render(fmt.Sprintf("%-12s", "Retry")),
-		countStyle.Render(fmt.Sprintf("%5d", m.SelfRepeat.TotalRetries)),
-		countStyle.Render(fmt.Sprintf("%3.0f%%", m.SelfRepeat.RetryPct)),
-		mutedStyle.Render("[frustrated]")))
+		s.File.Render(fmt.Sprintf("%-12s", "Retry")),
+		s.Success.Render(fmt.Sprintf("%5d", m.SelfRepeat.TotalRetries)),
+		s.Success.Render(fmt.Sprintf("%3.0f%%", m.SelfRepeat.RetryPct)),
+		s.Muted.Render("[frustrated]")))
 	b.WriteString("\n")
 
 	// Zero Results section
-	b.WriteString(headerStyle.Render("Zero Results"))
+	b.WriteString(s.Header.Render("Zero Results"))
 	b.WriteString("\n")
 	b.WriteString(fmt.Sprintf("  %s  %s  %s\n",
-		labelStyle.Render(fmt.Sprintf("%-12s", "Zero results")),
-		countStyle.Render(fmt.Sprintf("%5d", m.ZeroResults.ZeroResultCount)),
-		countStyle.Render(fmt.Sprintf("%3.0f%%", m.ZeroResults.ZeroResultPercent))))
+		s.File.Render(fmt.Sprintf("%-12s", "Zero results")),
+		s.Success.Render(fmt.Sprintf("%5d", m.ZeroResults.ZeroResultCount)),
+		s.Success.Render(fmt.Sprintf("%3.0f%%", m.ZeroResults.ZeroResultPercent))))
 	b.WriteString(fmt.Sprintf("  %s retry=%d  save=%d  explore=%d\n",
-		mutedStyle.Render("After zero:"),
+		s.Muted.Render("After zero:"),
 		m.ZeroResults.RetryAfterZero,
 		m.ZeroResults.SaveAfterZero,
 		m.ZeroResults.ExploreAfterZero))

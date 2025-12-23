@@ -18,13 +18,10 @@ func (f *RaceFormatter) Matches(command string) bool {
 func (f *RaceFormatter) Format(lines []string, width int) string {
 	var b strings.Builder
 
-	// Styles
-	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true)
-	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
-	warningStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFBD2E")).Bold(true)
+	s := Styles()
+	// Non-bold variants for race output details
 	fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6"))
 	funcStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
-	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
 
 	// Parse JSON events and extract race warnings
 	var races []string
@@ -76,31 +73,31 @@ func (f *RaceFormatter) Format(lines []string, width int) string {
 
 	// Build summary
 	if raceDetected {
-		b.WriteString(errorStyle.Render("✗ DATA RACE DETECTED"))
+		b.WriteString(s.Error.Render("✗ DATA RACE DETECTED"))
 		b.WriteString("\n\n")
 
 		// Show race details
 		for i, line := range races {
 			if i >= 30 { // Limit output
-				b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more lines\n", len(races)-30)))
+				b.WriteString(s.Muted.Render(fmt.Sprintf("  ... and %d more lines\n", len(races)-30)))
 				break
 			}
 
 			// Style different parts of race output
 			if strings.Contains(line, "DATA RACE") {
-				b.WriteString(warningStyle.Render(line))
+				b.WriteString(s.Warn.Render(line))
 			} else if strings.Contains(line, ".go:") {
 				b.WriteString(fileStyle.Render(line))
 			} else if strings.Contains(line, "Read at") || strings.Contains(line, "Write at") ||
 				strings.Contains(line, "Previous") {
 				b.WriteString(funcStyle.Render(line))
 			} else {
-				b.WriteString(mutedStyle.Render(line))
+				b.WriteString(s.Muted.Render(line))
 			}
 			b.WriteString("\n")
 		}
 	} else {
-		b.WriteString(successStyle.Render("✓ No data races detected"))
+		b.WriteString(s.Success.Render("✓ No data races detected"))
 		b.WriteString("\n")
 	}
 
@@ -109,14 +106,14 @@ func (f *RaceFormatter) Format(lines []string, width int) string {
 		b.WriteString("\n")
 		total := testsPassed + testsFailed + testsSkipped
 		if testsFailed > 0 {
-			b.WriteString(errorStyle.Render(fmt.Sprintf("Tests: %d passed, %d failed", testsPassed, testsFailed)))
+			b.WriteString(s.Error.Render(fmt.Sprintf("Tests: %d passed, %d failed", testsPassed, testsFailed)))
 		} else {
-			b.WriteString(successStyle.Render(fmt.Sprintf("Tests: %d passed", testsPassed)))
+			b.WriteString(s.Success.Render(fmt.Sprintf("Tests: %d passed", testsPassed)))
 		}
 		if testsSkipped > 0 {
-			b.WriteString(mutedStyle.Render(fmt.Sprintf(", %d skipped", testsSkipped)))
+			b.WriteString(s.Muted.Render(fmt.Sprintf(", %d skipped", testsSkipped)))
 		}
-		b.WriteString(mutedStyle.Render(fmt.Sprintf(" (total: %d)", total)))
+		b.WriteString(s.Muted.Render(fmt.Sprintf(" (total: %d)", total)))
 		b.WriteString("\n")
 	}
 

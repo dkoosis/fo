@@ -68,19 +68,13 @@ func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 		return (&PlainFormatter{}).Format(lines, width)
 	}
 
-	// Styles
-	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true)
-	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFBD2E")).Bold(true)
-	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
-	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6")).Bold(true)
-	fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
-	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
+	s := Styles()
 	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
 
 	m := dashboard.Metrics
 
 	// ── Top 5 Largest Files ──────────────────────────────────────────────
-	b.WriteString(headerStyle.Render("◉ Largest Source Files"))
+	b.WriteString(s.Header.Render("◉ Largest Source Files"))
 	b.WriteString("\n\n")
 
 	for i, file := range dashboard.TopFiles {
@@ -90,20 +84,20 @@ func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 		var tierStyle lipgloss.Style
 		switch file.Tier {
 		case "red":
-			tierStyle = errorStyle
+			tierStyle = s.Error
 		case "yellow":
-			tierStyle = warnStyle
+			tierStyle = s.Warn
 		default:
-			tierStyle = successStyle
+			tierStyle = s.Success
 		}
 		b.WriteString(fmt.Sprintf("  %s  %s\n",
 			tierStyle.Render(fmt.Sprintf("%4d", file.Lines)),
-			fileStyle.Render(file.Path)))
+			s.File.Render(file.Path)))
 	}
 	b.WriteString("\n")
 
 	// ── File Size Distribution ───────────────────────────────────────────
-	b.WriteString(headerStyle.Render("◉ Size Distribution"))
+	b.WriteString(s.Header.Render("◉ Size Distribution"))
 	b.WriteString("\n\n")
 
 	// Get previous values for trends (Week -1 if available)
@@ -116,9 +110,9 @@ func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 
 	// Red (>1000 LOC)
 	redArrow := trendArrow(m.Red, prevRed, true) // up is bad
-	redStyle := successStyle
+	redStyle := s.Success
 	if m.Red > 0 {
-		redStyle = errorStyle
+		redStyle = s.Error
 	}
 	b.WriteString(fmt.Sprintf("  %s %s %s\n",
 		labelStyle.Render(fmt.Sprintf("%14s:", ">1000 LOC")),
@@ -127,9 +121,9 @@ func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 
 	// Yellow (500-999 LOC)
 	yellowArrow := trendArrow(m.Yellow, prevYellow, true) // up is bad
-	yellowStyle := successStyle
+	yellowStyle := s.Success
 	if m.Yellow > 0 {
-		yellowStyle = warnStyle
+		yellowStyle = s.Warn
 	}
 	b.WriteString(fmt.Sprintf("  %s %s %s\n",
 		labelStyle.Render(fmt.Sprintf("%14s:", "500-999 LOC")),
@@ -140,7 +134,7 @@ func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 	greenArrow := trendArrow(m.Green, prevGreen, false) // up is good
 	b.WriteString(fmt.Sprintf("  %s %s %s\n",
 		labelStyle.Render(fmt.Sprintf("%14s:", "<500 LOC")),
-		successStyle.Render(fmt.Sprintf("%4d", m.Green)),
+		s.Success.Render(fmt.Sprintf("%4d", m.Green)),
 		greenArrow))
 
 	b.WriteString("\n")
@@ -157,21 +151,21 @@ func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 	testArrow := trendArrowNeutral(m.TestFiles, prevTest)
 	b.WriteString(fmt.Sprintf("  %s %s %s\n",
 		labelStyle.Render(fmt.Sprintf("%14s:", "Test files")),
-		fileStyle.Render(fmt.Sprintf("%4d", m.TestFiles)),
+		s.File.Render(fmt.Sprintf("%4d", m.TestFiles)),
 		testArrow))
 
 	// MD files (neutral)
 	mdArrow := trendArrowNeutral(m.MDFiles, prevMD)
 	b.WriteString(fmt.Sprintf("  %s %s %s\n",
 		labelStyle.Render(fmt.Sprintf("%14s:", "Markdown files")),
-		fileStyle.Render(fmt.Sprintf("%4d", m.MDFiles)),
+		s.File.Render(fmt.Sprintf("%4d", m.MDFiles)),
 		mdArrow))
 
 	// Orphan MD (any > 0 is wrong)
 	orphanArrow := trendArrow(m.OrphanMD, prevOrphan, true) // up is bad
-	orphanStyle := successStyle
+	orphanStyle := s.Success
 	if m.OrphanMD > 0 {
-		orphanStyle = errorStyle
+		orphanStyle = s.Error
 	}
 	b.WriteString(fmt.Sprintf("  %s %s %s\n",
 		labelStyle.Render(fmt.Sprintf("%14s:", "Orphan docs")),
@@ -181,7 +175,7 @@ func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 	// ── Weekly Trend (if history available) ──────────────────────────────
 	if len(dashboard.History) > 1 {
 		b.WriteString("\n")
-		b.WriteString(headerStyle.Render("◉ 4-Week Trend"))
+		b.WriteString(s.Header.Render("◉ 4-Week Trend"))
 		b.WriteString("\n\n")
 
 		// Show last 4 weeks as mini sparkbars
@@ -196,8 +190,8 @@ func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 			total := h.Green + h.Yellow + h.Red
 			if total == 0 {
 				b.WriteString(fmt.Sprintf("  %-10s %s\n",
-					mutedStyle.Render(h.Week),
-					mutedStyle.Render(strings.Repeat("·", barWidth))))
+					s.Muted.Render(h.Week),
+					s.Muted.Render(strings.Repeat("·", barWidth))))
 				continue
 			}
 
@@ -205,12 +199,12 @@ func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 			yellowChars := (h.Yellow * barWidth) / total
 			redChars := barWidth - greenChars - yellowChars
 
-			bar := successStyle.Render(strings.Repeat("█", greenChars)) +
-				warnStyle.Render(strings.Repeat("█", yellowChars)) +
-				errorStyle.Render(strings.Repeat("█", redChars))
+			bar := s.Success.Render(strings.Repeat("█", greenChars)) +
+				s.Warn.Render(strings.Repeat("█", yellowChars)) +
+				s.Error.Render(strings.Repeat("█", redChars))
 
 			paddedWeek := fmt.Sprintf("%-10s", h.Week)
-			b.WriteString(fmt.Sprintf("  %s %s\n", mutedStyle.Render(paddedWeek), bar))
+			b.WriteString(fmt.Sprintf("  %s %s\n", s.Muted.Render(paddedWeek), bar))
 		}
 	}
 

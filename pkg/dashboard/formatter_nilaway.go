@@ -30,18 +30,14 @@ type nilawayAnalyzerResult struct {
 func (f *NilawayFormatter) Format(lines []string, _ int) string {
 	var b strings.Builder
 
-	// Styles
-	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true)
-	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
-	fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6")).Bold(true)
-	messageStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
+	s := Styles()
+	// reasonStyle is a lighter gray for secondary info
 	reasonStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
-	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
 
 	// Combine lines and parse JSON
 	combined := strings.Join(lines, "\n")
 	if strings.TrimSpace(combined) == "" {
-		b.WriteString(successStyle.Render("✓ No nil pointer issues found\n"))
+		b.WriteString(s.Success.Render("✓ No nil pointer issues found\n"))
 		return b.String()
 	}
 
@@ -58,15 +54,15 @@ func (f *NilawayFormatter) Format(lines []string, _ int) string {
 	if len(allFindings) == 0 {
 		// Check if output looks like an error or empty result
 		if strings.Contains(combined, "error") || strings.Contains(combined, "Error") {
-			b.WriteString(errorStyle.Render("✗ nilaway encountered errors:\n\n"))
-			b.WriteString(messageStyle.Render(combined))
+			b.WriteString(s.Error.Render("✗ nilaway encountered errors:\n\n"))
+			b.WriteString(s.File.Render(combined))
 			return b.String()
 		}
-		b.WriteString(successStyle.Render("✓ No nil pointer issues found\n"))
+		b.WriteString(s.Success.Render("✓ No nil pointer issues found\n"))
 		return b.String()
 	}
 
-	b.WriteString(errorStyle.Render(fmt.Sprintf("✗ %d potential nil pointer issues:", len(allFindings))))
+	b.WriteString(s.Error.Render(fmt.Sprintf("✗ %d potential nil pointer issues:", len(allFindings))))
 	b.WriteString("\n\n")
 
 	// Group by file for better display
@@ -90,12 +86,12 @@ func (f *NilawayFormatter) Format(lines []string, _ int) string {
 	for _, file := range fileOrder {
 		if displayed >= maxDisplay {
 			remaining := len(allFindings) - displayed
-			b.WriteString(mutedStyle.Render(fmt.Sprintf("\n  ... and %d more issues\n", remaining)))
+			b.WriteString(s.Muted.Render(fmt.Sprintf("\n  ... and %d more issues\n", remaining)))
 			break
 		}
 
 		findings := byFile[file]
-		b.WriteString(fileStyle.Render(file))
+		b.WriteString(s.Header.Render(file))
 		b.WriteString("\n")
 
 		for _, finding := range findings {
@@ -112,7 +108,7 @@ func (f *NilawayFormatter) Format(lines []string, _ int) string {
 				}
 			}
 
-			b.WriteString(fmt.Sprintf("  %s %s\n", mutedStyle.Render(loc+":"), messageStyle.Render(finding.Message)))
+			b.WriteString(fmt.Sprintf("  %s %s\n", s.Muted.Render(loc+":"), s.File.Render(finding.Message)))
 			if finding.Reason != "" {
 				b.WriteString(fmt.Sprintf("      %s\n", reasonStyle.Render(finding.Reason)))
 			}

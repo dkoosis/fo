@@ -48,26 +48,21 @@ func (f *OrcaHygieneFormatter) Format(lines []string, width int) string {
 		return (&PlainFormatter{}).Format(lines, width)
 	}
 
-	// Styles
-	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6")).Bold(true)
-	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
-	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true)
-	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFBD2E")).Bold(true)
-	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
+	s := Styles()
 	pathStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
 
 	// Header
-	b.WriteString(headerStyle.Render("◉ Orca Hygiene"))
+	b.WriteString(s.Header.Render("◉ Orca Hygiene"))
 	b.WriteString("\n\n")
 
 	if len(report.Issues) == 0 {
-		b.WriteString(successStyle.Render("✓ All checks passed"))
+		b.WriteString(s.Success.Render("✓ All checks passed"))
 		b.WriteString("\n")
 		return b.String()
 	}
 
 	// Summary
-	b.WriteString(mutedStyle.Render(report.Summary))
+	b.WriteString(s.Muted.Render(report.Summary))
 	b.WriteString("\n\n")
 
 	// Group issues by severity
@@ -82,20 +77,20 @@ func (f *OrcaHygieneFormatter) Format(lines []string, width int) string {
 
 	// Show errors first
 	if len(errors) > 0 {
-		b.WriteString(errorStyle.Render("Errors"))
+		b.WriteString(s.Error.Render("Errors"))
 		b.WriteString("\n")
 		for _, issue := range errors {
-			renderHygieneIssue(&b, issue, pathStyle, mutedStyle, width)
+			renderHygieneIssue(&b, issue, pathStyle, s.Muted, width)
 		}
 		b.WriteString("\n")
 	}
 
 	// Then warnings
 	if len(warnings) > 0 {
-		b.WriteString(warnStyle.Render("Warnings"))
+		b.WriteString(s.Warn.Render("Warnings"))
 		b.WriteString("\n")
 		for _, issue := range warnings {
-			renderHygieneIssue(&b, issue, pathStyle, mutedStyle, width)
+			renderHygieneIssue(&b, issue, pathStyle, s.Muted, width)
 		}
 	}
 

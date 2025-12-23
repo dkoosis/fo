@@ -48,48 +48,43 @@ func (f *MCPErrorsFormatter) Format(lines []string, width int) string {
 		return (&PlainFormatter{}).Format(lines, width)
 	}
 
-	// Styles
-	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true)
-	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFBD2E")).Bold(true)
-	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
-	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6")).Bold(true)
-	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
+	s := Styles()
 	detailStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
 
 	// Header with summary
-	b.WriteString(headerStyle.Render("◉ MCP Server Logs"))
+	b.WriteString(s.Header.Render("◉ MCP Server Logs"))
 	b.WriteString("\n\n")
 
 	if report.ErrorCount == 0 && report.WarnCount == 0 {
-		b.WriteString(successStyle.Render("✓ No errors or warnings"))
+		b.WriteString(s.Success.Render("✓ No errors or warnings"))
 		b.WriteString("\n")
 		return b.String()
 	}
 
 	// Summary counts
 	if report.ErrorCount > 0 {
-		b.WriteString(errorStyle.Render(fmt.Sprintf("  %d errors", report.ErrorCount)))
+		b.WriteString(s.Error.Render(fmt.Sprintf("  %d errors", report.ErrorCount)))
 	} else {
-		b.WriteString(successStyle.Render("  0 errors"))
+		b.WriteString(s.Success.Render("  0 errors"))
 	}
 	b.WriteString("  ")
 	if report.WarnCount > 0 {
-		b.WriteString(warnStyle.Render(fmt.Sprintf("%d warnings", report.WarnCount)))
+		b.WriteString(s.Warn.Render(fmt.Sprintf("%d warnings", report.WarnCount)))
 	} else {
-		b.WriteString(mutedStyle.Render("0 warnings"))
+		b.WriteString(s.Muted.Render("0 warnings"))
 	}
 	b.WriteString("\n\n")
 
 	// Show recent errors (up to 5)
 	if len(report.Errors) > 0 {
-		b.WriteString(headerStyle.Render("Recent Errors"))
+		b.WriteString(s.Header.Render("Recent Errors"))
 		b.WriteString("\n")
 		shown := 0
 		for i := len(report.Errors) - 1; i >= 0 && shown < 5; i-- {
 			e := report.Errors[i]
-			levelStyle := errorStyle
+			levelStyle := s.Error
 			if e.Level == "WARN" {
-				levelStyle = warnStyle
+				levelStyle = s.Warn
 			}
 			msg := stripMCPLogPrefix(e.Message)
 			if len(msg) > width-15 && width > 18 {
@@ -108,7 +103,7 @@ func (f *MCPErrorsFormatter) Format(lines []string, width int) string {
 			shown++
 		}
 		if len(report.Errors) > 5 {
-			b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", len(report.Errors)-5)))
+			b.WriteString(s.Muted.Render(fmt.Sprintf("  ... and %d more\n", len(report.Errors)-5)))
 		}
 	}
 

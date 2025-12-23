@@ -5,8 +5,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/charmbracelet/lipgloss"
 )
 
 // JscpdFormatter handles jscpd --reporters console output.
@@ -22,12 +20,7 @@ var ansiRegex = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 func (f *JscpdFormatter) Format(lines []string, _ int) string {
 	var b strings.Builder
 
-	// Styles
-	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6")).Bold(true)
-	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFBD2E")).Bold(true)
-	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
-	fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
-	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
+	s := Styles()
 
 	// Count clones and parse summary
 	cloneCount := 0
@@ -53,30 +46,30 @@ func (f *JscpdFormatter) Format(lines []string, _ int) string {
 	}
 
 	// Header
-	b.WriteString(headerStyle.Render("◉ Code Duplication"))
+	b.WriteString(s.Header.Render("◉ Code Duplication"))
 	b.WriteString("\n\n")
 
 	if cloneCount == 0 {
-		b.WriteString(successStyle.Render("✓ No duplicates found"))
+		b.WriteString(s.Success.Render("✓ No duplicates found"))
 		b.WriteString("\n")
 		return b.String()
 	}
 
 	// Summary
-	b.WriteString(warnStyle.Render(fmt.Sprintf("⚠ %d clones found", cloneCount)))
+	b.WriteString(s.Warn.Render(fmt.Sprintf("⚠ %d clones found", cloneCount)))
 	b.WriteString("\n\n")
 
 	// Show unique files with clones
 	shown := make(map[string]bool)
 	for _, file := range clones {
 		if file != "" && !shown[file] {
-			b.WriteString(fmt.Sprintf("  %s\n", fileStyle.Render(file)))
+			b.WriteString(fmt.Sprintf("  %s\n", s.File.Render(file)))
 			shown[file] = true
 		}
 	}
 
 	if cloneCount > len(shown) {
-		b.WriteString(mutedStyle.Render(fmt.Sprintf("\n  ... and %d more\n", cloneCount-len(shown))))
+		b.WriteString(s.Muted.Render(fmt.Sprintf("\n  ... and %d more\n", cloneCount-len(shown))))
 	}
 
 	return b.String()

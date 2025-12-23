@@ -78,15 +78,16 @@ type goTestStyles struct {
 }
 
 func newGoTestStyles() goTestStyles {
+	s := Styles()
 	return goTestStyles{
-		pass:    lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true),
-		fail:    lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true),
-		skip:    lipgloss.NewStyle().Foreground(lipgloss.Color("#FFBD2E")),
-		run:     lipgloss.NewStyle().Foreground(lipgloss.Color("#48CAE4")),
-		pkg:     lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6")).Bold(true),
-		test:    lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC")),
-		muted:   lipgloss.NewStyle().Foreground(lipgloss.Color("#626262")),
-		pending: lipgloss.NewStyle().Foreground(lipgloss.Color("#FFDD88")),
+		pass:    s.Success,
+		fail:    s.Error,
+		skip:    lipgloss.NewStyle().Foreground(lipgloss.Color("#FFBD2E")), // non-bold warn
+		run:     lipgloss.NewStyle().Foreground(lipgloss.Color("#48CAE4")), // test-specific cyan
+		pkg:     s.Header,
+		test:    s.File,
+		muted:   s.Muted,
+		pending: lipgloss.NewStyle().Foreground(lipgloss.Color("#FFDD88")), // test-specific pending
 	}
 }
 

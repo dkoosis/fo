@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"github.com/charmbracelet/lipgloss"
 )
 
 // GoArchLintFormatter handles go-arch-lint --json output.
@@ -40,13 +38,7 @@ type archLintReport struct {
 func (f *GoArchLintFormatter) Format(lines []string, width int) string {
 	var b strings.Builder
 
-	// Styles
-	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true)
-	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFBD2E")).Bold(true)
-	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
-	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6")).Bold(true)
-	fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
-	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
+	s := Styles()
 
 	// Parse JSON
 	fullOutput := strings.Join(lines, "\n")
@@ -62,61 +54,61 @@ func (f *GoArchLintFormatter) Format(lines []string, width int) string {
 	totalIssues := depCount + unmatchedCount + deepScanCount
 
 	if !report.Payload.ArchHasWarnings || totalIssues == 0 {
-		b.WriteString(successStyle.Render("✓ No architecture violations\n"))
+		b.WriteString(s.Success.Render("✓ No architecture violations\n"))
 		return b.String()
 	}
 
 	// Summary
-	b.WriteString(warnStyle.Render(fmt.Sprintf("△ %d architecture issues", totalIssues)))
+	b.WriteString(s.Warn.Render(fmt.Sprintf("△ %d architecture issues", totalIssues)))
 	b.WriteString("\n\n")
 
 	// Dependency violations
 	if depCount > 0 {
-		b.WriteString(headerStyle.Render("◉ Dependency Violations"))
-		b.WriteString(errorStyle.Render(fmt.Sprintf(" (%d)", depCount)))
+		b.WriteString(s.Header.Render("◉ Dependency Violations"))
+		b.WriteString(s.Error.Render(fmt.Sprintf(" (%d)", depCount)))
 		b.WriteString("\n")
 		for i, dep := range report.Payload.ArchWarningsDeps {
 			if i >= 10 {
-				b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", depCount-10)))
+				b.WriteString(s.Muted.Render(fmt.Sprintf("  ... and %d more\n", depCount-10)))
 				break
 			}
 			b.WriteString(fmt.Sprintf("  %s → %s\n",
-				warnStyle.Render(dep.ComponentFrom),
-				errorStyle.Render(dep.ComponentTo)))
-			b.WriteString(fmt.Sprintf("    %s\n", fileStyle.Render(shortPath(dep.FileRelPath))))
+				s.Warn.Render(dep.ComponentFrom),
+				s.Error.Render(dep.ComponentTo)))
+			b.WriteString(fmt.Sprintf("    %s\n", s.File.Render(shortPath(dep.FileRelPath))))
 		}
 		b.WriteString("\n")
 	}
 
 	// Unmatched files
 	if unmatchedCount > 0 {
-		b.WriteString(headerStyle.Render("◉ Unmatched Files"))
-		b.WriteString(warnStyle.Render(fmt.Sprintf(" (%d)", unmatchedCount)))
+		b.WriteString(s.Header.Render("◉ Unmatched Files"))
+		b.WriteString(s.Warn.Render(fmt.Sprintf(" (%d)", unmatchedCount)))
 		b.WriteString("\n")
 		for i, um := range report.Payload.ArchWarningsNotMatched {
 			if i >= 10 {
-				b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", unmatchedCount-10)))
+				b.WriteString(s.Muted.Render(fmt.Sprintf("  ... and %d more\n", unmatchedCount-10)))
 				break
 			}
-			b.WriteString(fmt.Sprintf("  %s\n", fileStyle.Render(um.FileRelPath)))
+			b.WriteString(fmt.Sprintf("  %s\n", s.File.Render(um.FileRelPath)))
 		}
 		b.WriteString("\n")
 	}
 
 	// Deep scan violations
 	if deepScanCount > 0 {
-		b.WriteString(headerStyle.Render("◉ Deep Scan Violations"))
-		b.WriteString(errorStyle.Render(fmt.Sprintf(" (%d)", deepScanCount)))
+		b.WriteString(s.Header.Render("◉ Deep Scan Violations"))
+		b.WriteString(s.Error.Render(fmt.Sprintf(" (%d)", deepScanCount)))
 		b.WriteString("\n")
 		for i, ds := range report.Payload.ArchWarningsDeepScan {
 			if i >= 10 {
-				b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", deepScanCount-10)))
+				b.WriteString(s.Muted.Render(fmt.Sprintf("  ... and %d more\n", deepScanCount-10)))
 				break
 			}
 			b.WriteString(fmt.Sprintf("  %s → %s\n",
-				warnStyle.Render(ds.Gate),
-				errorStyle.Render(ds.ComponentTo)))
-			b.WriteString(fmt.Sprintf("    %s\n", fileStyle.Render(shortPath(ds.FileRelPath))))
+				s.Warn.Render(ds.Gate),
+				s.Error.Render(ds.ComponentTo)))
+			b.WriteString(fmt.Sprintf("    %s\n", s.File.Render(shortPath(ds.FileRelPath))))
 		}
 	}
 

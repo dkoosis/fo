@@ -16,11 +16,7 @@ func (f *GofmtFormatter) Matches(command string) bool {
 
 func (f *GofmtFormatter) Format(lines []string, _ int) string {
 	var b strings.Builder
-
-	// Styles
-	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true)
-	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
-	fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
+	s := Styles()
 
 	// Filter to non-empty lines (actual files)
 	var files []string
@@ -32,15 +28,15 @@ func (f *GofmtFormatter) Format(lines []string, _ int) string {
 	}
 
 	if len(files) == 0 {
-		b.WriteString(successStyle.Render("✓ All files formatted correctly\n"))
+		b.WriteString(s.Success.Render("✓ All files formatted correctly\n"))
 		return b.String()
 	}
 
-	b.WriteString(errorStyle.Render(fmt.Sprintf("✗ %d files need formatting:", len(files))))
+	b.WriteString(s.Error.Render(fmt.Sprintf("✗ %d files need formatting:", len(files))))
 	b.WriteString("\n\n")
 
 	for _, file := range files {
-		b.WriteString(fmt.Sprintf("  %s\n", fileStyle.Render(file)))
+		b.WriteString(fmt.Sprintf("  %s\n", s.File.Render(file)))
 	}
 
 	return b.String()
@@ -55,12 +51,7 @@ func (f *GoVetFormatter) Matches(command string) bool {
 
 func (f *GoVetFormatter) Format(lines []string, _ int) string {
 	var b strings.Builder
-
-	// Styles
-	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true)
-	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
-	fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
-	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
+	s := Styles()
 
 	// Filter to non-empty lines
 	var issues []string
@@ -72,19 +63,19 @@ func (f *GoVetFormatter) Format(lines []string, _ int) string {
 	}
 
 	if len(issues) == 0 {
-		b.WriteString(successStyle.Render("✓ No issues found\n"))
+		b.WriteString(s.Success.Render("✓ No issues found\n"))
 		return b.String()
 	}
 
-	b.WriteString(errorStyle.Render(fmt.Sprintf("✗ %d issues:", len(issues))))
+	b.WriteString(s.Error.Render(fmt.Sprintf("✗ %d issues:", len(issues))))
 	b.WriteString("\n\n")
 
 	for i, issue := range issues {
 		if i >= 15 {
-			b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", len(issues)-15)))
+			b.WriteString(s.Muted.Render(fmt.Sprintf("  ... and %d more\n", len(issues)-15)))
 			break
 		}
-		b.WriteString(fmt.Sprintf("  %s\n", fileStyle.Render(issue)))
+		b.WriteString(fmt.Sprintf("  %s\n", s.File.Render(issue)))
 	}
 
 	return b.String()
@@ -99,12 +90,7 @@ func (f *GoBuildFormatter) Matches(command string) bool {
 
 func (f *GoBuildFormatter) Format(lines []string, _ int) string {
 	var b strings.Builder
-
-	// Styles
-	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")).Bold(true)
-	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
-	fileStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
-	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
+	s := Styles()
 
 	// Filter to actual errors (exclude go toolchain info messages)
 	var errors []string
@@ -125,19 +111,19 @@ func (f *GoBuildFormatter) Format(lines []string, _ int) string {
 	}
 
 	if len(errors) == 0 {
-		b.WriteString(successStyle.Render("✓ Build successful\n"))
+		b.WriteString(s.Success.Render("✓ Build successful\n"))
 		return b.String()
 	}
 
-	b.WriteString(errorStyle.Render("✗ Build failed:"))
+	b.WriteString(s.Error.Render("✗ Build failed:"))
 	b.WriteString("\n\n")
 
 	for i, err := range errors {
 		if i >= 20 {
-			b.WriteString(mutedStyle.Render(fmt.Sprintf("  ... and %d more\n", len(errors)-20)))
+			b.WriteString(s.Muted.Render(fmt.Sprintf("  ... and %d more\n", len(errors)-20)))
 			break
 		}
-		b.WriteString(fmt.Sprintf("  %s\n", fileStyle.Render(err)))
+		b.WriteString(fmt.Sprintf("  %s\n", s.File.Render(err)))
 	}
 
 	return b.String()

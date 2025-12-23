@@ -53,21 +53,19 @@ func (f *NugstatsFormatter) Format(lines []string, width int) string {
 		return (&PlainFormatter{}).Format(lines, width)
 	}
 
-	// Styles
-	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6")).Bold(true)
-	countStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
-	kindStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
+	s := Styles()
+	// Delta styles are non-bold variants for semantic differentiation
 	deltaUpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575"))
 	deltaDownStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56"))
 
 	// Header
-	b.WriteString(headerStyle.Render("◉ Knowledge Graph"))
+	b.WriteString(s.Header.Render("◉ Knowledge Graph"))
 	b.WriteString("  ")
-	b.WriteString(countStyle.Render(fmt.Sprintf("%d nuggets", report.Total)))
+	b.WriteString(s.Success.Render(fmt.Sprintf("%d nuggets", report.Total)))
 	b.WriteString("\n\n")
 
 	// By kind - show all, with right-aligned columns
-	b.WriteString(headerStyle.Render("By Kind"))
+	b.WriteString(s.Header.Render("By Kind"))
 	b.WriteString("\n")
 
 	// Find max width for kind names, counts, and deltas for alignment
@@ -110,9 +108,9 @@ func (f *NugstatsFormatter) Format(lines []string, width int) string {
 		paddedCount := fmt.Sprintf("%*d", countWidth, k.Count)
 		paddedPct := fmt.Sprintf("%2d%%", pct)
 		b.WriteString(fmt.Sprintf("  %s  %s  %s  %s\n",
-			kindStyle.Render(paddedKind),
-			countStyle.Render(paddedCount),
-			kindStyle.Render(paddedPct),
+			s.File.Render(paddedKind),
+			s.Success.Render(paddedCount),
+			s.File.Render(paddedPct),
 			delta))
 	}
 
