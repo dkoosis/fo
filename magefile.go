@@ -56,6 +56,7 @@ func allCLI() error {
 	fmt.Println("═══ Build + Lint + Test ═══")
 	return runSequential(
 		step{"Build", "go", []string{"build", "./..."}},
+		step{"Install", "go", []string{"install", "./cmd/fo"}},
 		step{"Test", "go", []string{"test", "-cover", "./..."}},
 		step{"Vet", "go", []string{"vet", "./..."}},
 		step{"Gofmt", "gofmt", []string{"-l", "."}},
@@ -104,6 +105,7 @@ func qaCLI() error {
 	fmt.Println("═══ Full QA ═══")
 	return runSequential(
 		step{"Build", "go", []string{"build", "./..."}},
+		step{"Install", "go", []string{"install", "./cmd/fo"}},
 		step{"Test", "go", []string{"test", "-cover", "./..."}},
 		step{"Race", "go", []string{"test", "-race", "-timeout=5m", "./..."}},
 		step{"Golangci-lint", "golangci-lint", []string{"run", "./..."}},
@@ -155,6 +157,14 @@ func runFoDashboard(tasks ...string) error {
 	buildCmd.Stderr = os.Stderr
 	if err := buildCmd.Run(); err != nil {
 		return fmt.Errorf("failed to build fo: %w", err)
+	}
+
+	// Install fo binary to ~/go/bin
+	installCmd := exec.Command("go", "install", "./cmd/fo")
+	installCmd.Stdout = os.Stdout
+	installCmd.Stderr = os.Stderr
+	if err := installCmd.Run(); err != nil {
+		return fmt.Errorf("failed to install fo: %w", err)
 	}
 
 	// Build task args
