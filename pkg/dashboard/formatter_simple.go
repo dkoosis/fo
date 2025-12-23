@@ -144,6 +144,13 @@ func (f *PlainFormatter) Format(lines []string, _ int) string {
 	var result []string
 	for _, line := range lines {
 		lower := strings.ToLower(line)
+
+		// Skip structured log lines (slog format) - level=ERROR is just a log level, not an error
+		if isStructuredLogLine(line) {
+			result = append(result, line)
+			continue
+		}
+
 		if strings.Contains(lower, "error") || strings.Contains(lower, "fail") || strings.Contains(lower, "panic") {
 			result = append(result, errorStyle.Render(line))
 		} else if strings.Contains(lower, "warning") || strings.Contains(lower, "warn") {
@@ -153,4 +160,11 @@ func (f *PlainFormatter) Format(lines []string, _ int) string {
 		}
 	}
 	return strings.Join(result, "\n")
+}
+
+// isStructuredLogLine detects slog-style structured log output.
+// These lines contain level=ERROR/WARN as metadata, not actual errors.
+func isStructuredLogLine(line string) bool {
+	// slog text format: time=... level=...
+	return strings.Contains(line, "time=") && strings.Contains(line, "level=")
 }

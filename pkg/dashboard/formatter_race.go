@@ -35,10 +35,8 @@ func (f *RaceFormatter) Format(lines []string, width int) string {
 
 		var event GoTestEvent
 		if err := json.Unmarshal([]byte(line), &event); err != nil {
-			// Not JSON, check for race warning
-			if strings.Contains(line, "WARNING: DATA RACE") {
-				raceDetected = true
-			}
+			// Not JSON - parse verbose output format
+			parseVerboseLine(line, &testsPassed, &testsFailed, &testsSkipped, &raceDetected, &races)
 			continue
 		}
 
@@ -49,16 +47,7 @@ func (f *RaceFormatter) Format(lines []string, width int) string {
 
 		// Collect race-related output
 		if event.Action == actionOutput && event.Test == "" {
-			output := strings.TrimSpace(event.Output)
-			if strings.Contains(output, "DATA RACE") ||
-				strings.Contains(output, "Read at") ||
-				strings.Contains(output, "Write at") ||
-				strings.Contains(output, "Previous write") ||
-				strings.Contains(output, "Previous read") ||
-				strings.Contains(output, "Goroutine") ||
-				(strings.HasPrefix(output, "  ") && strings.Contains(output, ".go:")) {
-				races = append(races, output)
-			}
+			collectRaceOutput(event.Output, &races)
 		}
 
 		// Track test results
@@ -118,4 +107,41 @@ func (f *RaceFormatter) Format(lines []string, width int) string {
 	}
 
 	return b.String()
+}
+
+// parseVerboseLine parses go test -v output format (non-JSON).
+func parseVerboseLine(line string, passed, failed, skipped *int, raceDetected *bool, races *[]string) {
+	// Check for race warning
+	if strings.Contains(line, "WARNING: DATA RACE") {
+		*raceDetected = true
+	}
+
+	// Collect race-related output
+	collectRaceOutput(line, races)
+
+	// Parse test results: "--- PASS: TestName (0.00s)"
+	if strings.HasPrefix(line, "--- PASS:") {
+		*passed++
+	} else if strings.HasPrefix(line, "--- FAIL:") {
+		*failed++
+	} else if strings.HasPrefix(line, "--- SKIP:") {
+		*skipped++
+	}
+}
+
+// collectRaceOutput appends race-related lines to the races slice.
+func collectRaceOutput(output string, races *[]string) {
+	trimmed := strings.TrimSpace(output)
+	if trimmed == "" {
+		return
+	}
+	if strings.Contains(trimmed, "DATA RACE") ||
+		strings.Contains(trimmed, "Read at") ||
+		strings.Contains(trimmed, "Write at") ||
+		strings.Contains(trimmed, "Previous write") ||
+		strings.Contains(trimmed, "Previous read") ||
+		strings.Contains(trimmed, "Goroutine") ||
+		(strings.HasPrefix(trimmed, "  ") && strings.Contains(trimmed, ".go:")) {
+		*races = append(*races, trimmed)
+	}
 }
