@@ -19,12 +19,31 @@ func (f *FilesizeDashboardFormatter) Matches(command string) bool {
 type FilesizeDashboard struct {
 	Timestamp string                   `json:"timestamp"`
 	Metrics   FilesizeDashboardMetrics `json:"metrics"`
+	Deltas    FilesizeDashboardDeltas  `json:"deltas"`
 	TopFiles  []FilesizeDashboardFile  `json:"top_files"`
 	History   []FilesizeHistoryEntry   `json:"history"`
 }
 
 // FilesizeDashboardMetrics holds the file size metrics.
 type FilesizeDashboardMetrics struct {
+	Total     int `json:"total"`
+	Green     int `json:"green"`
+	Yellow    int `json:"yellow"`
+	Red       int `json:"red"`
+	TestFiles int `json:"test_files"`
+	MDFiles   int `json:"md_files"`
+	OrphanMD  int `json:"orphan_md"`
+}
+
+// FilesizeDashboardDeltas contains deltas at different time intervals.
+type FilesizeDashboardDeltas struct {
+	Day   FilesizeMetricDeltas `json:"day"`
+	Week  FilesizeMetricDeltas `json:"week"`
+	Month FilesizeMetricDeltas `json:"month"`
+}
+
+// FilesizeMetricDeltas holds delta values for each metric.
+type FilesizeMetricDeltas struct {
 	Total     int `json:"total"`
 	Green     int `json:"green"`
 	Yellow    int `json:"yellow"`
@@ -98,79 +117,103 @@ func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 
 	// ── File Size Distribution ───────────────────────────────────────────
 	b.WriteString(s.Header.Render("◉ Size Distribution"))
-	b.WriteString("\n\n")
+	b.WriteString("\n")
 
-	// Get previous values for trends (Week -1 if available)
-	var prevRed, prevYellow, prevGreen int
-	if len(dashboard.History) > 0 {
-		prevRed = dashboard.History[0].Red
-		prevYellow = dashboard.History[0].Yellow
-		prevGreen = dashboard.History[0].Green
+	// Header row with delta time periods
+	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
+	b.WriteString(fmt.Sprintf("  %s %s  %s  %s  %s\n",
+		strings.Repeat(" ", 14), // label space
+		strings.Repeat(" ", 4),  // count space
+		headerStyle.Render("  1d  "),
+		headerStyle.Render("  1w  "),
+		headerStyle.Render(" 1mo  ")))
+	b.WriteString("\n")
+
+	// Calculate max delta width for alignment
+	maxDelta := 0
+	for _, delta := range []int{
+		abs(dashboard.Deltas.Day.Red), abs(dashboard.Deltas.Week.Red), abs(dashboard.Deltas.Month.Red),
+		abs(dashboard.Deltas.Day.Yellow), abs(dashboard.Deltas.Week.Yellow), abs(dashboard.Deltas.Month.Yellow),
+		abs(dashboard.Deltas.Day.Green), abs(dashboard.Deltas.Week.Green), abs(dashboard.Deltas.Month.Green),
+		abs(dashboard.Deltas.Day.TestFiles), abs(dashboard.Deltas.Week.TestFiles), abs(dashboard.Deltas.Month.TestFiles),
+		abs(dashboard.Deltas.Day.MDFiles), abs(dashboard.Deltas.Week.MDFiles), abs(dashboard.Deltas.Month.MDFiles),
+		abs(dashboard.Deltas.Day.OrphanMD), abs(dashboard.Deltas.Week.OrphanMD), abs(dashboard.Deltas.Month.OrphanMD),
+	} {
+		if delta > maxDelta {
+			maxDelta = delta
+		}
 	}
+	deltaWidth := max(len(fmt.Sprintf("%d", maxDelta)), 1)
 
-	// Red (>1000 LOC)
-	redArrow := trendArrow(m.Red, prevRed, true) // up is bad
+	deltaUpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56"))   // red - up is bad
+	deltaDownStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")) // green - down is good
+
+	// Red (>1000 LOC) - up is bad
 	redStyle := s.Success
 	if m.Red > 0 {
 		redStyle = s.Error
 	}
-	b.WriteString(fmt.Sprintf("  %s %s %s\n",
+	b.WriteString(fmt.Sprintf("  %s %s  %s  %s  %s\n",
 		labelStyle.Render(fmt.Sprintf("%14s:", ">1000 LOC")),
 		redStyle.Render(fmt.Sprintf("%4d", m.Red)),
-		redArrow))
+		renderDelta(dashboard.Deltas.Day.Red, deltaWidth, deltaUpStyle, deltaDownStyle, true),
+		renderDelta(dashboard.Deltas.Week.Red, deltaWidth, deltaUpStyle, deltaDownStyle, true),
+		renderDelta(dashboard.Deltas.Month.Red, deltaWidth, deltaUpStyle, deltaDownStyle, true)))
 
-	// Yellow (500-999 LOC)
-	yellowArrow := trendArrow(m.Yellow, prevYellow, true) // up is bad
+	// Yellow (500-999 LOC) - up is bad
 	yellowStyle := s.Success
 	if m.Yellow > 0 {
 		yellowStyle = s.Warn
 	}
-	b.WriteString(fmt.Sprintf("  %s %s %s\n",
+	b.WriteString(fmt.Sprintf("  %s %s  %s  %s  %s\n",
 		labelStyle.Render(fmt.Sprintf("%14s:", "500-999 LOC")),
 		yellowStyle.Render(fmt.Sprintf("%4d", m.Yellow)),
-		yellowArrow))
+		renderDelta(dashboard.Deltas.Day.Yellow, deltaWidth, deltaUpStyle, deltaDownStyle, true),
+		renderDelta(dashboard.Deltas.Week.Yellow, deltaWidth, deltaUpStyle, deltaDownStyle, true),
+		renderDelta(dashboard.Deltas.Month.Yellow, deltaWidth, deltaUpStyle, deltaDownStyle, true)))
 
-	// Green (<500 LOC)
-	greenArrow := trendArrow(m.Green, prevGreen, false) // up is good
-	b.WriteString(fmt.Sprintf("  %s %s %s\n",
+	// Green (<500 LOC) - up is good
+	deltaUpGood := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575"))   // green - up is good
+	deltaDownBad := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")) // red - down is bad
+	b.WriteString(fmt.Sprintf("  %s %s  %s  %s  %s\n",
 		labelStyle.Render(fmt.Sprintf("%14s:", "<500 LOC")),
 		s.Success.Render(fmt.Sprintf("%4d", m.Green)),
-		greenArrow))
+		renderDelta(dashboard.Deltas.Day.Green, deltaWidth, deltaUpGood, deltaDownBad, false),
+		renderDelta(dashboard.Deltas.Week.Green, deltaWidth, deltaUpGood, deltaDownBad, false),
+		renderDelta(dashboard.Deltas.Month.Green, deltaWidth, deltaUpGood, deltaDownBad, false)))
 
 	b.WriteString("\n")
 
-	// Get previous values for additional metrics
-	var prevTest, prevMD, prevOrphan int
-	if len(dashboard.History) > 0 {
-		prevTest = dashboard.History[0].TestFiles
-		prevMD = dashboard.History[0].MDFiles
-		prevOrphan = dashboard.History[0].OrphanMD
-	}
+	// Neutral style for test/MD files (gray arrows)
+	deltaNeutral := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
 
-	// Test files (neutral - more is generally good)
-	testArrow := trendArrowNeutral(m.TestFiles, prevTest)
-	b.WriteString(fmt.Sprintf("  %s %s %s\n",
+	// Test files (neutral)
+	b.WriteString(fmt.Sprintf("  %s %s  %s  %s  %s\n",
 		labelStyle.Render(fmt.Sprintf("%14s:", "Test files")),
 		s.File.Render(fmt.Sprintf("%4d", m.TestFiles)),
-		testArrow))
+		renderDelta(dashboard.Deltas.Day.TestFiles, deltaWidth, deltaNeutral, deltaNeutral, true),
+		renderDelta(dashboard.Deltas.Week.TestFiles, deltaWidth, deltaNeutral, deltaNeutral, true),
+		renderDelta(dashboard.Deltas.Month.TestFiles, deltaWidth, deltaNeutral, deltaNeutral, true)))
 
 	// MD files (neutral)
-	mdArrow := trendArrowNeutral(m.MDFiles, prevMD)
-	b.WriteString(fmt.Sprintf("  %s %s %s\n",
+	b.WriteString(fmt.Sprintf("  %s %s  %s  %s  %s\n",
 		labelStyle.Render(fmt.Sprintf("%14s:", "Markdown files")),
 		s.File.Render(fmt.Sprintf("%4d", m.MDFiles)),
-		mdArrow))
+		renderDelta(dashboard.Deltas.Day.MDFiles, deltaWidth, deltaNeutral, deltaNeutral, true),
+		renderDelta(dashboard.Deltas.Week.MDFiles, deltaWidth, deltaNeutral, deltaNeutral, true),
+		renderDelta(dashboard.Deltas.Month.MDFiles, deltaWidth, deltaNeutral, deltaNeutral, true)))
 
-	// Orphan MD (any > 0 is wrong)
-	orphanArrow := trendArrow(m.OrphanMD, prevOrphan, true) // up is bad
+	// Orphan MD (any > 0 is wrong) - up is bad
 	orphanStyle := s.Success
 	if m.OrphanMD > 0 {
 		orphanStyle = s.Error
 	}
-	b.WriteString(fmt.Sprintf("  %s %s %s\n",
+	b.WriteString(fmt.Sprintf("  %s %s  %s  %s  %s\n",
 		labelStyle.Render(fmt.Sprintf("%14s:", "Orphan docs")),
 		orphanStyle.Render(fmt.Sprintf("%4d", m.OrphanMD)),
-		orphanArrow))
+		renderDelta(dashboard.Deltas.Day.OrphanMD, deltaWidth, deltaUpStyle, deltaDownStyle, true),
+		renderDelta(dashboard.Deltas.Week.OrphanMD, deltaWidth, deltaUpStyle, deltaDownStyle, true),
+		renderDelta(dashboard.Deltas.Month.OrphanMD, deltaWidth, deltaUpStyle, deltaDownStyle, true)))
 
 	// ── Weekly Trend (if history available) ──────────────────────────────
 	if len(dashboard.History) > 1 {
@@ -211,41 +254,28 @@ func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 	return b.String()
 }
 
-// trendArrow returns a colored arrow based on direction.
-// upIsBad=true means increasing values are bad (red arrow up, green arrow down).
-func trendArrow(current, previous int, upIsBad bool) string {
-	if previous == 0 {
-		return ""
-	}
-	diff := current - previous
-	if diff == 0 {
-		return ""
+// renderDelta formats a delta value with arrow and right-aligned number.
+// Follows the nugstats pattern: "↑  5" or "↓ 12" with fixed width.
+func renderDelta(delta, width int, upStyle, downStyle lipgloss.Style, upIsBad bool) string {
+	if delta == 0 {
+		return strings.Repeat(" ", width+2) // space for arrow + space + number
 	}
 
-	upStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56"))   // red
-	downStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")) // green
+	// Swap styles if up is good
 	if !upIsBad {
-		upStyle, downStyle = downStyle, upStyle // swap colors
+		upStyle, downStyle = downStyle, upStyle
 	}
 
-	if diff > 0 {
-		return upStyle.Render("↑")
+	if delta > 0 {
+		return upStyle.Render(fmt.Sprintf("↑%*d", width, delta))
 	}
-	return downStyle.Render("↓")
+	return downStyle.Render(fmt.Sprintf("↓%*d", width, -delta))
 }
 
-// trendArrowNeutral returns a muted arrow (no good/bad coloring).
-func trendArrowNeutral(current, previous int) string {
-	if previous == 0 {
-		return ""
+// abs returns the absolute value of an integer.
+func abs(n int) int {
+	if n < 0 {
+		return -n
 	}
-	diff := current - previous
-	if diff == 0 {
-		return ""
-	}
-	muted := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
-	if diff > 0 {
-		return muted.Render("↑")
-	}
-	return muted.Render("↓")
+	return n
 }
