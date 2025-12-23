@@ -87,27 +87,48 @@ func (f *TelemetrySignalsFormatter) Format(lines []string, width int) string {
 
 	// Styles
 	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#0077B6")).Bold(true)
-	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
+	countStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
 	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#CCCCCC"))
 	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
 
-	// Header with summary message
-	b.WriteString(headerStyle.Render("◉ Telemetry Signals"))
-	b.WriteString("\n")
-	b.WriteString(mutedStyle.Render(fmt.Sprintf("  %s", report.Metrics.Period)))
-	b.WriteString("\n\n")
-
-	// Key metrics in a compact format
 	m := report.Metrics
 
-	// Adoption bar
-	b.WriteString(labelStyle.Render("Adoption"))
+	// Header
+	b.WriteString(headerStyle.Render("◉ Telemetry Signals"))
 	b.WriteString("  ")
-	b.WriteString(valueStyle.Render(fmt.Sprintf("%.0f%% Orca", m.Adoption.OrcaMCPPercent)))
-	b.WriteString(mutedStyle.Render(fmt.Sprintf("  %.0f%% Bash  %.0f%% Git", m.Adoption.BashPercent, m.Adoption.GitOpsPercent)))
-	b.WriteString("\n")
+	b.WriteString(countStyle.Render(fmt.Sprintf("%d calls", m.TotalCalls)))
+	b.WriteString(mutedStyle.Render(fmt.Sprintf("  %d sessions", m.Sessions)))
+	b.WriteString("\n\n")
 
-	// Mini bar for adoption
+	// Tool Adoption section
+	b.WriteString(headerStyle.Render("Tool Adoption"))
+	b.WriteString("\n")
+	adoptionData := []struct {
+		label string
+		count int
+		pct   float64
+		note  string
+	}{
+		{"Orca MCP", m.Adoption.OrcaMCPCount, m.Adoption.OrcaMCPPercent, ""},
+		{"Bash", m.Adoption.BashCount, m.Adoption.BashPercent, ""},
+		{"Navigation", m.Adoption.NavigationCount, m.Adoption.NavigationPercent, "cd overhead"},
+	}
+	for _, a := range adoptionData {
+		paddedLabel := fmt.Sprintf("%-12s", a.label)
+		paddedCount := fmt.Sprintf("%5d", a.count)
+		paddedPct := fmt.Sprintf("%3.0f%%", a.pct)
+		note := ""
+		if a.note != "" {
+			note = mutedStyle.Render(fmt.Sprintf("  [%s]", a.note))
+		}
+		b.WriteString(fmt.Sprintf("  %s  %s  %s%s\n",
+			labelStyle.Render(paddedLabel),
+			countStyle.Render(paddedCount),
+			countStyle.Render(paddedPct),
+			note))
+	}
+
+	// Adoption bar
 	barWidth := max(min(width-4, 40), 20)
 	orcaWidth := int(m.Adoption.OrcaMCPPercent * float64(barWidth) / 100)
 	bashWidth := int(m.Adoption.BashPercent * float64(barWidth) / 100)
@@ -116,8 +137,7 @@ func (f *TelemetrySignalsFormatter) Format(lines []string, width int) string {
 	if otherWidth < 0 {
 		otherWidth = 0
 	}
-
-	b.WriteString("  ")
+	b.WriteString("\n  ")
 	orcaBarStyle := lipgloss.NewStyle().Background(lipgloss.Color("#04B575"))
 	bashBarStyle := lipgloss.NewStyle().Background(lipgloss.Color("#0077B6"))
 	gitBarStyle := lipgloss.NewStyle().Background(lipgloss.Color("#FFBD2E"))
@@ -128,38 +148,49 @@ func (f *TelemetrySignalsFormatter) Format(lines []string, width int) string {
 	b.WriteString(otherBarStyle.Render(strings.Repeat(" ", otherWidth)))
 	b.WriteString("\n\n")
 
-	// Entropy (average)
+	// Entropy section
 	if len(m.Entropy) > 0 {
-		var totalEntropy float64
+		b.WriteString(headerStyle.Render("Entropy"))
+		b.WriteString(mutedStyle.Render("  (lower = less confusion)"))
+		b.WriteString("\n")
 		for _, e := range m.Entropy {
-			totalEntropy += e.Entropy
+			paddedTool := fmt.Sprintf("%-18s", e.Tool)
+			bar := strings.Repeat("█", int(e.Entropy*3))
+			b.WriteString(fmt.Sprintf("  %s  %s %s\n",
+				labelStyle.Render(paddedTool),
+				countStyle.Render(fmt.Sprintf("%4.2f", e.Entropy)),
+				mutedStyle.Render(bar)))
 		}
-		avgEntropy := totalEntropy / float64(len(m.Entropy))
-		b.WriteString(labelStyle.Render("Entropy"))
-		b.WriteString("    ")
-		b.WriteString(valueStyle.Render(fmt.Sprintf("%.2f avg", avgEntropy)))
-		b.WriteString(mutedStyle.Render("  (lower = more predictable)"))
 		b.WriteString("\n")
 	}
 
-	// Refinement rate
-	b.WriteString(labelStyle.Render("Refinement"))
-	b.WriteString(" ")
-	b.WriteString(valueStyle.Render(fmt.Sprintf("%.0f%%", m.SelfRepeat.RefinementPct)))
-	b.WriteString(mutedStyle.Render(fmt.Sprintf("  %d refinements, %d retries", m.SelfRepeat.TotalRefinements, m.SelfRepeat.TotalRetries)))
+	// Self-Repeat section
+	b.WriteString(headerStyle.Render("Self-Repeat"))
+	b.WriteString(mutedStyle.Render("  (search_nugs)"))
+	b.WriteString("\n")
+	b.WriteString(fmt.Sprintf("  %s  %s  %s\n",
+		labelStyle.Render(fmt.Sprintf("%-12s", "Refinement")),
+		countStyle.Render(fmt.Sprintf("%5d", m.SelfRepeat.TotalRefinements)),
+		countStyle.Render(fmt.Sprintf("%3.0f%%", m.SelfRepeat.RefinementPct))))
+	b.WriteString(fmt.Sprintf("  %s  %s  %s  %s\n",
+		labelStyle.Render(fmt.Sprintf("%-12s", "Retry")),
+		countStyle.Render(fmt.Sprintf("%5d", m.SelfRepeat.TotalRetries)),
+		countStyle.Render(fmt.Sprintf("%3.0f%%", m.SelfRepeat.RetryPct)),
+		mutedStyle.Render("[frustrated]")))
 	b.WriteString("\n")
 
-	// Zero results
-	b.WriteString(labelStyle.Render("Zero Results"))
-	b.WriteString(" ")
-	b.WriteString(valueStyle.Render(fmt.Sprintf("%.0f%%", m.ZeroResults.ZeroResultPercent)))
-	b.WriteString(mutedStyle.Render(fmt.Sprintf("  %d total", m.ZeroResults.ZeroResultCount)))
+	// Zero Results section
+	b.WriteString(headerStyle.Render("Zero Results"))
 	b.WriteString("\n")
-
-	// Session count
-	b.WriteString("\n")
-	b.WriteString(mutedStyle.Render(fmt.Sprintf("%d sessions, %d tool calls", m.Sessions, m.TotalCalls)))
-	b.WriteString("\n")
+	b.WriteString(fmt.Sprintf("  %s  %s  %s\n",
+		labelStyle.Render(fmt.Sprintf("%-12s", "Zero results")),
+		countStyle.Render(fmt.Sprintf("%5d", m.ZeroResults.ZeroResultCount)),
+		countStyle.Render(fmt.Sprintf("%3.0f%%", m.ZeroResults.ZeroResultPercent))))
+	b.WriteString(fmt.Sprintf("  %s retry=%d  save=%d  explore=%d\n",
+		mutedStyle.Render("After zero:"),
+		m.ZeroResults.RetryAfterZero,
+		m.ZeroResults.SaveAfterZero,
+		m.ZeroResults.ExploreAfterZero))
 
 	return b.String()
 }

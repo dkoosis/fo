@@ -100,12 +100,19 @@ func (f *NugstatsFormatter) Format(lines []string, width int) string {
 		} else if k.Delta < 0 {
 			delta = deltaDownStyle.Render(fmt.Sprintf("↓%*d", deltaWidth, -k.Delta))
 		}
+		// Calculate percentage
+		pct := 0
+		if report.Total > 0 {
+			pct = (k.Count * 100) / report.Total
+		}
 		// Pad raw strings BEFORE styling to avoid ANSI code width issues
 		paddedKind := fmt.Sprintf("%-*s", maxKindLen, k.Kind)
 		paddedCount := fmt.Sprintf("%*d", countWidth, k.Count)
-		b.WriteString(fmt.Sprintf("  %s  %s  %s\n",
+		paddedPct := fmt.Sprintf("%2d%%", pct)
+		b.WriteString(fmt.Sprintf("  %s  %s  %s  %s\n",
 			kindStyle.Render(paddedKind),
 			countStyle.Render(paddedCount),
+			kindStyle.Render(paddedPct),
 			delta))
 	}
 
