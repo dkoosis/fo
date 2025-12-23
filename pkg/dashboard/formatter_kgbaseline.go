@@ -12,7 +12,7 @@ import (
 type KGBaselineFormatter struct{}
 
 func (f *KGBaselineFormatter) Matches(command string) bool {
-	return strings.Contains(command, "kg-baseline.json")
+	return strings.Contains(command, "kg-subsys.json") || strings.Contains(command, "kg-baseline.json")
 }
 
 // KGBaselineReport matches the JSON output from kg baseline tests.
@@ -70,14 +70,14 @@ func (f *KGBaselineFormatter) Format(lines []string, width int) string {
 	}
 
 	// Verify it's actually a KG baseline report
-	if report.TestSuite != "kg-baseline" {
+	if report.TestSuite != "kg-baseline" && report.TestSuite != "kg-subsys" {
 		return (&PlainFormatter{}).Format(lines, width)
 	}
 
 	s := Styles()
 
 	// Header with grade
-	b.WriteString(s.Header.Render("◉ KG Baseline Suite"))
+	b.WriteString(s.Header.Render("◉ KG Subsystem"))
 	b.WriteString("  ")
 	gradeStyle := s.Success
 	if report.Summary.Grade == "C" || report.Summary.Grade == "D" {
@@ -91,96 +91,85 @@ func (f *KGBaselineFormatter) Format(lines []string, width int) string {
 		report.Summary.Passed, report.Summary.Total, report.Summary.Skipped)))
 	b.WriteString("\n\n")
 
-	// Group results by category
-	categories := map[string][]KGBaselineResult{
-		"Storage":       {},
-		"Search":        {},
-		"Semantic":      {},
-		"Import/Export": {},
-		"Validation":    {},
-		"Migrations":    {},
-	}
+	// Find max widths for alignment
+	maxNameLen := 0
+	maxDurationMs := int64(0)
+	maxThroughput := 0.0
 
 	for _, r := range report.Results {
-		cap := r.Capability
-		if strings.HasPrefix(cap, "storage_crud") {
-			categories["Storage"] = append(categories["Storage"], r)
-		} else if strings.HasPrefix(cap, "search_bm25") {
-			categories["Search"] = append(categories["Search"], r)
-		} else if strings.HasPrefix(cap, "semantic_") || strings.HasPrefix(cap, "hybrid_") {
-			categories["Semantic"] = append(categories["Semantic"], r)
-		} else if strings.HasPrefix(cap, "import_export") {
-			categories["Import/Export"] = append(categories["Import/Export"], r)
-		} else if strings.Contains(cap, "validation") {
-			categories["Validation"] = append(categories["Validation"], r)
-		} else if strings.Contains(cap, "migration") {
-			categories["Migrations"] = append(categories["Migrations"], r)
+		// Clean up capability name
+		capName := strings.ReplaceAll(r.Capability, "_", " ")
+		if len(capName) > maxNameLen {
+			maxNameLen = len(capName)
+		}
+		if r.Metrics.DurationMs > maxDurationMs {
+			maxDurationMs = r.Metrics.DurationMs
+		}
+		if r.Metrics.Throughput > maxThroughput {
+			maxThroughput = r.Metrics.Throughput
 		}
 	}
 
-	// Display categories in order
-	catOrder := []string{"Storage", "Search", "Semantic", "Import/Export", "Validation", "Migrations"}
-	for _, cat := range catOrder {
-		results := categories[cat]
-		if len(results) == 0 {
-			continue
+	// Calculate column widths
+	durationWidth := len(fmt.Sprintf("%d", maxDurationMs))
+	throughputWidth := len(fmt.Sprintf("%.0f", maxThroughput))
+
+	// Display all results
+	for _, r := range report.Results {
+		// Status icon
+		statusIcon := "✓"
+		statusStyle := s.Success
+		if r.Status == "fail" {
+			statusIcon = "✗"
+			statusStyle = s.Error
+		} else if r.Status == "skip" {
+			statusIcon = "○"
+			statusStyle = s.File
 		}
 
-		b.WriteString(s.Header.Render(cat))
-		b.WriteString("\n")
+		// Capability name (clean up underscores)
+		capName := strings.ReplaceAll(r.Capability, "_", " ")
 
-		for _, r := range results {
-			// Status icon
-			statusIcon := "✓"
-			statusStyle := s.Success
-			if r.Status == "fail" {
-				statusIcon = "✗"
-				statusStyle = s.Error
-			} else if r.Status == "skip" {
-				statusIcon = "○"
-				statusStyle = s.File
+		// Pad name string BEFORE styling
+		paddedName := fmt.Sprintf("%-*s", maxNameLen, capName)
+
+		b.WriteString(fmt.Sprintf("  %s %s",
+			statusStyle.Render(statusIcon),
+			s.File.Render(paddedName)))
+
+		// Metrics - right-aligned numbers
+		if r.Status == "pass" {
+			// Duration (right-aligned)
+			paddedDuration := fmt.Sprintf("%*dms", durationWidth, r.Metrics.DurationMs)
+			b.WriteString(fmt.Sprintf("  %s", s.File.Render(paddedDuration)))
+
+			// Throughput (right-aligned, if present)
+			if r.Metrics.Throughput > 0 {
+				paddedThroughput := fmt.Sprintf("%*.0f ops/s", throughputWidth, r.Metrics.Throughput)
+				b.WriteString(fmt.Sprintf("  %s", s.Success.Render(paddedThroughput)))
+			} else {
+				// Pad empty space
+				b.WriteString(strings.Repeat(" ", throughputWidth+7))
 			}
 
-			// Capability name (clean up underscores)
-			capName := strings.ReplaceAll(r.Capability, "_", " ")
-			capName = strings.TrimPrefix(capName, "storage crud ")
-			capName = strings.TrimPrefix(capName, "search bm25 ")
-			capName = strings.TrimPrefix(capName, "import export ")
-			capName = strings.TrimPrefix(capName, "semantic ")
-
-			b.WriteString(fmt.Sprintf("  %s %s",
-				statusStyle.Render(statusIcon),
-				s.File.Render(capName)))
-
-			// Metrics
-			if r.Status == "pass" && r.Metrics.DurationMs > 0 {
-				b.WriteString(fmt.Sprintf("  %s",
-					s.File.Render(fmt.Sprintf("(%dms", r.Metrics.DurationMs))))
-
-				if r.Metrics.Throughput > 0 {
-					b.WriteString(fmt.Sprintf(", %s",
-						s.Success.Render(fmt.Sprintf("%.0f ops/s", r.Metrics.Throughput))))
-				}
-				if r.Metrics.Accuracy > 0 {
-					b.WriteString(fmt.Sprintf(", %s",
-						s.Success.Render(fmt.Sprintf("%.0f%% acc", r.Metrics.Accuracy*100))))
-				}
-				b.WriteString(s.File.Render(")"))
+			// Accuracy (if present)
+			if r.Metrics.Accuracy > 0 {
+				b.WriteString(fmt.Sprintf("  %s", s.Success.Render(fmt.Sprintf("%.0f%% acc", r.Metrics.Accuracy*100))))
 			}
-
-			// Error message for failures/skips
-			if r.Status == "skip" && r.Error != "" {
-				errMsg := r.Error
-				if len(errMsg) > 60 {
-					errMsg = errMsg[:57] + "..."
-				}
-				b.WriteString(fmt.Sprintf("\n    %s", s.File.Render(errMsg)))
-			}
-
-			b.WriteString("\n")
 		}
+
+		// Error message for failures/skips
+		if r.Status == "skip" && r.Error != "" {
+			errMsg := r.Error
+			if len(errMsg) > 60 {
+				errMsg = errMsg[:57] + "..."
+			}
+			b.WriteString(fmt.Sprintf("\n    %s", s.File.Render(errMsg)))
+		}
+
 		b.WriteString("\n")
 	}
+	b.WriteString("\n")
 
 	// Summary bar
 	b.WriteString(s.Header.Render("Summary"))
