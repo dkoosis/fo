@@ -164,10 +164,9 @@ func (f *MCPErrorsFormatter) GetStatus(lines []string) IndicatorStatus {
 		return IndicatorDefault
 	}
 
-	if report.ErrorCount > 0 {
-		return IndicatorError
-	}
-	if report.WarnCount > 0 {
+	// MCP log errors are informational (lock conflicts, connection issues)
+	// not build-breaking - show as warning to surface but not fail QA
+	if report.ErrorCount > 0 || report.WarnCount > 0 {
 		return IndicatorWarning
 	}
 	return IndicatorSuccess

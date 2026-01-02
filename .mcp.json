@@ -3,10 +3,7 @@
     "orca": {
       "command": "/Users/vcto/Projects/orca/bin/orca",
       "args": [],
-      "env": {
-        "ORCA_TELEMETRY_PATH": "/Users/vcto/Projects/orca/.orca",
-        "ORCA_KG_DB_PATH": "/Users/vcto/Projects/orca/.orca/knowledge.db"
-      }
+      "env": {}
     }
   }
 }

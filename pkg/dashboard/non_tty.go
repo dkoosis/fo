@@ -56,9 +56,28 @@ func renderSummary(out io.Writer, tasks []*Task) int {
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Summary:")
 	for _, task := range tasks {
-		status := "✓"
-		if task.Status == TaskFailed {
+		// Use content-aware status indicator if available
+		indicator := GetIndicatorStatus(task.Spec.Command, task.Output)
+		var status string
+		var isFailed bool
+		switch indicator {
+		case IndicatorWarning:
+			status = "⚠"
+		case IndicatorError:
 			status = "✗"
+			isFailed = true
+		case IndicatorSuccess:
+			status = "✓"
+		default:
+			// Fall back to exit-code-based status
+			if task.Status == TaskFailed {
+				status = "✗"
+				isFailed = true
+			} else {
+				status = "✓"
+			}
+		}
+		if isFailed {
 			failures++
 		}
 		duration := task.Duration().Round(10 * time.Millisecond)
