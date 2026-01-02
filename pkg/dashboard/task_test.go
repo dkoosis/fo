@@ -22,15 +22,14 @@ func TestTask_StartTasks_UpdatesStatusAndOutput_When_CommandsSucceedAndFail(t *t
 	}
 
 	tasks, updates := StartTasks(ctx, specs)
+	// Consume all updates; runTask already updates Status/ExitCode
 	for update := range updates {
 		task := tasks[update.Index]
 		if update.Line != "" {
+			// appendLine is needed since runTask doesn't call it
 			task.appendLine(update.Line)
 		}
-		task.Status = update.Status
-		if update.ExitCode != 0 {
-			task.ExitCode = update.ExitCode
-		}
+		// Don't update Status/ExitCode - runTask already does that
 	}
 
 	require.Len(t, tasks, 2)

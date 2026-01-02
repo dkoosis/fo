@@ -138,7 +138,7 @@ func TestRender_WithFindings(t *testing.T) {
 	output := adapter.Render(result)
 
 	assert.Contains(t, output, "WARN")
-	assert.Contains(t, output, "1") // finding count
+	assert.Contains(t, output, "1")   // finding count
 	assert.Contains(t, output, ":42") // line number reference
 }
 

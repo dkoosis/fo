@@ -18,8 +18,8 @@ func (f *GovulncheckFormatter) Matches(command string) bool {
 // GovulncheckVuln represents a vulnerability finding.
 type GovulncheckVuln struct {
 	OSV struct {
-		ID       string   `json:"id"`
-		Summary  string   `json:"summary"`
+		ID       string `json:"id"`
+		Summary  string `json:"summary"`
 		Severity []struct {
 			Type  string `json:"type"`
 			Score string `json:"score"`

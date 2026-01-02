@@ -149,13 +149,13 @@ func RenderInlineStatus(theme *Theme, status, message, duration string) string {
 	var style lipgloss.Style
 
 	switch status {
-	case "success":
+	case StatusSuccess:
 		icon = theme.Icons.Success
 		style = theme.Styles.StatusSuccess
-	case "warning":
+	case StatusWarning:
 		icon = theme.Icons.Warning
 		style = theme.Styles.StatusWarning
-	case "error":
+	case StatusError:
 		icon = theme.Icons.Error
 		style = theme.Styles.StatusError
 	default:

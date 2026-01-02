@@ -36,19 +36,19 @@ type Progress struct {
 
 // Failure represents a fuzz test failure.
 type Failure struct {
-	TestName    string
-	Duration    string
-	Error       string
-	CorpusFile  string
-	RerunCmd    string
+	TestName   string
+	Duration   string
+	Error      string
+	CorpusFile string
+	RerunCmd   string
 }
 
 // Result represents parsed fuzz output.
 type Result struct {
-	Status    FuzzStatus
-	Progress  []Progress
-	Failures  []Failure
-	TestName  string
+	Status   FuzzStatus
+	Progress []Progress
+	Failures []Failure
+	TestName string
 }
 
 // Adapter parses and renders fuzz output.

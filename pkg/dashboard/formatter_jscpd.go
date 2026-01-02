@@ -94,3 +94,25 @@ func parseCloneCount(line string) int {
 	}
 	return 0
 }
+
+// GetStatus implements StatusIndicator for content-aware menu icons.
+func (f *JscpdFormatter) GetStatus(lines []string) IndicatorStatus {
+	cloneCount := 0
+	for _, line := range lines {
+		clean := ansiRegex.ReplaceAllString(line, "")
+		clean = strings.TrimSpace(clean)
+
+		if strings.HasPrefix(clean, "Clone found") {
+			cloneCount++
+		} else if strings.HasPrefix(clean, "Found ") && strings.Contains(clean, "clones") {
+			if n := parseCloneCount(clean); n > 0 {
+				cloneCount = n
+			}
+		}
+	}
+
+	if cloneCount > 0 {
+		return IndicatorWarning
+	}
+	return IndicatorSuccess
+}

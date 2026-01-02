@@ -4,18 +4,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 )
 
-// MCPErrorsFormatter handles mcp-errors -format=dashboard output.
+// MCPErrorsFormatter handles mcp-logscan (formerly mcp-errors) -format=dashboard output.
 type MCPErrorsFormatter struct{}
 
 func (f *MCPErrorsFormatter) Matches(command string) bool {
-	return strings.Contains(command, "mcp-errors") && strings.Contains(command, "-format=dashboard")
+	return (strings.Contains(command, "mcp-errors") || strings.Contains(command, "mcp-logscan")) &&
+		strings.Contains(command, "-format=dashboard")
 }
 
-// MCPErrorsReport matches the JSON output from mcp-errors -format=dashboard.
+// MCPErrorsReport matches the JSON output from mcp-logscan -format=dashboard.
 type MCPErrorsReport struct {
 	Timestamp  string           `json:"timestamp"`
 	LogFiles   []string         `json:"log_files"`
@@ -31,6 +33,12 @@ type MCPErrorDetail struct {
 	Message string `json:"message"`
 	Detail  string `json:"detail,omitempty"`
 }
+
+// maxDisplayErrors is the maximum number of errors to show in the detail panel.
+const maxDisplayErrors = 10
+
+// maxErrorAgeDays filters out errors older than this many days.
+const maxErrorAgeDays = 5
 
 func (f *MCPErrorsFormatter) Format(lines []string, width int) string {
 	var b strings.Builder
@@ -50,6 +58,7 @@ func (f *MCPErrorsFormatter) Format(lines []string, width int) string {
 
 	s := Styles()
 	detailStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
+	timeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#666666"))
 
 	// Header with summary
 	b.WriteString(s.Header.Render("◉ MCP Server Logs"))
@@ -75,39 +84,93 @@ func (f *MCPErrorsFormatter) Format(lines []string, width int) string {
 	}
 	b.WriteString("\n\n")
 
-	// Show recent errors (up to 5)
+	// Filter and show recent errors (up to maxDisplayErrors, within maxErrorAgeDays)
 	if len(report.Errors) > 0 {
 		b.WriteString(s.Header.Render("Recent Errors"))
 		b.WriteString("\n")
 		shown := 0
-		for i := len(report.Errors) - 1; i >= 0 && shown < 5; i-- {
+		skipped := 0
+		cutoff := time.Now().AddDate(0, 0, -maxErrorAgeDays)
+
+		// Iterate backwards for reverse chronological order (newest first)
+		for i := len(report.Errors) - 1; i >= 0 && shown < maxDisplayErrors; i-- {
 			e := report.Errors[i]
+
+			// Filter by age
+			if errorTime, err := time.Parse(time.RFC3339, e.Time); err == nil {
+				if errorTime.Before(cutoff) {
+					skipped++
+					continue
+				}
+			}
+
+			// Icon instead of [ERROR]/[WARN]
+			icon := "✗"
 			levelStyle := s.Error
-			if e.Level == "WARN" {
+			if e.Level == "WARN" || e.Level == "WARNING" {
+				icon = "⚠"
 				levelStyle = s.Warn
 			}
-			msg := stripMCPLogPrefix(e.Message)
-			if len(msg) > width-15 && width > 18 {
-				msg = msg[:width-18] + "..."
+
+			// Format timestamp
+			timestamp := ""
+			if e.Time != "" {
+				if t, err := time.Parse(time.RFC3339, e.Time); err == nil {
+					timestamp = t.Format("Jan 2 15:04")
+				}
 			}
-			b.WriteString(fmt.Sprintf("  %s %s\n",
-				levelStyle.Render("["+e.Level+"]"),
+
+			msg := stripMCPLogPrefix(e.Message)
+			// Reserve space for icon (2) + timestamp (12) + padding (4)
+			maxMsgWidth := width - 18
+			if maxMsgWidth > 3 && len(msg) > maxMsgWidth {
+				msg = msg[:maxMsgWidth-3] + "..."
+			}
+
+			b.WriteString(fmt.Sprintf("  %s %s  %s\n",
+				levelStyle.Render(icon),
+				timeStyle.Render(timestamp),
 				msg))
+
 			if e.Detail != "" {
 				detail := e.Detail
 				if len(detail) > width-12 && width > 15 {
 					detail = detail[:width-15] + "..."
 				}
-				b.WriteString(fmt.Sprintf("         %s\n", detailStyle.Render(detail)))
+				b.WriteString(fmt.Sprintf("       %s\n", detailStyle.Render(detail)))
 			}
 			shown++
 		}
-		if len(report.Errors) > 5 {
-			b.WriteString(s.Muted.Render(fmt.Sprintf("  ... and %d more\n", len(report.Errors)-5)))
+		remaining := len(report.Errors) - shown - skipped
+		if remaining > 0 {
+			b.WriteString(s.Muted.Render(fmt.Sprintf("  ... and %d more\n", remaining)))
 		}
 	}
 
 	return b.String()
+}
+
+// GetStatus implements StatusIndicator for content-aware menu icons.
+func (f *MCPErrorsFormatter) GetStatus(lines []string) IndicatorStatus {
+	fullOutput := strings.Join(lines, "\n")
+	jsonStart := strings.Index(fullOutput, "{")
+	if jsonStart == -1 {
+		return IndicatorDefault
+	}
+	jsonOutput := fullOutput[jsonStart:]
+
+	var report MCPErrorsReport
+	if err := json.Unmarshal([]byte(jsonOutput), &report); err != nil {
+		return IndicatorDefault
+	}
+
+	if report.ErrorCount > 0 {
+		return IndicatorError
+	}
+	if report.WarnCount > 0 {
+		return IndicatorWarning
+	}
+	return IndicatorSuccess
 }
 
 // stripMCPLogPrefix removes the verbose MCP log prefix that appears in stderr.

@@ -901,7 +901,7 @@ func (c *Console) PrintH1Header(name string) {
 
 // GetMutedColor returns the Muted color code from the theme.
 func (c *Console) GetMutedColor() string {
-	return string(c.designConf.GetColor("Muted"))
+	return string(c.designConf.GetColor(colorKeyMuted))
 }
 
 // ResetColor returns the reset color code from the theme.
@@ -984,7 +984,7 @@ func (c *Console) StyleWarning(text string) string {
 
 // StyleMuted returns text styled with the muted color.
 func (c *Console) StyleMuted(text string) string {
-	return c.StyleWithColor("Muted", text)
+	return c.StyleWithColor(colorKeyMuted, text)
 }
 
 // FormatStatusIcon returns a fully styled icon string for the given status.
@@ -1016,10 +1016,10 @@ func (c *Console) FormatStatusIcon(status string) string {
 		colorKey = "Warning"
 	case "SKIP", "MUTED":
 		icon = "▫"
-		colorKey = "Muted"
+		colorKey = colorKeyMuted
 	default:
 		icon = "▫"
-		colorKey = "Muted"
+		colorKey = colorKeyMuted
 	}
 
 	return c.StyleWithColor(colorKey, icon)
@@ -1040,9 +1040,9 @@ func (c *Console) FormatStatusText(text, status string) string {
 	case "WARNING":
 		colorKey = "Warning"
 	case "SKIP", "MUTED":
-		colorKey = "Muted"
+		colorKey = colorKeyMuted
 	default:
-		colorKey = "Muted"
+		colorKey = colorKeyMuted
 	}
 
 	return c.StyleWithColor(colorKey, text)
@@ -1263,6 +1263,7 @@ func (c *Console) runContext(
 	setProcessGroup(cmd)
 
 	cmdDone := make(chan struct{})
+	processStarted := make(chan struct{})
 
 	// Goroutine: Handle signals
 	signalHandlerDone := make(chan struct{})
@@ -1281,6 +1282,8 @@ func (c *Console) runContext(
 				}
 				fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Process state: %s\n", processStateStr)
 			}
+			// Wait for process to start before accessing cmd.Process
+			<-processStarted
 			if cmd.Process == nil {
 				if c.cfg.Debug {
 					fmt.Fprintln(os.Stderr, "[DEBUG sigChan] Process is nil, canceling context.")
@@ -1303,7 +1306,9 @@ func (c *Console) runContext(
 				if c.cfg.Debug {
 					fmt.Fprintln(os.Stderr, "[DEBUG sigChan] Timeout after signal, ensuring process is killed.")
 				}
-				if cmd.Process != nil && cmd.ProcessState == nil {
+				<-processStarted
+				if cmd.Process != nil {
+					// Try to kill; ignore error if process already exited
 					_ = killProcessGroupWithSIGKILL(cmd)
 				}
 				cancel()
@@ -1312,7 +1317,9 @@ func (c *Console) runContext(
 			if c.cfg.Debug {
 				fmt.Fprintln(os.Stderr, "[DEBUG sigChan] Context done, ensuring process is killed if running.")
 			}
-			if cmd.Process != nil && cmd.ProcessState == nil {
+			<-processStarted
+			if cmd.Process != nil {
+				// Try to kill; ignore error if process already exited
 				_ = killProcessGroupWithSIGKILL(cmd)
 			}
 		case <-cmdDone:
@@ -1329,7 +1336,7 @@ func (c *Console) runContext(
 	// Execute command (these functions call cmd.Start() and cmd.Wait())
 	// They will close cmdDone when cmd.Wait() completes
 	if c.cfg.LiveStreamOutput {
-		exitCode, cmdRunError = c.executeStreamMode(cmd, task, cmdDone)
+		exitCode, cmdRunError = c.executeStreamMode(cmd, task, cmdDone, processStarted)
 		if cmdRunError != nil {
 			var exitErr *exec.ExitError
 			if !errors.As(cmdRunError, &exitErr) {
@@ -1337,7 +1344,7 @@ func (c *Console) runContext(
 			}
 		}
 	} else {
-		exitCode, cmdRunError = c.executeCaptureMode(cmd, task, cmdDone)
+		exitCode, cmdRunError = c.executeCaptureMode(cmd, task, cmdDone, processStarted)
 		if cmdRunError != nil {
 			var exitErr *exec.ExitError
 			if !errors.As(cmdRunError, &exitErr) {
@@ -1478,7 +1485,7 @@ func (c *Console) renderCapturedOutput(task *design.Task, exitCode int, isActual
 		})
 
 		if hasActualRenderableOutput {
-			_, _ = c.cfg.Out.Write([]byte(task.Config.GetColor("Muted") + "--- Captured output: ---" + task.Config.ResetColor() + "\n"))
+			_, _ = c.cfg.Out.Write([]byte(task.Config.GetColor(colorKeyMuted) + "--- Captured output: ---" + task.Config.ResetColor() + "\n"))
 			// Use snapshot for rendering to avoid holding lock during I/O
 			for _, line := range task.GetOutputLinesSnapshot() {
 				_, _ = c.cfg.Out.Write([]byte(task.RenderOutputLine(line) + "\n"))
@@ -1535,7 +1542,7 @@ func (c *Console) renderTestJSONOutput(task *design.Task) {
 	RenderTestResults(c.cfg.Out, results, c)
 }
 
-func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task, cmdDone chan struct{}) (int, error) {
+func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task, cmdDone chan struct{}, processStarted chan struct{}) (int, error) {
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil {
 		if c.cfg.Debug {
@@ -1544,7 +1551,8 @@ func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task, cmdDone ch
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		runErr := cmd.Run()
-		close(cmdDone) // Signal that command has finished
+		close(processStarted) // Signal that process attempt completed (failed)
+		close(cmdDone)        // Signal that command has finished
 		errCtx := design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true}
 		task.AddOutputLine(
 			formatInternalError("Error setting up stderr pipe for stream mode: %v", err),
@@ -1601,6 +1609,7 @@ func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task, cmdDone ch
 	}()
 
 	startErr := cmd.Start()
+	close(processStarted) // Signal that cmd.Start() completed (success or failure)
 	if startErr != nil {
 		errMsg := fmt.Sprintf("Error starting command '%s': %v", strings.Join(cmd.Args, " "), startErr)
 		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true})
@@ -1629,7 +1638,7 @@ func (c *Console) executeStreamMode(cmd *exec.Cmd, task *design.Task, cmdDone ch
 }
 
 func (c *Console) executeCaptureMode(
-	cmd *exec.Cmd, task *design.Task, cmdDone chan struct{},
+	cmd *exec.Cmd, task *design.Task, cmdDone chan struct{}, processStarted chan struct{},
 ) (int, error) {
 	if c.cfg.Debug {
 		fmt.Fprintf(os.Stderr, "[DEBUG executeCaptureMode] Starting in CAPTURE mode\n")
@@ -1640,7 +1649,8 @@ func (c *Console) executeCaptureMode(
 		errMsg := formatInternalError("Error creating stdout pipe: %v", err)
 		task.AddOutputLine(errMsg, design.TypeError, design.LineContext{CognitiveLoad: design.LoadHigh, Importance: 5, IsInternal: true})
 		_, _ = fmt.Fprintln(c.cfg.Err, errMsg)
-		close(cmdDone) // Signal that command has finished (failed to create pipe)
+		close(processStarted) // Signal that process attempt completed (failed)
+		close(cmdDone)        // Signal that command has finished (failed to create pipe)
 		return 1, err
 	}
 
@@ -1652,7 +1662,8 @@ func (c *Console) executeCaptureMode(
 		if closeErr := stdoutPipe.Close(); closeErr != nil && c.cfg.Debug {
 			_, _ = fmt.Fprintf(c.cfg.Err, "[DEBUG] Error closing stdout pipe: %v\n", closeErr)
 		}
-		close(cmdDone) // Signal that command has finished (failed to create pipe)
+		close(processStarted) // Signal that process attempt completed (failed)
+		close(cmdDone)        // Signal that command has finished (failed to create pipe)
 		return 1, err
 	}
 
@@ -1669,6 +1680,7 @@ func (c *Console) executeCaptureMode(
 		close(cmdDone) // Signal that command has finished (failed to start)
 		return getExitCode(err, c.cfg.Debug), err
 	}
+	close(processStarted) // Signal that cmd.Start() completed successfully
 
 	// Try adapter-based parsing first
 	exitCode, runErr := c.tryAdapterMode(cmd, task, stdoutPipe, stderrPipe, cmdDone)
@@ -2027,7 +2039,7 @@ func (c *Console) saveCapture(task *design.Task, stdout, stderr []byte, exitCode
 	}
 
 	// Create capture directory if needed
-	if err := os.MkdirAll(c.cfg.CaptureDir, 0755); err != nil {
+	if err := os.MkdirAll(c.cfg.CaptureDir, 0750); err != nil {
 		if c.cfg.Debug {
 			fmt.Fprintf(os.Stderr, "[DEBUG saveCapture] Failed to create capture dir: %v\n", err)
 		}

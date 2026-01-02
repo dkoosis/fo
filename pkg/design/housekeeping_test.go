@@ -9,10 +9,10 @@ func TestHousekeeping_Render(t *testing.T) {
 	cfg := &Config{
 		IsMonochrome: true,
 	}
-	cfg.Icons.Success = "✓"
-	cfg.Icons.Warning = "⚠"
-	cfg.Icons.Error = "✗"
-	cfg.Icons.Info = "•"
+	cfg.Icons.Success = IconCharSuccess
+	cfg.Icons.Warning = IconCharWarning
+	cfg.Icons.Error = IconCharError
+	cfg.Icons.Info = IconCharBullet
 	cfg.Style.Indentation = "  "
 
 	tests := []struct {

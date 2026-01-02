@@ -17,32 +17,32 @@ func (f *TelemetrySignalsFormatter) Matches(command string) bool {
 
 // TelemetrySignalsReport matches the JSON output from telemetry-signals -format=dashboard.
 type TelemetrySignalsReport struct {
-	Details any                      `json:"details"`
-	Message string                   `json:"message"`
-	Metrics TelemetrySignalsMetrics  `json:"metrics"`
+	Details any                     `json:"details"`
+	Message string                  `json:"message"`
+	Metrics TelemetrySignalsMetrics `json:"metrics"`
 }
 
 // TelemetrySignalsMetrics contains the metrics data.
 type TelemetrySignalsMetrics struct {
-	Timestamp   string                  `json:"timestamp"`
-	Period      string                  `json:"period"`
-	TotalCalls  int                     `json:"total_calls"`
-	Sessions    int                     `json:"sessions"`
-	Adoption    TelemetryAdoption       `json:"adoption"`
-	Entropy     []TelemetryEntropy      `json:"entropy"`
-	SelfRepeat  TelemetrySelfRepeat     `json:"self_repeat"`
-	ZeroResults TelemetryZeroResults    `json:"zero_results"`
+	Timestamp   string               `json:"timestamp"`
+	Period      string               `json:"period"`
+	TotalCalls  int                  `json:"total_calls"`
+	Sessions    int                  `json:"sessions"`
+	Adoption    TelemetryAdoption    `json:"adoption"`
+	Entropy     []TelemetryEntropy   `json:"entropy"`
+	SelfRepeat  TelemetrySelfRepeat  `json:"self_repeat"`
+	ZeroResults TelemetryZeroResults `json:"zero_results"`
 }
 
 // TelemetryAdoption contains adoption metrics.
 type TelemetryAdoption struct {
-	OrcaMCPPercent  float64 `json:"orca_mcp_percent"`
-	BashPercent     float64 `json:"bash_percent"`
-	GitOpsPercent   float64 `json:"git_ops_percent"`
+	OrcaMCPPercent    float64 `json:"orca_mcp_percent"`
+	BashPercent       float64 `json:"bash_percent"`
+	GitOpsPercent     float64 `json:"git_ops_percent"`
 	NavigationPercent float64 `json:"navigation_percent"`
-	OrcaMCPCount    int     `json:"orca_mcp_count"`
-	BashCount       int     `json:"bash_count"`
-	NavigationCount int     `json:"navigation_count"`
+	OrcaMCPCount      int     `json:"orca_mcp_count"`
+	BashCount         int     `json:"bash_count"`
+	NavigationCount   int     `json:"navigation_count"`
 }
 
 // TelemetryEntropy contains entropy data for a tool.

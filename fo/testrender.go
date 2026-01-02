@@ -12,6 +12,11 @@ import (
 	"golang.org/x/term"
 )
 
+// Color key constants
+const (
+	colorKeyMuted = "Muted"
+)
+
 // TestResult represents a single test with its status.
 type TestResult struct {
 	Name   string
@@ -365,7 +370,7 @@ func (r *TestRenderer) renderSparkbar(coverage float64) string {
 	}
 
 	// Determine color key based on coverage thresholds
-	filledColorKey := "Muted"
+	filledColorKey := colorKeyMuted
 	for _, threshold := range r.config.CoverageThresholds {
 		if coverage >= threshold.Min && coverage <= threshold.Max {
 			filledColorKey = threshold.ColorKey

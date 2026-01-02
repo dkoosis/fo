@@ -96,7 +96,7 @@ func (o *Orchestrator) Run(ctx context.Context, tools []ToolSpec) ([]ToolResult,
 	}
 
 	// Ensure build directory exists
-	if err := os.MkdirAll(o.buildDir, 0755); err != nil {
+	if err := os.MkdirAll(o.buildDir, 0750); err != nil {
 		return nil, fmt.Errorf("create build dir: %w", err)
 	}
 
@@ -166,6 +166,7 @@ func (o *Orchestrator) runTool(ctx context.Context, spec ToolSpec) ToolResult {
 	result := ToolResult{Spec: spec}
 
 	// Build command
+	// #nosec G204 -- Executing configured linter tools from ToolSpec (expected behavior)
 	cmd := exec.CommandContext(ctx, spec.Command, spec.Args...)
 	if spec.WorkingDir != "" {
 		cmd.Dir = spec.WorkingDir

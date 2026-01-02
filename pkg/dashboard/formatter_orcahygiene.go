@@ -17,10 +17,10 @@ func (f *OrcaHygieneFormatter) Matches(command string) bool {
 
 // OrcaHygieneReport matches the JSON output from orca-hygiene -format=dashboard.
 type OrcaHygieneReport struct {
-	Status   string              `json:"status"`
-	Summary  string              `json:"summary"`
-	Issues   []OrcaHygieneIssue  `json:"issues"`
-	ExitCode int                 `json:"exit_code"`
+	Status   string             `json:"status"`
+	Summary  string             `json:"summary"`
+	Issues   []OrcaHygieneIssue `json:"issues"`
+	ExitCode int                `json:"exit_code"`
 }
 
 // OrcaHygieneIssue represents a single hygiene issue.
@@ -122,4 +122,35 @@ func renderHygieneIssue(b *strings.Builder, issue OrcaHygieneIssue, pathStyle, m
 		}
 		fmt.Fprintf(b, "    %s\n", mutedStyle.Render("→ "+fix))
 	}
+}
+
+// GetStatus implements StatusIndicator for content-aware menu icons.
+func (f *OrcaHygieneFormatter) GetStatus(lines []string) IndicatorStatus {
+	fullOutput := strings.Join(lines, "\n")
+	jsonStart := strings.Index(fullOutput, "{")
+	if jsonStart == -1 {
+		return IndicatorDefault
+	}
+	jsonOutput := fullOutput[jsonStart:]
+
+	var report OrcaHygieneReport
+	if err := json.Unmarshal([]byte(jsonOutput), &report); err != nil {
+		return IndicatorDefault
+	}
+
+	// Check for errors first (higher severity)
+	for _, issue := range report.Issues {
+		if issue.Severity == "error" {
+			return IndicatorError
+		}
+	}
+
+	// Check for warnings
+	for _, issue := range report.Issues {
+		if issue.Severity == "warning" {
+			return IndicatorWarning
+		}
+	}
+
+	return IndicatorSuccess
 }

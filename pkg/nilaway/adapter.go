@@ -123,7 +123,7 @@ func parsePosition(posn string) (file string, line, col int) {
 	if len(parts) >= 3 {
 		col, _ = strconv.Atoi(parts[2])
 	}
-	return
+	return file, line, col
 }
 
 // ParseBytes parses nilaway JSON output from bytes.

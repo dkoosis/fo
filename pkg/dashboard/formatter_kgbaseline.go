@@ -17,11 +17,11 @@ func (f *KGBaselineFormatter) Matches(command string) bool {
 
 // KGBaselineReport matches the JSON output from kg baseline tests.
 type KGBaselineReport struct {
-	TestSuite string                `json:"test_suite"`
-	Version   string                `json:"version"`
-	Timestamp string                `json:"timestamp"`
-	Results   []KGBaselineResult    `json:"results"`
-	Summary   KGBaselineSummary     `json:"summary"`
+	TestSuite string             `json:"test_suite"`
+	Version   string             `json:"version"`
+	Timestamp string             `json:"timestamp"`
+	Results   []KGBaselineResult `json:"results"`
+	Summary   KGBaselineSummary  `json:"summary"`
 }
 
 // KGBaselineResult represents a single capability test result.
@@ -35,11 +35,11 @@ type KGBaselineResult struct {
 
 // KGBaselineMetrics contains performance metrics.
 type KGBaselineMetrics struct {
-	DurationMs  int64              `json:"duration_ms"`
-	Throughput  float64            `json:"throughput,omitempty"`
-	Accuracy    float64            `json:"accuracy,omitempty"`
-	MemoryBytes int64              `json:"memory_bytes,omitempty"`
-	Custom      map[string]any     `json:"custom,omitempty"`
+	DurationMs  int64          `json:"duration_ms"`
+	Throughput  float64        `json:"throughput,omitempty"`
+	Accuracy    float64        `json:"accuracy,omitempty"`
+	MemoryBytes int64          `json:"memory_bytes,omitempty"`
+	Custom      map[string]any `json:"custom,omitempty"`
 }
 
 // KGBaselineSummary contains overall test results.
@@ -80,9 +80,10 @@ func (f *KGBaselineFormatter) Format(lines []string, width int) string {
 	b.WriteString(s.Header.Render("◉ KG Subsystem"))
 	b.WriteString("  ")
 	gradeStyle := s.Success
-	if report.Summary.Grade == "C" || report.Summary.Grade == "D" {
+	switch report.Summary.Grade {
+	case "C", "D":
 		gradeStyle = s.Warn
-	} else if report.Summary.Grade == "F" {
+	case "F":
 		gradeStyle = s.Error
 	}
 	b.WriteString(gradeStyle.Render(fmt.Sprintf("Grade: %s", report.Summary.Grade)))
@@ -119,10 +120,11 @@ func (f *KGBaselineFormatter) Format(lines []string, width int) string {
 		// Status icon
 		statusIcon := "✓"
 		statusStyle := s.Success
-		if r.Status == "fail" {
+		switch r.Status {
+		case "fail":
 			statusIcon = "✗"
 			statusStyle = s.Error
-		} else if r.Status == "skip" {
+		case "skip":
 			statusIcon = "○"
 			statusStyle = s.File
 		}
@@ -213,4 +215,35 @@ func (f *KGBaselineFormatter) Format(lines []string, width int) string {
 	b.WriteString("\n")
 
 	return b.String()
+}
+
+// GetStatus implements StatusIndicator for content-aware menu icons.
+func (f *KGBaselineFormatter) GetStatus(lines []string) IndicatorStatus {
+	fullOutput := strings.Join(lines, "\n")
+	jsonStart := strings.Index(fullOutput, "{")
+	if jsonStart == -1 {
+		return IndicatorDefault
+	}
+	jsonOutput := fullOutput[jsonStart:]
+
+	var report KGBaselineReport
+	if err := json.Unmarshal([]byte(jsonOutput), &report); err != nil {
+		return IndicatorDefault
+	}
+
+	// Verify it's actually a KG baseline report
+	if report.TestSuite != "kg-baseline" && report.TestSuite != "kg-subsys" {
+		return IndicatorDefault
+	}
+
+	// Grade-based status
+	switch report.Summary.Grade {
+	case "F":
+		return IndicatorError
+	case "C", "D":
+		return IndicatorWarning
+	default:
+		// A, B grades are success
+		return IndicatorSuccess
+	}
 }

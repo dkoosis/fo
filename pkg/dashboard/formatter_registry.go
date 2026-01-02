@@ -8,7 +8,7 @@ var formatters = []OutputFormatter{
 	&GoTestFormatter{},
 	&FilesizeDashboardFormatter{}, // Must be before SARIF to match dashboard format
 	&KGBaselineFormatter{},        // kg-baseline.json output
-	&MCPErrorsFormatter{},         // mcp-errors -format=dashboard output
+	&MCPErrorsFormatter{},         // mcp-logscan -format=dashboard output
 	&NugstatsFormatter{},          // nugstats -format=dashboard output
 	&OrcaHygieneFormatter{},       // orca-hygiene -format=dashboard output
 	&TelemetrySignalsFormatter{},  // telemetry-signals -format=dashboard output
@@ -20,7 +20,7 @@ var formatters = []OutputFormatter{
 	&GoArchLintFormatter{},        // go-arch-lint output
 	&NilawayFormatter{},           // nilaway -json output
 	&SARIFFormatter{},
-	&JscpdFormatter{},             // jscpd --reporters console output
+	&JscpdFormatter{}, // jscpd --reporters console output
 	&PlainFormatter{}, // fallback, always last
 }
 
@@ -32,4 +32,28 @@ func FormatOutput(command string, lines []string, width int) string {
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// GetFormatter returns the formatter for the given command, or nil if none matches.
+func GetFormatter(command string) OutputFormatter {
+	for _, f := range formatters {
+		if f.Matches(command) {
+			return f
+		}
+	}
+	return nil
+}
+
+// GetIndicatorStatus returns the status indicator for a task based on its output.
+// If the formatter implements StatusIndicator, it delegates to GetStatus.
+// Otherwise returns IndicatorDefault.
+func GetIndicatorStatus(command string, lines []string) IndicatorStatus {
+	f := GetFormatter(command)
+	if f == nil {
+		return IndicatorDefault
+	}
+	if si, ok := f.(StatusIndicator); ok {
+		return si.GetStatus(lines)
+	}
+	return IndicatorDefault
 }

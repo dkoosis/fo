@@ -352,7 +352,7 @@ func renderFailedTests(b *strings.Builder, failedTests []string, width int, styl
 		if len(displayName) > maxNameWidth && maxNameWidth > 20 {
 			displayName = truncateAtWord(displayName, maxNameWidth-3) + "..."
 		}
-		b.WriteString(fmt.Sprintf("   %s\n", styles.test.Render(displayName)))
+		_, _ = fmt.Fprintf(b, "   %s\n", styles.test.Render(displayName))
 	}
 }
 

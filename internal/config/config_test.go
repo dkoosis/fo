@@ -121,7 +121,7 @@ func TestLoadConfig_When_FileReadError(t *testing.T) {
 
 	// Create a directory instead of a file to cause a read error
 	configFile := filepath.Join(tmpDir, ".fo.yaml")
-	err = os.Mkdir(configFile, 0o755)
+	err = os.Mkdir(configFile, 0o750)
 	require.NoError(t, err)
 
 	cfg := LoadConfig()

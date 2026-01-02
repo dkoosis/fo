@@ -15,7 +15,7 @@ func (f *RaceFormatter) Matches(command string) bool {
 	return strings.Contains(command, "go test") && strings.Contains(command, "-race")
 }
 
-func (f *RaceFormatter) Format(lines []string, width int) string {
+func (f *RaceFormatter) Format(lines []string, _ int) string {
 	var b strings.Builder
 
 	s := Styles()

@@ -47,19 +47,19 @@ func RunDashboardWithTheme(ctx context.Context, specs []TaskSpec, theme *Dashboa
 }
 
 type model struct {
-	ctx          context.Context
-	specs        []TaskSpec
-	tasks        []*Task
-	updates      <-chan TaskUpdate
-	selected     int
-	visualOrder  []int // maps visual position to task index
-	viewport     viewport.Model
-	ready        bool
-	done         bool
-	width        int // terminal width
-	height       int // terminal height
-	listWidth    int // width allocated to task list
-	detailWidth  int // width allocated to detail pane
+	ctx         context.Context
+	specs       []TaskSpec
+	tasks       []*Task
+	updates     <-chan TaskUpdate
+	selected    int
+	visualOrder []int // maps visual position to task index
+	viewport    viewport.Model
+	ready       bool
+	done        bool
+	width       int // terminal width
+	height      int // terminal height
+	listWidth   int // width allocated to task list
+	detailWidth int // width allocated to detail pane
 }
 
 func newModel(ctx context.Context, specs []TaskSpec) model {
@@ -391,8 +391,8 @@ func extractTestCoverage(lines []string) float64 {
 			continue
 		}
 		var event struct {
-			Action string  `json:"Action"`
-			Output string  `json:"Output"`
+			Action string `json:"Action"`
+			Output string `json:"Output"`
 		}
 		if err := json.Unmarshal([]byte(line), &event); err != nil {
 			continue
@@ -449,10 +449,23 @@ func statusIcon(task *Task) string {
 		interval := time.Duration(activeTheme.SpinnerInterval) * time.Millisecond
 		idx := int(time.Since(task.StartedAt)/interval) % len(frames)
 		return activeTheme.RunningIconStyle.Render(frames[idx])
-	case TaskSuccess:
-		return activeTheme.SuccessIconStyle.Render(activeTheme.Icons.Success)
-	case TaskFailed:
-		return activeTheme.ErrorIconStyle.Render(activeTheme.Icons.Error)
+	case TaskSuccess, TaskFailed:
+		// Check for content-based override
+		indicator := GetIndicatorStatus(task.Spec.Command, task.GetOutput())
+		switch indicator {
+		case IndicatorWarning:
+			return activeTheme.WarningIconStyle.Render(activeTheme.Icons.Warning)
+		case IndicatorError:
+			return activeTheme.ErrorIconStyle.Render(activeTheme.Icons.Error)
+		case IndicatorSuccess:
+			return activeTheme.SuccessIconStyle.Render(activeTheme.Icons.Success)
+		default:
+			// Fall back to exit-code-based status
+			if task.Status == TaskSuccess {
+				return activeTheme.SuccessIconStyle.Render(activeTheme.Icons.Success)
+			}
+			return activeTheme.ErrorIconStyle.Render(activeTheme.Icons.Error)
+		}
 	default:
 		return "?"
 	}
@@ -468,10 +481,23 @@ func rawStatusIcon(task *Task) string {
 		interval := time.Duration(activeTheme.SpinnerInterval) * time.Millisecond
 		idx := int(time.Since(task.StartedAt)/interval) % len(frames)
 		return frames[idx]
-	case TaskSuccess:
-		return activeTheme.Icons.Success
-	case TaskFailed:
-		return activeTheme.Icons.Error
+	case TaskSuccess, TaskFailed:
+		// Check for content-based override
+		indicator := GetIndicatorStatus(task.Spec.Command, task.GetOutput())
+		switch indicator {
+		case IndicatorWarning:
+			return activeTheme.Icons.Warning
+		case IndicatorError:
+			return activeTheme.Icons.Error
+		case IndicatorSuccess:
+			return activeTheme.Icons.Success
+		default:
+			// Fall back to exit-code-based status
+			if task.Status == TaskSuccess {
+				return activeTheme.Icons.Success
+			}
+			return activeTheme.Icons.Error
+		}
 	default:
 		return "?"
 	}

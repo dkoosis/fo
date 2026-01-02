@@ -8,6 +8,14 @@ import (
 	"github.com/dkoosis/fo/pkg/design"
 )
 
+// SARIF severity levels
+const (
+	severityError   = "error"
+	severityWarning = "warning"
+	severityInfo    = "info"
+	severityNote    = "note"
+)
+
 // Mapper converts SARIF results to fo design patterns.
 type Mapper struct {
 	config ToolRenderConfig
@@ -58,25 +66,25 @@ func (m *Mapper) mapToSummary(doc *Document, pc PatternConfig) *design.Summary {
 	switch pc.GroupBy {
 	case "severity":
 		// Group by severity level
-		if n := stats.ByLevel["error"]; n > 0 {
+		if n := stats.ByLevel[severityError]; n > 0 {
 			metrics = append(metrics, design.SummaryItem{
 				Label: "Errors",
 				Value: fmt.Sprintf("%d", n),
-				Type:  "error",
+				Type:  severityError,
 			})
 		}
-		if n := stats.ByLevel["warning"]; n > 0 {
+		if n := stats.ByLevel[severityWarning]; n > 0 {
 			metrics = append(metrics, design.SummaryItem{
 				Label: "Warnings",
 				Value: fmt.Sprintf("%d", n),
-				Type:  "warning",
+				Type:  severityWarning,
 			})
 		}
-		if n := stats.ByLevel["note"]; n > 0 {
+		if n := stats.ByLevel[severityNote]; n > 0 {
 			metrics = append(metrics, design.SummaryItem{
 				Label: "Notes",
 				Value: fmt.Sprintf("%d", n),
-				Type:  "info",
+				Type:  severityInfo,
 			})
 		}
 
@@ -98,7 +106,7 @@ func (m *Mapper) mapToSummary(doc *Document, pc PatternConfig) *design.Summary {
 			metrics = append(metrics, design.SummaryItem{
 				Label: rc.rule,
 				Value: fmt.Sprintf("%d", rc.count),
-				Type:  "info",
+				Type:  severityInfo,
 			})
 		}
 	}
@@ -247,11 +255,11 @@ func (m *Mapper) mapLevel(level string) string {
 		if mapped, ok := m.config.SeverityMapping[level]; ok {
 			// Convert fo semantic type to TestTable status
 			switch mapped {
-			case "error":
+			case severityError:
 				return "fail"
-			case "warning":
+			case severityWarning:
 				return "skip" // Use skip for warnings (shows warning icon)
-			case "info":
+			case severityInfo:
 				return "pass" // Use pass for info (shows checkmark)
 			}
 		}
@@ -259,9 +267,9 @@ func (m *Mapper) mapLevel(level string) string {
 
 	// Default mapping
 	switch level {
-	case "error":
+	case severityError:
 		return "fail"
-	case "warning":
+	case severityWarning:
 		return "skip"
 	default:
 		return "pass"

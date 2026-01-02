@@ -17,10 +17,12 @@ func (f *NugstatsFormatter) Matches(command string) bool {
 
 // NugstatsReport matches the JSON output from nugstats -format=dashboard.
 type NugstatsReport struct {
-	Timestamp string              `json:"timestamp"`
-	Total     int                 `json:"total"`
-	ByKind    []NugstatsKindCount `json:"by_kind"`
-	Weekly    []NugstatsWeekly    `json:"weekly"`
+	Timestamp     string              `json:"timestamp"`
+	Total         int                 `json:"total"`
+	TotalDelta    int                 `json:"total_delta"`    // this_week_created - last_week_created
+	PreviousTotal int                 `json:"previous_total"` // nugs created in previous week
+	ByKind        []NugstatsKindCount `json:"by_kind"`
+	Weekly        []NugstatsWeekly    `json:"weekly"`
 }
 
 // NugstatsKindCount represents a count by kind.
@@ -139,4 +141,35 @@ func (f *NugstatsFormatter) Format(lines []string, width int) string {
 	}
 
 	return b.String()
+}
+
+// GetStatus implements StatusIndicator for content-aware menu icons.
+func (f *NugstatsFormatter) GetStatus(lines []string) IndicatorStatus {
+	fullOutput := strings.Join(lines, "\n")
+	jsonStart := strings.Index(fullOutput, "{")
+	if jsonStart == -1 {
+		return IndicatorDefault
+	}
+	jsonOutput := fullOutput[jsonStart:]
+
+	var report NugstatsReport
+	if err := json.Unmarshal([]byte(jsonOutput), &report); err != nil {
+		return IndicatorDefault
+	}
+
+	// Check thresholds for decrease (negative delta)
+	// Red X: decrease > 10% of previous week's activity
+	if report.PreviousTotal > 0 && report.TotalDelta < 0 {
+		decreasePercent := float64(-report.TotalDelta) * 100 / float64(report.PreviousTotal)
+		if decreasePercent > 10 {
+			return IndicatorError
+		}
+	}
+
+	// Yellow warning: decrease > 10 absolute
+	if report.TotalDelta < -10 {
+		return IndicatorWarning
+	}
+
+	return IndicatorSuccess
 }

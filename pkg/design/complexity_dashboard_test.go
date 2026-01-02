@@ -9,9 +9,9 @@ func TestComplexityDashboard_Render(t *testing.T) {
 	cfg := &Config{
 		IsMonochrome: true,
 	}
-	cfg.Icons.Success = "✓"
-	cfg.Icons.Warning = "⚠"
-	cfg.Icons.Error = "✗"
+	cfg.Icons.Success = IconCharSuccess
+	cfg.Icons.Warning = IconCharWarning
+	cfg.Icons.Error = IconCharError
 	cfg.Style.Indentation = "  "
 
 	tests := []struct {

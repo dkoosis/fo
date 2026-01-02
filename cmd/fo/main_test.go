@@ -169,6 +169,7 @@ func TestParseGlobalFlags_SetsCliFields_When_ValidInputsProvided(t *testing.T) {
 }
 
 func TestParseGlobalFlags_Exits_When_ShowOutputInvalid(t *testing.T) {
+	// #nosec G204 -- Standard Go test pattern: subprocess call uses os.Args[0] (test binary)
 	cmd := exec.Command(os.Args[0], "-test.run=TestHelperProcess", "--", "--show-output", "sometimes")
 	cmd.Env = append(os.Environ(), "FO_TEST_HELPER=1", "FO_HELPER_MODE=parseGlobalFlags")
 
@@ -284,6 +285,7 @@ func TestRun_ManagesExecutionFlow_When_DifferentInputsProvided(t *testing.T) {
 }
 
 func TestHandlePrintCommand_RendersMessage_When_ArgumentsValid(t *testing.T) {
+	// #nosec G204 -- Standard Go test pattern: subprocess call uses os.Args[0] (test binary)
 	cmd := exec.Command(os.Args[0], "-test.run=TestHelperProcess", "--", "--type", "raw", "--", "Hello")
 	cmd.Env = append(os.Environ(), "FO_TEST_HELPER=1", "FO_HELPER_MODE=printCommand")
 

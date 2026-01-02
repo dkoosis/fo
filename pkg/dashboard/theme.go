@@ -46,6 +46,7 @@ type DashboardIcons struct {
 	Running string `yaml:"running"` // Running task icon (static, spinner animates)
 	Success string `yaml:"success"` // Success icon
 	Error   string `yaml:"error"`   // Error icon
+	Warning string `yaml:"warning"` // Warning icon (content-based override)
 	Group   string `yaml:"group"`   // Group header prefix
 	Select  string `yaml:"select"`  // Selected item marker
 }
@@ -86,6 +87,7 @@ type CompiledTheme struct {
 	StatusBarStyle    lipgloss.Style
 	SuccessIconStyle  lipgloss.Style
 	ErrorIconStyle    lipgloss.Style
+	WarningIconStyle  lipgloss.Style
 	RunningIconStyle  lipgloss.Style
 	PendingIconStyle  lipgloss.Style
 	DurationStyle     lipgloss.Style
@@ -123,6 +125,7 @@ func DefaultDashboardTheme() *DashboardTheme {
 			Running: "\u2800", // placeholder, spinner frames override
 			Success: "\u2713", // ✓
 			Error:   "\u2717", // ✗
+			Warning: "\u26a0", // ⚠
 			Group:   "\u25b8", // ▸
 			Select:  "\u25b6", // ▶
 		},
@@ -207,6 +210,7 @@ func (t *DashboardTheme) Compile() *CompiledTheme {
 
 	ct.SuccessIconStyle = lipgloss.NewStyle().Foreground(ct.colorSuccess).Bold(true)
 	ct.ErrorIconStyle = lipgloss.NewStyle().Foreground(ct.colorError).Bold(true)
+	ct.WarningIconStyle = lipgloss.NewStyle().Foreground(ct.colorWarning).Bold(true)
 	ct.RunningIconStyle = lipgloss.NewStyle().Foreground(ct.colorWarning).Bold(true)
 	ct.PendingIconStyle = lipgloss.NewStyle().Foreground(ct.colorMuted)
 	ct.DurationStyle = lipgloss.NewStyle().Foreground(ct.colorMuted).Italic(true)

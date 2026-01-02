@@ -64,6 +64,7 @@ func StartTasks(ctx context.Context, specs []TaskSpec) ([]*Task, <-chan TaskUpda
 
 func runTask(ctx context.Context, index int, task *Task, updates chan<- TaskUpdate, wg *sync.WaitGroup) {
 	defer wg.Done()
+	// #nosec G204 -- Executing user-provided task commands (expected behavior for dashboard task runner)
 	cmd := exec.CommandContext(ctx, "bash", "-lc", task.Spec.Command)
 	stdout, _ := cmd.StdoutPipe()
 	stderr, _ := cmd.StderrPipe()

@@ -173,7 +173,7 @@ func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 		renderDelta(dashboard.Deltas.Month.Yellow, deltaWidth, deltaUpStyle, deltaDownStyle, true)))
 
 	// Green (<500 LOC) - up is good
-	deltaUpGood := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575"))   // green - up is good
+	deltaUpGood := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575"))  // green - up is good
 	deltaDownBad := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56")) // red - down is bad
 	b.WriteString(fmt.Sprintf("  %s %s  %s  %s  %s\n",
 		labelStyle.Render(fmt.Sprintf("%14s:", "<500 LOC")),

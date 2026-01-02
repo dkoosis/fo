@@ -49,6 +49,7 @@ func (e *EditorMode) OpenInEditor(content string) (string, error) {
 
 	// Open in editor
 	editorParts := strings.Fields(e.editorCmd)
+	// #nosec G204 -- User-configured editor command from environment (expected behavior)
 	cmd := exec.Command(editorParts[0], append(editorParts[1:], tmpFile.Name())...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
