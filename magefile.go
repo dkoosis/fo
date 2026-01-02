@@ -151,20 +151,17 @@ func runSequential(steps ...step) error {
 }
 
 func runFoDashboard(tasks ...string) error {
-	// Build fo first
-	buildCmd := exec.Command("go", "build", "-o", "/tmp/fo-dashboard", "./cmd/fo")
+	// Ensure bin directory exists
+	if err := os.MkdirAll("bin", 0o755); err != nil {
+		return fmt.Errorf("failed to create bin dir: %w", err)
+	}
+
+	// Build fo to bin/fo (used by orca/lintkit via ~/Projects/fo/bin/fo)
+	buildCmd := exec.Command("go", "build", "-o", "bin/fo", "./cmd/fo")
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
 	if err := buildCmd.Run(); err != nil {
 		return fmt.Errorf("failed to build fo: %w", err)
-	}
-
-	// Install fo binary to ~/go/bin
-	installCmd := exec.Command("go", "install", "./cmd/fo")
-	installCmd.Stdout = os.Stdout
-	installCmd.Stderr = os.Stderr
-	if err := installCmd.Run(); err != nil {
-		return fmt.Errorf("failed to install fo: %w", err)
 	}
 
 	// Build task args
@@ -174,7 +171,7 @@ func runFoDashboard(tasks ...string) error {
 	}
 
 	// Run dashboard with TTY attached
-	cmd := exec.Command("/tmp/fo-dashboard", args...)
+	cmd := exec.Command("bin/fo", args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
