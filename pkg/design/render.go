@@ -881,93 +881,77 @@ func JoinVertical(components ...string) string {
 	return lipgloss.JoinVertical(lipgloss.Left, components...)
 }
 
+// directMessageIcon determines the icon for a direct message.
+func directMessageIcon(cfg *Config, messageType, customIcon string, elementStyle ElementStyleDef) string {
+	if customIcon != "" {
+		return customIcon
+	}
+	if elementStyle.IconKey != "" {
+		return cfg.GetIcon(elementStyle.IconKey)
+	}
+	// Fallback icon logic based on message type
+	switch messageType {
+	case MessageTypeH1, MessageTypeHeader:
+		return cfg.GetIcon("Start")
+	case MessageTypeH2:
+		return cfg.GetIcon("Info")
+	case MessageTypeH3:
+		return cfg.GetIcon("Bullet")
+	case StatusSuccess:
+		return cfg.GetIcon("Success")
+	case StatusWarning:
+		return cfg.GetIcon("Warning")
+	case StatusError:
+		return cfg.GetIcon("Error")
+	default:
+		return cfg.GetIcon("Info")
+	}
+}
+
+// directMessageFGColor determines the foreground color for a direct message.
+func directMessageFGColor(messageType string, elementStyle ElementStyleDef) string {
+	if elementStyle.ColorFG != "" {
+		return elementStyle.ColorFG
+	}
+	switch messageType {
+	case MessageTypeH1, MessageTypeH2, MessageTypeHeader:
+		return "Process"
+	case StatusSuccess:
+		return "Success"
+	case StatusWarning:
+		return "Warning"
+	case StatusError:
+		return "Error"
+	case TypeInfo:
+		return "Process"
+	default:
+		return "Detail"
+	}
+}
+
 // RenderDirectMessage creates the formatted status line.
 func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, indentLevel int) string {
-	var sb strings.Builder
-	var iconToUse string
-	var rawFgColor, rawBgColor string
-	var finalFgColor, finalBgColor lipgloss.Color
-	var finalTextStyle string
-	var elementStyle ElementStyleDef
-
 	lowerMessageType := strings.ToLower(messageType)
-	styleKey := ""
 
-	// Determine the styleKey based on messageType to fetch ElementStyleDef
+	// Determine style key
+	var elementStyle ElementStyleDef
 	switch lowerMessageType {
 	case MessageTypeH1, MessageTypeH2, MessageTypeH3, StatusSuccess, StatusWarning, StatusError, TypeInfo:
-		// Direct mapping from type to element style key (properly capitalized)
-		styleKey = threadSafeTitle(lowerMessageType)
-	case MessageTypeHeader: // Legacy support for MessageTypeHeader type
-		styleKey = "H1"
+		elementStyle = cfg.GetElementStyle(threadSafeTitle(lowerMessageType))
+	case MessageTypeHeader:
+		elementStyle = cfg.GetElementStyle("H1")
 	}
 
-	if styleKey != "" {
-		elementStyle = cfg.GetElementStyle(styleKey)
-	}
-
-	// Determine Icon
-	switch {
-	case customIcon != "":
-		iconToUse = customIcon
-	case elementStyle.IconKey != "":
-		iconToUse = cfg.GetIcon(elementStyle.IconKey)
-	default:
-		// Fallback icon logic based on message type
-		// Note: MessageType* constants are aliases with same values as Status* and Type* constants
-		switch lowerMessageType {
-		case MessageTypeH1, MessageTypeHeader:
-			iconToUse = cfg.GetIcon("Start")
-		case MessageTypeH2:
-			iconToUse = cfg.GetIcon("Info")
-		case MessageTypeH3:
-			iconToUse = cfg.GetIcon("Bullet")
-		case StatusSuccess: // Also matches MessageTypeSuccess (same value: "success")
-			iconToUse = cfg.GetIcon("Success")
-		case StatusWarning: // Also matches MessageTypeWarning (same value: "warning")
-			iconToUse = cfg.GetIcon("Warning")
-		case StatusError: // Also matches MessageTypeError (same value: "error")
-			iconToUse = cfg.GetIcon("Error")
-		case TypeInfo: // Also matches MessageTypeInfo (same value: "info")
-			iconToUse = cfg.GetIcon("Info")
-		default:
-			iconToUse = cfg.GetIcon("Info")
-		}
-	}
-
-	// Determine colors from ElementStyleDef
-	if elementStyle.ColorFG != "" {
-		rawFgColor = elementStyle.ColorFG
-	} else {
-		// Fallback color logic based on message type
-		// Note: MessageType* constants are aliases with same values as Status* and Type* constants
-		switch lowerMessageType {
-		case MessageTypeH1, MessageTypeH2, MessageTypeHeader:
-			rawFgColor = "Process"
-		case StatusSuccess: // Also matches MessageTypeSuccess (same value: "success")
-			rawFgColor = "Success"
-		case StatusWarning: // Also matches MessageTypeWarning (same value: "warning")
-			rawFgColor = "Warning"
-		case StatusError: // Also matches MessageTypeError (same value: "error")
-			rawFgColor = "Error"
-		case TypeInfo: // Also matches MessageTypeInfo (same value: "info")
-			rawFgColor = "Process"
-		default:
-			rawFgColor = "Detail"
-		}
-	}
-
-	// BG Color from ElementStyleDef
-	if elementStyle.ColorBG != "" {
-		rawBgColor = elementStyle.ColorBG
-	}
+	iconToUse := directMessageIcon(cfg, lowerMessageType, customIcon, elementStyle)
+	rawFgColor := directMessageFGColor(lowerMessageType, elementStyle)
+	rawBgColor := elementStyle.ColorBG
 
 	if lowerMessageType == MessageTypeRaw {
-		rawFgColor = ""
-		rawBgColor = ""
+		rawFgColor, rawBgColor = "", ""
 	}
 
-	// Resolve raw color names/keys to actual ANSI codes
+	// Resolve colors
+	var finalFgColor, finalBgColor lipgloss.Color
 	if rawFgColor != "" {
 		finalFgColor = cfg.GetColor(rawFgColor)
 	}
@@ -975,20 +959,21 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 		finalBgColor = cfg.GetColor(rawBgColor)
 	}
 
+	// Build text style
+	var finalTextStyle string
 	if !cfg.IsMonochrome && elementStyle.TextStyle != nil {
 		var styleParts []string
 		for _, styleName := range elementStyle.TextStyle {
-			stylePart := cfg.GetColor(threadSafeTitle(strings.ToLower(styleName)))
-			if stylePart != "" {
+			if stylePart := cfg.GetColor(threadSafeTitle(strings.ToLower(styleName))); stylePart != "" {
 				styleParts = append(styleParts, string(stylePart))
 			}
 		}
 		finalTextStyle = strings.Join(styleParts, "")
 	}
 
+	var sb strings.Builder
 	sb.WriteString(strings.Repeat(cfg.GetIndentation(1), indentLevel))
 
-	// Phase 2: Build lipgloss.Style instead of manual concatenation
 	if lowerMessageType != MessageTypeRaw {
 		style := lipgloss.NewStyle()
 		if finalBgColor != "" {
@@ -997,24 +982,20 @@ func RenderDirectMessage(cfg *Config, messageType, customIcon, message string, i
 		if finalFgColor != "" {
 			style = style.Foreground(finalFgColor)
 		}
-		// Apply text styles
 		if strings.Contains(finalTextStyle, string(cfg.GetColor("Bold"))) {
 			style = style.Bold(true)
 		}
 		if strings.Contains(finalTextStyle, string(cfg.GetColor("Italic"))) {
 			style = style.Italic(true)
 		}
-
 		messageWithIcon := message
 		if iconToUse != "" {
 			messageWithIcon = iconToUse + " " + message
 		}
 		sb.WriteString(style.Render(messageWithIcon))
 	} else {
-		// Raw mode: no styling
 		if iconToUse != "" {
-			sb.WriteString(iconToUse)
-			sb.WriteString(" ")
+			sb.WriteString(iconToUse + " ")
 		}
 		sb.WriteString(message)
 	}

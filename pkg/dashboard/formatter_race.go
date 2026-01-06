@@ -145,3 +145,24 @@ func collectRaceOutput(output string, races *[]string) {
 		*races = append(*races, trimmed)
 	}
 }
+
+// GetStatus implements StatusIndicator for content-aware menu icons.
+func (f *RaceFormatter) GetStatus(lines []string) IndicatorStatus {
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		// Check raw line for race warning
+		if strings.Contains(line, "WARNING: DATA RACE") {
+			return IndicatorError
+		}
+		// Check JSON event output
+		var event GoTestEvent
+		if err := json.Unmarshal([]byte(line), &event); err == nil {
+			if strings.Contains(event.Output, "WARNING: DATA RACE") {
+				return IndicatorError
+			}
+		}
+	}
+	return IndicatorSuccess
+}

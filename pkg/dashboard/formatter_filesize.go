@@ -117,17 +117,7 @@ func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 	b.WriteString(s.Header.Render("◉ Size Distribution"))
 	b.WriteString("\n")
 
-	// Header row with delta time periods
-	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
-	b.WriteString(fmt.Sprintf("  %s %s  %s  %s  %s\n",
-		strings.Repeat(" ", 14), // label space
-		strings.Repeat(" ", 4),  // count space
-		headerStyle.Render("  1d  "),
-		headerStyle.Render("  1w  "),
-		headerStyle.Render(" 1mo  ")))
-	b.WriteString("\n")
-
-	// Calculate max delta width for alignment
+	// Calculate max delta width for alignment (needed for header alignment)
 	maxDelta := 0
 	for _, delta := range []int{
 		abs(dashboard.Deltas.Day.Red), abs(dashboard.Deltas.Week.Red), abs(dashboard.Deltas.Month.Red),
@@ -142,6 +132,19 @@ func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 		}
 	}
 	deltaWidth := max(len(fmt.Sprintf("%d", maxDelta)), 1)
+	// Delta columns are arrow (1) + number (deltaWidth) = deltaWidth+1 chars
+	deltaColWidth := deltaWidth + 1
+
+	// Header row with delta time periods
+	// Label is 14 chars + colon = 15, count is 4 chars
+	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888"))
+	b.WriteString(fmt.Sprintf("  %s %s  %s  %s  %s\n",
+		strings.Repeat(" ", 15), // label space (14 + colon)
+		strings.Repeat(" ", 4),  // count space
+		headerStyle.Render(fmt.Sprintf("%*s", deltaColWidth, "1d")),
+		headerStyle.Render(fmt.Sprintf("%*s", deltaColWidth, "1w")),
+		headerStyle.Render(fmt.Sprintf("%*s", deltaColWidth, "1mo"))))
+	b.WriteString("\n")
 
 	deltaUpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F56"))   // red - up is bad
 	deltaDownStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")) // green - down is good
@@ -256,7 +259,7 @@ func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 // Follows the nugstats pattern: "↑  5" or "↓ 12" with fixed width.
 func renderDelta(delta, width int, upStyle, downStyle lipgloss.Style, upIsBad bool) string {
 	if delta == 0 {
-		return strings.Repeat(" ", width+2) // space for arrow + space + number
+		return strings.Repeat(" ", width+1) // arrow (1) + number (width)
 	}
 
 	// Swap styles if up is good

@@ -2,6 +2,13 @@ package dashboard
 
 import "github.com/charmbracelet/lipgloss"
 
+// Icon constants for consistent formatting across dashboard formatters.
+const (
+	IconSuccess = "✓"
+	IconError   = "✗"
+	IconPending = "○"
+)
+
 // FormatterStyles contains shared styles for all dashboard formatters.
 // Centralizes the 62+ duplicated style definitions across formatters.
 type FormatterStyles struct {

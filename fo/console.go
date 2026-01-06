@@ -947,6 +947,38 @@ func (c *Console) getSpinnerColor() string {
 	return fmt.Sprintf("\033[38;5;%sm", color)
 }
 
+// maybeStartSpinner starts a spinner if conditions are met, returns nil otherwise.
+// Conditions: not in section, not streaming, spinner not disabled, not monochrome, output is TTY.
+func (c *Console) maybeStartSpinner(label string) *Spinner {
+	if c.inSection || c.cfg.LiveStreamOutput || c.designConf.Style.NoSpinner || c.cfg.Monochrome {
+		return nil
+	}
+	f, ok := c.cfg.Out.(*os.File)
+	if !ok || !term.IsTerminal(int(f.Fd())) {
+		return nil
+	}
+
+	interval := time.Duration(c.designConf.Style.SpinnerInterval) * time.Millisecond
+	if interval == 0 {
+		interval = 80 * time.Millisecond
+	}
+	spinnerStyle := c.designConf.Style.SpinnerStyle
+	if spinnerStyle == "" {
+		spinnerStyle = DefaultSpinnerStyle
+	}
+
+	spinner := NewSpinner(SpinnerConfig{
+		Style:        spinnerStyle,
+		CustomFrames: ParseSpinnerChars(c.designConf.Style.SpinnerChars),
+		Interval:     interval,
+		Message:      label + "...",
+		Color:        c.getSpinnerColor(),
+		Writer:       c.cfg.Out,
+	})
+	spinner.Start()
+	return spinner
+}
+
 // GetIcon returns an icon from the theme by key.
 func (c *Console) GetIcon(iconKey string) string {
 	return c.designConf.GetIcon(iconKey)
@@ -1206,6 +1238,73 @@ func (c *Console) RunSimple(command string, args ...string) error {
 	return err // Infrastructure error, pass through
 }
 
+// signalHandler handles process signals in a separate goroutine.
+func (c *Console) signalHandler(
+	ctx context.Context, cancel context.CancelFunc, sigChan chan os.Signal,
+	cmd *exec.Cmd, cmdDone, processStarted, done chan struct{},
+) {
+	defer func() {
+		signal.Stop(sigChan)
+		close(done)
+	}()
+	select {
+	case sig := <-sigChan:
+		c.handleSignal(sig, cancel, cmd, cmdDone, processStarted)
+	case <-ctx.Done():
+		c.debugLog("[DEBUG sigChan] Context done, ensuring process is killed if running.")
+		<-processStarted
+		if cmd.Process != nil {
+			_ = killProcessGroupWithSIGKILL(cmd)
+		}
+	case <-cmdDone:
+		c.debugLog("[DEBUG sigChan] cmdDone received, command finished naturally.")
+	}
+}
+
+// handleSignal processes a received signal for the command.
+func (c *Console) handleSignal(
+	sig os.Signal, cancel context.CancelFunc, cmd *exec.Cmd, cmdDone, processStarted chan struct{},
+) {
+	if c.cfg.Debug {
+		fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Received signal %v\n", sig)
+		processStateStr := "nil"
+		if cmd.ProcessState != nil {
+			processStateStr = fmt.Sprintf("%+v", cmd.ProcessState)
+		}
+		fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Process state: %s\n", processStateStr)
+	}
+	<-processStarted
+	if cmd.Process == nil {
+		c.debugLog("[DEBUG sigChan] Process is nil, canceling context.")
+		cancel()
+		return
+	}
+	if c.cfg.Debug {
+		fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Received signal %v for PID %d. Forwarding...\n", sig, cmd.Process.Pid)
+	}
+	if err := killProcessGroup(cmd, sig); err != nil && c.cfg.Debug {
+		fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Error killing process group: %v\n", err)
+	}
+	select {
+	case <-cmdDone:
+		c.debugLog("[DEBUG sigChan] cmdDone received after signal forwarding.")
+	case <-time.After(SignalTimeout):
+		c.debugLog("[DEBUG sigChan] Timeout after signal, ensuring process is killed.")
+		<-processStarted
+		if cmd.Process != nil {
+			_ = killProcessGroupWithSIGKILL(cmd)
+		}
+		cancel()
+	}
+}
+
+// debugLog writes a debug message if debug mode is enabled.
+func (c *Console) debugLog(msg string) {
+	if c.cfg.Debug {
+		fmt.Fprintln(os.Stderr, msg)
+	}
+}
+
 //nolint:funlen,gocognit // Complex function handling command execution, signal handling, and output rendering
 func (c *Console) runContext(
 	ctx context.Context, cancel context.CancelFunc, sigChan chan os.Signal,
@@ -1229,34 +1328,8 @@ func (c *Console) runContext(
 		_, _ = c.cfg.Out.Write([]byte(c.taskView.RenderStart(taskData) + "\n"))
 	}
 
-	// Start spinner if enabled (only when not in section, not streaming, and output is a TTY)
-	var spinner *Spinner
-	isTTY := false
-	if f, ok := c.cfg.Out.(*os.File); ok {
-		isTTY = term.IsTerminal(int(f.Fd()))
-	}
-	if !c.inSection && !c.cfg.LiveStreamOutput && !c.designConf.Style.NoSpinner && !c.cfg.Monochrome && isTTY {
-		spinnerColor := c.getSpinnerColor()
-		interval := time.Duration(c.designConf.Style.SpinnerInterval) * time.Millisecond
-		if interval == 0 {
-			interval = 80 * time.Millisecond
-		}
-		spinnerStyle := c.designConf.Style.SpinnerStyle
-		if spinnerStyle == "" {
-			spinnerStyle = DefaultSpinnerStyle
-		}
-		customFrames := ParseSpinnerChars(c.designConf.Style.SpinnerChars)
-
-		spinner = NewSpinner(SpinnerConfig{
-			Style:        spinnerStyle,
-			CustomFrames: customFrames,
-			Interval:     interval,
-			Message:      labelToUse + "...",
-			Color:        spinnerColor,
-			Writer:       c.cfg.Out,
-		})
-		spinner.Start()
-	}
+	// Start spinner if enabled
+	spinner := c.maybeStartSpinner(labelToUse)
 
 	cmd := exec.CommandContext(ctx, command, args...)
 	cmd.Env = os.Environ()
@@ -1267,67 +1340,7 @@ func (c *Console) runContext(
 
 	// Goroutine: Handle signals
 	signalHandlerDone := make(chan struct{})
-	go func() {
-		defer func() {
-			signal.Stop(sigChan)
-			close(signalHandlerDone)
-		}()
-		select {
-		case sig := <-sigChan:
-			if c.cfg.Debug {
-				fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Received signal %v\n", sig)
-				processStateStr := "nil"
-				if cmd.ProcessState != nil {
-					processStateStr = fmt.Sprintf("%+v", cmd.ProcessState)
-				}
-				fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Process state: %s\n", processStateStr)
-			}
-			// Wait for process to start before accessing cmd.Process
-			<-processStarted
-			if cmd.Process == nil {
-				if c.cfg.Debug {
-					fmt.Fprintln(os.Stderr, "[DEBUG sigChan] Process is nil, canceling context.")
-				}
-				cancel()
-				return
-			}
-			if c.cfg.Debug {
-				fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Received signal %v for PID %d. Forwarding...\n", sig, cmd.Process.Pid)
-			}
-			if err := killProcessGroup(cmd, sig); err != nil && c.cfg.Debug {
-				fmt.Fprintf(os.Stderr, "[DEBUG sigChan] Error killing process group: %v\n", err)
-			}
-			select {
-			case <-cmdDone:
-				if c.cfg.Debug {
-					fmt.Fprintln(os.Stderr, "[DEBUG sigChan] cmdDone received after signal forwarding.")
-				}
-			case <-time.After(SignalTimeout):
-				if c.cfg.Debug {
-					fmt.Fprintln(os.Stderr, "[DEBUG sigChan] Timeout after signal, ensuring process is killed.")
-				}
-				<-processStarted
-				if cmd.Process != nil {
-					// Try to kill; ignore error if process already exited
-					_ = killProcessGroupWithSIGKILL(cmd)
-				}
-				cancel()
-			}
-		case <-ctx.Done():
-			if c.cfg.Debug {
-				fmt.Fprintln(os.Stderr, "[DEBUG sigChan] Context done, ensuring process is killed if running.")
-			}
-			<-processStarted
-			if cmd.Process != nil {
-				// Try to kill; ignore error if process already exited
-				_ = killProcessGroupWithSIGKILL(cmd)
-			}
-		case <-cmdDone:
-			if c.cfg.Debug {
-				fmt.Fprintln(os.Stderr, "[DEBUG sigChan] cmdDone received, command finished naturally.")
-			}
-		}
-	}()
+	go c.signalHandler(ctx, cancel, sigChan, cmd, cmdDone, processStarted, signalHandlerDone)
 
 	var exitCode int
 	var cmdRunError error
