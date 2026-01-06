@@ -34,6 +34,24 @@ var validPatterns = map[string]bool{
 	"comparison":  true,
 }
 
+// formatHandler encapsulates format detection and rendering logic.
+type formatHandler struct {
+	detect func([]byte) bool
+	render func([]byte, *design.Config) int
+}
+
+// formatHandlers defines the ordered list of format handlers.
+// Order matters: first matching handler wins.
+var formatHandlers = []formatHandler{
+	{detect: sarif.IsSARIF, render: renderSARIF},
+	{detect: archlint.IsArchLintJSON, render: renderArchLint},
+	{detect: gofmt.IsGofmtOutput, render: renderGofmt},
+	{detect: nilaway.IsNilawayOutput, render: renderNilaway},
+	{detect: goleak.IsGoleakOutput, render: renderGoleak},
+	{detect: racedetect.IsRaceDetectorOutput, render: renderRaceDetector},
+	{detect: fuzz.IsFuzzOutput, render: renderFuzz},
+}
+
 // LocalAppConfig holds behavioral settings derived from AppConfig and CLI flags.
 type LocalAppConfig struct {
 	Label            string
@@ -346,41 +364,14 @@ func runEditorMode(cliFlags config.CliFlags, _ *config.AppConfig) int {
 		return 0
 	}
 
-	// Check if input is SARIF format
-	if sarif.IsSARIF(input) {
-		return renderSARIF(input, resolvedCfg.Theme)
+	// Try each format handler in order; first match wins
+	for _, h := range formatHandlers {
+		if h.detect(input) {
+			return h.render(input, resolvedCfg.Theme)
+		}
 	}
 
-	// Check if input is go-arch-lint JSON format
-	if archlint.IsArchLintJSON(input) {
-		return renderArchLint(input, resolvedCfg.Theme)
-	}
-
-	// Check if input is gofmt -l output (list of .go files)
-	if gofmt.IsGofmtOutput(input) {
-		return renderGofmt(input, resolvedCfg.Theme)
-	}
-
-	// Check if input is nilaway JSON output
-	if nilaway.IsNilawayOutput(input) {
-		return renderNilaway(input, resolvedCfg.Theme)
-	}
-
-	// Check if input is goleak output
-	if goleak.IsGoleakOutput(input) {
-		return renderGoleak(input, resolvedCfg.Theme)
-	}
-
-	// Check if input is race detector output
-	if racedetect.IsRaceDetectorOutput(input) {
-		return renderRaceDetector(input, resolvedCfg.Theme)
-	}
-
-	// Check if input is fuzz testing output
-	if fuzz.IsFuzzOutput(input) {
-		return renderFuzz(input, resolvedCfg.Theme)
-	}
-
+	// No known format detected; fall through to generic processing
 	// Create a task for the stdin processing
 	task := design.NewTask("stdin", "stream", "pipe", nil, resolvedCfg.Theme)
 
