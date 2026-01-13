@@ -1,6 +1,7 @@
 package sarif
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -24,27 +25,19 @@ func Read(r io.Reader) (*Document, error) {
 	if err := json.NewDecoder(r).Decode(&doc); err != nil {
 		return nil, fmt.Errorf("decode sarif: %w", err)
 	}
-
-	// Basic validation
-	if doc.Version == "" {
-		return nil, fmt.Errorf("missing sarif version")
-	}
-
-	return &doc, nil
+	return validateDocument(&doc)
 }
 
 // ReadBytes parses SARIF from a byte slice.
 func ReadBytes(data []byte) (*Document, error) {
-	var doc Document
-	if err := json.Unmarshal(data, &doc); err != nil {
-		return nil, fmt.Errorf("decode sarif: %w", err)
-	}
+	return Read(bytes.NewReader(data))
+}
 
+func validateDocument(doc *Document) (*Document, error) {
 	if doc.Version == "" {
 		return nil, fmt.Errorf("missing sarif version")
 	}
-
-	return &doc, nil
+	return doc, nil
 }
 
 // IsSARIF checks if data looks like a SARIF document.

@@ -1,7 +1,6 @@
 package dashboard
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -41,9 +40,8 @@ func (f *GoArchLintFormatter) Format(lines []string, width int) string {
 	s := Styles()
 
 	// Parse JSON
-	fullOutput := strings.Join(lines, "\n")
 	var report archLintReport
-	if err := json.Unmarshal([]byte(fullOutput), &report); err != nil {
+	if !decodeJSONLines(lines, &report) {
 		return (&PlainFormatter{}).Format(lines, width)
 	}
 

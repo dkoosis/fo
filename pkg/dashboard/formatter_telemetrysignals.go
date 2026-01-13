@@ -1,7 +1,6 @@
 package dashboard
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -72,16 +71,8 @@ type TelemetryZeroResults struct {
 func (f *TelemetrySignalsFormatter) Format(lines []string, width int) string {
 	var b strings.Builder
 
-	// Find the JSON object in the output (skip any build/download messages)
-	fullOutput := strings.Join(lines, "\n")
-	jsonStart := strings.Index(fullOutput, "{")
-	if jsonStart == -1 {
-		return (&PlainFormatter{}).Format(lines, width)
-	}
-	jsonOutput := fullOutput[jsonStart:]
-
 	var report TelemetrySignalsReport
-	if err := json.Unmarshal([]byte(jsonOutput), &report); err != nil {
+	if !decodeJSONLinesWithPrefix(lines, &report) {
 		return (&PlainFormatter{}).Format(lines, width)
 	}
 

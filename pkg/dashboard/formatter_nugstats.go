@@ -1,7 +1,6 @@
 package dashboard
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -42,16 +41,8 @@ type NugstatsWeekly struct {
 func (f *NugstatsFormatter) Format(lines []string, width int) string {
 	var b strings.Builder
 
-	// Find the JSON object in the output (skip any build/download messages)
-	fullOutput := strings.Join(lines, "\n")
-	jsonStart := strings.Index(fullOutput, "{")
-	if jsonStart == -1 {
-		return (&PlainFormatter{}).Format(lines, width)
-	}
-	jsonOutput := fullOutput[jsonStart:]
-
 	var report NugstatsReport
-	if err := json.Unmarshal([]byte(jsonOutput), &report); err != nil {
+	if !decodeJSONLinesWithPrefix(lines, &report) {
 		return (&PlainFormatter{}).Format(lines, width)
 	}
 
@@ -145,15 +136,8 @@ func (f *NugstatsFormatter) Format(lines []string, width int) string {
 
 // GetStatus implements StatusIndicator for content-aware menu icons.
 func (f *NugstatsFormatter) GetStatus(lines []string) IndicatorStatus {
-	fullOutput := strings.Join(lines, "\n")
-	jsonStart := strings.Index(fullOutput, "{")
-	if jsonStart == -1 {
-		return IndicatorDefault
-	}
-	jsonOutput := fullOutput[jsonStart:]
-
 	var report NugstatsReport
-	if err := json.Unmarshal([]byte(jsonOutput), &report); err != nil {
+	if !decodeJSONLinesWithPrefix(lines, &report) {
 		return IndicatorDefault
 	}
 

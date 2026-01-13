@@ -1,7 +1,6 @@
 package dashboard
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -51,9 +50,8 @@ func (f *SARIFFormatter) Format(lines []string, width int) string {
 	ruleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#626262"))
 
 	// Try to parse SARIF
-	fullOutput := strings.Join(lines, "\n")
 	var report SARIFReport
-	if err := json.Unmarshal([]byte(fullOutput), &report); err != nil {
+	if !decodeJSONLines(lines, &report) {
 		// Not SARIF, fall back to plain
 		return (&PlainFormatter{}).Format(lines, width)
 	}
