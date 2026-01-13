@@ -11,6 +11,7 @@ var formatters = []OutputFormatter{
 	&MCPErrorsFormatter{},         // mcp-logscan -format=dashboard output
 	&NugstatsFormatter{},          // nugstats -format=dashboard output
 	&OrcaHygieneFormatter{},       // orca-hygiene -format=dashboard output
+	&HTMLHygieneFormatter{},       // html-export-hygiene -format=dashboard output
 	&TelemetrySignalsFormatter{},  // telemetry-signals -format=dashboard output
 	&GovulncheckFormatter{},       // govulncheck output
 	&GolangciLintFormatter{},      // Per-linter sections for golangci-lint

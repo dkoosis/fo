@@ -33,7 +33,8 @@ type DashboardColors struct {
 	Primary   string `yaml:"primary"`   // Main accent (title, selected, borders)
 	Success   string `yaml:"success"`   // Success state (checkmarks)
 	Error     string `yaml:"error"`     // Error state (X marks)
-	Warning   string `yaml:"warning"`   // Running/in-progress state
+	Warning   string `yaml:"warning"`   // Warning state (content-based warnings)
+	Running   string `yaml:"running"`   // Running/in-progress state (spinner)
 	Muted     string `yaml:"muted"`     // Secondary text, pending items
 	Text      string `yaml:"text"`      // Normal text
 	Border    string `yaml:"border"`    // Border color
@@ -71,6 +72,7 @@ type CompiledTheme struct {
 	colorSuccess   lipgloss.Color
 	colorError     lipgloss.Color
 	colorWarning   lipgloss.Color
+	colorRunning   lipgloss.Color
 	colorMuted     lipgloss.Color
 	colorText      lipgloss.Color
 	colorBorder    lipgloss.Color
@@ -114,7 +116,8 @@ func DefaultDashboardTheme() *DashboardTheme {
 			Primary:   "#7D56F4", // Purple
 			Success:   "#04B575", // Green
 			Error:     "#FF5F56", // Red
-			Warning:   "#FFBD2E", // Yellow/Orange
+			Warning:   "#FFBD2E", // Yellow/Orange - content-based warnings
+			Running:   "#7D56F4", // Purple - in-progress spinner (same as primary)
 			Muted:     "#626262", // Gray
 			Text:      "#CCCCCC", // Light gray
 			Border:    "#444444", // Dark gray
@@ -165,6 +168,12 @@ func (t *DashboardTheme) Compile() *CompiledTheme {
 	ct.colorSuccess = lipgloss.Color(t.Colors.Success)
 	ct.colorError = lipgloss.Color(t.Colors.Error)
 	ct.colorWarning = lipgloss.Color(t.Colors.Warning)
+	// Running color defaults to Warning for backwards compatibility
+	if t.Colors.Running != "" {
+		ct.colorRunning = lipgloss.Color(t.Colors.Running)
+	} else {
+		ct.colorRunning = ct.colorWarning
+	}
 	ct.colorMuted = lipgloss.Color(t.Colors.Muted)
 	ct.colorText = lipgloss.Color(t.Colors.Text)
 	ct.colorBorder = lipgloss.Color(t.Colors.Border)
@@ -211,7 +220,7 @@ func (t *DashboardTheme) Compile() *CompiledTheme {
 	ct.SuccessIconStyle = lipgloss.NewStyle().Foreground(ct.colorSuccess).Bold(true)
 	ct.ErrorIconStyle = lipgloss.NewStyle().Foreground(ct.colorError).Bold(true)
 	ct.WarningIconStyle = lipgloss.NewStyle().Foreground(ct.colorWarning).Bold(true)
-	ct.RunningIconStyle = lipgloss.NewStyle().Foreground(ct.colorWarning).Bold(true)
+	ct.RunningIconStyle = lipgloss.NewStyle().Foreground(ct.colorRunning).Bold(true)
 	ct.PendingIconStyle = lipgloss.NewStyle().Foreground(ct.colorMuted)
 	ct.DurationStyle = lipgloss.NewStyle().Foreground(ct.colorMuted).Italic(true)
 

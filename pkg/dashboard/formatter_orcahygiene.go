@@ -7,6 +7,13 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// Severity constants for OrcaHygieneIssue.
+const (
+	severityError   = "error"
+	severityWarning = "warning"
+	severityInfo    = "info"
+)
+
 // OrcaHygieneFormatter handles orca-hygiene -format=dashboard output.
 type OrcaHygieneFormatter struct{}
 
@@ -59,7 +66,7 @@ func (f *OrcaHygieneFormatter) Format(lines []string, width int) string {
 	// Group issues by severity
 	var errors, warnings []OrcaHygieneIssue
 	for _, issue := range report.Issues {
-		if issue.Severity == "error" {
+		if issue.Severity == severityError {
 			errors = append(errors, issue)
 		} else {
 			warnings = append(warnings, issue)
@@ -124,14 +131,14 @@ func (f *OrcaHygieneFormatter) GetStatus(lines []string) IndicatorStatus {
 
 	// Check for errors first (higher severity)
 	for _, issue := range report.Issues {
-		if issue.Severity == "error" {
+		if issue.Severity == severityError {
 			return IndicatorError
 		}
 	}
 
 	// Check for warnings (including "info" which orca-hygiene counts as warnings)
 	for _, issue := range report.Issues {
-		if issue.Severity == "warning" || issue.Severity == "info" {
+		if issue.Severity == severityWarning || issue.Severity == severityInfo {
 			return IndicatorWarning
 		}
 	}

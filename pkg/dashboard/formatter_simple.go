@@ -18,14 +18,7 @@ func (f *GofmtFormatter) Format(lines []string, _ int) string {
 	var b strings.Builder
 	s := Styles()
 
-	// Filter to non-empty lines (actual files)
-	var files []string
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed != "" && strings.HasSuffix(trimmed, ".go") {
-			files = append(files, trimmed)
-		}
-	}
+	files := f.findUnformattedFiles(lines)
 
 	if len(files) == 0 {
 		b.WriteString(s.Success.Render("✓ All files formatted correctly\n"))
@@ -42,6 +35,25 @@ func (f *GofmtFormatter) Format(lines []string, _ int) string {
 	return b.String()
 }
 
+func (f *GofmtFormatter) findUnformattedFiles(lines []string) []string {
+	var files []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" && strings.HasSuffix(trimmed, ".go") {
+			files = append(files, trimmed)
+		}
+	}
+	return files
+}
+
+// GetStatus implements StatusIndicator for content-aware menu icons.
+func (f *GofmtFormatter) GetStatus(lines []string) IndicatorStatus {
+	if len(f.findUnformattedFiles(lines)) > 0 {
+		return IndicatorError
+	}
+	return IndicatorSuccess
+}
+
 // GoVetFormatter handles go vet output.
 type GoVetFormatter struct{}
 
@@ -53,14 +65,7 @@ func (f *GoVetFormatter) Format(lines []string, _ int) string {
 	var b strings.Builder
 	s := Styles()
 
-	// Filter to non-empty lines
-	var issues []string
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed != "" {
-			issues = append(issues, trimmed)
-		}
-	}
+	issues := f.findIssues(lines)
 
 	if len(issues) == 0 {
 		b.WriteString(s.Success.Render("✓ No issues found\n"))
@@ -81,6 +86,25 @@ func (f *GoVetFormatter) Format(lines []string, _ int) string {
 	return b.String()
 }
 
+func (f *GoVetFormatter) findIssues(lines []string) []string {
+	var issues []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" {
+			issues = append(issues, trimmed)
+		}
+	}
+	return issues
+}
+
+// GetStatus implements StatusIndicator for content-aware menu icons.
+func (f *GoVetFormatter) GetStatus(lines []string) IndicatorStatus {
+	if len(f.findIssues(lines)) > 0 {
+		return IndicatorError
+	}
+	return IndicatorSuccess
+}
+
 // GoBuildFormatter handles go build output.
 type GoBuildFormatter struct{}
 
@@ -92,23 +116,7 @@ func (f *GoBuildFormatter) Format(lines []string, _ int) string {
 	var b strings.Builder
 	s := Styles()
 
-	// Filter to actual errors (exclude go toolchain info messages)
-	var errors []string
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
-		}
-		// Skip info messages from go toolchain
-		if strings.HasPrefix(trimmed, "go: downloading") ||
-			strings.HasPrefix(trimmed, "go: extracting") ||
-			strings.HasPrefix(trimmed, "go: finding") ||
-			strings.HasPrefix(trimmed, "go: upgraded") ||
-			strings.HasPrefix(trimmed, "go: added") {
-			continue
-		}
-		errors = append(errors, trimmed)
-	}
+	errors := f.findBuildErrors(lines)
 
 	if len(errors) == 0 {
 		b.WriteString(s.Success.Render("✓ Build successful\n"))
@@ -127,6 +135,35 @@ func (f *GoBuildFormatter) Format(lines []string, _ int) string {
 	}
 
 	return b.String()
+}
+
+func (f *GoBuildFormatter) findBuildErrors(lines []string) []string {
+	// Filter to actual errors (exclude go toolchain info messages)
+	var errors []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		// Skip info messages from go toolchain
+		if strings.HasPrefix(trimmed, "go: downloading") ||
+			strings.HasPrefix(trimmed, "go: extracting") ||
+			strings.HasPrefix(trimmed, "go: finding") ||
+			strings.HasPrefix(trimmed, "go: upgraded") ||
+			strings.HasPrefix(trimmed, "go: added") {
+			continue
+		}
+		errors = append(errors, trimmed)
+	}
+	return errors
+}
+
+// GetStatus implements StatusIndicator for content-aware menu icons.
+func (f *GoBuildFormatter) GetStatus(lines []string) IndicatorStatus {
+	if len(f.findBuildErrors(lines)) > 0 {
+		return IndicatorError
+	}
+	return IndicatorSuccess
 }
 
 // PlainFormatter is the fallback formatter.
