@@ -1,7 +1,6 @@
 package dashboard
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -76,9 +75,8 @@ func (f *FilesizeDashboardFormatter) Format(lines []string, width int) string {
 	var b strings.Builder
 
 	// Parse dashboard JSON
-	fullOutput := strings.Join(lines, "\n")
 	var dashboard FilesizeDashboard
-	if err := json.Unmarshal([]byte(fullOutput), &dashboard); err != nil {
+	if !decodeJSONLines(lines, &dashboard) {
 		return (&PlainFormatter{}).Format(lines, width)
 	}
 

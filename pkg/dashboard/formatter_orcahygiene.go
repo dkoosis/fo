@@ -1,7 +1,6 @@
 package dashboard
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -35,16 +34,8 @@ type OrcaHygieneIssue struct {
 func (f *OrcaHygieneFormatter) Format(lines []string, width int) string {
 	var b strings.Builder
 
-	// Find the JSON object in the output (skip any build/download messages)
-	fullOutput := strings.Join(lines, "\n")
-	jsonStart := strings.Index(fullOutput, "{")
-	if jsonStart == -1 {
-		return (&PlainFormatter{}).Format(lines, width)
-	}
-	jsonOutput := fullOutput[jsonStart:]
-
 	var report OrcaHygieneReport
-	if err := json.Unmarshal([]byte(jsonOutput), &report); err != nil {
+	if !decodeJSONLinesWithPrefix(lines, &report) {
 		return (&PlainFormatter{}).Format(lines, width)
 	}
 
@@ -126,15 +117,8 @@ func renderHygieneIssue(b *strings.Builder, issue OrcaHygieneIssue, pathStyle, m
 
 // GetStatus implements StatusIndicator for content-aware menu icons.
 func (f *OrcaHygieneFormatter) GetStatus(lines []string) IndicatorStatus {
-	fullOutput := strings.Join(lines, "\n")
-	jsonStart := strings.Index(fullOutput, "{")
-	if jsonStart == -1 {
-		return IndicatorDefault
-	}
-	jsonOutput := fullOutput[jsonStart:]
-
 	var report OrcaHygieneReport
-	if err := json.Unmarshal([]byte(jsonOutput), &report); err != nil {
+	if !decodeJSONLinesWithPrefix(lines, &report) {
 		return IndicatorDefault
 	}
 
