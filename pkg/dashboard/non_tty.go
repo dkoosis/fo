@@ -12,6 +12,13 @@ import (
 // RunNonTTY executes tasks and streams prefixed output for non-interactive environments.
 func RunNonTTY(ctx context.Context, specs []TaskSpec, out io.Writer) int {
 	tasks, updates := StartTasks(ctx, specs)
+
+	// Pre-compute which tasks prefer batch mode (suppress streaming for these)
+	prefersBatch := make([]bool, len(tasks))
+	for i, task := range tasks {
+		prefersBatch[i] = FormatterPrefersBatch(task.Spec.Command)
+	}
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -24,8 +31,11 @@ func RunNonTTY(ctx context.Context, specs []TaskSpec, out io.Writer) int {
 				task.Output = append(task.Output, update.Line)
 				task.mu.Unlock()
 
-				prefix := fmt.Sprintf("[%s/%s] ", task.Spec.Group, task.Spec.Name)
-				fmt.Fprintf(out, "%s%s\n", prefix, update.Line)
+				// Only stream raw output if formatter doesn't prefer batch mode
+				if !prefersBatch[update.Index] {
+					prefix := fmt.Sprintf("[%s/%s] ", task.Spec.Group, task.Spec.Name)
+					fmt.Fprintf(out, "%s%s\n", prefix, update.Line)
+				}
 			}
 			if update.Status == TaskSuccess || update.Status == TaskFailed {
 				task.ExitCode = update.ExitCode

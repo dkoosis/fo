@@ -7,6 +7,7 @@ var formatters = []OutputFormatter{
 	&RaceFormatter{}, // Must be before GoTestFormatter (more specific match)
 	&GoTestFormatter{},
 	&FilesizeDashboardFormatter{}, // Must be before SARIF to match dashboard format
+	&SnipeMetricsFormatter{},      // snipe BASELINE.json output
 	&KGBaselineFormatter{},        // kg-baseline.json output
 	&MCPErrorsFormatter{},         // mcp-logscan -format=dashboard output
 	&NugstatsFormatter{},          // nugstats -format=dashboard output
@@ -57,4 +58,17 @@ func GetIndicatorStatus(command string, lines []string) IndicatorStatus {
 		return si.GetStatus(lines)
 	}
 	return IndicatorDefault
+}
+
+// FormatterPrefersBatch returns true if the formatter for this command
+// prefers batch mode (output collected before formatting, no streaming).
+func FormatterPrefersBatch(command string) bool {
+	f := GetFormatter(command)
+	if f == nil {
+		return false
+	}
+	if bf, ok := f.(BatchFormatter); ok {
+		return bf.PrefersBatch()
+	}
+	return false
 }

@@ -45,3 +45,12 @@ type StatusIndicator interface {
 	// Return IndicatorDefault to use the task's exit code.
 	GetStatus(lines []string) IndicatorStatus
 }
+
+// BatchFormatter is an optional interface formatters can implement to indicate
+// they prefer batch mode (no streaming). Useful for formatters that transform
+// structured data (JSON, etc.) where streaming raw output is noise.
+type BatchFormatter interface {
+	// PrefersBatch returns true if this formatter wants output collected
+	// before formatting, rather than streamed line-by-line.
+	PrefersBatch() bool
+}
