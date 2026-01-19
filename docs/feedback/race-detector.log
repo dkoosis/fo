@@ -1,0 +1,13 @@
+ok  	github.com/dkoosis/fo/cmd/fo	2.359s
+ok  	github.com/dkoosis/fo/fo	4.002s
+ok  	github.com/dkoosis/fo/internal/config	1.150s
+?   	github.com/dkoosis/fo/internal/version	[no test files]
+ok  	github.com/dkoosis/fo/pkg/archlint	1.067s
+ok  	github.com/dkoosis/fo/pkg/dashboard	11.720s
+ok  	github.com/dkoosis/fo/pkg/design	1.755s
+ok  	github.com/dkoosis/fo/pkg/fuzz	1.445s
+ok  	github.com/dkoosis/fo/pkg/gofmt	1.126s
+ok  	github.com/dkoosis/fo/pkg/goleak	1.095s
+ok  	github.com/dkoosis/fo/pkg/nilaway	1.071s
+ok  	github.com/dkoosis/fo/pkg/racedetect	1.103s
+ok  	github.com/dkoosis/fo/pkg/sarif	2.564s
