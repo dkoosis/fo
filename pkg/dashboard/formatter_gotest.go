@@ -197,11 +197,14 @@ func handlePackageEvent(pr *pkgResult, event GoTestEvent) {
 }
 
 func recordCoverage(pr *pkgResult, output string) {
-	if !strings.HasPrefix(output, "coverage:") {
+	// Coverage lines may have leading tabs (e.g., from packages with no tests)
+	// Look for "coverage:" anywhere in the output
+	idx := strings.Index(output, "coverage:")
+	if idx == -1 {
 		return
 	}
 	var cov float64
-	_, _ = fmt.Sscanf(output, "coverage: %f%%", &cov)
+	_, _ = fmt.Sscanf(output[idx:], "coverage: %f%%", &cov)
 	if cov > 0 {
 		pr.coverage = cov
 	}

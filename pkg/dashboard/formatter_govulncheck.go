@@ -126,3 +126,30 @@ func (f *GovulncheckFormatter) Format(lines []string, width int) string {
 
 	return b.String()
 }
+
+// GetStatus implements StatusIndicator for content-aware menu icons.
+func (f *GovulncheckFormatter) GetStatus(lines []string) IndicatorStatus {
+	fullOutput := strings.Join(lines, "\n")
+
+	// Check for simple "no vulnerabilities" message (text mode)
+	if strings.Contains(fullOutput, "No vulnerabilities found") {
+		return IndicatorSuccess
+	}
+
+	// Parse NDJSON format - check if any vulnerabilities were found
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || !strings.HasPrefix(line, "{") {
+			continue
+		}
+
+		var entry struct {
+			Finding *GovulncheckVuln `json:"finding"`
+		}
+		if err := json.Unmarshal([]byte(line), &entry); err == nil && entry.Finding != nil {
+			return IndicatorError // Found at least one vulnerability
+		}
+	}
+
+	return IndicatorSuccess
+}
