@@ -156,3 +156,65 @@ func TestProcessor_ProcessOutput_When_DebugEnabled(t *testing.T) {
 	outputLines := task.GetOutputLinesSnapshot()
 	assert.Len(t, outputLines, 1)
 }
+
+func TestIsLintCheck_When_ValidCheck(t *testing.T) {
+	t.Parallel()
+
+	data := []byte(`{"$schema":"lintkit-check","tool":"filesize","status":"warn"}`)
+	assert.True(t, IsLintCheck(data))
+}
+
+func TestIsLintCheck_When_CheckWithTrailingText(t *testing.T) {
+	t.Parallel()
+
+	data := []byte(`{"$schema":"lintkit-check","tool":"test"}
+Some trailing output`)
+	assert.True(t, IsLintCheck(data))
+}
+
+func TestIsLintCheck_When_NotCheck(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		data []byte
+	}{
+		{"sarif", []byte(`{"version":"2.1.0","$schema":"https://sarif.schema"}`)},
+		{"empty object", []byte(`{}`)},
+		{"not json", []byte(`not json`)},
+		{"empty", []byte(``)},
+		{"different schema", []byte(`{"$schema":"something-else"}`)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.False(t, IsLintCheck(tt.data))
+		})
+	}
+}
+
+func TestProcessor_ProcessOutput_When_LintCheck(t *testing.T) {
+	t.Parallel()
+
+	pm := design.NewPatternMatcher(design.UnicodeVibrantTheme())
+	processor := NewProcessor(pm, 1024*1024, false)
+
+	cfg := design.UnicodeVibrantTheme()
+	task := design.NewTask("Test", "testing", "tool", []string{}, cfg)
+
+	checkData := `{
+		"$schema": "lintkit-check",
+		"tool": "filesize",
+		"status": "warn",
+		"summary": "3 red files"
+	}`
+
+	processor.ProcessOutput(task, []byte(checkData), "tool", []string{})
+
+	assert.True(t, task.IsCheck, "Expected IsCheck to be true")
+	assert.NotEmpty(t, task.CheckData, "Expected CheckData to be populated")
+
+	// Should not be classified as SARIF or TestJSON
+	assert.False(t, task.IsSARIF)
+	assert.False(t, task.IsTestJSON)
+}

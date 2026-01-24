@@ -42,6 +42,10 @@ type Task struct {
 	IsTestJSON   bool   // True if output is go test -json format
 	TestJSONData []byte // Raw test JSON data for rendering
 
+	// Lintkit-check support
+	IsCheck   bool   // True if output is lintkit-check format
+	CheckData []byte // Raw check data for rendering
+
 	// Configuration and context
 	Config  *Config
 	Context TaskContext

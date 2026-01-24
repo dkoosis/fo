@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "orca": {
-      "command": "/Users/vcto/Projects/orca/bin/orca",
-      "args": [],
-      "env": {}
-    }
-  }
-}

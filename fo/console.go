@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/dkoosis/fo/pkg/check"
 	"github.com/dkoosis/fo/pkg/design"
 	"github.com/dkoosis/fo/pkg/sarif"
 	"golang.org/x/term"
@@ -1469,6 +1470,12 @@ func (c *Console) renderCapturedOutput(task *design.Task, exitCode int, isActual
 		return
 	}
 
+	// lintkit-check output gets specialized rendering
+	if task.IsCheck && showCaptured && !isActualFoStartupFailure {
+		c.renderCheckOutput(task)
+		return
+	}
+
 	// Go test JSON output gets specialized rendering
 	if task.IsTestJSON && showCaptured && !isActualFoStartupFailure {
 		c.renderTestJSONOutput(task)
@@ -1534,6 +1541,28 @@ func (c *Console) renderSARIFOutput(task *design.Task) {
 	renderer := sarif.NewRenderer(rendererCfg, task.Config)
 
 	output := renderer.Render(doc)
+	if output != "" {
+		_, _ = c.cfg.Out.Write([]byte(output))
+	}
+}
+
+// renderCheckOutput renders lintkit-check data using the check renderer.
+func (c *Console) renderCheckOutput(task *design.Task) {
+	if len(task.CheckData) == 0 {
+		return
+	}
+
+	report, err := check.ReadBytes(task.CheckData)
+	if err != nil {
+		// Fall back to raw output on parse error
+		fmt.Fprintf(c.cfg.Out, "Check parse error: %v\n", err)
+		return
+	}
+
+	rendererCfg := check.DefaultRendererConfig()
+	renderer := check.NewRenderer(rendererCfg, task.Config)
+
+	output := renderer.Render(report)
 	if output != "" {
 		_, _ = c.cfg.Out.Write([]byte(output))
 	}

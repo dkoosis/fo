@@ -37,7 +37,7 @@ func NewProcessor(
 }
 
 // ProcessOutput processes buffered output.
-// SARIF and go test JSON formats are detected and stored for specialized rendering.
+// SARIF, go test JSON, and lintkit-check formats are detected and stored for specialized rendering.
 // Other formats go through line-by-line classification.
 func (p *Processor) ProcessOutput(
 	task *design.Task,
@@ -45,6 +45,14 @@ func (p *Processor) ProcessOutput(
 	command string,
 	args []string,
 ) {
+	// lintkit-check gets stored for specialized rendering
+	// Check this first since isSARIF would also match on $schema field
+	if IsLintCheck(output) {
+		task.IsCheck = true
+		task.CheckData = extractLintCheck(output)
+		return
+	}
+
 	// SARIF gets stored for specialized rendering - skip line-by-line
 	if isSARIF(output) {
 		// Extract just the SARIF JSON (tools may append text after it)
@@ -104,6 +112,70 @@ func isSARIF(data []byte) bool {
 
 // extractSARIF extracts just the SARIF JSON from data that may have trailing text.
 func extractSARIF(data []byte) []byte {
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 || data[0] != '{' {
+		return nil
+	}
+
+	// Find the end of the JSON object
+	depth := 0
+	for i, b := range data {
+		switch b {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return data[:i+1]
+			}
+		}
+	}
+	return nil
+}
+
+// lintCheckSchema is the schema identifier for lintkit-check format.
+const lintCheckSchema = "lintkit-check"
+
+// IsLintCheck checks if data looks like a lintkit-check document.
+// Returns true if the $schema field equals "lintkit-check".
+func IsLintCheck(data []byte) bool {
+	// Check if data starts with '{' (JSON object)
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 || data[0] != '{' {
+		return false
+	}
+
+	// Find the end of the JSON object by counting braces
+	depth := 0
+	jsonEnd := -1
+	for i, b := range data {
+		if b == '{' {
+			depth++
+		} else if b == '}' {
+			depth--
+			if depth == 0 {
+				jsonEnd = i + 1
+				break
+			}
+		}
+	}
+
+	if jsonEnd <= 0 {
+		return false
+	}
+
+	// Parse just the JSON portion
+	var probe struct {
+		Schema string `json:"$schema"`
+	}
+	if err := json.Unmarshal(data[:jsonEnd], &probe); err != nil {
+		return false
+	}
+	return probe.Schema == lintCheckSchema
+}
+
+// extractLintCheck extracts just the lintkit-check JSON from data that may have trailing text.
+func extractLintCheck(data []byte) []byte {
 	data = bytes.TrimSpace(data)
 	if len(data) == 0 || data[0] != '{' {
 		return nil
