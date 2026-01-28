@@ -109,6 +109,10 @@ func (f *GoVetFormatter) GetStatus(lines []string) IndicatorStatus {
 type GoBuildFormatter struct{}
 
 func (f *GoBuildFormatter) Matches(command string) bool {
+	// Don't match chained commands - "go build && ./binary" means we care about binary's output
+	if strings.Contains(command, "&&") {
+		return false
+	}
 	return strings.Contains(command, "go build")
 }
 

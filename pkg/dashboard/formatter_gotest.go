@@ -684,3 +684,25 @@ func averageCoverage(accum *subsystemAccumulator) float64 {
 	}
 	return accum.totalCoverage / float64(accum.coverageCount)
 }
+
+// GetStatus implements StatusIndicator for content-aware menu icons.
+// This ensures go test results are evaluated based on actual test outcomes,
+// not just exit codes (which can be confused by output parsing issues).
+func (f *GoTestFormatter) GetStatus(lines []string) IndicatorStatus {
+	packages, pkgOrder := parseGoTestEvents(lines)
+	totals := countTestTotals(packages, pkgOrder)
+
+	if totals.failed > 0 {
+		return IndicatorError
+	}
+	// If tests are still running, don't override the exit code
+	if totals.running > 0 {
+		return IndicatorDefault
+	}
+	// All tests passed or skipped
+	if totals.passed > 0 || totals.skipped > 0 {
+		return IndicatorSuccess
+	}
+	// No tests found - defer to exit code
+	return IndicatorDefault
+}
