@@ -216,6 +216,31 @@ func TestJTBD_WrapSARIFMissingToolFlag(t *testing.T) {
 	}
 }
 
+// --- Unit: parseDiagLine ---
+
+func TestParseDiagLine(t *testing.T) {
+	tests := []struct {
+		input            string
+		wantFile         string
+		wantLine, wantCol int
+		wantMsg          string
+	}{
+		{"main.go:15:3: unreachable code", "main.go", 15, 3, "unreachable code"},
+		{"pkg/util.go:42: unused variable x", "pkg/util.go", 42, 0, "unused variable x"},
+		{"pkg/handler.go", "pkg/handler.go", 0, 0, "needs formatting"},
+		{`C:\Users\dev\main.go:15:3: unreachable code`, `C:\Users\dev\main.go`, 15, 3, "unreachable code"},
+		{`D:\proj\util.go:42: unused`, `D:\proj\util.go`, 42, 0, "unused"},
+		{"not a diagnostic", "", 0, 0, ""},
+	}
+	for _, tt := range tests {
+		file, ln, col, msg := parseDiagLine(tt.input)
+		if file != tt.wantFile || ln != tt.wantLine || col != tt.wantCol || msg != tt.wantMsg {
+			t.Errorf("parseDiagLine(%q) = (%q,%d,%d,%q), want (%q,%d,%d,%q)",
+				tt.input, file, ln, col, msg, tt.wantFile, tt.wantLine, tt.wantCol, tt.wantMsg)
+		}
+	}
+}
+
 // --- JTBD: Deterministic sort order (LLM spec) ---
 
 func TestJTBD_LLMSortOrderSeverityThenFileThenLine(t *testing.T) {

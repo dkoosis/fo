@@ -214,14 +214,25 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 //  1. file.go:line:col: message
 //  2. file.go:line: message
 //  3. path/to/file.go  (file-only, e.g., gofmt -l)
+//
+// Handles Windows drive-letter prefixes (e.g. C:\path\file.go:10:5: msg).
 func parseDiagLine(line string) (file string, ln, col int, msg string) {
+	rest := line
+	var prefix string
+
+	// Strip Windows drive letter (e.g. "C:") so the colon-split works.
+	if len(rest) >= 3 && rest[1] == ':' && (rest[2] == '\\' || rest[2] == '/') {
+		prefix = rest[:2]
+		rest = rest[2:]
+	}
+
 	// Try file:line:col: message
-	parts := strings.SplitN(line, ":", 4)
+	parts := strings.SplitN(rest, ":", 4)
 	if len(parts) >= 4 {
 		var l, c int
 		if _, err := fmt.Sscanf(parts[1], "%d", &l); err == nil {
 			if _, err := fmt.Sscanf(parts[2], "%d", &c); err == nil {
-				return parts[0], l, c, strings.TrimSpace(parts[3])
+				return prefix + parts[0], l, c, strings.TrimSpace(parts[3])
 			}
 		}
 	}
@@ -230,7 +241,7 @@ func parseDiagLine(line string) (file string, ln, col int, msg string) {
 	if len(parts) >= 3 {
 		var l int
 		if _, err := fmt.Sscanf(parts[1], "%d", &l); err == nil {
-			return parts[0], l, 0, strings.TrimSpace(strings.Join(parts[2:], ":"))
+			return prefix + parts[0], l, 0, strings.TrimSpace(strings.Join(parts[2:], ":"))
 		}
 	}
 
