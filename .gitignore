@@ -40,3 +40,6 @@ visual_test_outputs/
 
 # Built binaries
 bin/
+
+# Git worktrees
+.worktrees/
