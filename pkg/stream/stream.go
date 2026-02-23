@@ -213,7 +213,7 @@ func (s *streamer) handlePkgFail(e testjson.TestEvent) {
 	}
 	s.hasFailed = true
 	total := pkg.passed + pkg.failed + pkg.skipped
-	line := fmt.Sprintf("  \u2717 %-28s %d/%d  %.1fs", pkg.short, pkg.failed, total, e.Elapsed)
+	line := fmt.Sprintf("  \u2717 %-28s %d/%d  %.1fs", pkg.short, pkg.passed, total, e.Elapsed)
 	s.tw.EraseFooter()
 	s.tw.PrintLine(s.styleLine(KindPkgFail, line))
 
@@ -325,6 +325,9 @@ func Run(ctx context.Context, r io.Reader, out io.Writer, width, height int, sty
 	})
 	if err != nil {
 		s.finish()
+		if ctx.Err() != nil {
+			return 130
+		}
 		return 2
 	}
 
