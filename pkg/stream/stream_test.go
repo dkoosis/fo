@@ -3,6 +3,7 @@ package stream
 import (
 	"bytes"
 	"context"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -181,6 +182,25 @@ func TestStreamer_Finish_PrintsSummary(t *testing.T) {
 	}
 }
 
+func TestStreamer_FailSummary_ShowsFailCount(t *testing.T) {
+	events := []testjson.TestEvent{
+		{Action: "start", Package: "example.com/pkg/x", Time: time.Now()},
+		{Action: "run", Package: "example.com/pkg/x", Test: "TestGood"},
+		{Action: "pass", Package: "example.com/pkg/x", Test: "TestGood", Elapsed: 0.01},
+		{Action: "run", Package: "example.com/pkg/x", Test: "TestBad"},
+		{Action: "fail", Package: "example.com/pkg/x", Test: "TestBad", Elapsed: 0.02},
+		{Action: "fail", Package: "example.com/pkg/x", Elapsed: 1.0},
+	}
+	out := plainOutput(runStream(t, events, 80, 24))
+
+	if !strings.Contains(out, "FAIL") {
+		t.Errorf("summary missing FAIL, got: %s", out)
+	}
+	if !strings.Contains(out, "1/2") {
+		t.Errorf("summary missing fail count '1/2', got: %s", out)
+	}
+}
+
 func TestStreamer_BoilerplateFiltered(t *testing.T) {
 	events := []testjson.TestEvent{
 		{Action: "start", Package: "example.com/pkg", Time: time.Now()},
@@ -202,5 +222,34 @@ func TestStreamer_BoilerplateFiltered(t *testing.T) {
 	}
 	if strings.Contains(out, "--- FAIL: TestFail") {
 		t.Error("'--- FAIL:' boilerplate should be filtered from flushed output")
+	}
+}
+
+func TestRun_Integration_TrixiData(t *testing.T) {
+	f, err := os.Open("testdata/gotest-pass.json")
+	if err != nil {
+		t.Skipf("testdata not available: %v", err)
+	}
+	defer f.Close()
+
+	var buf bytes.Buffer
+	exitCode := Run(context.Background(), f, &buf, 80, 24, nil)
+	if exitCode != 0 {
+		t.Errorf("exit code = %d, want 0 (all pass)", exitCode)
+	}
+	out := buf.String()
+	// Should contain test lines from multiple packages
+	if !strings.Contains(out, "embedder") {
+		t.Error("output missing 'embedder' package")
+	}
+	if !strings.Contains(out, "index") {
+		t.Error("output missing 'index' package")
+	}
+	// Should contain final summary
+	if !strings.Contains(out, "PASS") {
+		t.Error("output missing PASS summary")
+	}
+	if !strings.Contains(out, "9 packages") {
+		t.Errorf("output missing '9 packages' in summary")
 	}
 }
