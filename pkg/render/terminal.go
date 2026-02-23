@@ -99,8 +99,8 @@ func (t *Terminal) renderLeaderboard(l *pattern.Leaderboard) string {
 			sb.WriteString(t.theme.Muted.Render(fmt.Sprintf("%2d. ", item.Rank)))
 		}
 		name := item.Name
-		if len(name) > maxName {
-			name = name[:maxName-3] + "..."
+		if len([]rune(name)) > maxName {
+			name = string([]rune(name)[:maxName-3]) + "..."
 		}
 		sb.WriteString(t.theme.Primary.Render(padRight(name, maxName)))
 		sb.WriteString("  ")
@@ -139,8 +139,8 @@ func (t *Terminal) renderTestTable(tt *pattern.TestTable) string {
 		sb.WriteString(style.Render(icon + " "))
 
 		name := r.Name
-		if len(name) > maxName {
-			name = name[:maxName-3] + "..."
+		if len([]rune(name)) > maxName {
+			name = string([]rune(name)[:maxName-3]) + "..."
 		}
 		sb.WriteString(padRight(name, maxName))
 
@@ -269,6 +269,8 @@ func (t *Terminal) statusIconStyle(status string) (string, lipgloss.Style) {
 		return t.theme.Icons.Fail, t.theme.Error
 	case "skip":
 		return t.theme.Icons.Warn, t.theme.Warning
+	case "wip":
+		return t.theme.Icons.WIP, t.theme.Muted
 	default:
 		return t.theme.Icons.Info, t.theme.Muted
 	}

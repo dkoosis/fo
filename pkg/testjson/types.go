@@ -13,6 +13,9 @@ type TestEvent struct {
 	Output  string    `json:"Output"`
 }
 
+// ProcessFunc is called for each parsed event during streaming.
+type ProcessFunc func(TestEvent)
+
 // TestResult represents a single test with its status.
 type TestResult struct {
 	Name     string

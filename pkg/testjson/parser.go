@@ -2,6 +2,7 @@ package testjson
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -36,6 +37,29 @@ func ParseStream(r io.Reader) ([]TestPackageResult, error) {
 // ParseBytes is a convenience for parsing from a byte slice.
 func ParseBytes(data []byte) ([]TestPackageResult, error) {
 	return ParseStream(strings.NewReader(string(data)))
+}
+
+// Stream parses go test -json events line by line and calls fn for each one.
+// Stops on EOF or when ctx is cancelled. Malformed lines are silently skipped.
+func Stream(ctx context.Context, r io.Reader, fn ProcessFunc) error {
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	for scanner.Scan() {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+		var event TestEvent
+		if err := json.Unmarshal(line, &event); err != nil {
+			continue
+		}
+		fn(event)
+	}
+	return scanner.Err()
 }
 
 type aggregator struct {

@@ -2,7 +2,7 @@
 //
 // Usage:
 //
-//	golangci-lint run --out-format sarif ./... | fo
+//	golangci-lint run --output.sarif.path=stdout ./... | fo
 //	go test -json ./... | fo
 //	go vet ./... 2>&1 | fo wrap sarif --tool govet
 //
@@ -19,10 +19,12 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"strings"
 
 	"golang.org/x/term"
@@ -32,6 +34,7 @@ import (
 	"github.com/dkoosis/fo/pkg/pattern"
 	"github.com/dkoosis/fo/pkg/render"
 	"github.com/dkoosis/fo/pkg/sarif"
+	"github.com/dkoosis/fo/pkg/stream"
 	"github.com/dkoosis/fo/pkg/testjson"
 )
 
@@ -53,8 +56,43 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	// Read all stdin
-	input, err := io.ReadAll(stdin)
+	// Peek stdin to detect format without consuming
+	br := bufio.NewReaderSize(stdin, 8*1024)
+	peeked, _ := br.Peek(4096)
+	if len(peeked) == 0 {
+		fmt.Fprintf(stderr, "fo: no input on stdin\n")
+		return 2
+	}
+
+	format := detect.Sniff(peeked)
+
+	// Stream mode: go test -json + TTY stdout + auto format
+	isTTY := false
+	if f, ok := stdout.(*os.File); ok {
+		isTTY = term.IsTerminal(int(f.Fd()))
+	}
+
+	if format == detect.GoTestJSON && isTTY && *formatFlag == "auto" {
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer stop()
+
+		width, height := 80, 24
+		if f, ok := stdout.(*os.File); ok {
+			if w, h, err := term.GetSize(int(f.Fd())); err == nil {
+				if w > 0 {
+					width = w
+				}
+				if h > 0 {
+					height = h
+				}
+			}
+		}
+
+		return stream.Run(ctx, br, stdout, width, height, nil)
+	}
+
+	// Batch mode: read all remaining input
+	input, err := io.ReadAll(br)
 	if err != nil {
 		fmt.Fprintf(stderr, "fo: reading stdin: %v\n", err)
 		return 2
@@ -64,8 +102,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	// Detect format
-	format := detect.Sniff(input)
+	// Re-detect on full input if initial peek was inconclusive
+	if format == detect.Unknown {
+		format = detect.Sniff(input)
+	}
 
 	// Parse and map to patterns
 	var patterns []pattern.Pattern
@@ -91,8 +131,14 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	// Select renderer
-	renderer := selectRenderer(*formatFlag, *themeFlag, stdout)
+	// Validate and select renderer
+	mode := resolveFormat(*formatFlag, stdout)
+	validFormats := map[string]bool{"terminal": true, "llm": true, "json": true}
+	if !validFormats[mode] {
+		fmt.Fprintf(stderr, "fo: unknown format %q (expected auto, terminal, llm, json)\n", *formatFlag)
+		return 2
+	}
+	renderer := selectRenderer(mode, *themeFlag, stdout)
 
 	// Render and output
 	output := renderer.Render(patterns)
@@ -101,8 +147,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	return exitCode(patterns)
 }
 
-func selectRenderer(format, themeName string, w io.Writer) render.Renderer {
-	mode := resolveFormat(format, w)
+func selectRenderer(mode, themeName string, w io.Writer) render.Renderer {
 	switch mode {
 	case "json":
 		return render.NewJSON()
@@ -116,8 +161,8 @@ func selectRenderer(format, themeName string, w io.Writer) render.Renderer {
 		}
 		width := 80
 		if f, ok := w.(*os.File); ok {
-			if w, _, err := term.GetSize(int(f.Fd())); err == nil && w > 0 {
-				width = w
+			if tw, _, err := term.GetSize(int(f.Fd())); err == nil && tw > 0 {
+				width = tw
 			}
 		}
 		return render.NewTerminal(theme, width)
