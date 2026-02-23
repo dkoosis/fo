@@ -16,11 +16,12 @@ type Theme struct {
 
 // ThemeIcons defines the icon set for a theme.
 type ThemeIcons struct {
-	Pass    string
-	Fail    string
-	Warn    string
-	Info    string
-	Bullet  string
+	Pass   string
+	Fail   string
+	Warn   string
+	Info   string
+	WIP    string
+	Bullet string
 }
 
 // DefaultTheme returns a vibrant color theme.
@@ -38,6 +39,7 @@ func DefaultTheme() Theme {
 			Fail:   "✗",
 			Warn:   "⚠",
 			Info:   "●",
+			WIP:    "○",
 			Bullet: "·",
 		},
 	}
@@ -58,6 +60,7 @@ func OrcaTheme() Theme {
 			Fail:   "✗",
 			Warn:   "!",
 			Info:   "·",
+			WIP:    "○",
 			Bullet: "·",
 		},
 	}
@@ -78,6 +81,7 @@ func MonoTheme() Theme {
 			Fail:   "x",
 			Warn:   "!",
 			Info:   "*",
+			WIP:    "-",
 			Bullet: "-",
 		},
 	}
