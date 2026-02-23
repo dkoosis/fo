@@ -1,6 +1,7 @@
 package jtbd
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -31,6 +32,9 @@ func TestScan_FindsAnnotations(t *testing.T) {
 	if !ok {
 		t.Fatal("TestSave not found")
 	}
+	if save.Package != "example.com/testdata" {
+		t.Errorf("TestSave: expected package example.com/testdata, got %s", save.Package)
+	}
 	if len(save.JobIDs) != 1 || save.JobIDs[0] != "KG-P1" {
 		t.Errorf("TestSave: expected [KG-P1], got %v", save.JobIDs)
 	}
@@ -45,6 +49,39 @@ func TestScan_FindsAnnotations(t *testing.T) {
 
 	if _, ok := byFunc["TestHelper"]; ok {
 		t.Error("TestHelper should not have annotations")
+	}
+}
+
+func TestScan_SubdirectoryPackage(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	subDir := filepath.Join(tmpDir, "sub")
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	testFile := filepath.Join(subDir, "foo_test.go")
+	content := []byte(`package sub
+
+import "testing"
+
+// Serves: FOO-1
+func TestBar(t *testing.T) {}
+`)
+	if err := os.WriteFile(testFile, content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	annotations, err := Scan(tmpDir, "example.com/proj")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(annotations) != 1 {
+		t.Fatalf("expected 1 annotation, got %d", len(annotations))
+	}
+	if annotations[0].Package != "example.com/proj/sub" {
+		t.Errorf("expected package example.com/proj/sub, got %s", annotations[0].Package)
 	}
 }
 
