@@ -1,6 +1,8 @@
-.PHONY: all build test lint fmt fmt-fix vet clean lint-sarif
+.PHONY: all qa build test lint fmt fmt-fix vet clean lint-sarif
 
 all: build test lint ## Full QA pass
+
+qa: all ## Alias for all
 
 build: ## Install binary to $GOBIN
 	go install ./cmd/fo
