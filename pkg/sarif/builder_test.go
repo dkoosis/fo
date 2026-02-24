@@ -67,27 +67,6 @@ func TestBuilder_Chaining(t *testing.T) {
 	}
 }
 
-func TestIsSARIF(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-		want  bool
-	}{
-		{"valid", `{"version":"2.1.0","runs":[]}`, true},
-		{"empty", ``, false},
-		{"not json", `hello`, false},
-		{"json but not sarif", `{"name":"test"}`, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := IsSARIF([]byte(tt.input))
-			if got != tt.want {
-				t.Errorf("IsSARIF(%q) = %v, want %v", tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestNormalizePath(t *testing.T) {
 	tests := []struct {
 		input string

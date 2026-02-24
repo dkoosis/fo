@@ -27,7 +27,9 @@ func FromSARIF(doc *sarif.Document) []pattern.Pattern {
 	// 3. Issue list grouped by file
 	groups := sarif.GroupByFile(doc)
 	for _, g := range groups {
-		patterns = append(patterns, sarifFileTable(g))
+		if t := sarifFileTable(g); t != nil {
+			patterns = append(patterns, t)
+		}
 	}
 
 	return patterns

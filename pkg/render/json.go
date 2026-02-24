@@ -41,7 +41,8 @@ func (j *JSON) Render(patterns []pattern.Pattern) string {
 
 	data, err := json.MarshalIndent(out, "", "  ")
 	if err != nil {
-		return `{"error":"` + err.Error() + `"}`
+		errJSON, _ := json.Marshal(map[string]string{"error": err.Error()})
+		return string(errJSON)
 	}
 	return string(data) + "\n"
 }

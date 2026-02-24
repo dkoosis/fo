@@ -2,8 +2,8 @@
 
 all: build test lint ## Full QA pass
 
-build: ## Compile all packages
-	go build ./...
+build: ## Install binary to $GOBIN
+	go install ./cmd/fo
 
 test: ## Run tests with race detector and coverage
 	go test -race -cover ./...

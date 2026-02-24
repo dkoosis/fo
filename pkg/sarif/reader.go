@@ -5,19 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 )
-
-// ReadFile parses a SARIF file from disk.
-func ReadFile(path string) (*Document, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("open sarif file: %w", err)
-	}
-	defer f.Close()
-
-	return Read(f)
-}
 
 // Read parses SARIF from an io.Reader.
 func Read(r io.Reader) (*Document, error) {
@@ -38,20 +26,6 @@ func validateDocument(doc *Document) (*Document, error) {
 		return nil, fmt.Errorf("missing sarif version")
 	}
 	return doc, nil
-}
-
-// IsSARIF checks if data looks like a SARIF document.
-// Returns true if it's valid JSON with a SARIF version field.
-func IsSARIF(data []byte) bool {
-	var probe struct {
-		Version string `json:"version"`
-		Schema  string `json:"$schema"`
-	}
-	if err := json.Unmarshal(data, &probe); err != nil {
-		return false
-	}
-	// SARIF version is typically "2.1.0"
-	return probe.Version != "" || probe.Schema != ""
 }
 
 // Stats aggregates statistics from SARIF results.
@@ -179,28 +153,3 @@ func GroupByFile(doc *Document) []GroupedResults {
 	return groups
 }
 
-// GroupByRule organizes results by rule ID.
-func GroupByRule(doc *Document) []GroupedResults {
-	byRule := make(map[string][]Result)
-	var order []string
-
-	for _, run := range doc.Runs {
-		for _, result := range run.Results {
-			rule := result.RuleID
-			if _, seen := byRule[rule]; !seen {
-				order = append(order, rule)
-			}
-			byRule[rule] = append(byRule[rule], result)
-		}
-	}
-
-	groups := make([]GroupedResults, 0, len(byRule))
-	for _, rule := range order {
-		groups = append(groups, GroupedResults{
-			Key:     rule,
-			Results: byRule[rule],
-		})
-	}
-
-	return groups
-}

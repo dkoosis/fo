@@ -31,9 +31,5 @@ Three outputs: terminal (TTY), llm (piped), json (--format json)
 - Exit codes: 0=clean, 1=failures, 2=fo error
 - Dependencies: lipgloss + x/term only
 
-## Session Start
-1. `set_workspace /Users/vcto/Projects/fo` — auto-loads `n:boot:fo`
-2. `search_nugs({tags: ["project:fo"], limit: 10})` — project context
-
 ## Search Scope
 Skip: vendor, node_modules, build, .trash, dist, .git, .worktrees
