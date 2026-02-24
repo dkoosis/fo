@@ -56,7 +56,7 @@ func TestScan_SubdirectoryPackage(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	subDir := filepath.Join(tmpDir, "sub")
-	if err := os.MkdirAll(subDir, 0o755); err != nil {
+	if err := os.MkdirAll(subDir, 0o750); err != nil {
 		t.Fatal(err)
 	}
 

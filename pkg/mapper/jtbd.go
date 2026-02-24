@@ -55,7 +55,7 @@ func jtbdLayerTable(layer string, jobs []jtbd.JobResult) *pattern.TestTable {
 		return jobs[i].Job.ID < jobs[j].Job.ID
 	})
 
-	var items []pattern.TestTableItem
+	items := make([]pattern.TestTableItem, 0, len(jobs))
 	for _, j := range jobs {
 		status := mapJTBDStatus(j.Status)
 
@@ -66,7 +66,7 @@ func jtbdLayerTable(layer string, jobs []jtbd.JobResult) *pattern.TestTable {
 		}
 
 		if j.Total > 0 {
-			var names []string
+			names := make([]string, 0, len(j.Tests))
 			for _, t := range j.Tests {
 				name := shortJTBDFuncName(t.FuncName)
 				if t.Status == "fail" {

@@ -7,6 +7,11 @@ import (
 	"github.com/dkoosis/fo/pkg/pattern"
 )
 
+const (
+	statusPass = "pass"
+	statusFail = "fail"
+)
+
 func TestFromJTBD_ProducesPatterns(t *testing.T) {
 	report := &jtbd.Report{
 		Total: 3, Running: 1, Broken: 1, WIP: 1,
@@ -15,16 +20,16 @@ func TestFromJTBD_ProducesPatterns(t *testing.T) {
 				Job:    jtbd.Job{ID: "KG-P1", Layer: "Plumbing", Statement: "save"},
 				Status: "running", Passed: 2, Total: 2,
 				Tests: []jtbd.TestOutcome{
-					{FuncName: "TestSave", Status: "pass"},
-					{FuncName: "TestGet", Status: "pass"},
+					{FuncName: "TestSave", Status: statusPass},
+					{FuncName: "TestGet", Status: statusPass},
 				},
 			},
 			{
 				Job:    jtbd.Job{ID: "KG-P2", Layer: "Plumbing", Statement: "search"},
 				Status: "broken", Passed: 1, Failed: 1, Total: 2,
 				Tests: []jtbd.TestOutcome{
-					{FuncName: "TestSearch", Status: "pass"},
-					{FuncName: "TestPrefix", Status: "fail"},
+					{FuncName: "TestSearch", Status: statusPass},
+					{FuncName: "TestPrefix", Status: statusFail},
 				},
 			},
 			{
@@ -56,10 +61,10 @@ func TestFromJTBD_ProducesPatterns(t *testing.T) {
 	if len(plumbing.Results) != 2 {
 		t.Errorf("expected 2 plumbing items, got %d", len(plumbing.Results))
 	}
-	if plumbing.Results[0].Status != "pass" {
+	if plumbing.Results[0].Status != statusPass {
 		t.Errorf("KG-P1 should be pass, got %s", plumbing.Results[0].Status)
 	}
-	if plumbing.Results[1].Status != "fail" {
+	if plumbing.Results[1].Status != statusFail {
 		t.Errorf("KG-P2 should be fail, got %s", plumbing.Results[1].Status)
 	}
 

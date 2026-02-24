@@ -116,7 +116,7 @@ func (a *aggregator) processEvent(e TestEvent) {
 	pkg := a.getOrCreate(e.Package)
 
 	switch e.Action {
-	case "pass":
+	case StatusPass:
 		if e.Test != "" {
 			pkg.passed++
 			ts := pkg.getOrCreateTest(e.Test)
@@ -126,7 +126,7 @@ func (a *aggregator) processEvent(e TestEvent) {
 			pkg.duration = time.Duration(e.Elapsed * float64(time.Second))
 		}
 
-	case "fail":
+	case StatusFail:
 		if e.Test != "" {
 			pkg.failed++
 			ts := pkg.getOrCreateTest(e.Test)
@@ -142,7 +142,7 @@ func (a *aggregator) processEvent(e TestEvent) {
 			}
 		}
 
-	case "skip":
+	case StatusSkip:
 		if e.Test != "" {
 			pkg.skipped++
 			ts := pkg.getOrCreateTest(e.Test)

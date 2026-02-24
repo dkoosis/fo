@@ -2,6 +2,7 @@ package testjson
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -55,11 +56,11 @@ func TestStream_RespectsContextCancellation(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var count int
-	err := Stream(ctx, strings.NewReader(input), func(e TestEvent) {
+	err := Stream(ctx, strings.NewReader(input), func(_ TestEvent) {
 		count++
 		cancel()
 	})
-	if err != nil && err != context.Canceled {
+	if err != nil && !errors.Is(err, context.Canceled) {
 		t.Fatalf("Stream() unexpected error: %v", err)
 	}
 	if count != 1 {

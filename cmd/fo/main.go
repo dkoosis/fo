@@ -67,84 +67,104 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	format := detect.Sniff(peeked)
 
 	// Stream mode: go test -json + TTY stdout + auto format
-	isTTY := false
-	if f, ok := stdout.(*os.File); ok {
-		isTTY = term.IsTerminal(int(f.Fd()))
+	if format == detect.GoTestJSON && isTTYWriter(stdout) && *formatFlag == "auto" {
+		return runStream(br, stdout)
 	}
 
-	if format == detect.GoTestJSON && isTTY && *formatFlag == "auto" {
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer stop()
+	// Batch mode
+	patterns, code := runBatch(br, format, *formatFlag, *themeFlag, stdout, stderr)
+	if code >= 0 {
+		return code
+	}
 
-		width, height := 80, 24
-		if f, ok := stdout.(*os.File); ok {
-			if w, h, err := term.GetSize(int(f.Fd())); err == nil {
-				if w > 0 {
-					width = w
-				}
-				if h > 0 {
-					height = h
-				}
+	output := selectRenderer(resolveFormat(*formatFlag, stdout), *themeFlag, stdout).Render(patterns)
+	fmt.Fprint(stdout, output)
+	return exitCode(patterns)
+}
+
+// isTTYWriter reports whether w is a terminal.
+func isTTYWriter(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	return ok && term.IsTerminal(int(f.Fd()))
+}
+
+// termSize returns the terminal dimensions for w, defaulting to 80x24.
+func termSize(w io.Writer) (width, height int) {
+	width, height = 80, 24
+	if f, ok := w.(*os.File); ok {
+		if tw, th, err := term.GetSize(int(f.Fd())); err == nil {
+			if tw > 0 {
+				width = tw
+			}
+			if th > 0 {
+				height = th
 			}
 		}
-
-		return stream.Run(ctx, br, stdout, width, height, nil)
 	}
+	return width, height
+}
 
-	// Batch mode: read all remaining input
+// runStream handles the live streaming path (go test -json + TTY).
+func runStream(br *bufio.Reader, stdout io.Writer) int {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	width, height := termSize(stdout)
+	return stream.Run(ctx, br, stdout, width, height, nil)
+}
+
+// runBatch reads, detects, parses, and validates input in batch mode.
+// Returns (patterns, -1) on success; (nil, exitCode) on error.
+func runBatch(br *bufio.Reader, format detect.Format, formatFlag, themeFlag string, stdout, stderr io.Writer) ([]pattern.Pattern, int) {
 	input, err := io.ReadAll(br)
 	if err != nil {
 		fmt.Fprintf(stderr, "fo: reading stdin: %v\n", err)
-		return 2
+		return nil, 2
 	}
 	if len(input) == 0 {
 		fmt.Fprintf(stderr, "fo: no input on stdin\n")
-		return 2
+		return nil, 2
 	}
-
-	// Re-detect on full input if initial peek was inconclusive
 	if format == detect.Unknown {
 		format = detect.Sniff(input)
 	}
 
-	// Parse and map to patterns
-	var patterns []pattern.Pattern
-	switch format {
-	case detect.SARIF:
-		doc, parseErr := sarif.ReadBytes(input)
-		if parseErr != nil {
-			fmt.Fprintf(stderr, "fo: parsing SARIF: %v\n", parseErr)
-			return 2
-		}
-		patterns = mapper.FromSARIF(doc)
-
-	case detect.GoTestJSON:
-		results, parseErr := testjson.ParseBytes(input)
-		if parseErr != nil {
-			fmt.Fprintf(stderr, "fo: parsing go test -json: %v\n", parseErr)
-			return 2
-		}
-		patterns = mapper.FromTestJSON(results)
-
-	default:
-		fmt.Fprintf(stderr, "fo: unrecognized input format (expected SARIF or go test -json)\n")
-		return 2
+	patterns, parseCode := parseInput(format, input, stderr)
+	if parseCode >= 0 {
+		return nil, parseCode
 	}
 
-	// Validate and select renderer
-	mode := resolveFormat(*formatFlag, stdout)
+	mode := resolveFormat(formatFlag, stdout)
 	validFormats := map[string]bool{"terminal": true, "llm": true, "json": true}
 	if !validFormats[mode] {
-		fmt.Fprintf(stderr, "fo: unknown format %q (expected auto, terminal, llm, json)\n", *formatFlag)
-		return 2
+		fmt.Fprintf(stderr, "fo: unknown format %q (expected auto, terminal, llm, json)\n", formatFlag)
+		return nil, 2
 	}
-	renderer := selectRenderer(mode, *themeFlag, stdout)
+	_ = themeFlag // consumed by caller via selectRenderer
+	return patterns, -1
+}
 
-	// Render and output
-	output := renderer.Render(patterns)
-	fmt.Fprint(stdout, output)
-
-	return exitCode(patterns)
+// parseInput parses raw bytes according to the detected format.
+// Returns (patterns, -1) on success; (nil, exitCode) on error.
+func parseInput(format detect.Format, input []byte, stderr io.Writer) ([]pattern.Pattern, int) {
+	switch format {
+	case detect.SARIF:
+		doc, err := sarif.ReadBytes(input)
+		if err != nil {
+			fmt.Fprintf(stderr, "fo: parsing SARIF: %v\n", err)
+			return nil, 2
+		}
+		return mapper.FromSARIF(doc), -1
+	case detect.GoTestJSON:
+		results, err := testjson.ParseBytes(input)
+		if err != nil {
+			fmt.Fprintf(stderr, "fo: parsing go test -json: %v\n", err)
+			return nil, 2
+		}
+		return mapper.FromTestJSON(results), -1
+	default:
+		fmt.Fprintf(stderr, "fo: unrecognized input format (expected SARIF or go test -json)\n")
+		return nil, 2
+	}
 }
 
 func selectRenderer(mode, themeName string, w io.Writer) render.Renderer {

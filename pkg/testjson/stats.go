@@ -27,7 +27,7 @@ func ComputeStats(results []TestPackageResult) Stats {
 		if r.Duration > s.Duration {
 			s.Duration = r.Duration
 		}
-		if r.Status() == "fail" {
+		if r.Status() == StatusFail {
 			s.FailedPkgs++
 		}
 		if r.BuildError != "" {

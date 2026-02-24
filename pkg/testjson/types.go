@@ -3,6 +3,13 @@ package testjson
 
 import "time"
 
+// Status values returned by TestPackageResult.Status and TestResult.Status.
+const (
+	StatusPass = "pass"
+	StatusFail = "fail"
+	StatusSkip = "skip"
+)
+
 // TestEvent represents a single event from go test -json output.
 type TestEvent struct {
 	Time    time.Time `json:"Time"`
@@ -50,13 +57,13 @@ func (r *TestPackageResult) TotalTests() int {
 	return r.Passed + r.Failed + r.Skipped
 }
 
-// Status returns "pass", "fail", or "skip" for the package.
+// Status returns StatusPass, StatusFail, or StatusSkip for the package.
 func (r *TestPackageResult) Status() string {
 	if r.BuildError != "" || r.Panicked || r.Failed > 0 {
-		return "fail"
+		return StatusFail
 	}
 	if r.Passed == 0 && r.Skipped > 0 {
-		return "skip"
+		return StatusSkip
 	}
-	return "pass"
+	return StatusPass
 }
