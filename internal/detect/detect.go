@@ -3,6 +3,7 @@ package detect
 
 import (
 	"encoding/json"
+	"regexp"
 )
 
 // Format represents a recognized input format.
@@ -12,6 +13,11 @@ const (
 	Unknown    Format = iota
 	SARIF             // SARIF 2.1.0 JSON document
 	GoTestJSON        // go test -json NDJSON stream
+	Report            // Delimited multi-tool report
+)
+
+var reportDelimiterRe = regexp.MustCompile(
+	`^--- tool:\w[\w-]* format:(sarif|testjson|text|metrics|archlint|jscpd)(?: status:(pass|fail))? ---$`,
 )
 
 // Sniff examines the first bytes of input to determine format.
@@ -25,7 +31,12 @@ func Sniff(data []byte) Format {
 		return Unknown
 	}
 
-	// Must start with '{' for either format
+	// Check for report delimiter before requiring '{' — reports start with '---'
+	if firstLine := extractFirstLine(data); reportDelimiterRe.Match(firstLine) {
+		return Report
+	}
+
+	// Must start with '{' for SARIF or go test -json
 	if data[0] != '{' {
 		return Unknown
 	}
@@ -77,4 +88,13 @@ func isGoTestJSON(data []byte) bool {
 		"pass": true, "bench": true, "fail": true, "output": true, "skip": true,
 	}
 	return validActions[event.Action]
+}
+
+func extractFirstLine(data []byte) []byte {
+	for i, b := range data {
+		if b == '\n' || b == '\r' {
+			return data[:i]
+		}
+	}
+	return data
 }
