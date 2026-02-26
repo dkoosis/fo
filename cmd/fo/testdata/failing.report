@@ -1,0 +1,11 @@
+--- tool:vet format:sarif ---
+{"version":"2.1.0","$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json","runs":[{"tool":{"driver":{"name":"govet","rules":[]}},"results":[]}]}
+--- tool:lint format:sarif ---
+{"version":"2.1.0","$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json","runs":[{"tool":{"driver":{"name":"golangci-lint"}},"results":[{"ruleId":"errcheck","level":"error","message":{"text":"error return value not checked"},"locations":[{"physicalLocation":{"artifactLocation":{"uri":"internal/store/store.go"},"region":{"startLine":42,"startColumn":5}}}]}]}]}
+--- tool:test format:testjson ---
+{"Time":"2024-01-01T00:00:00Z","Action":"run","Package":"example.com/pkg","Test":"TestParser"}
+{"Time":"2024-01-01T00:00:00Z","Action":"output","Package":"example.com/pkg","Test":"TestParser","Output":"    parser_test.go:20: expected nil, got error: unexpected token\n"}
+{"Time":"2024-01-01T00:00:01Z","Action":"fail","Package":"example.com/pkg","Test":"TestParser","Elapsed":0.02}
+{"Time":"2024-01-01T00:00:01Z","Action":"fail","Package":"example.com/pkg","Elapsed":0.5}
+--- tool:arch format:text status:pass ---
+OK

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 )
@@ -330,6 +331,51 @@ func TestJTBD_PanicsSurfaceFirst(t *testing.T) {
 	}
 	if panicIdx > passIdx {
 		t.Error("PANIC should appear before Passing packages")
+	}
+}
+
+// --- Report format integration tests ---
+
+func TestRun_ReportClean(t *testing.T) {
+	input, err := os.ReadFile("testdata/clean.report")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "llm"}, bytes.NewReader(input), &stdout, &stderr)
+	if code != 0 {
+		t.Errorf("clean report exit code = %d, want 0; stderr: %s", code, stderr.String())
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "all pass") {
+		t.Errorf("expected 'all pass' in output:\n%s", out)
+	}
+}
+
+func TestRun_ReportFailing(t *testing.T) {
+	input, err := os.ReadFile("testdata/failing.report")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "llm"}, bytes.NewReader(input), &stdout, &stderr)
+	if code != 1 {
+		t.Errorf("failing report exit code = %d, want 1; stderr: %s", code, stderr.String())
+	}
+}
+
+func TestRun_ReportJSON(t *testing.T) {
+	input, err := os.ReadFile("testdata/clean.report")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "json"}, bytes.NewReader(input), &stdout, &stderr)
+	if code != 0 {
+		t.Errorf("JSON report exit code = %d, want 0; stderr: %s", code, stderr.String())
+	}
+	if !strings.HasPrefix(strings.TrimSpace(stdout.String()), "{") {
+		t.Errorf("expected JSON output, got:\n%s", stdout.String())
 	}
 }
 
