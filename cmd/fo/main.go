@@ -33,6 +33,7 @@ import (
 	"github.com/dkoosis/fo/pkg/mapper"
 	"github.com/dkoosis/fo/pkg/pattern"
 	"github.com/dkoosis/fo/pkg/render"
+	"github.com/dkoosis/fo/pkg/report"
 	"github.com/dkoosis/fo/pkg/sarif"
 	"github.com/dkoosis/fo/pkg/stream"
 	"github.com/dkoosis/fo/pkg/testjson"
@@ -161,8 +162,20 @@ func parseInput(format detect.Format, input []byte, stderr io.Writer) ([]pattern
 			return nil, 2
 		}
 		return mapper.FromTestJSON(results), -1
+	case detect.Report:
+		sections, err := report.Parse(input)
+		if err != nil {
+			fmt.Fprintf(stderr, "fo: parsing report: %v\n", err)
+			return nil, 2
+		}
+		patterns, mapErr := mapper.FromReport(sections)
+		if mapErr != nil {
+			fmt.Fprintf(stderr, "fo: mapping report: %v\n", mapErr)
+			return nil, 2
+		}
+		return patterns, -1
 	default:
-		fmt.Fprintf(stderr, "fo: unrecognized input format (expected SARIF or go test -json)\n")
+		fmt.Fprintf(stderr, "fo: unrecognized input format (expected SARIF, go test -json, or report)\n")
 		return nil, 2
 	}
 }

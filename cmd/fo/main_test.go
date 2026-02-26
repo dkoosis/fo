@@ -216,6 +216,22 @@ func TestJTBD_WrapSARIFMissingToolFlag(t *testing.T) {
 	}
 }
 
+// --- Report format tests ---
+
+func TestRun_ReportFormat(t *testing.T) {
+	input := "--- tool:vet format:sarif ---\n" +
+		`{"version":"2.1.0","$schema":"...","runs":[{"tool":{"driver":{"name":"govet"}},"results":[]}]}` + "\n" +
+		"--- tool:arch format:text status:pass ---\nAll checks passed.\n"
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "llm"}, strings.NewReader(input), &stdout, &stderr)
+	if code != 0 {
+		t.Errorf("exit code = %d, want 0; stderr: %s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "REPORT:") {
+		t.Errorf("output should contain REPORT header, got:\n%s", stdout.String())
+	}
+}
+
 // --- Unit: parseDiagLine ---
 
 func TestParseDiagLine(t *testing.T) {
