@@ -4,7 +4,7 @@ package detect
 import (
 	"encoding/json"
 
-	"github.com/dkoosis/fo/pkg/report"
+	"github.com/dkoosis/fo/internal/report"
 )
 
 // Format represents a recognized input format.

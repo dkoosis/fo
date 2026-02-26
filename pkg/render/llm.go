@@ -25,6 +25,7 @@ func (l *LLM) Render(patterns []pattern.Pattern) string {
 	// Separate by type to build appropriate output
 	var summaries []*pattern.Summary
 	var tables []*pattern.TestTable
+	var errors []*pattern.Error
 
 	for _, p := range patterns {
 		switch v := p.(type) {
@@ -32,6 +33,8 @@ func (l *LLM) Render(patterns []pattern.Pattern) string {
 			summaries = append(summaries, v)
 		case *pattern.TestTable:
 			tables = append(tables, v)
+		case *pattern.Error:
+			errors = append(errors, v)
 		}
 	}
 
@@ -39,7 +42,7 @@ func (l *LLM) Render(patterns []pattern.Pattern) string {
 	for _, s := range summaries {
 		switch s.Kind {
 		case pattern.SummaryKindReport:
-			return l.renderReport(summaries, tables)
+			return l.renderReport(summaries, tables, errors)
 		case pattern.SummaryKindTest:
 			return l.renderTestOutput(summaries, tables)
 		case pattern.SummaryKindSARIF:
@@ -49,7 +52,7 @@ func (l *LLM) Render(patterns []pattern.Pattern) string {
 	return l.renderSARIFOutput(tables)
 }
 
-func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestTable) string {
+func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestTable, errors []*pattern.Error) string {
 	var sb strings.Builder
 
 	var reportSummary *pattern.Summary
@@ -65,7 +68,7 @@ func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestT
 
 	sb.WriteString(reportSummary.Label + "\n")
 
-	// Build a map of tables by tool name prefix
+	// Build maps by tool name prefix
 	tablesByTool := make(map[string][]*pattern.TestTable)
 	for _, t := range tables {
 		for _, m := range reportSummary.Metrics {
@@ -74,9 +77,18 @@ func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestT
 			}
 		}
 	}
+	errorsByTool := make(map[string][]*pattern.Error)
+	for _, e := range errors {
+		errorsByTool[e.Source] = append(errorsByTool[e.Source], e)
+	}
 
 	for _, m := range reportSummary.Metrics {
 		sb.WriteString("\n" + m.Label + ": " + m.Value + "\n")
+
+		// Render parse errors for this tool
+		for _, e := range errorsByTool[m.Label] {
+			sb.WriteString("  ERROR: " + e.Message + "\n")
+		}
 
 		for _, t := range tablesByTool[m.Label] {
 			sb.WriteString("\n")

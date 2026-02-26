@@ -33,7 +33,7 @@ import (
 	"github.com/dkoosis/fo/pkg/mapper"
 	"github.com/dkoosis/fo/pkg/pattern"
 	"github.com/dkoosis/fo/pkg/render"
-	"github.com/dkoosis/fo/pkg/report"
+	"github.com/dkoosis/fo/internal/report"
 	"github.com/dkoosis/fo/pkg/sarif"
 	"github.com/dkoosis/fo/pkg/stream"
 	"github.com/dkoosis/fo/pkg/testjson"
@@ -216,6 +216,8 @@ func resolveFormat(format string, w io.Writer) string {
 }
 
 // exitCode returns 0 for clean, 1 for failures present.
+// Failures propagate through TestTable fail items (real failures) or Error
+// patterns (parse failures). Summary is display-only, not a decision input.
 func exitCode(patterns []pattern.Pattern) int {
 	for _, p := range patterns {
 		switch v := p.(type) {
@@ -225,12 +227,9 @@ func exitCode(patterns []pattern.Pattern) int {
 					return 1
 				}
 			}
-		case *pattern.Summary:
-			for _, m := range v.Metrics {
-				if m.Kind == "error" {
-					return 1
-				}
-			}
+		case *pattern.Error:
+			_ = v
+			return 1
 		}
 	}
 	return 0

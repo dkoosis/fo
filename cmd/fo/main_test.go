@@ -221,7 +221,7 @@ func TestJTBD_WrapSARIFMissingToolFlag(t *testing.T) {
 
 func TestRun_ReportFormat(t *testing.T) {
 	input := "--- tool:vet format:sarif ---\n" +
-		`{"version":"2.1.0","$schema":"...","runs":[{"tool":{"driver":{"name":"govet"}},"results":[]}]}` + "\n" +
+		`{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"govet"}},"results":[]}]}` + "\n" +
 		"--- tool:arch format:text status:pass ---\nAll checks passed.\n"
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"--format", "llm"}, strings.NewReader(input), &stdout, &stderr)
@@ -390,9 +390,9 @@ func TestRun_ReportBrokenSection(t *testing.T) {
 		t.Errorf("broken section report exit code = %d, want 1; stderr: %s", code, stderr.String())
 	}
 	out := stdout.String()
-	// Broken lint section should surface as error
-	if !strings.Contains(out, "parse error") {
-		t.Errorf("expected 'parse error' for broken section in output:\n%s", out)
+	// Broken lint section should surface as a visible error
+	if !strings.Contains(out, "ERROR:") {
+		t.Errorf("expected 'ERROR:' for broken section in output:\n%s", out)
 	}
 	// Valid test section should still render
 	if !strings.Contains(out, "test:") {

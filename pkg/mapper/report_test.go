@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dkoosis/fo/internal/report"
 	"github.com/dkoosis/fo/pkg/pattern"
-	"github.com/dkoosis/fo/pkg/report"
 )
 
 func TestFromReport_TextPassSection(t *testing.T) {
@@ -23,13 +23,17 @@ func TestFromReport_TextPassSection(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected Summary, got %T", patterns[0])
 	}
+	if sum.Kind != pattern.SummaryKindReport {
+		t.Errorf("expected report kind, got %q", sum.Kind)
+	}
 	if sum.Metrics[0].Kind != "success" {
 		t.Errorf("expected success kind, got %q", sum.Metrics[0].Kind)
 	}
 }
 
 func TestFromReport_SARIFSection(t *testing.T) {
-	sarifDoc := `{"version":"2.1.0","$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json","runs":[{"tool":{"driver":{"name":"govet","rules":[]}},"results":[]}]}`
+	// Minimal valid SARIF — tests mapper logic, not SARIF parser edge cases
+	sarifDoc := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"govet"}},"results":[]}]}`
 	sections := []report.Section{
 		{Tool: "vet", Format: "sarif", Content: []byte(sarifDoc)},
 	}
@@ -37,12 +41,20 @@ func TestFromReport_SARIFSection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(patterns) == 0 {
-		t.Fatal("expected patterns")
+	// Should produce a Summary (report header) + whatever SARIF patterns
+	sum, ok := patterns[0].(*pattern.Summary)
+	if !ok {
+		t.Fatalf("expected Summary, got %T", patterns[0])
+	}
+	if sum.Metrics[0].Label != "vet" {
+		t.Errorf("expected tool label 'vet', got %q", sum.Metrics[0].Label)
+	}
+	if sum.Metrics[0].Kind != "success" {
+		t.Errorf("clean SARIF should be success, got %q", sum.Metrics[0].Kind)
 	}
 }
 
-func TestFromReport_MalformedSectionReportsError(t *testing.T) {
+func TestFromReport_MalformedSectionEmitsError(t *testing.T) {
 	sections := []report.Section{
 		{Tool: "lint", Format: "sarif", Content: []byte("not valid json{{{")},
 	}
@@ -50,17 +62,28 @@ func TestFromReport_MalformedSectionReportsError(t *testing.T) {
 	if err != nil {
 		t.Fatal("FromReport should not return top-level error for section failures")
 	}
-	sum, ok := patterns[0].(*pattern.Summary)
-	if !ok {
-		t.Fatalf("expected Summary, got %T", patterns[0])
-	}
+	// Summary should mark the section as error
+	sum := patterns[0].(*pattern.Summary)
 	if sum.Metrics[0].Kind != "error" {
 		t.Errorf("malformed section should be marked error, got %q", sum.Metrics[0].Kind)
+	}
+	// Should contain an Error pattern (not a TestTable)
+	var foundError bool
+	for _, p := range patterns {
+		if e, ok := p.(*pattern.Error); ok {
+			foundError = true
+			if e.Source != "lint" {
+				t.Errorf("error source = %q, want 'lint'", e.Source)
+			}
+		}
+	}
+	if !foundError {
+		t.Error("expected Error pattern for malformed section")
 	}
 }
 
 func TestFromReport_MultiSection(t *testing.T) {
-	sarifDoc := `{"version":"2.1.0","$schema":"...","runs":[{"tool":{"driver":{"name":"govet"}},"results":[]}]}`
+	sarifDoc := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"govet"}},"results":[]}]}`
 	sections := []report.Section{
 		{Tool: "vet", Format: "sarif", Content: []byte(sarifDoc)},
 		{Tool: "arch", Format: "text", Status: "pass", Content: []byte("OK")},

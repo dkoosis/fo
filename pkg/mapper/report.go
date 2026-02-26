@@ -8,7 +8,7 @@ import (
 	"github.com/dkoosis/fo/internal/jscpd"
 	"github.com/dkoosis/fo/internal/metrics"
 	"github.com/dkoosis/fo/pkg/pattern"
-	"github.com/dkoosis/fo/pkg/report"
+	"github.com/dkoosis/fo/internal/report"
 	"github.com/dkoosis/fo/pkg/sarif"
 	"github.com/dkoosis/fo/pkg/testjson"
 )
@@ -89,12 +89,7 @@ func mapSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 // sectionError emits a visible error pattern for a section that failed to parse.
 func sectionError(tool string, err error) []pattern.Pattern {
 	return []pattern.Pattern{
-		&pattern.TestTable{
-			Label: tool + " errors",
-			Results: []pattern.TestTableItem{
-				{Name: "parse error", Status: "fail", Details: err.Error()},
-			},
-		},
+		&pattern.Error{Source: tool, Message: err.Error()},
 	}
 }
 
