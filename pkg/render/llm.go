@@ -35,19 +35,87 @@ func (l *LLM) Render(patterns []pattern.Pattern) string {
 		}
 	}
 
-	// Detect if this is test output or SARIF based on summary label
+	// TODO: replace string-prefix dispatch with Summary.Kind field
+	isReport := false
 	isTestOutput := false
 	for _, s := range summaries {
+		if strings.HasPrefix(s.Label, "REPORT:") {
+			isReport = true
+			break
+		}
 		if strings.HasPrefix(s.Label, "PASS") || strings.HasPrefix(s.Label, "FAIL") {
 			isTestOutput = true
-			break
 		}
 	}
 
+	if isReport {
+		return l.renderReport(summaries, tables)
+	}
 	if isTestOutput {
 		return l.renderTestOutput(summaries, tables)
 	}
 	return l.renderSARIFOutput(tables)
+}
+
+func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestTable) string {
+	var sb strings.Builder
+
+	var reportSummary *pattern.Summary
+	for _, s := range summaries {
+		if strings.HasPrefix(s.Label, "REPORT:") {
+			reportSummary = s
+			break
+		}
+	}
+	if reportSummary == nil {
+		return ""
+	}
+
+	sb.WriteString(reportSummary.Label + "\n")
+
+	// Build a map of tables by tool name prefix
+	tablesByTool := make(map[string][]*pattern.TestTable)
+	for _, t := range tables {
+		for _, m := range reportSummary.Metrics {
+			if strings.HasPrefix(t.Label, m.Label) {
+				tablesByTool[m.Label] = append(tablesByTool[m.Label], t)
+			}
+		}
+	}
+
+	for _, m := range reportSummary.Metrics {
+		sb.WriteString("\n" + m.Label + ": " + m.Value + "\n")
+
+		for _, t := range tablesByTool[m.Label] {
+			sb.WriteString("\n")
+			for _, item := range t.Results {
+				prefix := "  "
+				if item.Status == statusFail {
+					prefix = "  FAIL "
+				}
+				sb.WriteString(prefix + item.Name)
+				if item.Duration != "" {
+					sb.WriteString(" (" + item.Duration + ")")
+				}
+				sb.WriteString("\n")
+				if item.Details != "" {
+					lines := strings.Split(item.Details, "\n")
+					max := 3
+					if len(lines) < max {
+						max = len(lines)
+					}
+					for _, line := range lines[:max] {
+						sb.WriteString("    " + line + "\n")
+					}
+					if len(lines) > 3 {
+						sb.WriteString(fmt.Sprintf("    ... (%d more lines)\n", len(lines)-3))
+					}
+				}
+			}
+		}
+	}
+
+	return sb.String()
 }
 
 func (l *LLM) renderSARIFOutput(tables []*pattern.TestTable) string {
