@@ -6,7 +6,9 @@ import (
 	"regexp"
 )
 
-var delimiterRe = regexp.MustCompile(
+// DelimiterRe matches report section delimiter lines.
+// Canonical regex — used by both the section parser and format detection.
+var DelimiterRe = regexp.MustCompile(
 	`^--- tool:(\w[\w-]*) format:(sarif|testjson|text|metrics|archlint|jscpd)(?: status:(pass|fail))? ---$`,
 )
 
@@ -26,7 +28,7 @@ func Parse(data []byte) ([]Section, error) {
 	var current *Section
 
 	for _, line := range lines {
-		if m := delimiterRe.FindSubmatch(line); m != nil {
+		if m := DelimiterRe.FindSubmatch(line); m != nil {
 			if current != nil {
 				current.Content = trimTrailingNewline(current.Content)
 				sections = append(sections, *current)

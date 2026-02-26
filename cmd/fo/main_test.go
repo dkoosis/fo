@@ -379,6 +379,52 @@ func TestRun_ReportJSON(t *testing.T) {
 	}
 }
 
+func TestRun_ReportBrokenSection(t *testing.T) {
+	input, err := os.ReadFile("testdata/broken-section.report")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "llm"}, bytes.NewReader(input), &stdout, &stderr)
+	if code != 1 {
+		t.Errorf("broken section report exit code = %d, want 1; stderr: %s", code, stderr.String())
+	}
+	out := stdout.String()
+	// Broken lint section should surface as error
+	if !strings.Contains(out, "parse error") {
+		t.Errorf("expected 'parse error' for broken section in output:\n%s", out)
+	}
+	// Valid test section should still render
+	if !strings.Contains(out, "test:") {
+		t.Errorf("expected valid test section to still render:\n%s", out)
+	}
+}
+
+func TestRun_ReportFullFormats(t *testing.T) {
+	input, err := os.ReadFile("testdata/full.report")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "llm"}, bytes.NewReader(input), &stdout, &stderr)
+	if code != 0 {
+		t.Errorf("full report exit code = %d, want 0; stderr: %s", code, stderr.String())
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "7 tools") {
+		t.Errorf("expected '7 tools' in output:\n%s", out)
+	}
+	if !strings.Contains(out, "all pass") {
+		t.Errorf("expected 'all pass' in output:\n%s", out)
+	}
+	// Verify each tool appears in output
+	for _, tool := range []string{"vet:", "lint:", "test:", "eval:", "vuln:", "arch:", "dupl:"} {
+		if !strings.Contains(out, tool) {
+			t.Errorf("expected tool %q in output:\n%s", tool, out)
+		}
+	}
+}
+
 // --- JTBD: Multi-run SARIF (multiple tools in one document) ---
 
 func TestJTBD_MultiRunSARIF(t *testing.T) {

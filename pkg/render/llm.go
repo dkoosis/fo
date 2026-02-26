@@ -35,24 +35,16 @@ func (l *LLM) Render(patterns []pattern.Pattern) string {
 		}
 	}
 
-	// TODO: replace string-prefix dispatch with Summary.Kind field
-	isReport := false
-	isTestOutput := false
+	// Dispatch on Summary.Kind
 	for _, s := range summaries {
-		if strings.HasPrefix(s.Label, "REPORT:") {
-			isReport = true
-			break
+		switch s.Kind {
+		case pattern.SummaryKindReport:
+			return l.renderReport(summaries, tables)
+		case pattern.SummaryKindTest:
+			return l.renderTestOutput(summaries, tables)
+		case pattern.SummaryKindSARIF:
+			return l.renderSARIFOutput(tables)
 		}
-		if strings.HasPrefix(s.Label, "PASS") || strings.HasPrefix(s.Label, "FAIL") {
-			isTestOutput = true
-		}
-	}
-
-	if isReport {
-		return l.renderReport(summaries, tables)
-	}
-	if isTestOutput {
-		return l.renderTestOutput(summaries, tables)
 	}
 	return l.renderSARIFOutput(tables)
 }
@@ -62,7 +54,7 @@ func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestT
 
 	var reportSummary *pattern.Summary
 	for _, s := range summaries {
-		if strings.HasPrefix(s.Label, "REPORT:") {
+		if s.Kind == pattern.SummaryKindReport {
 			reportSummary = s
 			break
 		}
@@ -273,6 +265,9 @@ func sarifScope(tables []*pattern.TestTable) string {
 }
 
 // parseRuleLocation splits "ruleId:line:col" into components.
+// Note: splits left-to-right on ':', so colons in paths (e.g. Windows drive letters)
+// would mis-parse. Currently safe — SARIF URIs use POSIX convention and the mapper
+// stores only the rule:line:col portion in TestTableItem.Name.
 func parseRuleLocation(name string) (rule string, line, col int) {
 	parts := strings.Split(name, ":")
 	if len(parts) >= 3 {

@@ -39,6 +39,7 @@ func sarifSummary(stats sarif.Stats) *pattern.Summary {
 	if stats.TotalIssues == 0 {
 		return &pattern.Summary{
 			Label: "Analysis Results",
+			Kind:  pattern.SummaryKindSARIF,
 			Metrics: []pattern.SummaryItem{
 				{Label: "Issues", Value: "0", Kind: "success"},
 			},
@@ -64,6 +65,7 @@ func sarifSummary(stats sarif.Stats) *pattern.Summary {
 
 	return &pattern.Summary{
 		Label:   fmt.Sprintf("Analysis: %d issues", stats.TotalIssues),
+		Kind:    pattern.SummaryKindSARIF,
 		Metrics: metrics,
 	}
 }

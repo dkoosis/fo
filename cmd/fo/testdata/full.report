@@ -1,0 +1,16 @@
+--- tool:vet format:sarif ---
+{"version":"2.1.0","$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json","runs":[{"tool":{"driver":{"name":"govet","rules":[]}},"results":[]}]}
+--- tool:lint format:sarif ---
+{"version":"2.1.0","$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json","runs":[{"tool":{"driver":{"name":"golangci-lint"}},"results":[]}]}
+--- tool:test format:testjson ---
+{"Time":"2024-01-01T00:00:00Z","Action":"run","Package":"example.com/pkg","Test":"TestA"}
+{"Time":"2024-01-01T00:00:00Z","Action":"pass","Package":"example.com/pkg","Test":"TestA","Elapsed":0.05}
+{"Time":"2024-01-01T00:00:00Z","Action":"pass","Package":"example.com/pkg","Elapsed":0.1}
+--- tool:eval format:metrics ---
+{"scope":"86 queries · 51 nugs","columns":["MRR","P@5","P@10","NDCG5"],"rows":[{"name":"Overall","values":[0.983,0.227,0.119,0.961],"n":86}],"regressions":[]}
+--- tool:vuln format:sarif ---
+{"version":"2.1.0","$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json","runs":[{"tool":{"driver":{"name":"govulncheck"}},"results":[]}]}
+--- tool:arch format:archlint ---
+{"Type":"models.Check","Payload":{"ArchHasWarnings":false,"ArchWarningsDeps":[],"ArchWarningsNotMatched":[],"ArchWarningsDeepScan":[],"OmittedCount":0,"Qualities":[{"ID":"component_imports","Used":true}]}}
+--- tool:dupl format:jscpd ---
+{"duplicates":[],"statistics":{}}

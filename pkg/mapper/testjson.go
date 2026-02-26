@@ -117,6 +117,7 @@ func testSummary(s testjson.Stats) *pattern.Summary {
 
 	return &pattern.Summary{
 		Label:   label,
+		Kind:    pattern.SummaryKindTest,
 		Metrics: metrics,
 	}
 }

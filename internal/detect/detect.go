@@ -3,7 +3,8 @@ package detect
 
 import (
 	"encoding/json"
-	"regexp"
+
+	"github.com/dkoosis/fo/pkg/report"
 )
 
 // Format represents a recognized input format.
@@ -14,10 +15,6 @@ const (
 	SARIF             // SARIF 2.1.0 JSON document
 	GoTestJSON        // go test -json NDJSON stream
 	Report            // Delimited multi-tool report
-)
-
-var reportDelimiterRe = regexp.MustCompile(
-	`^--- tool:\w[\w-]* format:(sarif|testjson|text|metrics|archlint|jscpd)(?: status:(pass|fail))? ---$`,
 )
 
 // Sniff examines the first bytes of input to determine format.
@@ -32,7 +29,7 @@ func Sniff(data []byte) Format {
 	}
 
 	// Check for report delimiter before requiring '{' — reports start with '---'
-	if firstLine := extractFirstLine(data); reportDelimiterRe.Match(firstLine) {
+	if firstLine := extractFirstLine(data); report.DelimiterRe.Match(firstLine) {
 		return Report
 	}
 

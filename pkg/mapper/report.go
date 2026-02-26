@@ -59,6 +59,7 @@ func FromReport(sections []report.Section) ([]pattern.Pattern, error) {
 
 	topSummary := &pattern.Summary{
 		Label:   label,
+		Kind:    pattern.SummaryKindReport,
 		Metrics: toolSummaries,
 	}
 
@@ -80,14 +81,27 @@ func mapSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 	case "text":
 		return mapTextSection(sec)
 	default:
-		return nil, false, fmt.Sprintf("unknown format %q", sec.Format)
+		return sectionError(sec.Tool, fmt.Errorf("unknown format %q", sec.Format)),
+			false, fmt.Sprintf("unknown format %q", sec.Format)
+	}
+}
+
+// sectionError emits a visible error pattern for a section that failed to parse.
+func sectionError(tool string, err error) []pattern.Pattern {
+	return []pattern.Pattern{
+		&pattern.TestTable{
+			Label: tool + " errors",
+			Results: []pattern.TestTableItem{
+				{Name: "parse error", Status: "fail", Details: err.Error()},
+			},
+		},
 	}
 }
 
 func mapSARIFSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 	doc, err := sarif.ReadBytes(sec.Content)
 	if err != nil {
-		return nil, false, fmt.Sprintf("parse error: %v", err)
+		return sectionError(sec.Tool, err), false, fmt.Sprintf("parse error: %v", err)
 	}
 	stats := sarif.ComputeStats(doc)
 	patterns := FromSARIF(doc)
@@ -110,7 +124,7 @@ func mapSARIFSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 func mapTestJSONSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 	results, err := testjson.ParseBytes(sec.Content)
 	if err != nil {
-		return nil, false, fmt.Sprintf("parse error: %v", err)
+		return sectionError(sec.Tool, err), false, fmt.Sprintf("parse error: %v", err)
 	}
 	stats := testjson.ComputeStats(results)
 	patterns := FromTestJSON(results)
@@ -127,7 +141,7 @@ func mapTestJSONSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 func mapMetricsSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 	m, err := metrics.Parse(sec.Content)
 	if err != nil {
-		return nil, false, fmt.Sprintf("parse error: %v", err)
+		return sectionError(sec.Tool, err), false, fmt.Sprintf("parse error: %v", err)
 	}
 
 	passed := len(m.Regressions) == 0
@@ -175,7 +189,7 @@ func mapMetricsSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 func mapArchLintSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 	result, err := archlint.Parse(sec.Content)
 	if err != nil {
-		return nil, false, fmt.Sprintf("parse error: %v", err)
+		return sectionError(sec.Tool, err), false, fmt.Sprintf("parse error: %v", err)
 	}
 
 	passed := !result.HasWarnings
@@ -207,7 +221,7 @@ func mapArchLintSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 func mapJSCPDSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 	result, err := jscpd.Parse(sec.Content)
 	if err != nil {
-		return nil, false, fmt.Sprintf("parse error: %v", err)
+		return sectionError(sec.Tool, err), false, fmt.Sprintf("parse error: %v", err)
 	}
 
 	if len(result.Clones) == 0 {
@@ -232,6 +246,8 @@ func mapJSCPDSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 	return patterns, true, label // clones don't fail the report
 }
 
+// mapTextSection handles text sections with explicit pass/fail status.
+// Text sections rely on explicit status from the delimiter; content is opaque.
 func mapTextSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 	passed := sec.Status != "fail"
 	label := sec.Status

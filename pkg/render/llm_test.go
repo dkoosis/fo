@@ -11,6 +11,7 @@ func TestLLM_RenderReport(t *testing.T) {
 	patterns := []pattern.Pattern{
 		&pattern.Summary{
 			Label: "REPORT: 2 tools — all pass",
+			Kind:  pattern.SummaryKindReport,
 			Metrics: []pattern.SummaryItem{
 				{Label: "vet", Value: "0 diags", Kind: "success"},
 				{Label: "arch", Value: "pass", Kind: "success"},
@@ -31,6 +32,7 @@ func TestLLM_RenderReportWithFailures(t *testing.T) {
 	patterns := []pattern.Pattern{
 		&pattern.Summary{
 			Label: "REPORT: 3 tools — 1 fail, 2 pass",
+			Kind:  pattern.SummaryKindReport,
 			Metrics: []pattern.SummaryItem{
 				{Label: "vet", Value: "0 diags", Kind: "success"},
 				{Label: "lint", Value: "2 err", Kind: "error"},
