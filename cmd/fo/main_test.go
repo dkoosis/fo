@@ -334,6 +334,28 @@ func TestJTBD_PanicsSurfaceFirst(t *testing.T) {
 	}
 }
 
+func TestJTBD_WrapSARIFLongLine(t *testing.T) {
+	// A diagnostic message exceeding the default 64KiB scanner limit must not
+	// cause an error. This reproduces GitHub issue #220.
+	longMsg := strings.Repeat("x", 70_000)
+	input := "main.go:1:1: " + longMsg + "\n"
+
+	var stdout, stderr bytes.Buffer
+	code := runWrap([]string{"sarif", "--tool", "big"}, strings.NewReader(input), &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("expected exit 0, got %d; stderr: %s", code, stderr.String())
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, `"uri": "main.go"`) {
+		t.Errorf("missing file URI in output:\n%.200s…", output)
+	}
+	if !strings.Contains(output, longMsg[:100]) {
+		t.Errorf("long message truncated or missing from output")
+	}
+}
+
 // --- Report format integration tests ---
 
 func TestRun_ReportClean(t *testing.T) {

@@ -260,6 +260,7 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	b := sarif.NewBuilder(*toolName, *version)
 	scanner := bufio.NewScanner(stdin)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
 	for scanner.Scan() {
 		line := scanner.Text()
