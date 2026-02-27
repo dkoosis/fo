@@ -127,7 +127,7 @@ func mapSARIFSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 }
 
 func mapTestJSONSection(sec report.Section) ([]pattern.Pattern, bool, string) {
-	results, err := testjson.ParseBytes(sec.Content)
+	results, _, err := testjson.ParseBytes(sec.Content)
 	if err != nil {
 		return sectionError(sec.Tool, err), false, fmt.Sprintf("parse error: %v", err)
 	}

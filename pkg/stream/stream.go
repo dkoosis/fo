@@ -320,9 +320,12 @@ func Run(ctx context.Context, r io.Reader, out io.Writer, width, height int, sty
 	tw := newTermWriter(out, width, height)
 	s := newStreamer(tw, style)
 
-	err := testjson.Stream(ctx, r, func(e testjson.TestEvent) {
+	malformed, err := testjson.Stream(ctx, r, func(e testjson.TestEvent) {
 		s.handleEvent(e)
 	})
+	if malformed > 0 {
+		fmt.Fprintf(out, "fo: warning: %d malformed line(s) skipped\n", malformed)
+	}
 	if err != nil {
 		s.finish()
 		if ctx.Err() != nil {

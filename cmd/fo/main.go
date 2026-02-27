@@ -156,10 +156,13 @@ func parseInput(format detect.Format, input []byte, stderr io.Writer) ([]pattern
 		}
 		return mapper.FromSARIF(doc), -1
 	case detect.GoTestJSON:
-		results, err := testjson.ParseBytes(input)
+		results, malformed, err := testjson.ParseBytes(input)
 		if err != nil {
 			fmt.Fprintf(stderr, "fo: parsing go test -json: %v\n", err)
 			return nil, 2
+		}
+		if malformed > 0 {
+			fmt.Fprintf(stderr, "fo: warning: %d malformed line(s) skipped\n", malformed)
 		}
 		return mapper.FromTestJSON(results), -1
 	case detect.Report:

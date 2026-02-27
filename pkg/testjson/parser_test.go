@@ -14,9 +14,12 @@ func TestParseStream_BasicPassFail(t *testing.T) {
 		`{"Time":"2024-01-01T00:00:00Z","Action":"pass","Package":"example.com/pkg","Elapsed":0.5}`,
 	}, "\n") + "\n"
 
-	results, err := ParseStream(strings.NewReader(input))
+	results, malformed, err := ParseStream(strings.NewReader(input))
 	if err != nil {
 		t.Fatal(err)
+	}
+	if malformed != 0 {
+		t.Errorf("expected 0 malformed, got %d", malformed)
 	}
 	if len(results) != 1 {
 		t.Fatalf("expected 1 package, got %d", len(results))
@@ -42,7 +45,7 @@ func TestParseStream_Coverage(t *testing.T) {
 		`{"Time":"2024-01-01T00:00:00Z","Action":"pass","Package":"example.com/pkg","Elapsed":0.5}`,
 	}, "\n") + "\n"
 
-	results, err := ParseStream(strings.NewReader(input))
+	results, _, err := ParseStream(strings.NewReader(input))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +65,7 @@ func TestParseStream_PanicDetection(t *testing.T) {
 		`{"Time":"2024-01-01T00:00:00Z","Action":"fail","Package":"example.com/pkg","Elapsed":0.0}`,
 	}, "\n") + "\n"
 
-	results, err := ParseStream(strings.NewReader(input))
+	results, _, err := ParseStream(strings.NewReader(input))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +81,7 @@ func TestParseStream_SkipsEmptyPackages(t *testing.T) {
 	// A package with only "start" action and no tests should be skipped
 	input := `{"Time":"2024-01-01T00:00:00Z","Action":"start","Package":"example.com/empty"}` + "\n"
 
-	results, err := ParseStream(strings.NewReader(input))
+	results, _, err := ParseStream(strings.NewReader(input))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,9 +96,12 @@ func TestParseStream_MalformedLinesSkipped(t *testing.T) {
 		`{"Time":"2024-01-01T00:00:00Z","Action":"pass","Package":"x","Test":"T","Elapsed":0.1}` + "\n" +
 		`{"Time":"2024-01-01T00:00:00Z","Action":"pass","Package":"x","Elapsed":0.1}` + "\n"
 
-	results, err := ParseStream(strings.NewReader(input))
+	results, malformed, err := ParseStream(strings.NewReader(input))
 	if err != nil {
 		t.Fatal(err)
+	}
+	if malformed != 2 {
+		t.Errorf("expected 2 malformed lines, got %d", malformed)
 	}
 	if len(results) != 1 {
 		t.Fatalf("expected 1 package (skipping malformed), got %d", len(results))

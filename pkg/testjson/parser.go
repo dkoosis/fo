@@ -11,12 +11,14 @@ import (
 )
 
 // ParseStream parses go test -json NDJSON from a reader, line by line.
-func ParseStream(r io.Reader) ([]TestPackageResult, error) {
+// Returns the parsed results, the number of malformed lines skipped, and any error.
+func ParseStream(r io.Reader) ([]TestPackageResult, int, error) {
 	agg := newAggregator()
 	scanner := bufio.NewScanner(r)
 	// Allow large lines for verbose test output
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
+	var malformed int
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if len(line) == 0 {
@@ -24,42 +26,83 @@ func ParseStream(r io.Reader) ([]TestPackageResult, error) {
 		}
 		var event TestEvent
 		if err := json.Unmarshal(line, &event); err != nil {
-			continue // skip malformed lines
+			malformed++
+			continue
 		}
 		agg.processEvent(event)
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("scanning test output: %w", err)
+		return nil, malformed, fmt.Errorf("scanning test output: %w", err)
 	}
-	return agg.results(), nil
+	return agg.results(), malformed, nil
 }
 
 // ParseBytes is a convenience for parsing from a byte slice.
-func ParseBytes(data []byte) ([]TestPackageResult, error) {
+func ParseBytes(data []byte) ([]TestPackageResult, int, error) {
 	return ParseStream(strings.NewReader(string(data)))
 }
 
+// scanResult carries a scanned line or terminal error from the scanner goroutine.
+type scanResult struct {
+	line []byte
+	err  error
+}
+
 // Stream parses go test -json events line by line and calls fn for each one.
-// Stops on EOF or when ctx is cancelled. Malformed lines are silently skipped.
-func Stream(ctx context.Context, r io.Reader, fn ProcessFunc) error {
+// Stops on EOF or when ctx is cancelled. Returns the number of malformed lines
+// skipped and any error. Context cancellation interrupts even if the reader is
+// blocked, by closing r if it implements io.Closer.
+func Stream(ctx context.Context, r io.Reader, fn ProcessFunc) (int, error) {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
-	for scanner.Scan() {
-		if err := ctx.Err(); err != nil {
-			return err
+	lines := make(chan scanResult)
+	go func() {
+		defer close(lines)
+		for scanner.Scan() {
+			// Copy bytes — scanner reuses the buffer.
+			cp := append([]byte(nil), scanner.Bytes()...)
+			select {
+			case lines <- scanResult{line: cp}:
+			case <-ctx.Done():
+				return
+			}
 		}
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			continue
+		if err := scanner.Err(); err != nil {
+			select {
+			case lines <- scanResult{err: err}:
+			case <-ctx.Done():
+			}
 		}
-		var event TestEvent
-		if err := json.Unmarshal(line, &event); err != nil {
-			continue
+	}()
+
+	var malformed int
+	for {
+		select {
+		case <-ctx.Done():
+			// Attempt to unblock the scanner goroutine.
+			if c, ok := r.(io.Closer); ok {
+				_ = c.Close()
+			}
+			return malformed, ctx.Err()
+		case res, ok := <-lines:
+			if !ok {
+				return malformed, nil
+			}
+			if res.err != nil {
+				return malformed, res.err
+			}
+			if len(res.line) == 0 {
+				continue
+			}
+			var event TestEvent
+			if err := json.Unmarshal(res.line, &event); err != nil {
+				malformed++
+				continue
+			}
+			fn(event)
 		}
-		fn(event)
 	}
-	return scanner.Err()
 }
 
 type aggregator struct {
