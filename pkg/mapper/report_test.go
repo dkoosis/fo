@@ -26,7 +26,7 @@ func TestFromReport_TextPassSection(t *testing.T) {
 	if sum.Kind != pattern.SummaryKindReport {
 		t.Errorf("expected report kind, got %q", sum.Kind)
 	}
-	if sum.Metrics[0].Kind != "success" {
+	if sum.Metrics[0].Kind != kindSuccess {
 		t.Errorf("expected success kind, got %q", sum.Metrics[0].Kind)
 	}
 }
@@ -49,7 +49,7 @@ func TestFromReport_SARIFSection(t *testing.T) {
 	if sum.Metrics[0].Label != "vet" {
 		t.Errorf("expected tool label 'vet', got %q", sum.Metrics[0].Label)
 	}
-	if sum.Metrics[0].Kind != "success" {
+	if sum.Metrics[0].Kind != kindSuccess {
 		t.Errorf("clean SARIF should be success, got %q", sum.Metrics[0].Kind)
 	}
 }
@@ -64,7 +64,7 @@ func TestFromReport_MalformedSectionEmitsError(t *testing.T) {
 	}
 	// Summary should mark the section as error
 	sum := patterns[0].(*pattern.Summary)
-	if sum.Metrics[0].Kind != "error" {
+	if sum.Metrics[0].Kind != kindError {
 		t.Errorf("malformed section should be marked error, got %q", sum.Metrics[0].Kind)
 	}
 	// Should contain an Error pattern (not a TestTable)

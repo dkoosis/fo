@@ -30,10 +30,10 @@ import (
 	"golang.org/x/term"
 
 	"github.com/dkoosis/fo/internal/detect"
+	"github.com/dkoosis/fo/internal/report"
 	"github.com/dkoosis/fo/pkg/mapper"
 	"github.com/dkoosis/fo/pkg/pattern"
 	"github.com/dkoosis/fo/pkg/render"
-	"github.com/dkoosis/fo/internal/report"
 	"github.com/dkoosis/fo/pkg/sarif"
 	"github.com/dkoosis/fo/pkg/stream"
 	"github.com/dkoosis/fo/pkg/testjson"
@@ -228,7 +228,6 @@ func exitCode(patterns []pattern.Pattern) int {
 				}
 			}
 		case *pattern.Error:
-			_ = v
 			return 1
 		}
 	}

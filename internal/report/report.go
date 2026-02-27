@@ -22,7 +22,7 @@ type Section struct {
 
 // Parse splits delimited report input into sections.
 func Parse(data []byte) ([]Section, error) {
-	data = bytes.TrimRight(data, "\n")
+	data = trimTrailingNewline(data)
 	lines := bytes.Split(data, []byte("\n"))
 	var sections []Section
 	var current *Section

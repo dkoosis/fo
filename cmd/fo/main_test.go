@@ -362,6 +362,24 @@ func TestRun_ReportFailing(t *testing.T) {
 	if code != 1 {
 		t.Errorf("failing report exit code = %d, want 1; stderr: %s", code, stderr.String())
 	}
+
+	out := stdout.String()
+
+	// SARIF diagnostics from the lint section must surface with file+rule detail
+	if !strings.Contains(out, "internal/store/store.go") {
+		t.Errorf("expected SARIF file path in output:\n%s", out)
+	}
+	if !strings.Contains(out, "errcheck") {
+		t.Errorf("expected SARIF rule ID in output:\n%s", out)
+	}
+
+	// TestJSON failures from the test section must surface
+	if !strings.Contains(out, "TestParser") {
+		t.Errorf("expected failed test name in output:\n%s", out)
+	}
+	if !strings.Contains(out, "parser_test.go:20") {
+		t.Errorf("expected test failure location in output:\n%s", out)
+	}
 }
 
 func TestRun_ReportJSON(t *testing.T) {

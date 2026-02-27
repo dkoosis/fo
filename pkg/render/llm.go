@@ -68,13 +68,11 @@ func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestT
 
 	sb.WriteString(reportSummary.Label + "\n")
 
-	// Build maps by tool name prefix
+	// Group tables by originating tool
 	tablesByTool := make(map[string][]*pattern.TestTable)
 	for _, t := range tables {
-		for _, m := range reportSummary.Metrics {
-			if strings.HasPrefix(t.Label, m.Label) {
-				tablesByTool[m.Label] = append(tablesByTool[m.Label], t)
-			}
+		if t.Source != "" {
+			tablesByTool[t.Source] = append(tablesByTool[t.Source], t)
 		}
 	}
 	errorsByTool := make(map[string][]*pattern.Error)
@@ -91,7 +89,11 @@ func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestT
 		}
 
 		for _, t := range tablesByTool[m.Label] {
-			sb.WriteString("\n")
+			if t.Label != "" {
+				sb.WriteString("\n## " + t.Label + "\n")
+			} else {
+				sb.WriteString("\n")
+			}
 			for _, item := range t.Results {
 				prefix := "  "
 				if item.Status == statusFail {

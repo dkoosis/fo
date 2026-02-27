@@ -40,7 +40,8 @@ func TestLLM_RenderReportWithFailures(t *testing.T) {
 			},
 		},
 		&pattern.TestTable{
-			Label: "lint violations",
+			Label:  "lint violations",
+			Source: "lint",
 			Results: []pattern.TestTableItem{
 				{Name: "store → eval", Status: "fail", Details: "forbidden dependency"},
 			},
@@ -50,6 +51,9 @@ func TestLLM_RenderReportWithFailures(t *testing.T) {
 	out := r.Render(patterns)
 	if !strings.Contains(out, "1 fail") {
 		t.Errorf("expected failure count in output:\n%s", out)
+	}
+	if !strings.Contains(out, "lint violations") {
+		t.Errorf("expected table label in output:\n%s", out)
 	}
 	if !strings.Contains(out, "FAIL store → eval") {
 		t.Errorf("expected violation detail in output:\n%s", out)
