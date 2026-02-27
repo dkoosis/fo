@@ -69,7 +69,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	// Stream mode: go test -json + TTY stdout + auto format
 	if format == detect.GoTestJSON && isTTYWriter(stdout) && *formatFlag == "auto" {
-		return runStream(br, stdout)
+		return runStream(stdin, br, stdout)
 	}
 
 	// Batch mode
@@ -106,9 +106,15 @@ func termSize(w io.Writer) (width, height int) {
 }
 
 // runStream handles the live streaming path (go test -json + TTY).
-func runStream(br *bufio.Reader, stdout io.Writer) int {
+func runStream(stdin io.Reader, br *bufio.Reader, stdout io.Writer) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+	// Close the underlying reader on cancel to unblock Stream's scanner goroutine.
+	// bufio.Reader doesn't implement io.Closer, so Stream can't close it itself.
+	if c, ok := stdin.(io.Closer); ok {
+		stopClose := context.AfterFunc(ctx, func() { _ = c.Close() })
+		defer stopClose()
+	}
 	width, height := termSize(stdout)
 	return stream.Run(ctx, br, stdout, width, height, nil)
 }

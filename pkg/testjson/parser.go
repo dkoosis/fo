@@ -50,8 +50,12 @@ type scanResult struct {
 
 // Stream parses go test -json events line by line and calls fn for each one.
 // Stops on EOF or when ctx is cancelled. Returns the number of malformed lines
-// skipped and any error. Context cancellation interrupts even if the reader is
-// blocked, by closing r if it implements io.Closer.
+// skipped and any error.
+//
+// Cancellation: the scanner runs in a background goroutine. On context cancel,
+// Stream closes r (if it implements io.Closer) to unblock the scanner. If r
+// does not implement io.Closer (e.g. *bufio.Reader), the caller must close the
+// underlying reader externally to prevent a goroutine leak.
 func Stream(ctx context.Context, r io.Reader, fn ProcessFunc) (int, error) {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
