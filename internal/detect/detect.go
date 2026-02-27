@@ -80,11 +80,12 @@ func isGoTestJSON(data []byte) bool {
 		return false
 	}
 
-	validActions := map[string]bool{
-		"start": true, "run": true, "pause": true, "cont": true,
-		"pass": true, "bench": true, "fail": true, "output": true, "skip": true,
+	switch event.Action {
+	case "start", "run", "pause", "cont", "pass", "bench", "fail", "output", "skip":
+		return true
+	default:
+		return false
 	}
-	return validActions[event.Action]
 }
 
 func extractFirstLine(data []byte) []byte {

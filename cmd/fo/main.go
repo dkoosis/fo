@@ -141,8 +141,10 @@ func runBatch(br *bufio.Reader, format detect.Format, formatFlag, themeFlag stri
 	}
 
 	mode := resolveFormat(formatFlag, stdout)
-	validFormats := map[string]bool{"terminal": true, "llm": true, "json": true}
-	if !validFormats[mode] {
+	switch mode {
+	case "terminal", "llm", "json":
+		// valid
+	default:
 		fmt.Fprintf(stderr, "fo: unknown format %q (expected auto, terminal, llm, json)\n", formatFlag)
 		return nil, 2
 	}

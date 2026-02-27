@@ -2,9 +2,11 @@ package sarif
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
+	"slices"
 )
 
 // Read parses SARIF from an io.Reader.
@@ -100,20 +102,14 @@ func TopFiles(doc *Document, limit int) []FileIssue {
 		}
 	}
 
-	// Convert to slice and sort
+	// Convert to slice and sort by issue count descending
 	files := make([]FileIssue, 0, len(byFile))
 	for _, fi := range byFile {
 		files = append(files, *fi)
 	}
-
-	// Sort by issue count descending
-	for i := 0; i < len(files); i++ {
-		for j := i + 1; j < len(files); j++ {
-			if files[j].IssueCount > files[i].IssueCount {
-				files[i], files[j] = files[j], files[i]
-			}
-		}
-	}
+	slices.SortFunc(files, func(a, b FileIssue) int {
+		return cmp.Compare(b.IssueCount, a.IssueCount)
+	})
 
 	if limit > 0 && len(files) > limit {
 		files = files[:limit]
