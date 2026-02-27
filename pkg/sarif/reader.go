@@ -9,9 +9,14 @@ import (
 
 // Read parses SARIF from an io.Reader.
 func Read(r io.Reader) (*Document, error) {
+	dec := json.NewDecoder(r)
 	var doc Document
-	if err := json.NewDecoder(r).Decode(&doc); err != nil {
+	if err := dec.Decode(&doc); err != nil {
 		return nil, fmt.Errorf("decode sarif: %w", err)
+	}
+	// Reject trailing data after the SARIF document.
+	if err := dec.Decode(new(json.RawMessage)); err != io.EOF {
+		return nil, fmt.Errorf("unexpected trailing data after SARIF document")
 	}
 	return validateDocument(&doc)
 }
