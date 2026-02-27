@@ -3,6 +3,7 @@ package pattern
 // TestTable represents test results with status and timing.
 type TestTable struct {
 	Label   string
+	Source  string // originating tool (set in report context for grouping)
 	Results []TestTableItem
 }
 

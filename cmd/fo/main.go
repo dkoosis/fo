@@ -30,6 +30,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/dkoosis/fo/internal/detect"
+	"github.com/dkoosis/fo/internal/report"
 	"github.com/dkoosis/fo/pkg/mapper"
 	"github.com/dkoosis/fo/pkg/pattern"
 	"github.com/dkoosis/fo/pkg/render"
@@ -161,8 +162,20 @@ func parseInput(format detect.Format, input []byte, stderr io.Writer) ([]pattern
 			return nil, 2
 		}
 		return mapper.FromTestJSON(results), -1
+	case detect.Report:
+		sections, err := report.Parse(input)
+		if err != nil {
+			fmt.Fprintf(stderr, "fo: parsing report: %v\n", err)
+			return nil, 2
+		}
+		patterns, mapErr := mapper.FromReport(sections)
+		if mapErr != nil {
+			fmt.Fprintf(stderr, "fo: mapping report: %v\n", mapErr)
+			return nil, 2
+		}
+		return patterns, -1
 	default:
-		fmt.Fprintf(stderr, "fo: unrecognized input format (expected SARIF or go test -json)\n")
+		fmt.Fprintf(stderr, "fo: unrecognized input format (expected SARIF, go test -json, or report)\n")
 		return nil, 2
 	}
 }
@@ -203,6 +216,8 @@ func resolveFormat(format string, w io.Writer) string {
 }
 
 // exitCode returns 0 for clean, 1 for failures present.
+// Failures propagate through TestTable fail items (real failures) or Error
+// patterns (parse failures). Summary is display-only, not a decision input.
 func exitCode(patterns []pattern.Pattern) int {
 	for _, p := range patterns {
 		switch v := p.(type) {
@@ -212,12 +227,8 @@ func exitCode(patterns []pattern.Pattern) int {
 					return 1
 				}
 			}
-		case *pattern.Summary:
-			for _, m := range v.Metrics {
-				if m.Kind == "error" {
-					return 1
-				}
-			}
+		case *pattern.Error:
+			return 1
 		}
 	}
 	return 0

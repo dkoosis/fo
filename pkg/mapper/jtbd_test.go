@@ -7,11 +7,6 @@ import (
 	"github.com/dkoosis/fo/pkg/pattern"
 )
 
-const (
-	statusPass = "pass"
-	statusFail = "fail"
-)
-
 func TestFromJTBD_ProducesPatterns(t *testing.T) {
 	report := &jtbd.Report{
 		Total: 3, Running: 1, Broken: 1, WIP: 1,

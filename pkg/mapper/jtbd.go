@@ -69,7 +69,7 @@ func jtbdLayerTable(layer string, jobs []jtbd.JobResult) *pattern.TestTable {
 			names := make([]string, 0, len(j.Tests))
 			for _, t := range j.Tests {
 				name := shortJTBDFuncName(t.FuncName)
-				if t.Status == "fail" {
+				if t.Status == statusFail {
 					name += " FAIL"
 				}
 				names = append(names, name)
@@ -91,9 +91,9 @@ func jtbdLayerTable(layer string, jobs []jtbd.JobResult) *pattern.TestTable {
 func mapJTBDStatus(s string) string {
 	switch s {
 	case "running":
-		return "pass"
+		return statusPass
 	case "broken":
-		return "fail"
+		return statusFail
 	default:
 		return "wip"
 	}

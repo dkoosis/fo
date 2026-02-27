@@ -46,6 +46,8 @@ func (t *Terminal) renderOne(p pattern.Pattern) string {
 		return t.renderSparkline(v)
 	case *pattern.Comparison:
 		return t.renderComparison(v)
+	case *pattern.Error:
+		return t.renderError(v)
 	default:
 		return ""
 	}
@@ -274,6 +276,10 @@ func (t *Terminal) statusIconStyle(status string) (string, lipgloss.Style) {
 	default:
 		return t.theme.Icons.Info, t.theme.Muted
 	}
+}
+
+func (t *Terminal) renderError(e *pattern.Error) string {
+	return t.theme.Error.Render(fmt.Sprintf("  %s %s: %s", t.theme.Icons.Fail, e.Source, e.Message)) + "\n"
 }
 
 func padRight(s string, width int) string {

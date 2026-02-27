@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 )
@@ -216,6 +217,22 @@ func TestJTBD_WrapSARIFMissingToolFlag(t *testing.T) {
 	}
 }
 
+// --- Report format tests ---
+
+func TestRun_ReportFormat(t *testing.T) {
+	input := "--- tool:vet format:sarif ---\n" +
+		`{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"govet"}},"results":[]}]}` + "\n" +
+		"--- tool:arch format:text status:pass ---\nAll checks passed.\n"
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "llm"}, strings.NewReader(input), &stdout, &stderr)
+	if code != 0 {
+		t.Errorf("exit code = %d, want 0; stderr: %s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "REPORT:") {
+		t.Errorf("output should contain REPORT header, got:\n%s", stdout.String())
+	}
+}
+
 // --- Unit: parseDiagLine ---
 
 func TestParseDiagLine(t *testing.T) {
@@ -314,6 +331,115 @@ func TestJTBD_PanicsSurfaceFirst(t *testing.T) {
 	}
 	if panicIdx > passIdx {
 		t.Error("PANIC should appear before Passing packages")
+	}
+}
+
+// --- Report format integration tests ---
+
+func TestRun_ReportClean(t *testing.T) {
+	input, err := os.ReadFile("testdata/clean.report")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "llm"}, bytes.NewReader(input), &stdout, &stderr)
+	if code != 0 {
+		t.Errorf("clean report exit code = %d, want 0; stderr: %s", code, stderr.String())
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "all pass") {
+		t.Errorf("expected 'all pass' in output:\n%s", out)
+	}
+}
+
+func TestRun_ReportFailing(t *testing.T) {
+	input, err := os.ReadFile("testdata/failing.report")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "llm"}, bytes.NewReader(input), &stdout, &stderr)
+	if code != 1 {
+		t.Errorf("failing report exit code = %d, want 1; stderr: %s", code, stderr.String())
+	}
+
+	out := stdout.String()
+
+	// SARIF diagnostics from the lint section must surface with file+rule detail
+	if !strings.Contains(out, "internal/store/store.go") {
+		t.Errorf("expected SARIF file path in output:\n%s", out)
+	}
+	if !strings.Contains(out, "errcheck") {
+		t.Errorf("expected SARIF rule ID in output:\n%s", out)
+	}
+
+	// TestJSON failures from the test section must surface
+	if !strings.Contains(out, "TestParser") {
+		t.Errorf("expected failed test name in output:\n%s", out)
+	}
+	if !strings.Contains(out, "parser_test.go:20") {
+		t.Errorf("expected test failure location in output:\n%s", out)
+	}
+}
+
+func TestRun_ReportJSON(t *testing.T) {
+	input, err := os.ReadFile("testdata/clean.report")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "json"}, bytes.NewReader(input), &stdout, &stderr)
+	if code != 0 {
+		t.Errorf("JSON report exit code = %d, want 0; stderr: %s", code, stderr.String())
+	}
+	if !strings.HasPrefix(strings.TrimSpace(stdout.String()), "{") {
+		t.Errorf("expected JSON output, got:\n%s", stdout.String())
+	}
+}
+
+func TestRun_ReportBrokenSection(t *testing.T) {
+	input, err := os.ReadFile("testdata/broken-section.report")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "llm"}, bytes.NewReader(input), &stdout, &stderr)
+	if code != 1 {
+		t.Errorf("broken section report exit code = %d, want 1; stderr: %s", code, stderr.String())
+	}
+	out := stdout.String()
+	// Broken lint section should surface as a visible error
+	if !strings.Contains(out, "ERROR:") {
+		t.Errorf("expected 'ERROR:' for broken section in output:\n%s", out)
+	}
+	// Valid test section should still render
+	if !strings.Contains(out, "test:") {
+		t.Errorf("expected valid test section to still render:\n%s", out)
+	}
+}
+
+func TestRun_ReportFullFormats(t *testing.T) {
+	input, err := os.ReadFile("testdata/full.report")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "llm"}, bytes.NewReader(input), &stdout, &stderr)
+	if code != 0 {
+		t.Errorf("full report exit code = %d, want 0; stderr: %s", code, stderr.String())
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "7 tools") {
+		t.Errorf("expected '7 tools' in output:\n%s", out)
+	}
+	if !strings.Contains(out, "all pass") {
+		t.Errorf("expected 'all pass' in output:\n%s", out)
+	}
+	// Verify each tool appears in output
+	for _, tool := range []string{"vet:", "lint:", "test:", "eval:", "vuln:", "arch:", "dupl:"} {
+		if !strings.Contains(out, tool) {
+			t.Errorf("expected tool %q in output:\n%s", tool, out)
+		}
 	}
 }
 

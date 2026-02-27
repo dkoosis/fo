@@ -25,6 +25,7 @@ func (l *LLM) Render(patterns []pattern.Pattern) string {
 	// Separate by type to build appropriate output
 	var summaries []*pattern.Summary
 	var tables []*pattern.TestTable
+	var errors []*pattern.Error
 
 	for _, p := range patterns {
 		switch v := p.(type) {
@@ -32,22 +33,95 @@ func (l *LLM) Render(patterns []pattern.Pattern) string {
 			summaries = append(summaries, v)
 		case *pattern.TestTable:
 			tables = append(tables, v)
+		case *pattern.Error:
+			errors = append(errors, v)
 		}
 	}
 
-	// Detect if this is test output or SARIF based on summary label
-	isTestOutput := false
+	// Dispatch on Summary.Kind
 	for _, s := range summaries {
-		if strings.HasPrefix(s.Label, "PASS") || strings.HasPrefix(s.Label, "FAIL") {
-			isTestOutput = true
+		switch s.Kind {
+		case pattern.SummaryKindReport:
+			return l.renderReport(summaries, tables, errors)
+		case pattern.SummaryKindTest:
+			return l.renderTestOutput(summaries, tables)
+		case pattern.SummaryKindSARIF:
+			return l.renderSARIFOutput(tables)
+		}
+	}
+	return l.renderSARIFOutput(tables)
+}
+
+func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestTable, errors []*pattern.Error) string {
+	var sb strings.Builder
+
+	var reportSummary *pattern.Summary
+	for _, s := range summaries {
+		if s.Kind == pattern.SummaryKindReport {
+			reportSummary = s
 			break
 		}
 	}
-
-	if isTestOutput {
-		return l.renderTestOutput(summaries, tables)
+	if reportSummary == nil {
+		return ""
 	}
-	return l.renderSARIFOutput(tables)
+
+	sb.WriteString(reportSummary.Label + "\n")
+
+	// Group tables by originating tool
+	tablesByTool := make(map[string][]*pattern.TestTable)
+	for _, t := range tables {
+		if t.Source != "" {
+			tablesByTool[t.Source] = append(tablesByTool[t.Source], t)
+		}
+	}
+	errorsByTool := make(map[string][]*pattern.Error)
+	for _, e := range errors {
+		errorsByTool[e.Source] = append(errorsByTool[e.Source], e)
+	}
+
+	for _, m := range reportSummary.Metrics {
+		sb.WriteString("\n" + m.Label + ": " + m.Value + "\n")
+
+		// Render parse errors for this tool
+		for _, e := range errorsByTool[m.Label] {
+			sb.WriteString("  ERROR: " + e.Message + "\n")
+		}
+
+		for _, t := range tablesByTool[m.Label] {
+			if t.Label != "" {
+				sb.WriteString("\n## " + t.Label + "\n")
+			} else {
+				sb.WriteString("\n")
+			}
+			for _, item := range t.Results {
+				prefix := "  "
+				if item.Status == statusFail {
+					prefix = "  FAIL "
+				}
+				sb.WriteString(prefix + item.Name)
+				if item.Duration != "" {
+					sb.WriteString(" (" + item.Duration + ")")
+				}
+				sb.WriteString("\n")
+				if item.Details != "" {
+					lines := strings.Split(item.Details, "\n")
+					max := 3
+					if len(lines) < max {
+						max = len(lines)
+					}
+					for _, line := range lines[:max] {
+						sb.WriteString("    " + line + "\n")
+					}
+					if len(lines) > 3 {
+						sb.WriteString(fmt.Sprintf("    ... (%d more lines)\n", len(lines)-3))
+					}
+				}
+			}
+		}
+	}
+
+	return sb.String()
 }
 
 func (l *LLM) renderSARIFOutput(tables []*pattern.TestTable) string {
@@ -205,6 +279,9 @@ func sarifScope(tables []*pattern.TestTable) string {
 }
 
 // parseRuleLocation splits "ruleId:line:col" into components.
+// Note: splits left-to-right on ':', so colons in paths (e.g. Windows drive letters)
+// would mis-parse. Currently safe — SARIF URIs use POSIX convention and the mapper
+// stores only the rule:line:col portion in TestTableItem.Name.
 func parseRuleLocation(name string) (rule string, line, col int) {
 	parts := strings.Split(name, ":")
 	if len(parts) >= 3 {

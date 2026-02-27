@@ -47,3 +47,43 @@ func TestSniff_LeadingWhitespace(t *testing.T) {
 		t.Errorf("expected GoTestJSON with leading whitespace, got %d", got)
 	}
 }
+
+func TestSniff_Report(t *testing.T) {
+	input := []byte("--- tool:vet format:sarif ---\n{\"version\":\"2.1.0\"}")
+	got := Sniff(input)
+	if got != Report {
+		t.Errorf("Sniff() = %v, want Report", got)
+	}
+}
+
+func TestSniff_ReportWithStatus(t *testing.T) {
+	input := []byte("--- tool:arch format:text status:pass ---\nAll checks passed.")
+	got := Sniff(input)
+	if got != Report {
+		t.Errorf("Sniff() = %v, want Report", got)
+	}
+}
+
+func TestSniff_ReportMetricsFormat(t *testing.T) {
+	input := []byte("--- tool:eval format:metrics ---\n{\"scope\":\"86 queries\"}")
+	got := Sniff(input)
+	if got != Report {
+		t.Errorf("Sniff() = %v, want Report", got)
+	}
+}
+
+func TestSniff_ReportArchlintFormat(t *testing.T) {
+	input := []byte("--- tool:arch format:archlint ---\n{}")
+	got := Sniff(input)
+	if got != Report {
+		t.Errorf("Sniff() = %v, want Report", got)
+	}
+}
+
+func TestSniff_ReportJscpdFormat(t *testing.T) {
+	input := []byte("--- tool:dupl format:jscpd ---\n{}")
+	got := Sniff(input)
+	if got != Report {
+		t.Errorf("Sniff() = %v, want Report", got)
+	}
+}
