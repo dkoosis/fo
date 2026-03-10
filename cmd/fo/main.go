@@ -43,6 +43,55 @@ func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
 
+const usage = `fo — focused build output renderer
+
+USAGE
+  <input-command> | fo [FLAGS]
+  <tool-output>   | fo wrap sarif --tool <name> [FLAGS]
+
+INPUT FORMATS (auto-detected from stdin)
+  SARIF 2.1.0     Static analysis results (golangci-lint, gosec, etc.)
+  go test -json   Test execution stream (supports live + batch)
+  report          Multi-tool delimited report (--- tool:X format:Y ---)
+
+OUTPUT FORMATS (--format)
+  auto            TTY → terminal, piped → llm (default)
+  terminal        Styled Unicode with color and sparklines
+  llm             Terse plain text, no ANSI — optimized for AI consumption
+  json            Structured JSON for automation
+
+FLAGS
+  --format <mode>   Output format: auto | terminal | llm | json (default: auto)
+  --theme <name>    Color theme: default | orca | mono (default: default)
+
+SUBCOMMANDS
+  fo wrap sarif    Convert line-based diagnostics to SARIF 2.1.0
+    --tool <name>    Tool name for SARIF driver (required)
+    --rule <id>      Default rule ID (default: finding)
+    --level <level>  Severity: error | warning | note (default: warning)
+    --version <str>  Tool version string
+
+EXIT CODES
+  0   Clean — no errors or test failures
+  1   Failures — lint errors or test failures present
+  2   Usage error — bad flags, unrecognized input, stdin problems
+
+EXAMPLES
+  golangci-lint run --output.sarif.path=stdout ./... | fo
+  go test -json ./... | fo
+  go test -json ./... | fo --format llm
+  go vet ./... 2>&1 | fo wrap sarif --tool govet | fo
+  gofmt -l ./... | fo wrap sarif --tool gofmt --rule needs-formatting
+
+BEHAVIOR NOTES
+  - Reads all input from stdin; does not accept file arguments
+  - TTY auto-detection: terminal style when stdout is a TTY, LLM mode when piped
+  - Live streaming mode activates for go test -json when stdout is a TTY
+  - NO_COLOR env var forces mono theme
+  - SARIF input supports multiple runs (multiple tools in one document)
+  - Report format: sections delimited by "--- tool:<name> format:<fmt> ---"
+`
+
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	// Check for subcommands before flag parsing
 	if len(args) > 0 && args[0] == "wrap" {
@@ -51,6 +100,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	fs := flag.NewFlagSet("fo", flag.ContinueOnError)
 	fs.SetOutput(stderr)
+	fs.Usage = func() { fmt.Fprint(stderr, usage) }
 	formatFlag := fs.String("format", "auto", "Output format: auto, terminal, llm, json")
 	themeFlag := fs.String("theme", "default", "Theme: default, orca, mono")
 	if err := fs.Parse(args); err != nil {
@@ -247,15 +297,39 @@ func exitCode(patterns []pattern.Pattern) int {
 
 // --- fo wrap sarif subcommand ---
 
+const wrapUsage = `fo wrap sarif — convert line diagnostics to SARIF 2.1.0
+
+USAGE
+  <tool> ... 2>&1 | fo wrap sarif --tool <name> [FLAGS]
+
+Reads file:line:col: message lines from stdin, emits SARIF JSON to stdout.
+Supports three line formats:
+  file.go:15:3: message      (file, line, column, message)
+  file.go:42: message        (file, line, message)
+  file.go                    (file only — uses "needs formatting")
+
+FLAGS
+  --tool <name>     Tool name for SARIF driver.name (required)
+  --rule <id>       Default rule ID (default: finding)
+  --level <level>   Severity: error | warning | note (default: warning)
+  --version <str>   Tool version string
+
+EXAMPLES
+  go vet ./... 2>&1 | fo wrap sarif --tool govet
+  gofmt -l ./...    | fo wrap sarif --tool gofmt --rule needs-formatting
+  staticcheck ./... | fo wrap sarif --tool staticcheck --level error
+`
+
 func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 || args[0] != "sarif" {
-		fmt.Fprintf(stderr, "fo wrap: unknown subcommand (expected 'sarif')\n")
-		fmt.Fprintf(stderr, "Usage: fo wrap sarif --tool <name> [--rule <id>] [--level <level>]\n")
+		fmt.Fprintf(stderr, "fo wrap: unknown subcommand (expected 'sarif')\n\n")
+		fmt.Fprint(stderr, wrapUsage)
 		return 2
 	}
 
 	fs := flag.NewFlagSet("fo wrap sarif", flag.ContinueOnError)
 	fs.SetOutput(stderr)
+	fs.Usage = func() { fmt.Fprint(stderr, wrapUsage) }
 	toolName := fs.String("tool", "", "Tool name for SARIF driver.name (required)")
 	ruleID := fs.String("rule", "finding", "Default rule ID")
 	level := fs.String("level", "warning", "Default severity: error|warning|note")
