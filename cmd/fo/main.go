@@ -86,14 +86,14 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 // isTTYWriter reports whether w is a terminal.
 func isTTYWriter(w io.Writer) bool {
 	f, ok := w.(*os.File)
-	return ok && term.IsTerminal(int(f.Fd()))
+	return ok && term.IsTerminal(int(f.Fd())) //nolint:gosec // file descriptor fits in int on all supported platforms
 }
 
 // termSize returns the terminal dimensions for w, defaulting to 80x24.
 func termSize(w io.Writer) (width, height int) {
 	width, height = 80, 24
 	if f, ok := w.(*os.File); ok {
-		if tw, th, err := term.GetSize(int(f.Fd())); err == nil {
+		if tw, th, err := term.GetSize(int(f.Fd())); err == nil { //nolint:gosec // file descriptor fits in int on all supported platforms
 			if tw > 0 {
 				width = tw
 			}
@@ -205,7 +205,7 @@ func selectRenderer(mode, themeName string, w io.Writer) render.Renderer {
 		}
 		width := 80
 		if f, ok := w.(*os.File); ok {
-			if tw, _, err := term.GetSize(int(f.Fd())); err == nil && tw > 0 {
+			if tw, _, err := term.GetSize(int(f.Fd())); err == nil && tw > 0 { //nolint:gosec // file descriptor fits in int on all supported platforms
 				width = tw
 			}
 		}
@@ -219,7 +219,7 @@ func resolveFormat(format string, w io.Writer) string {
 	}
 	// Auto-detect: TTY = terminal, piped = llm
 	if f, ok := w.(*os.File); ok {
-		if term.IsTerminal(int(f.Fd())) {
+		if term.IsTerminal(int(f.Fd())) { //nolint:gosec // file descriptor fits in int on all supported platforms
 			return "terminal"
 		}
 	}

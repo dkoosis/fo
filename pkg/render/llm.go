@@ -114,7 +114,7 @@ func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestT
 						sb.WriteString("    " + line + "\n")
 					}
 					if len(lines) > 3 {
-						sb.WriteString(fmt.Sprintf("    ... (%d more lines)\n", len(lines)-3))
+						fmt.Fprintf(&sb, "    ... (%d more lines)\n", len(lines)-3)
 					}
 				}
 			}
@@ -189,9 +189,9 @@ func (l *LLM) renderSARIFOutput(tables []*pattern.TestTable) string {
 			sb.WriteString("\n## " + d.file + "\n")
 		}
 		if d.line > 0 {
-			sb.WriteString(fmt.Sprintf("  %s %s:%d:%d %s\n", d.level, d.rule, d.line, d.col, d.message))
+			fmt.Fprintf(&sb, "  %s %s:%d:%d %s\n", d.level, d.rule, d.line, d.col, d.message)
 		} else {
-			sb.WriteString(fmt.Sprintf("  %s %s %s\n", d.level, d.rule, d.message))
+			fmt.Fprintf(&sb, "  %s %s %s\n", d.level, d.rule, d.message)
 		}
 	}
 
@@ -223,7 +223,7 @@ func (l *LLM) renderTestOutput(summaries []*pattern.Summary, tables []*pattern.T
 			if item.Duration != "" {
 				dur = " (" + item.Duration + ")"
 			}
-			sb.WriteString(fmt.Sprintf("%s %s%s\n", prefix, item.Name, dur))
+			fmt.Fprintf(&sb, "%s %s%s\n", prefix, item.Name, dur)
 
 			if item.Details != "" {
 				lines := strings.Split(item.Details, "\n")
@@ -235,7 +235,7 @@ func (l *LLM) renderTestOutput(summaries []*pattern.Summary, tables []*pattern.T
 					sb.WriteString("    " + line + "\n")
 				}
 				if len(lines) > 3 {
-					sb.WriteString(fmt.Sprintf("    ... (%d more lines)\n", len(lines)-3))
+					fmt.Fprintf(&sb, "    ... (%d more lines)\n", len(lines)-3)
 				}
 			}
 		}
