@@ -23,7 +23,7 @@ const (
 // FromReport converts multi-section report data into patterns.
 // Individual section parse failures are reported as error patterns, not
 // as a top-level error — a malformed lint section shouldn't hide passing tests.
-func FromReport(sections []report.Section) ([]pattern.Pattern, error) {
+func FromReport(sections []report.Section) []pattern.Pattern {
 	allPatterns := make([]pattern.Pattern, 0, len(sections)*2)
 	toolSummaries := make([]pattern.SummaryItem, 0, len(sections))
 	pass, fail := 0, 0
@@ -73,7 +73,7 @@ func FromReport(sections []report.Section) ([]pattern.Pattern, error) {
 		Metrics: toolSummaries,
 	}
 
-	return append([]pattern.Pattern{topSummary}, allPatterns...), nil
+	return append([]pattern.Pattern{topSummary}, allPatterns...)
 }
 
 func mapSection(sec report.Section) ([]pattern.Pattern, bool, string) {
@@ -109,7 +109,7 @@ func mapSARIFSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 		return sectionError(sec.Tool, err), false, fmt.Sprintf("parse error: %v", err)
 	}
 	stats := sarif.ComputeStats(doc)
-	patterns := FromSARIF(doc)
+	patterns := fromSARIF(doc, stats)
 
 	passed := stats.ByLevel["error"] == 0
 	label := fmt.Sprintf("%d diags", stats.TotalIssues)
@@ -121,7 +121,9 @@ func mapSARIFSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 		if n := stats.ByLevel["warning"]; n > 0 {
 			parts = append(parts, fmt.Sprintf("%d warn", n))
 		}
-		label = strings.Join(parts, ", ")
+		if len(parts) > 0 {
+			label = strings.Join(parts, ", ")
+		}
 	}
 	return patterns, passed, label
 }
@@ -132,7 +134,7 @@ func mapTestJSONSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 		return sectionError(sec.Tool, err), false, fmt.Sprintf("parse error: %v", err)
 	}
 	stats := testjson.ComputeStats(results)
-	patterns := FromTestJSON(results)
+	patterns := fromTestJSON(results, stats)
 
 	passed := stats.Failed == 0 && stats.BuildErrors == 0 && stats.Panics == 0
 	if passed {
@@ -257,7 +259,7 @@ func mapTextSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 	passed := sec.Status != statusFail
 	status := sec.Status
 	if status == "" {
-		status = "pass"
+		status = statusPass
 	}
 	label := status
 	if len(sec.Content) > 0 {

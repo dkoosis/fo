@@ -13,7 +13,10 @@ import (
 // FromTestJSON converts test results into visualization patterns.
 // Returns: Summary + TestTable per failed package + TestTable for passing packages.
 func FromTestJSON(results []testjson.TestPackageResult) []pattern.Pattern {
-	stats := testjson.ComputeStats(results)
+	return fromTestJSON(results, testjson.ComputeStats(results))
+}
+
+func fromTestJSON(results []testjson.TestPackageResult, stats testjson.Stats) []pattern.Pattern {
 	var patterns []pattern.Pattern
 
 	// 1. Summary

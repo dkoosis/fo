@@ -229,12 +229,7 @@ func parseInput(format detect.Format, input []byte, stderr io.Writer) ([]pattern
 			fmt.Fprintf(stderr, "fo: parsing report: %v\n", err)
 			return nil, 2
 		}
-		patterns, mapErr := mapper.FromReport(sections)
-		if mapErr != nil {
-			fmt.Fprintf(stderr, "fo: mapping report: %v\n", mapErr)
-			return nil, 2
-		}
-		return patterns, -1
+		return mapper.FromReport(sections), -1
 	default:
 		fmt.Fprintf(stderr, "fo: unrecognized input format (expected SARIF, go test -json, or report)\n")
 		return nil, 2

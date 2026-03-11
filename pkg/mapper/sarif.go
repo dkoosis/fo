@@ -15,7 +15,10 @@ import (
 // When there are 0 issues, returns nil — the caller (report mapper) already
 // shows per-tool status in the top-level summary, so a detail block is noise.
 func FromSARIF(doc *sarif.Document) []pattern.Pattern {
-	stats := sarif.ComputeStats(doc)
+	return fromSARIF(doc, sarif.ComputeStats(doc))
+}
+
+func fromSARIF(doc *sarif.Document, stats sarif.Stats) []pattern.Pattern {
 	if stats.TotalIssues == 0 {
 		return nil
 	}
@@ -105,19 +108,18 @@ func sarifFileTable(g sarif.GroupedResults) *pattern.TestTable {
 		return nil
 	}
 
-	// Sort: errors first, then warnings, then notes; within level by line number
-	sorted := make([]sarif.Result, len(g.Results))
-	copy(sorted, g.Results)
-	sort.Slice(sorted, func(i, j int) bool {
-		li, lj := levelPriority(sorted[i].Level), levelPriority(sorted[j].Level)
+	// Sort: errors first, then warnings, then notes; within level by line number.
+	// GroupByFile returns fresh slices, so sorting in place is safe.
+	sort.Slice(g.Results, func(i, j int) bool {
+		li, lj := levelPriority(g.Results[i].Level), levelPriority(g.Results[j].Level)
 		if li != lj {
 			return li < lj
 		}
-		return sorted[i].Line() < sorted[j].Line()
+		return g.Results[i].Line() < g.Results[j].Line()
 	})
 
-	items := make([]pattern.TestTableItem, len(sorted))
-	for i, r := range sorted {
+	items := make([]pattern.TestTableItem, len(g.Results))
+	for i, r := range g.Results {
 		loc := ""
 		if r.Line() > 0 {
 			loc = fmt.Sprintf(":%d:%d", r.Line(), r.Col())

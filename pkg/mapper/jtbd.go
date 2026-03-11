@@ -100,11 +100,7 @@ func mapJTBDStatus(s string) string {
 }
 
 func shortJTBDFuncName(name string) string {
-	name = strings.TrimPrefix(name, "Test")
-	if len(name) > 30 {
-		name = name[:27] + "..."
-	}
-	return name
+	return truncateString(strings.TrimPrefix(name, "Test"), 30)
 }
 
 func groupByLayer(jobs []jtbd.JobResult) map[string][]jtbd.JobResult {

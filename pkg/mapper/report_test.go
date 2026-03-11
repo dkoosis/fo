@@ -12,10 +12,7 @@ func TestFromReport_TextPassSection(t *testing.T) {
 	sections := []report.Section{
 		{Tool: "vuln", Format: "text", Status: "pass", Content: []byte("No vulnerabilities.")},
 	}
-	patterns, err := FromReport(sections)
-	if err != nil {
-		t.Fatal(err)
-	}
+	patterns := FromReport(sections)
 	if len(patterns) < 1 {
 		t.Fatal("expected at least 1 pattern")
 	}
@@ -37,10 +34,7 @@ func TestFromReport_SARIFSection(t *testing.T) {
 	sections := []report.Section{
 		{Tool: "vet", Format: "sarif", Content: []byte(sarifDoc)},
 	}
-	patterns, err := FromReport(sections)
-	if err != nil {
-		t.Fatal(err)
-	}
+	patterns := FromReport(sections)
 	// Should produce a Summary (report header) + whatever SARIF patterns
 	sum, ok := patterns[0].(*pattern.Summary)
 	if !ok {
@@ -58,10 +52,7 @@ func TestFromReport_MalformedSectionEmitsError(t *testing.T) {
 	sections := []report.Section{
 		{Tool: "lint", Format: "sarif", Content: []byte("not valid json{{{")},
 	}
-	patterns, err := FromReport(sections)
-	if err != nil {
-		t.Fatal("FromReport should not return top-level error for section failures")
-	}
+	patterns := FromReport(sections)
 	// Summary should mark the section as error
 	sum := patterns[0].(*pattern.Summary)
 	if sum.Metrics[0].Kind != kindError {
@@ -88,10 +79,7 @@ func TestFromReport_MultiSection(t *testing.T) {
 		{Tool: "vet", Format: "sarif", Content: []byte(sarifDoc)},
 		{Tool: "arch", Format: "text", Status: "pass", Content: []byte("OK")},
 	}
-	patterns, err := FromReport(sections)
-	if err != nil {
-		t.Fatal(err)
-	}
+	patterns := FromReport(sections)
 	sum := patterns[0].(*pattern.Summary)
 	if len(sum.Metrics) != 2 {
 		t.Errorf("expected 2 tool metrics, got %d", len(sum.Metrics))
@@ -103,7 +91,7 @@ func TestFromReport_AllPassLabel(t *testing.T) {
 		{Tool: "vet", Format: "text", Status: "pass", Content: []byte("OK")},
 		{Tool: "lint", Format: "text", Status: "pass", Content: []byte("OK")},
 	}
-	patterns, _ := FromReport(sections)
+	patterns := FromReport(sections)
 	sum := patterns[0].(*pattern.Summary)
 	if !strings.Contains(sum.Label, "all pass") {
 		t.Errorf("expected 'all pass' in label, got %q", sum.Label)
@@ -115,7 +103,7 @@ func TestFromReport_FailLabel(t *testing.T) {
 		{Tool: "vet", Format: "text", Status: "pass", Content: []byte("OK")},
 		{Tool: "lint", Format: "text", Status: "fail", Content: []byte("errors")},
 	}
-	patterns, _ := FromReport(sections)
+	patterns := FromReport(sections)
 	sum := patterns[0].(*pattern.Summary)
 	if !strings.Contains(sum.Label, "1 fail") {
 		t.Errorf("expected '1 fail' in label, got %q", sum.Label)
