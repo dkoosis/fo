@@ -39,10 +39,16 @@ func TestParse_WithViolation(t *testing.T) {
 			"ArchHasWarnings": true,
 			"ArchWarningsDeps": [
 				{
-					"ComponentA": {"Name": "store"},
-					"ComponentB": {"Name": "eval"},
-					"FileA": "internal/store/store.go",
-					"FileB": "internal/eval/eval.go"
+					"ComponentName": "agentSupervisor",
+					"FileRelativePath": "/internal/agent/supervisor/supervisor.go",
+					"FileAbsolutePath": "/home/user/project/internal/agent/supervisor/supervisor.go",
+					"ResolvedImportName": "github.com/example/project/internal/agent/shell",
+					"Reference": {
+						"Valid": true,
+						"File": "/home/user/project/internal/agent/supervisor/supervisor.go",
+						"Line": 15,
+						"Offset": 2
+					}
 				}
 			],
 			"ArchWarningsNotMatched": [],
@@ -60,8 +66,15 @@ func TestParse_WithViolation(t *testing.T) {
 	if len(result.Violations) != 1 {
 		t.Fatalf("got %d violations, want 1", len(result.Violations))
 	}
-	if result.Violations[0].From != "store" || result.Violations[0].To != "eval" {
-		t.Errorf("violation = %s → %s", result.Violations[0].From, result.Violations[0].To)
+	v := result.Violations[0]
+	if v.From != "agentSupervisor" {
+		t.Errorf("From = %q, want %q", v.From, "agentSupervisor")
+	}
+	if v.To != "github.com/example/project/internal/agent/shell" {
+		t.Errorf("To = %q, want full import path", v.To)
+	}
+	if v.FileFrom != "/internal/agent/supervisor/supervisor.go" {
+		t.Errorf("FileFrom = %q", v.FileFrom)
 	}
 }
 

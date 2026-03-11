@@ -1,30 +1,73 @@
-#!/bin/bash
-# Source this file to activate the fo environment
+#!/usr/bin/env bash
+# Source this file to activate the Go development environment for Codex/Claude sandbox
 # Usage: source .codex/activate.sh
-
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Generic — works for any Go project with Makefile or magefile.go
 
 # Detect platform for prebuilt binaries
-PLATFORM="$(uname -s)-$(uname -m)"
-case "$PLATFORM" in
-    Linux-x86_64)  BINDIR="$REPO_ROOT/.codex/bin/linux-amd64" ;;
-    Darwin-x86_64) BINDIR="$REPO_ROOT/.codex/bin/darwin-amd64" ;;
-    Darwin-arm64)  BINDIR="$REPO_ROOT/.codex/bin/darwin-arm64" ;;
-    *)             BINDIR="" ;;
+_CODEX_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+_CODEX_ARCH=$(uname -m)
+case "$_CODEX_ARCH" in
+  x86_64) _CODEX_ARCH="amd64" ;;
+  aarch64|arm64) _CODEX_ARCH="arm64" ;;
 esac
+_CODEX_PLATFORM="${_CODEX_OS}-${_CODEX_ARCH}"
+_CODEX_PROJECT=$(basename "$PWD")
 
-# Set up caches
-export GOCACHE="$REPO_ROOT/.codex/cache/go-build"
-export GOMODCACHE="$REPO_ROOT/.codex/cache/mod"
-export GOLANGCI_LINT_CACHE="$REPO_ROOT/.codex/cache/golangci-lint"
+export GOTOOLCHAIN=local
+export GOPROXY="https://proxy.golang.org,direct"
+export GOSUMDB="sum.golang.org"
+
+# Repo-local caches
+export GOCACHE="$PWD/.codex/cache/go-build"
+export GOMODCACHE="$PWD/.codex/cache/mod"
+export GOLANGCI_LINT_CACHE="$PWD/.codex/cache/golangci-lint"
 mkdir -p "$GOCACHE" "$GOMODCACHE" "$GOLANGCI_LINT_CACHE" 2>/dev/null || true
 
-# Add bins to PATH
-export PATH="$REPO_ROOT/bin:$BINDIR:$PATH"
-export GOTOOLCHAIN=auto
+# Performance
+export GOMAXPROCS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+ulimit -n 4096 2>/dev/null || true
 
-# Mark as activated
-export FO_ENV_ACTIVATED=1
+# Link prebuilt binaries for current platform
+_PREBUILT_DIR="$PWD/.bin/$_CODEX_PLATFORM"
+if [ -d "$_PREBUILT_DIR" ] && [ -n "$(ls -A "$_PREBUILT_DIR" 2>/dev/null)" ]; then
+  mkdir -p "$PWD/bin" 2>/dev/null || true
+  for tool in "$_PREBUILT_DIR"/*; do
+    [ -f "$tool" ] || continue
+    toolname=$(basename "$tool")
+    if [ ! -e "$PWD/bin/$toolname" ]; then
+      ln -sf "$tool" "$PWD/bin/$toolname" 2>/dev/null || true
+    fi
+  done
+fi
 
-echo "✅ fo environment activated"
-echo "   Tools available: $(which golangci-lint mage 2>/dev/null | wc -l | tr -d ' ')/2"
+# PATH: repo bins first
+export PATH="$PWD/bin:$PWD/.bin:$PATH"
+
+# Helper: available commands (auto-detects build system)
+codex-help() {
+  echo "Build & QA:"
+  if [ -f magefile.go ]; then
+    echo "  mage              # Default QA target"
+    echo "  mage qa           # Full quality gate"
+  elif [ -f Makefile ]; then
+    echo "  make              # Default QA target"
+    echo "  make test         # Run tests"
+    echo "  make lint         # Run linters"
+  fi
+  echo ""
+  echo "Formatting:"
+  echo "  gofumpt -w <file>    # Format Go file (strict)"
+  echo "  goimports -w <file>  # Fix imports"
+  echo ""
+  echo "Code Navigation:"
+  echo "  snipe def <symbol>   # Jump to definition"
+  echo "  snipe callers <sym>  # Find callers"
+  echo "  snipe search \"text\"  # Text search"
+}
+
+_TOOLS_FOUND=$(which golangci-lint snipe 2>/dev/null | wc -l | tr -d ' ')
+echo "${_CODEX_PROJECT} environment activated (${_CODEX_PLATFORM})"
+echo "  Tools: ${_TOOLS_FOUND}/2 core (golangci-lint, snipe)"
+echo "  Run 'codex-help' for available commands"
+
+unset _CODEX_OS _CODEX_ARCH _CODEX_PLATFORM _PREBUILT_DIR _TOOLS_FOUND _CODEX_PROJECT
