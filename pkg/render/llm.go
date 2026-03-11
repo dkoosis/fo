@@ -104,19 +104,7 @@ func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestT
 					sb.WriteString(" (" + item.Duration + ")")
 				}
 				sb.WriteString("\n")
-				if item.Details != "" {
-					lines := strings.Split(item.Details, "\n")
-					max := 3
-					if len(lines) < max {
-						max = len(lines)
-					}
-					for _, line := range lines[:max] {
-						sb.WriteString("    " + line + "\n")
-					}
-					if len(lines) > 3 {
-						fmt.Fprintf(&sb, "    ... (%d more lines)\n", len(lines)-3)
-					}
-				}
+				writeDetails(&sb, item.Details)
 			}
 		}
 	}
@@ -225,19 +213,7 @@ func (l *LLM) renderTestOutput(summaries []*pattern.Summary, tables []*pattern.T
 			}
 			fmt.Fprintf(&sb, "%s %s%s\n", prefix, item.Name, dur)
 
-			if item.Details != "" {
-				lines := strings.Split(item.Details, "\n")
-				max := 3
-				if len(lines) < max {
-					max = len(lines)
-				}
-				for _, line := range lines[:max] {
-					sb.WriteString("    " + line + "\n")
-				}
-				if len(lines) > 3 {
-					fmt.Fprintf(&sb, "    ... (%d more lines)\n", len(lines)-3)
-				}
-			}
+			writeDetails(&sb, item.Details)
 		}
 	}
 
@@ -296,6 +272,24 @@ func parseRuleLocation(name string) (rule string, line, col int) {
 		return rule, line, 0
 	}
 	return name, 0, 0
+}
+
+// writeDetails appends a truncated detail block (max 3 lines, 4-space indent).
+func writeDetails(sb *strings.Builder, details string) {
+	if details == "" {
+		return
+	}
+	lines := strings.Split(details, "\n")
+	show := 3
+	if len(lines) < show {
+		show = len(lines)
+	}
+	for _, line := range lines[:show] {
+		sb.WriteString("    " + line + "\n")
+	}
+	if len(lines) > 3 {
+		fmt.Fprintf(sb, "    ... (%d more lines)\n", len(lines)-3)
+	}
 }
 
 func llmLevelPriority(level string) int {

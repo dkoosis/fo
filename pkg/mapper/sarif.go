@@ -12,8 +12,13 @@ import (
 
 // FromSARIF converts a SARIF document into visualization patterns.
 // Returns: Summary + Leaderboard (if >1 file) + TestTable per file group.
+// When there are 0 issues, returns nil — the caller (report mapper) already
+// shows per-tool status in the top-level summary, so a detail block is noise.
 func FromSARIF(doc *sarif.Document) []pattern.Pattern {
 	stats := sarif.ComputeStats(doc)
+	if stats.TotalIssues == 0 {
+		return nil
+	}
 	var patterns []pattern.Pattern
 
 	// 1. Summary pattern — always first
@@ -36,16 +41,6 @@ func FromSARIF(doc *sarif.Document) []pattern.Pattern {
 }
 
 func sarifSummary(stats sarif.Stats) *pattern.Summary {
-	if stats.TotalIssues == 0 {
-		return &pattern.Summary{
-			Label: "Analysis Results",
-			Kind:  pattern.SummaryKindSARIF,
-			Metrics: []pattern.SummaryItem{
-				{Label: "Issues", Value: "0", Kind: "success"},
-			},
-		}
-	}
-
 	var metrics []pattern.SummaryItem
 	if n := stats.ByLevel["error"]; n > 0 {
 		metrics = append(metrics, pattern.SummaryItem{
