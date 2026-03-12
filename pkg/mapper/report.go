@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/dkoosis/fo/internal/archlint"
+	"github.com/dkoosis/fo/internal/fometrics"
 	"github.com/dkoosis/fo/internal/jscpd"
-	"github.com/dkoosis/fo/internal/metrics"
 	"github.com/dkoosis/fo/internal/report"
 	"github.com/dkoosis/fo/pkg/pattern"
 	"github.com/dkoosis/fo/pkg/sarif"
@@ -16,8 +16,6 @@ import (
 const (
 	statusFail = "fail"
 	statusPass = "pass"
-	kindSuccess = "success"
-	kindError   = "error"
 )
 
 // FromReport converts multi-section report data into patterns.
@@ -29,18 +27,14 @@ func FromReport(sections []report.Section) []pattern.Pattern {
 	pass, fail := 0, 0
 
 	for _, sec := range sections {
-		sectionPatterns, sectionPass, scopeLabel := mapSection(sec)
+		sectionPatterns, kind, scopeLabel := mapSection(sec)
 
-		if sectionPass {
-			pass++
-		} else {
+		if kind == pattern.KindError {
 			fail++
+		} else {
+			pass++
 		}
 
-		kind := kindSuccess
-		if !sectionPass {
-			kind = kindError
-		}
 		toolSummaries = append(toolSummaries, pattern.SummaryItem{
 			Label: sec.Tool,
 			Value: scopeLabel,
@@ -76,7 +70,7 @@ func FromReport(sections []report.Section) []pattern.Pattern {
 	return append([]pattern.Pattern{topSummary}, allPatterns...)
 }
 
-func mapSection(sec report.Section) ([]pattern.Pattern, bool, string) {
+func mapSection(sec report.Section) ([]pattern.Pattern, pattern.ItemKind, string) {
 	switch sec.Format {
 	case "sarif":
 		return mapSARIFSection(sec)
@@ -92,7 +86,7 @@ func mapSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 		return mapTextSection(sec)
 	default:
 		return sectionError(sec.Tool, fmt.Errorf("unknown format %q", sec.Format)),
-			false, fmt.Sprintf("unknown format %q", sec.Format)
+			pattern.KindError, fmt.Sprintf("unknown format %q", sec.Format)
 	}
 }
 
@@ -103,15 +97,18 @@ func sectionError(tool string, err error) []pattern.Pattern {
 	}
 }
 
-func mapSARIFSection(sec report.Section) ([]pattern.Pattern, bool, string) {
+func mapSARIFSection(sec report.Section) ([]pattern.Pattern, pattern.ItemKind, string) {
 	doc, err := sarif.ReadBytes(sec.Content)
 	if err != nil {
-		return sectionError(sec.Tool, err), false, fmt.Sprintf("parse error: %v", err)
+		return sectionError(sec.Tool, err), pattern.KindError, fmt.Sprintf("parse error: %v", err)
 	}
 	stats := sarif.ComputeStats(doc)
 	patterns := fromSARIF(doc, stats)
 
-	passed := stats.ByLevel["error"] == 0
+	kind := pattern.KindSuccess
+	if stats.ByLevel["error"] > 0 {
+		kind = pattern.KindError
+	}
 	label := fmt.Sprintf("%d diags", stats.TotalIssues)
 	if stats.TotalIssues > 0 {
 		var parts []string
@@ -125,13 +122,13 @@ func mapSARIFSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 			label = strings.Join(parts, ", ")
 		}
 	}
-	return patterns, passed, label
+	return patterns, kind, label
 }
 
-func mapTestJSONSection(sec report.Section) ([]pattern.Pattern, bool, string) {
+func mapTestJSONSection(sec report.Section) ([]pattern.Pattern, pattern.ItemKind, string) {
 	results, _, err := testjson.ParseBytes(sec.Content)
 	if err != nil {
-		return sectionError(sec.Tool, err), false, fmt.Sprintf("parse error: %v", err)
+		return sectionError(sec.Tool, err), pattern.KindError, fmt.Sprintf("parse error: %v", err)
 	}
 	stats := testjson.ComputeStats(results)
 	patterns := fromTestJSON(results, stats)
@@ -139,70 +136,122 @@ func mapTestJSONSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 	passed := stats.Failed == 0 && stats.BuildErrors == 0 && stats.Panics == 0
 	if passed {
 		label := fmt.Sprintf("PASS — %d tests, %d packages", stats.TotalTests, stats.Packages)
-		return patterns, true, label
+		return patterns, pattern.KindSuccess, label
 	}
 	label := fmt.Sprintf("FAIL — %d failed, %d passed", stats.Failed, stats.Passed)
-	return patterns, false, label
+	return patterns, pattern.KindError, label
 }
 
-func mapMetricsSection(sec report.Section) ([]pattern.Pattern, bool, string) {
-	m, err := metrics.Parse(sec.Content)
+func mapMetricsSection(sec report.Section) ([]pattern.Pattern, pattern.ItemKind, string) {
+	doc, err := fometrics.Parse(sec.Content)
 	if err != nil {
-		return sectionError(sec.Tool, err), false, fmt.Sprintf("parse error: %v", err)
+		return sectionError(sec.Tool, err), pattern.KindError, fmt.Sprintf("parse error: %v", err)
 	}
 
-	passed := len(m.Regressions) == 0
-
-	var label string
-	if len(m.Rows) > 0 && len(m.Columns) > 0 {
-		row := m.Rows[0]
-		var parts []string
-		for i, col := range m.Columns {
-			if i < len(row.Values) {
-				parts = append(parts, fmt.Sprintf("%s=%.3f", col, row.Values[i]))
-			}
-		}
-		prefix := "PASS"
-		if !passed {
-			prefix = "FAIL"
-		}
-		label = fmt.Sprintf("%s — %s (%s", prefix, strings.Join(parts, " "), m.Scope)
-		if passed {
-			label += ", no regressions)"
-		} else {
-			label += ")"
-		}
-	}
+	kind := mapMetricsStatus(doc.Status)
+	label := buildMetricsLabel(doc)
 
 	var patterns []pattern.Pattern
-	if len(m.Regressions) > 0 {
-		var items []pattern.TestTableItem
-		for _, r := range m.Regressions {
+
+	if len(doc.Details) > 0 {
+		items := make([]pattern.TestTableItem, 0, len(doc.Details))
+		for _, d := range doc.Details {
+			status := mapDetailSeverity(d.Severity)
+			name := d.Message
+			if d.File != "" {
+				loc := d.File
+				if d.Line > 0 {
+					loc = fmt.Sprintf("%s:%d", d.File, d.Line)
+				}
+				name = loc + " " + d.Message
+			}
 			items = append(items, pattern.TestTableItem{
-				Name:    fmt.Sprintf("regression: %s %s", r.Group, r.Metric),
-				Status:  statusFail,
-				Details: fmt.Sprintf("%.3f→%.3f (%.3f)", r.From, r.To, r.To-r.From),
+				Name:   name,
+				Status: status,
 			})
 		}
 		patterns = append(patterns, &pattern.TestTable{
-			Label:   sec.Tool + " regressions",
+			Label:   sec.Tool + " details",
 			Results: items,
 		})
 	}
 
-	return patterns, passed, label
-}
-
-func mapArchLintSection(sec report.Section) ([]pattern.Pattern, bool, string) {
-	result, err := archlint.Parse(sec.Content)
-	if err != nil {
-		return sectionError(sec.Tool, err), false, fmt.Sprintf("parse error: %v", err)
+	// Ensure status:"fail" produces exit code 1 even when details are empty.
+	if doc.Status == "fail" && len(doc.Details) == 0 {
+		patterns = append(patterns, &pattern.TestTable{
+			Label: sec.Tool,
+			Results: []pattern.TestTableItem{
+				{Name: "metrics check failed", Status: "fail"},
+			},
+		})
 	}
 
-	passed := !result.HasWarnings
-	if passed {
+	return patterns, kind, label
+}
+
+func mapMetricsStatus(status string) pattern.ItemKind {
+	switch status {
+	case "fail":
+		return pattern.KindError
+	case "warn":
+		return pattern.KindWarning
+	default:
+		return pattern.KindSuccess
+	}
+}
+
+func buildMetricsLabel(doc *fometrics.Document) string {
+	prefix := strings.ToUpper(doc.Status)
+
+	parts := make([]string, 0, len(doc.Metrics))
+	for _, m := range doc.Metrics {
+		formatted := formatMetricValue(m)
+		parts = append(parts, fmt.Sprintf("%s=%s", m.Name, formatted))
+	}
+
+	label := prefix
+	if len(parts) > 0 {
+		label += " — " + strings.Join(parts, " ")
+	}
+	if doc.Summary != "" {
+		label += " (" + doc.Summary + ")"
+	}
+	return label
+}
+
+func formatMetricValue(m fometrics.Metric) string {
+	var s string
+	if m.Value == float64(int64(m.Value)) {
+		s = fmt.Sprintf("%d", int64(m.Value))
+	} else {
+		s = fmt.Sprintf("%.3f", m.Value)
+	}
+	if m.Unit != "" {
+		s += m.Unit
+	}
+	return s
+}
+
+func mapDetailSeverity(severity string) string {
+	switch severity {
+	case "error":
+		return "fail"
+	case "warn":
+		return "skip"
+	default:
+		return "pass"
+	}
+}
+
+func mapArchLintSection(sec report.Section) ([]pattern.Pattern, pattern.ItemKind, string) {
+	result, err := archlint.Parse(sec.Content)
+	if err != nil {
+		return sectionError(sec.Tool, err), pattern.KindError, fmt.Sprintf("parse error: %v", err)
+	}
+
+	if !result.HasWarnings {
 		label := fmt.Sprintf("pass (%d checks, 0 violations)", len(result.Checks))
-		return nil, true, label
+		return nil, pattern.KindSuccess, label
 	}
 
 	var items []pattern.TestTableItem
@@ -222,17 +271,17 @@ func mapArchLintSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 	if len(result.Violations) != 1 {
 		label += "s"
 	}
-	return patterns, false, label
+	return patterns, pattern.KindError, label
 }
 
-func mapJSCPDSection(sec report.Section) ([]pattern.Pattern, bool, string) {
+func mapJSCPDSection(sec report.Section) ([]pattern.Pattern, pattern.ItemKind, string) {
 	result, err := jscpd.Parse(sec.Content)
 	if err != nil {
-		return sectionError(sec.Tool, err), false, fmt.Sprintf("parse error: %v", err)
+		return sectionError(sec.Tool, err), pattern.KindError, fmt.Sprintf("parse error: %v", err)
 	}
 
 	if len(result.Clones) == 0 {
-		return nil, true, "pass (0 clones)"
+		return nil, pattern.KindSuccess, "pass (0 clones)"
 	}
 
 	var items []pattern.TestTableItem
@@ -250,13 +299,16 @@ func mapJSCPDSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 		},
 	}
 	label := fmt.Sprintf("%d clones", len(result.Clones))
-	return patterns, true, label // clones don't fail the report
+	return patterns, pattern.KindSuccess, label // clones don't fail the report
 }
 
 // mapTextSection handles text sections with explicit pass/fail status.
 // Text sections rely on explicit status from the delimiter; content is opaque.
-func mapTextSection(sec report.Section) ([]pattern.Pattern, bool, string) {
-	passed := sec.Status != statusFail
+func mapTextSection(sec report.Section) ([]pattern.Pattern, pattern.ItemKind, string) {
+	kind := pattern.KindSuccess
+	if sec.Status == statusFail {
+		kind = pattern.KindError
+	}
 	status := sec.Status
 	if status == "" {
 		status = statusPass
@@ -272,5 +324,5 @@ func mapTextSection(sec report.Section) ([]pattern.Pattern, bool, string) {
 		}
 		label = status + " — " + firstLine
 	}
-	return nil, passed, label
+	return nil, kind, label
 }

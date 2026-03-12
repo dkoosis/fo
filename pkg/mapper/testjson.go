@@ -95,9 +95,9 @@ func testSummary(s testjson.Stats) *pattern.Summary {
 		})
 	}
 	if s.Passed > 0 {
-		kind := "success"
+		kind := pattern.KindSuccess
 		if s.Failed > 0 {
-			kind = "info"
+			kind = pattern.KindInfo
 		}
 		metrics = append(metrics, pattern.SummaryItem{
 			Label: "Passed", Value: fmt.Sprintf("%d/%d tests", s.Passed, s.TotalTests), Kind: kind,

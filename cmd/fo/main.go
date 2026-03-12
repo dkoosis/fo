@@ -52,6 +52,7 @@ USAGE
 INPUT FORMATS (auto-detected from stdin)
   SARIF 2.1.0     Static analysis results (golangci-lint, gosec, etc.)
   go test -json   Test execution stream (supports live + batch)
+  fo-metrics/v1   Scalar metrics, conformance, summaries (eval, jscpd, go-arch-lint)
   report          Multi-tool delimited report (--- tool:X format:Y ---)
 
 OUTPUT FORMATS (--format)
@@ -65,11 +66,13 @@ FLAGS
   --theme <name>    Color theme: default | orca | mono (default: default)
 
 SUBCOMMANDS
-  fo wrap sarif    Convert line-based diagnostics to SARIF 2.1.0
-    --tool <name>    Tool name for SARIF driver (required)
-    --rule <id>      Default rule ID (default: finding)
-    --level <level>  Severity: error | warning | note (default: warning)
-    --version <str>  Tool version string
+  fo wrap sarif      Convert line-based diagnostics to SARIF 2.1.0
+    --tool <name>      Tool name for SARIF driver (required)
+    --rule <id>        Default rule ID (default: finding)
+    --level <level>    Severity: error | warning | note (default: warning)
+    --version <str>    Tool version string
+  fo wrap jscpd      Convert jscpd JSON report to fo-metrics/v1
+  fo wrap archlint   Convert go-arch-lint JSON to fo-metrics/v1
 
 EXIT CODES
   0   Clean — no errors or test failures
@@ -292,18 +295,14 @@ func exitCode(patterns []pattern.Pattern) int {
 
 // --- fo wrap sarif subcommand ---
 
-const wrapUsage = `fo wrap sarif — convert line diagnostics to SARIF 2.1.0
+const wrapUsage = `fo wrap — convert tool output to fo-compatible formats
 
-USAGE
-  <tool> ... 2>&1 | fo wrap sarif --tool <name> [FLAGS]
+SUBCOMMANDS
+  fo wrap sarif      Convert line diagnostics to SARIF 2.1.0
+  fo wrap jscpd      Convert jscpd JSON report to fo-metrics/v1
+  fo wrap archlint   Convert go-arch-lint JSON to fo-metrics/v1
 
-Reads file:line:col: message lines from stdin, emits SARIF JSON to stdout.
-Supports three line formats:
-  file.go:15:3: message      (file, line, column, message)
-  file.go:42: message        (file, line, message)
-  file.go                    (file only — uses "needs formatting")
-
-FLAGS
+SARIF FLAGS
   --tool <name>     Tool name for SARIF driver.name (required)
   --rule <id>       Default rule ID (default: finding)
   --level <level>   Severity: error | warning | note (default: warning)
@@ -312,12 +311,25 @@ FLAGS
 EXAMPLES
   go vet ./... 2>&1 | fo wrap sarif --tool govet
   gofmt -l ./...    | fo wrap sarif --tool gofmt --rule needs-formatting
-  staticcheck ./... | fo wrap sarif --tool staticcheck --level error
+  jscpd --reporters json . | fo wrap jscpd | fo
+  go-arch-lint check --json | fo wrap archlint | fo
 `
 
 func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	if len(args) == 0 || args[0] != "sarif" {
-		fmt.Fprintf(stderr, "fo wrap: unknown subcommand (expected 'sarif')\n\n")
+	if len(args) == 0 {
+		fmt.Fprintf(stderr, "fo wrap: subcommand required (sarif, jscpd, archlint)\n\n")
+		fmt.Fprint(stderr, wrapUsage)
+		return 2
+	}
+	switch args[0] {
+	case "sarif":
+		// fall through to sarif handling below
+	case "jscpd":
+		return runWrapJscpd(stdin, stdout, stderr)
+	case "archlint":
+		return runWrapArchlint(stdin, stdout, stderr)
+	default:
+		fmt.Fprintf(stderr, "fo wrap: unknown subcommand %q (expected sarif, jscpd, archlint)\n\n", args[0])
 		fmt.Fprint(stderr, wrapUsage)
 		return 2
 	}
