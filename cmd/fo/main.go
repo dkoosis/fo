@@ -316,8 +316,20 @@ EXAMPLES
 `
 
 func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	if len(args) == 0 || args[0] != "sarif" {
-		fmt.Fprintf(stderr, "fo wrap: unknown subcommand (expected 'sarif')\n\n")
+	if len(args) == 0 {
+		fmt.Fprintf(stderr, "fo wrap: subcommand required (sarif, jscpd, archlint)\n\n")
+		fmt.Fprint(stderr, wrapUsage)
+		return 2
+	}
+	switch args[0] {
+	case "sarif":
+		// fall through to sarif handling below
+	case "jscpd":
+		return runWrapJscpd(stdin, stdout, stderr)
+	case "archlint":
+		return runWrapArchlint(stdin, stdout, stderr)
+	default:
+		fmt.Fprintf(stderr, "fo wrap: unknown subcommand %q (expected sarif, jscpd, archlint)\n\n", args[0])
 		fmt.Fprint(stderr, wrapUsage)
 		return 2
 	}
