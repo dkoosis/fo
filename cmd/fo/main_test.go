@@ -493,3 +493,64 @@ func TestJTBD_MultiRunSARIF(t *testing.T) {
 		t.Error("missing results from second run")
 	}
 }
+
+// --- fo-metrics E2E Tests ---
+
+func TestRun_ReportWithFoMetrics(t *testing.T) {
+	metricsJSON := `{"schema":"fo-metrics/v1","tool":"eval","status":"pass","metrics":[{"name":"MRR","value":0.983,"threshold":0.95,"direction":"higher_is_better"},{"name":"FPR","value":0.0,"threshold":0.05,"direction":"lower_is_better"}],"summary":"86 queries"}`
+	input := "--- tool:eval format:metrics ---\n" + metricsJSON + "\n"
+
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "llm"}, strings.NewReader(input), &stdout, &stderr)
+	if code != 0 {
+		t.Errorf("exit code = %d, want 0; stderr: %s", code, stderr.String())
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "eval:") {
+		t.Errorf("expected eval tool in output:\n%s", out)
+	}
+	if !strings.Contains(out, "MRR") {
+		t.Errorf("expected MRR metric in output:\n%s", out)
+	}
+}
+
+func TestRun_ReportWithFoMetricsFailing(t *testing.T) {
+	metricsJSON := `{"schema":"fo-metrics/v1","tool":"eval","status":"fail","metrics":[{"name":"MRR","value":0.8}],"details":[{"message":"MRR dropped below threshold","severity":"error"}]}`
+	input := "--- tool:eval format:metrics ---\n" + metricsJSON + "\n"
+
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "llm"}, strings.NewReader(input), &stdout, &stderr)
+	if code != 1 {
+		t.Errorf("exit code = %d, want 1; stderr: %s", code, stderr.String())
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "MRR dropped") {
+		t.Errorf("expected detail message in output:\n%s", out)
+	}
+}
+
+func TestRun_FoMetricsFailNoDetails(t *testing.T) {
+	metricsJSON := `{"schema":"fo-metrics/v1","tool":"check","status":"fail","metrics":[{"name":"score","value":0.5}]}`
+	input := "--- tool:check format:metrics ---\n" + metricsJSON + "\n"
+
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "llm"}, strings.NewReader(input), &stdout, &stderr)
+	if code != 1 {
+		t.Errorf("exit code = %d, want 1 for status:fail even without details; stderr: %s", code, stderr.String())
+	}
+}
+
+func TestRun_FoMetricsRejectsV2(t *testing.T) {
+	metricsJSON := `{"schema":"fo-metrics/v2","tool":"x","status":"pass","metrics":[]}`
+	input := "--- tool:x format:metrics ---\n" + metricsJSON + "\n"
+
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "llm"}, strings.NewReader(input), &stdout, &stderr)
+	if code != 1 {
+		t.Errorf("exit code = %d, want 1 (error pattern from unsupported schema); stderr: %s", code, stderr.String())
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "unsupported schema") {
+		t.Errorf("expected 'unsupported schema' error in output:\n%s", out)
+	}
+}
