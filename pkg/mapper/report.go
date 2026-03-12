@@ -203,7 +203,7 @@ func mapMetricsStatus(status string) pattern.ItemKind {
 func buildMetricsLabel(doc *fometrics.Document) string {
 	prefix := strings.ToUpper(doc.Status)
 
-	var parts []string
+	parts := make([]string, 0, len(doc.Metrics))
 	for _, m := range doc.Metrics {
 		formatted := formatMetricValue(m)
 		parts = append(parts, fmt.Sprintf("%s=%s", m.Name, formatted))

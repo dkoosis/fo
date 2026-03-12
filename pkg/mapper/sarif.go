@@ -140,11 +140,11 @@ func sarifFileTable(g sarif.GroupedResults) *pattern.TestTable {
 func mapLevel(level string) string {
 	switch level {
 	case "error":
-		return "fail"
+		return statusFail
 	case "warning":
 		return "skip"
 	default:
-		return "pass"
+		return statusPass
 	}
 }
 
