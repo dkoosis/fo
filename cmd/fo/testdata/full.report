@@ -7,7 +7,7 @@
 {"Time":"2024-01-01T00:00:00Z","Action":"pass","Package":"example.com/pkg","Test":"TestA","Elapsed":0.05}
 {"Time":"2024-01-01T00:00:00Z","Action":"pass","Package":"example.com/pkg","Elapsed":0.1}
 --- tool:eval format:metrics ---
-{"scope":"86 queries · 51 nugs","columns":["MRR","P@5","P@10","NDCG5"],"rows":[{"name":"Overall","values":[0.983,0.227,0.119,0.961],"n":86}],"regressions":[]}
+{"schema":"fo-metrics/v1","tool":"eval","status":"pass","metrics":[{"name":"MRR","value":0.983,"threshold":0.95,"direction":"higher_is_better"},{"name":"P@5","value":0.227},{"name":"P@10","value":0.119},{"name":"NDCG5","value":0.961,"threshold":0.9,"direction":"higher_is_better"}],"summary":"86 queries, 0 regressions"}
 --- tool:vuln format:sarif ---
 {"version":"2.1.0","runs":[{"tool":{"driver":{"name":"govulncheck"}},"results":[]}]}
 --- tool:arch format:archlint ---
