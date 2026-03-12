@@ -9,6 +9,16 @@ const (
 	SummaryKindReport SummaryKind = "report"
 )
 
+// ItemKind controls styling/coloring of summary items.
+type ItemKind string
+
+const (
+	KindSuccess ItemKind = "success"
+	KindError   ItemKind = "error"
+	KindWarning ItemKind = "warning"
+	KindInfo    ItemKind = "info"
+)
+
 // Summary represents high-level metrics and counts.
 type Summary struct {
 	Label   string
@@ -18,9 +28,9 @@ type Summary struct {
 
 // SummaryItem is a single metric in a summary.
 type SummaryItem struct {
-	Label string // e.g., "Errors", "Warnings", "Passed"
-	Value string // formatted value
-	Kind  string // "success", "error", "warning", "info" — affects coloring
+	Label string   // e.g., "Errors", "Warnings", "Passed"
+	Value string   // formatted value
+	Kind  ItemKind // KindSuccess, KindError, KindWarning, KindInfo — affects coloring
 }
 
 func (s *Summary) Type() PatternType { return PatternTypeSummary }

@@ -250,13 +250,13 @@ func (t *Terminal) renderComparison(c *pattern.Comparison) string {
 	return sb.String()
 }
 
-func (t *Terminal) iconStyle(kind string) (string, lipgloss.Style) {
+func (t *Terminal) iconStyle(kind pattern.ItemKind) (string, lipgloss.Style) {
 	switch kind {
-	case "success":
+	case pattern.KindSuccess:
 		return t.theme.Icons.Pass, t.theme.Success
-	case "error":
+	case pattern.KindError:
 		return t.theme.Icons.Fail, t.theme.Error
-	case "warning":
+	case pattern.KindWarning:
 		return t.theme.Icons.Warn, t.theme.Warning
 	default:
 		return t.theme.Icons.Info, t.theme.Primary
