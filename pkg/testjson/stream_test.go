@@ -9,62 +9,89 @@ import (
 	"time"
 )
 
-func TestStream_CallsFuncForEachEvent(t *testing.T) {
-	input := strings.Join([]string{
-		`{"Action":"start","Package":"example.com/pkg"}`,
-		`{"Action":"run","Package":"example.com/pkg","Test":"TestFoo"}`,
-		`{"Action":"pass","Package":"example.com/pkg","Test":"TestFoo","Elapsed":0.01}`,
-		`{"Action":"pass","Package":"example.com/pkg","Elapsed":0.5}`,
-	}, "\n") + "\n"
+func TestStream_EventDeliveryAndMalformedCounting(t *testing.T) {
+	t.Parallel()
 
-	var events []TestEvent
-	malformed, err := Stream(context.Background(), strings.NewReader(input), func(e TestEvent) {
-		events = append(events, e)
-	})
-	if err != nil {
-		t.Fatalf("Stream() error: %v", err)
-	}
-	if malformed != 0 {
-		t.Errorf("got %d malformed, want 0", malformed)
-	}
-	if len(events) != 4 {
-		t.Fatalf("got %d events, want 4", len(events))
-	}
-	if events[0].Action != "start" {
-		t.Errorf("events[0].Action = %q, want \"start\"", events[0].Action)
-	}
-	if events[2].Test != "TestFoo" {
-		t.Errorf("events[2].Test = %q, want \"TestFoo\"", events[2].Test)
-	}
-}
-
-func TestStream_SkipsMalformedLines(t *testing.T) {
-	input := `not json
+	tests := []struct {
+		name          string
+		input         string
+		wantMalformed int
+		wantEvents    int
+		check         func(t *testing.T, events []TestEvent)
+	}{
+		{
+			name: "valid stream emits all events in order",
+			input: strings.Join([]string{
+				`{"Action":"start","Package":"example.com/pkg"}`,
+				`{"Action":"run","Package":"example.com/pkg","Test":"TestFoo"}`,
+				`{"Action":"pass","Package":"example.com/pkg","Test":"TestFoo","Elapsed":0.01}`,
+				`{"Action":"pass","Package":"example.com/pkg","Elapsed":0.5}`,
+			}, "\n") + "\n",
+			wantMalformed: 0,
+			wantEvents:    4,
+			check: func(t *testing.T, events []TestEvent) {
+				t.Helper()
+				if events[0].Action != "start" {
+					t.Fatalf("events[0].Action = %q, want start", events[0].Action)
+				}
+				if events[2].Test != "TestFoo" {
+					t.Fatalf("events[2].Test = %q, want TestFoo", events[2].Test)
+				}
+			},
+		},
+		{
+			name: "malformed lines are skipped",
+			input: `not json
 {"Action":"start","Package":"example.com/pkg"}
 also not json
 {"Action":"pass","Package":"example.com/pkg","Elapsed":0.1}
-`
-	var events []TestEvent
-	malformed, err := Stream(context.Background(), strings.NewReader(input), func(e TestEvent) {
-		events = append(events, e)
-	})
-	if err != nil {
-		t.Fatalf("Stream() error: %v", err)
+`,
+			wantMalformed: 2,
+			wantEvents:    2,
+		},
+		{
+			name: "mixed malformed and valid lines",
+			input: strings.Join([]string{
+				`{"Action":"run","Package":"x","Test":"T1"}`,
+				`{CORRUPTED}`,
+				`{"Action":"fail","Package":"x","Test":"T1","Elapsed":0.1}`,
+				`not-json-at-all`,
+				`{"Action":"fail","Package":"x","Elapsed":0.2}`,
+			}, "\n") + "\n",
+			wantMalformed: 2,
+			wantEvents:    3,
+		},
 	}
-	if malformed != 2 {
-		t.Errorf("got %d malformed, want 2", malformed)
-	}
-	if len(events) != 2 {
-		t.Fatalf("got %d events, want 2 (malformed lines skipped)", len(events))
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			var events []TestEvent
+			malformed, err := Stream(context.Background(), strings.NewReader(tt.input), func(e TestEvent) {
+				events = append(events, e)
+			})
+			if err != nil {
+				t.Fatalf("Stream() error: %v", err)
+			}
+			if malformed != tt.wantMalformed {
+				t.Fatalf("malformed = %d, want %d", malformed, tt.wantMalformed)
+			}
+			if len(events) != tt.wantEvents {
+				t.Fatalf("events = %d, want %d", len(events), tt.wantEvents)
+			}
+			if tt.check != nil {
+				tt.check(t, events)
+			}
+		})
 	}
 }
 
 func TestStream_RespectsContextCancellation(t *testing.T) {
-	input := `{"Action":"start","Package":"example.com/pkg"}` + "\n"
+	t.Parallel()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var count int
-	_, err := Stream(ctx, strings.NewReader(input), func(_ TestEvent) {
+	_, err := Stream(ctx, strings.NewReader(`{"Action":"start","Package":"example.com/pkg"}`+"\n"), func(_ TestEvent) {
 		count++
 		cancel()
 	})
@@ -72,7 +99,7 @@ func TestStream_RespectsContextCancellation(t *testing.T) {
 		t.Fatalf("Stream() unexpected error: %v", err)
 	}
 	if count != 1 {
-		t.Errorf("got %d events, want 1", count)
+		t.Fatalf("events processed = %d, want 1", count)
 	}
 }
 
@@ -96,6 +123,8 @@ func (b *blockingReader) Close() error {
 }
 
 func TestStream_CancelUnblocksBlockedReader(t *testing.T) {
+	t.Parallel()
+
 	br := &blockingReader{done: make(chan struct{})}
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
@@ -112,31 +141,6 @@ func TestStream_CancelUnblocksBlockedReader(t *testing.T) {
 			t.Fatalf("expected DeadlineExceeded, got: %v", err)
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("Stream did not return after context cancellation — blocked on reader")
-	}
-}
-
-func TestStream_MalformedCountReturned(t *testing.T) {
-	// Mix of valid and invalid NDJSON with a corrupted fail event.
-	input := strings.Join([]string{
-		`{"Action":"run","Package":"x","Test":"T1"}`,
-		`{CORRUPTED}`,
-		`{"Action":"fail","Package":"x","Test":"T1","Elapsed":0.1}`,
-		`not-json-at-all`,
-		`{"Action":"fail","Package":"x","Elapsed":0.2}`,
-	}, "\n") + "\n"
-
-	var events []TestEvent
-	malformed, err := Stream(context.Background(), strings.NewReader(input), func(e TestEvent) {
-		events = append(events, e)
-	})
-	if err != nil {
-		t.Fatalf("Stream() error: %v", err)
-	}
-	if malformed != 2 {
-		t.Errorf("got %d malformed, want 2", malformed)
-	}
-	if len(events) != 3 {
-		t.Errorf("got %d events, want 3", len(events))
+		t.Fatal("Stream did not return after context cancellation")
 	}
 }
