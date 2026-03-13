@@ -65,9 +65,22 @@ codex-help() {
   echo "  snipe search \"text\"  # Text search"
 }
 
-_TOOLS_FOUND=$(which golangci-lint snipe 2>/dev/null | wc -l | tr -d ' ')
+# Report tool status
+_TOOLS_OK=0
+_TOOLS_MISS=0
+for _t in golangci-lint snipe jq go; do
+  if command -v "$_t" >/dev/null 2>&1; then
+    _TOOLS_OK=$((_TOOLS_OK + 1))
+  else
+    _TOOLS_MISS=$((_TOOLS_MISS + 1))
+  fi
+done
+
 echo "${_CODEX_PROJECT} environment activated (${_CODEX_PLATFORM})"
-echo "  Tools: ${_TOOLS_FOUND}/2 core (golangci-lint, snipe)"
+echo "  Tools: ${_TOOLS_OK}/4 core (go, golangci-lint, snipe, jq)"
+if [ "$_TOOLS_MISS" -gt 0 ]; then
+  echo "  WARNING: ${_TOOLS_MISS} tool(s) missing — run 'make help' for details"
+fi
 echo "  Run 'codex-help' for available commands"
 
-unset _CODEX_OS _CODEX_ARCH _CODEX_PLATFORM _PREBUILT_DIR _TOOLS_FOUND _CODEX_PROJECT
+unset _CODEX_OS _CODEX_ARCH _CODEX_PLATFORM _PREBUILT_DIR _TOOLS_OK _TOOLS_MISS _CODEX_PROJECT _t

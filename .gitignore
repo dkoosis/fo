@@ -43,3 +43,8 @@ bin/
 
 # Git worktrees
 .worktrees/
+
+# Codex sandbox runtime artifacts
+.codex/cache/
+.codex/setup-report.json
+.codex/setup-issues.txt
