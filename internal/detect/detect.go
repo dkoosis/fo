@@ -2,6 +2,7 @@
 package detect
 
 import (
+	"bytes"
 	"encoding/json"
 
 	"github.com/dkoosis/fo/internal/report"
@@ -53,11 +54,13 @@ func Sniff(data []byte) Format {
 
 func isSARIF(data []byte) bool {
 	var probe struct {
-		Version string `json:"version"`
-		Schema  string `json:"$schema"`
-		Runs    []json.RawMessage `json:"runs"`
+		Version string             `json:"version"`
+		Schema  string             `json:"$schema"`
+		Runs    []json.RawMessage  `json:"runs"`
 	}
-	if err := json.Unmarshal(data, &probe); err != nil {
+	// Use Decoder instead of Unmarshal to tolerate trailing text
+	// (golangci-lint v2 appends a text summary after the SARIF JSON).
+	if err := json.NewDecoder(bytes.NewReader(data)).Decode(&probe); err != nil {
 		return false
 	}
 	// SARIF version is "2.1.0" and has runs array

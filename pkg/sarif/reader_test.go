@@ -31,25 +31,27 @@ func TestRead_ValidWithTrailingWhitespace(t *testing.T) {
 	}
 }
 
-func TestRead_TrailingGarbageText(t *testing.T) {
-	input := minimalSARIF + `garbage`
-	_, err := Read(strings.NewReader(input))
-	if err == nil {
-		t.Fatal("expected error for trailing garbage text, got nil")
+func TestRead_TrailingPlainText(t *testing.T) {
+	// golangci-lint v2 appends a text summary after SARIF — tolerate it.
+	input := minimalSARIF + "\n1 issues:\n* gocognit: 1\n"
+	doc, err := Read(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("trailing plain text should be accepted, got error: %v", err)
 	}
-	if !strings.Contains(err.Error(), "trailing data") {
-		t.Errorf("expected trailing data error, got: %v", err)
+	if doc.Version != wantVersion {
+		t.Errorf("expected version %s, got %s", wantVersion, doc.Version)
 	}
 }
 
 func TestRead_TrailingJSONObject(t *testing.T) {
+	// Trailing JSON is tolerated — we only care about the first SARIF document.
 	input := minimalSARIF + `{"extra":"object"}`
-	_, err := Read(strings.NewReader(input))
-	if err == nil {
-		t.Fatal("expected error for trailing JSON object, got nil")
+	doc, err := Read(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("trailing JSON should be accepted, got error: %v", err)
 	}
-	if !strings.Contains(err.Error(), "trailing data") {
-		t.Errorf("expected trailing data error, got: %v", err)
+	if doc.Version != wantVersion {
+		t.Errorf("expected version %s, got %s", wantVersion, doc.Version)
 	}
 }
 
@@ -77,10 +79,24 @@ func TestReadBytes_ValidDocument(t *testing.T) {
 	}
 }
 
-func TestReadBytes_TrailingGarbage(t *testing.T) {
+func TestReadBytes_TrailingJSON(t *testing.T) {
 	input := minimalSARIF + `{"extra":true}`
-	_, err := ReadBytes([]byte(input))
-	if err == nil {
-		t.Fatal("expected error for trailing garbage via ReadBytes, got nil")
+	doc, err := ReadBytes([]byte(input))
+	if err != nil {
+		t.Fatalf("trailing JSON should be accepted via ReadBytes, got error: %v", err)
+	}
+	if doc.Version != wantVersion {
+		t.Errorf("expected version %s, got %s", wantVersion, doc.Version)
+	}
+}
+
+func TestReadBytes_TrailingText(t *testing.T) {
+	input := minimalSARIF + "\n1 issues:\n* gocognit: 1\n"
+	doc, err := ReadBytes([]byte(input))
+	if err != nil {
+		t.Fatalf("trailing text should be accepted via ReadBytes, got error: %v", err)
+	}
+	if doc.Version != wantVersion {
+		t.Errorf("expected version %s, got %s", wantVersion, doc.Version)
 	}
 }

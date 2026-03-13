@@ -87,3 +87,14 @@ func TestSniff_ReportJscpdFormat(t *testing.T) {
 		t.Errorf("Sniff() = %v, want Report", got)
 	}
 }
+
+func TestSniff_SARIFWithTrailingText(t *testing.T) {
+	// golangci-lint v2 appends a text summary after the SARIF JSON document
+	input := `{"version":"2.1.0","$schema":"https://sarif.dev","runs":[{"tool":{"driver":{"name":"golangci-lint"}},"results":[]}]}
+1 issues:
+* gocognit: 1
+`
+	if got := Sniff([]byte(input)); got != SARIF {
+		t.Errorf("expected SARIF with trailing text, got %d", got)
+	}
+}

@@ -16,10 +16,9 @@ func Read(r io.Reader) (*Document, error) {
 	if err := dec.Decode(&doc); err != nil {
 		return nil, fmt.Errorf("decode sarif: %w", err)
 	}
-	// Reject trailing data after the SARIF document.
-	if err := dec.Decode(new(json.RawMessage)); err != io.EOF {
-		return nil, fmt.Errorf("unexpected trailing data after SARIF document")
-	}
+	// Trailing data is tolerated: golangci-lint v2 appends a text summary
+	// after the SARIF JSON document, and the decoder already consumed the
+	// complete first JSON value successfully.
 	return validateDocument(&doc)
 }
 
