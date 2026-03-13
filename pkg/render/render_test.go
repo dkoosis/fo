@@ -1,26 +1,35 @@
-package render
+package render_test
 
 import (
 	"strings"
 	"testing"
 
 	"github.com/dkoosis/fo/pkg/pattern"
+	"github.com/dkoosis/fo/pkg/render"
 )
 
-func TestTerminal_RenderReportPatterns(t *testing.T) {
-	patterns := []pattern.Pattern{
+type unknownPattern struct{}
+
+func (unknownPattern) Type() pattern.PatternType { return "unknown" }
+
+func TestTerminalRender_ShowsSummaryAndSkipsUnknownPatterns(t *testing.T) {
+	r := render.NewTerminal(render.MonoTheme(), 80)
+
+	out := r.Render([]pattern.Pattern{
 		&pattern.Summary{
 			Label: "REPORT: 2 tools — all pass",
 			Kind:  pattern.SummaryKindReport,
 			Metrics: []pattern.SummaryItem{
-				{Label: "vet", Value: "0 diags", Kind: "success"},
-				{Label: "test", Value: "PASS — 60 tests", Kind: "success"},
+				{Label: "vet", Value: "0 diags", Kind: pattern.KindSuccess},
+				{Label: "test", Value: "PASS — 60 tests", Kind: pattern.KindSuccess},
 			},
 		},
-	}
-	r := NewTerminal(MonoTheme(), 80)
-	out := r.Render(patterns)
-	if !strings.Contains(out, "REPORT:") {
-		t.Errorf("expected REPORT in output:\n%s", out)
+		unknownPattern{},
+	})
+
+	for _, want := range []string{"REPORT:", "vet: 0 diags", "test: PASS — 60 tests"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected output to contain %q, got:\n%s", want, out)
+		}
 	}
 }
