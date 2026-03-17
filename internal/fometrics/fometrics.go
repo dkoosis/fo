@@ -58,8 +58,6 @@ func validate(doc *Document) error {
 		// exact match, ok
 	case strings.HasPrefix(doc.Schema, "fo-metrics/v1."):
 		// minor version, ok
-	case strings.HasPrefix(doc.Schema, "fo-metrics/"):
-		return fmt.Errorf("unsupported schema: %s", doc.Schema)
 	default:
 		return fmt.Errorf("unsupported schema: %s", doc.Schema)
 	}
