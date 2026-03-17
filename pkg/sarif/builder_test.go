@@ -67,20 +67,3 @@ func TestBuilder_Chaining(t *testing.T) {
 	}
 }
 
-func TestNormalizePath(t *testing.T) {
-	tests := []struct {
-		input string
-		want  string
-	}{
-		{"file:///abs/path.go", "/abs/path.go"},
-		{"file://relative/path.go", "relative/path.go"},
-		{"relative/path.go", "relative/path.go"},
-		{"path.go", "path.go"},
-	}
-	for _, tt := range tests {
-		got := NormalizePath(tt.input)
-		if got != tt.want {
-			t.Errorf("NormalizePath(%q) = %q, want %q", tt.input, got, tt.want)
-		}
-	}
-}

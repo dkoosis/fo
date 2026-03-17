@@ -1,8 +1,6 @@
 // Package sarif provides SARIF (Static Analysis Results Interchange Format) parsing and rendering.
 package sarif
 
-import "encoding/json"
-
 // Document represents a SARIF 2.1.0 document.
 // See: https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html
 type Document struct {
@@ -35,7 +33,6 @@ type Result struct {
 	Message   Message          `json:"message"`
 	Locations []Location       `json:"locations,omitempty"`
 	Related   []Location       `json:"relatedLocations,omitempty"`
-	Props     json.RawMessage  `json:"properties,omitempty"`
 }
 
 // Message contains the issue description.
@@ -68,16 +65,6 @@ type Region struct {
 	EndColumn   int `json:"endColumn,omitempty"`
 }
 
-// FilePath returns the normalized file path from a result's primary location.
-// Strips file:// prefix and normalizes separators.
-func (r *Result) FilePath() string {
-	if len(r.Locations) == 0 {
-		return ""
-	}
-	uri := r.Locations[0].PhysicalLocation.ArtifactLocation.URI
-	return NormalizePath(uri)
-}
-
 // Line returns the start line from a result's primary location.
 func (r *Result) Line() int {
 	if len(r.Locations) == 0 {
@@ -94,10 +81,3 @@ func (r *Result) Col() int {
 	return r.Locations[0].PhysicalLocation.Region.StartColumn
 }
 
-// NormalizePath strips file:// prefix and cleans a SARIF URI to a relative path.
-func NormalizePath(uri string) string {
-	if len(uri) > 7 && uri[:7] == "file://" {
-		uri = uri[7:]
-	}
-	return uri
-}
