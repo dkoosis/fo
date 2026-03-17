@@ -155,14 +155,14 @@ func (a *aggregator) processEvent(e TestEvent) {
 	pkg := a.getOrCreate(e.Package)
 
 	switch e.Action {
-	case StatusPass:
+	case "pass":
 		if e.Test != "" {
 			pkg.passed++
 		} else {
 			pkg.duration = time.Duration(e.Elapsed * float64(time.Second))
 		}
 
-	case StatusFail:
+	case "fail":
 		if e.Test != "" {
 			pkg.failed++
 			pkg.failedTests[e.Test] = pkg.outputBuf[e.Test]
@@ -175,7 +175,7 @@ func (a *aggregator) processEvent(e TestEvent) {
 			}
 		}
 
-	case StatusSkip:
+	case "skip":
 		if e.Test != "" {
 			pkg.skipped++
 		}

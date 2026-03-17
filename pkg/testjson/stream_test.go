@@ -64,7 +64,6 @@ also not json
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			var events []TestEvent
 			malformed, err := Stream(context.Background(), strings.NewReader(tt.input), func(e TestEvent) {

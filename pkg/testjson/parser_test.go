@@ -16,7 +16,7 @@ func TestParseStream_Behavior(t *testing.T) {
 		wantPassed      int
 		wantFailed      int
 		wantSkipped     int
-		wantStatus      string
+		wantStatus      Status
 		wantCoverage    float64
 		wantPanicked    bool
 		wantPackages    int
@@ -35,7 +35,7 @@ func TestParseStream_Behavior(t *testing.T) {
 			wantPackageName: "example.com/pkg",
 			wantPassed:      1,
 			wantFailed:      1,
-			wantStatus:      "fail",
+			wantStatus:      StatusFail,
 		},
 		{
 			name: "coverage is parsed from output",
@@ -50,7 +50,7 @@ func TestParseStream_Behavior(t *testing.T) {
 			wantPackageName: "example.com/pkg",
 			wantPassed:      1,
 			wantCoverage:    85.3,
-			wantStatus:      "pass",
+			wantStatus:      StatusPass,
 		},
 		{
 			name: "panic output marks package as panicked",
@@ -65,7 +65,7 @@ func TestParseStream_Behavior(t *testing.T) {
 			wantPackageName: "example.com/pkg",
 			wantFailed:      1,
 			wantPanicked:    true,
-			wantStatus:      "fail",
+			wantStatus:      StatusFail,
 		},
 		{
 			name: "malformed lines are skipped and counted",
@@ -80,7 +80,7 @@ func TestParseStream_Behavior(t *testing.T) {
 			wantPackages:    1,
 			wantPackageName: "x",
 			wantPassed:      1,
-			wantStatus:      "pass",
+			wantStatus:      StatusPass,
 		},
 		{
 			name: "package with no test activity is skipped",
@@ -93,7 +93,6 @@ func TestParseStream_Behavior(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			input := strings.Join(tt.inputLines, "\n") + "\n"
 			results, malformed, err := ParseStream(strings.NewReader(input))

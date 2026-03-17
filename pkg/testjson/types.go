@@ -3,11 +3,14 @@ package testjson
 
 import "time"
 
+// Status represents the outcome of a test package.
+type Status string
+
 // Status values returned by TestPackageResult.Status.
 const (
-	StatusPass = "pass"
-	StatusFail = "fail"
-	StatusSkip = "skip"
+	StatusPass Status = "pass"
+	StatusFail Status = "fail"
+	StatusSkip Status = "skip"
 )
 
 // TestEvent represents a single event from go test -json output.
@@ -46,7 +49,7 @@ func (r *TestPackageResult) TotalTests() int {
 }
 
 // Status returns StatusPass, StatusFail, or StatusSkip for the package.
-func (r *TestPackageResult) Status() string {
+func (r *TestPackageResult) Status() Status {
 	if r.BuildError != "" || r.Panicked || r.Failed > 0 {
 		return StatusFail
 	}
