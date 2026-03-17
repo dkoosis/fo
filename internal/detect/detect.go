@@ -27,7 +27,7 @@ func Sniff(data []byte) Format {
 	}
 
 	// Check for report delimiter before requiring '{' — reports start with '---'
-	if firstLine := extractFirstLine(data); report.DelimiterRe.Match(firstLine) {
+	if firstLine := extractFirstLine(data); report.IsDelimiter(firstLine) {
 		return Report
 	}
 

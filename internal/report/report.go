@@ -2,15 +2,22 @@ package report
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
 	"regexp"
 )
 
-// DelimiterRe matches report section delimiter lines.
-// Canonical regex — used by both the section parser and format detection.
-var DelimiterRe = regexp.MustCompile(
+// ErrNoSections is returned when Parse finds no delimiter lines in the input.
+var ErrNoSections = errors.New("no sections found in report input")
+
+// delimiterRe matches report section delimiter lines.
+var delimiterRe = regexp.MustCompile(
 	`^--- tool:(\w[\w-]*) format:(sarif|testjson|text|metrics|archlint|jscpd)(?: status:(pass|fail))? ---$`,
 )
+
+// IsDelimiter reports whether line is a section delimiter.
+func IsDelimiter(line []byte) bool {
+	return delimiterRe.Match(line)
+}
 
 var newline = []byte("\n")
 
@@ -23,6 +30,7 @@ type Section struct {
 }
 
 // Parse splits delimited report input into sections.
+// Lines before the first delimiter are silently discarded.
 func Parse(data []byte) ([]Section, error) {
 	data = bytes.TrimSuffix(data, newline)
 	lines := bytes.Split(data, newline)
@@ -30,7 +38,7 @@ func Parse(data []byte) ([]Section, error) {
 	var current *Section
 
 	for _, line := range lines {
-		if m := DelimiterRe.FindSubmatch(line); m != nil {
+		if m := delimiterRe.FindSubmatch(line); m != nil {
 			if current != nil {
 				current.Content = bytes.TrimSuffix(current.Content, newline)
 				sections = append(sections, *current)
@@ -53,7 +61,7 @@ func Parse(data []byte) ([]Section, error) {
 	}
 
 	if len(sections) == 0 {
-		return nil, fmt.Errorf("no sections found in report input")
+		return nil, ErrNoSections
 	}
 	return sections, nil
 }
