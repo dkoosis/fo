@@ -71,13 +71,13 @@ func (s *streamer) handleEvent(e testjson.TestEvent) {
 		if e.Test != "" {
 			s.handleTestPass(e)
 		} else {
-			s.handlePkgPass(e)
+			s.handlePkgDone(e, false)
 		}
 	case "fail":
 		if e.Test != "" {
 			s.handleTestFail(e)
 		} else {
-			s.handlePkgFail(e)
+			s.handlePkgDone(e, true)
 		}
 	case "skip":
 		if e.Test != "" {
@@ -109,93 +109,76 @@ func (s *streamer) handleRun(e testjson.TestEvent) {
 }
 
 func (s *streamer) handleTestPass(e testjson.TestEvent) {
-	if pkg, ok := s.active[e.Package]; ok {
-		pkg.passed++
-		pkg.finished++
+	pkg, ok := s.active[e.Package]
+	if !ok {
+		return
 	}
-	line := fmt.Sprintf("  %-10s · %-40s %5.2fs", shortPkg(e.Package), e.Test, e.Elapsed)
+	pkg.passed++
+	pkg.finished++
 	s.tw.EraseFooter()
-	s.tw.PrintLine(line)
-
-	// Discard output buffer on pass
+	s.tw.PrintLine(fmt.Sprintf("  %-10s · %-40s %5.2fs", pkg.short, e.Test, e.Elapsed))
 	delete(s.outputBuf, bufKey(e.Package, e.Test))
 }
 
 func (s *streamer) handleTestFail(e testjson.TestEvent) {
-	if pkg, ok := s.active[e.Package]; ok {
-		pkg.failed++
-		pkg.finished++
+	pkg, ok := s.active[e.Package]
+	if !ok {
+		return
 	}
+	pkg.failed++
+	pkg.finished++
 	s.hasFailed = true
-	line := fmt.Sprintf("  %-10s ✗ %-40s %5.2fs", shortPkg(e.Package), e.Test, e.Elapsed)
 	s.tw.EraseFooter()
-	s.tw.PrintLine(line)
-
-	// Flush buffered output
-	key := bufKey(e.Package, e.Test)
-	if lines, ok := s.outputBuf[key]; ok {
-		for _, l := range lines {
-			if isBoilerplate(l) {
-				continue
-			}
-			s.tw.PrintLine(fmt.Sprintf("             %s", l))
-		}
-		delete(s.outputBuf, key)
-	}
+	s.tw.PrintLine(fmt.Sprintf("  %-10s ✗ %-40s %5.2fs", pkg.short, e.Test, e.Elapsed))
+	s.flushOutputBuf(bufKey(e.Package, e.Test))
 }
 
 func (s *streamer) handleTestSkip(e testjson.TestEvent) {
-	if pkg, ok := s.active[e.Package]; ok {
-		pkg.skipped++
-		pkg.finished++
+	pkg, ok := s.active[e.Package]
+	if !ok {
+		return
 	}
-	line := fmt.Sprintf("  %-10s ○ %-40s", shortPkg(e.Package), e.Test)
+	pkg.skipped++
+	pkg.finished++
 	s.tw.EraseFooter()
-	s.tw.PrintLine(line)
-
-	// Discard output buffer on skip
+	s.tw.PrintLine(fmt.Sprintf("  %-10s ○ %-40s", pkg.short, e.Test))
 	delete(s.outputBuf, bufKey(e.Package, e.Test))
 }
 
-func (s *streamer) handlePkgPass(e testjson.TestEvent) {
+func (s *streamer) handlePkgDone(e testjson.TestEvent, failed bool) {
 	pkg, ok := s.active[e.Package]
 	if !ok {
 		return
 	}
+	if failed {
+		s.hasFailed = true
+	}
 	total := pkg.passed + pkg.failed + pkg.skipped
-	line := fmt.Sprintf("  ✓ %-28s %d/%d  %.1fs", pkg.short, pkg.passed, total, e.Elapsed)
+	sym := "✓"
+	if failed {
+		sym = "✗"
+	}
 	s.tw.EraseFooter()
-	s.tw.PrintLine(line)
-
+	s.tw.PrintLine(fmt.Sprintf("  %s %-28s %d/%d  %.1fs", sym, pkg.short, pkg.passed, total, e.Elapsed))
+	if failed {
+		s.flushOutputBuf(bufKey(e.Package, ""))
+	}
 	s.recordPkg(pkg, e.Elapsed)
 	delete(s.active, e.Package)
 }
 
-func (s *streamer) handlePkgFail(e testjson.TestEvent) {
-	pkg, ok := s.active[e.Package]
+// flushOutputBuf writes buffered output lines for key, filtering boilerplate.
+func (s *streamer) flushOutputBuf(key string) {
+	lines, ok := s.outputBuf[key]
 	if !ok {
 		return
 	}
-	s.hasFailed = true
-	total := pkg.passed + pkg.failed + pkg.skipped
-	line := fmt.Sprintf("  ✗ %-28s %d/%d  %.1fs", pkg.short, pkg.passed, total, e.Elapsed)
-	s.tw.EraseFooter()
-	s.tw.PrintLine(line)
-
-	// Flush any remaining package-level output
-	key := bufKey(e.Package, "")
-	if lines, ok := s.outputBuf[key]; ok {
-		for _, l := range lines {
-			if isBoilerplate(l) {
-				continue
-			}
+	for _, l := range lines {
+		if !isBoilerplate(l) {
 			s.tw.PrintLine(fmt.Sprintf("             %s", l))
 		}
-		delete(s.outputBuf, key)
 	}
-
-	s.recordPkg(pkg, e.Elapsed)
-	delete(s.active, e.Package)
+	delete(s.outputBuf, key)
 }
 
 // recordPkg accumulates totals from a finished package.
