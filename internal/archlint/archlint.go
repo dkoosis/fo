@@ -6,7 +6,7 @@ import "encoding/json"
 type Result struct {
 	HasWarnings bool
 	Violations  []Violation
-	Checks      []Check
+	CheckCount  int
 }
 
 // Violation records a forbidden dependency between components.
@@ -14,12 +14,6 @@ type Violation struct {
 	From     string // component name
 	To       string // resolved import name (disallowed dependency)
 	FileFrom string // source file relative path
-}
-
-// Check records whether an architecture rule was exercised.
-type Check struct {
-	ID   string
-	Used bool
 }
 
 // Parse decodes go-arch-lint --json output into a Result.
@@ -50,8 +44,6 @@ func Parse(data []byte) (*Result, error) {
 			FileFrom: d.FileRelativePath,
 		})
 	}
-	for _, q := range raw.Payload.Qualities {
-		r.Checks = append(r.Checks, Check{ID: q.ID, Used: q.Used})
-	}
+	r.CheckCount = len(raw.Payload.Qualities)
 	return r, nil
 }

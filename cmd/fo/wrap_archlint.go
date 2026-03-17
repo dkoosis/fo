@@ -28,7 +28,7 @@ func runWrapArchlint(stdin io.Reader, stdout, stderr io.Writer) int {
 		Status: "pass",
 		Metrics: []fometrics.Metric{
 			{Name: "violations", Value: float64(len(result.Violations)), Direction: "lower_is_better"},
-			{Name: "checks", Value: float64(len(result.Checks))},
+			{Name: "checks", Value: float64(result.CheckCount)},
 		},
 	}
 
@@ -44,7 +44,7 @@ func runWrapArchlint(stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 	}
 
-	doc.Summary = fmt.Sprintf("%d violations, %d checks", len(result.Violations), len(result.Checks))
+	doc.Summary = fmt.Sprintf("%d violations, %d checks", len(result.Violations), result.CheckCount)
 
 	out, err := json.Marshal(doc)
 	if err != nil {

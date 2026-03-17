@@ -27,8 +27,8 @@ func TestParse_Clean(t *testing.T) {
 	if len(result.Violations) != 0 {
 		t.Errorf("got %d violations, want 0", len(result.Violations))
 	}
-	if len(result.Checks) != 2 {
-		t.Errorf("got %d checks, want 2", len(result.Checks))
+	if result.CheckCount != 2 {
+		t.Errorf("got %d checks, want 2", result.CheckCount)
 	}
 }
 

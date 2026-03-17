@@ -250,7 +250,7 @@ func mapArchLintSection(sec report.Section) ([]pattern.Pattern, pattern.ItemKind
 	}
 
 	if !result.HasWarnings {
-		label := fmt.Sprintf("pass (%d checks, 0 violations)", len(result.Checks))
+		label := fmt.Sprintf("pass (%d checks, 0 violations)", result.CheckCount)
 		return nil, pattern.KindSuccess, label
 	}
 
