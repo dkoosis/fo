@@ -18,6 +18,16 @@ const (
 	Report            // Delimited multi-tool report
 )
 
+var formatNames = [...]string{"Unknown", "SARIF", "GoTestJSON", "Report"}
+
+// String returns the human-readable name of the format.
+func (f Format) String() string {
+	if int(f) < len(formatNames) {
+		return formatNames[f]
+	}
+	return formatNames[0]
+}
+
 // Sniff examines the first bytes of input to determine format.
 // Returns the detected format. Input must contain at least the first line.
 func Sniff(data []byte) Format {
@@ -60,8 +70,7 @@ func isSARIF(data []byte) bool {
 	if err := json.NewDecoder(bytes.NewReader(data)).Decode(&probe); err != nil {
 		return false
 	}
-	// SARIF version is "2.1.0" and has runs array
-	return probe.Version != "" && probe.Runs != nil
+	return probe.Version == "2.1.0" && probe.Runs != nil
 }
 
 func isGoTestJSON(data []byte) bool {
