@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 
 	"golang.org/x/term"
@@ -236,16 +237,10 @@ func selectRenderer(mode, themeName string, w io.Writer) render.Renderer {
 		return render.NewLLM()
 	default:
 		theme := render.ThemeByName(themeName)
-		// Honor NO_COLOR
 		if os.Getenv("NO_COLOR") != "" {
 			theme = render.MonoTheme()
 		}
-		width := 80
-		if f, ok := w.(*os.File); ok {
-			if tw, _, err := term.GetSize(int(f.Fd())); err == nil && tw > 0 { //nolint:gosec // file descriptor fits in int on all supported platforms
-				width = tw
-			}
-		}
+		width, _ := termSize(w)
 		return render.NewTerminal(theme, width)
 	}
 }
@@ -312,7 +307,7 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	switch args[0] {
 	case "sarif":
-		// fall through to sarif handling below
+		return runWrapSarif(args[1:], stdin, stdout, stderr)
 	case "jscpd":
 		return runWrapJscpd(stdin, stdout, stderr)
 	case "archlint":
@@ -322,7 +317,9 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprint(stderr, wrapUsage)
 		return 2
 	}
+}
 
+func runWrapSarif(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("fo wrap sarif", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() { fmt.Fprint(stderr, wrapUsage) }
@@ -330,7 +327,7 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	ruleID := fs.String("rule", "finding", "Default rule ID")
 	level := fs.String("level", "warning", "Default severity: error|warning|note")
 	version := fs.String("version", "", "Tool version string")
-	if err := fs.Parse(args[1:]); err != nil {
+	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 
@@ -387,9 +384,8 @@ func parseDiagLine(line string) (file string, ln, col int, msg string) {
 	// Try file:line:col: message
 	parts := strings.SplitN(rest, ":", 4)
 	if len(parts) >= 4 {
-		var l, c int
-		if _, err := fmt.Sscanf(parts[1], "%d", &l); err == nil {
-			if _, err := fmt.Sscanf(parts[2], "%d", &c); err == nil {
+		if l, err := strconv.Atoi(parts[1]); err == nil {
+			if c, err := strconv.Atoi(parts[2]); err == nil {
 				return prefix + parts[0], l, c, strings.TrimSpace(parts[3])
 			}
 		}
@@ -397,8 +393,7 @@ func parseDiagLine(line string) (file string, ln, col int, msg string) {
 
 	// Try file:line: message
 	if len(parts) >= 3 {
-		var l int
-		if _, err := fmt.Sscanf(parts[1], "%d", &l); err == nil {
+		if l, err := strconv.Atoi(parts[1]); err == nil {
 			return prefix + parts[0], l, 0, strings.TrimSpace(strings.Join(parts[2:], ":"))
 		}
 	}

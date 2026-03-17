@@ -43,7 +43,7 @@ func TestWrapArchlint_WithViolations(t *testing.T) {
 func TestWrapArchlint_InvalidJSON(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := runWrap([]string{"archlint"}, strings.NewReader("bad"), &stdout, &stderr)
-	if code != 1 {
-		t.Errorf("exit code = %d, want 1", code)
+	if code != 2 {
+		t.Errorf("exit code = %d, want 2", code)
 	}
 }

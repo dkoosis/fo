@@ -13,13 +13,13 @@ func runWrapArchlint(stdin io.Reader, stdout, stderr io.Writer) int {
 	data, err := io.ReadAll(stdin)
 	if err != nil {
 		fmt.Fprintf(stderr, "fo wrap archlint: reading stdin: %v\n", err)
-		return 1
+		return 2
 	}
 
 	result, err := archlint.Parse(data)
 	if err != nil {
 		fmt.Fprintf(stderr, "fo wrap archlint: %v\n", err)
-		return 1
+		return 2
 	}
 
 	doc := fometrics.Document{
@@ -49,7 +49,7 @@ func runWrapArchlint(stdin io.Reader, stdout, stderr io.Writer) int {
 	out, err := json.Marshal(doc)
 	if err != nil {
 		fmt.Fprintf(stderr, "fo wrap archlint: marshal: %v\n", err)
-		return 1
+		return 2
 	}
 	fmt.Fprintf(stdout, "%s\n", out)
 	return 0

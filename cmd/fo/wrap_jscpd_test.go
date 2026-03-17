@@ -46,8 +46,8 @@ func TestWrapJscpd_WithClones(t *testing.T) {
 func TestWrapJscpd_InvalidJSON(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := runWrap([]string{"jscpd"}, strings.NewReader("not json"), &stdout, &stderr)
-	if code != 1 {
-		t.Errorf("exit code = %d, want 1", code)
+	if code != 2 {
+		t.Errorf("exit code = %d, want 2", code)
 	}
 	if stderr.Len() == 0 {
 		t.Error("expected error on stderr")

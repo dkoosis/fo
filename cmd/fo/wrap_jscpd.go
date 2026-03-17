@@ -13,13 +13,13 @@ func runWrapJscpd(stdin io.Reader, stdout, stderr io.Writer) int {
 	data, err := io.ReadAll(stdin)
 	if err != nil {
 		fmt.Fprintf(stderr, "fo wrap jscpd: reading stdin: %v\n", err)
-		return 1
+		return 2
 	}
 
 	clones, err := jscpd.Parse(data)
 	if err != nil {
 		fmt.Fprintf(stderr, "fo wrap jscpd: %v\n", err)
-		return 1
+		return 2
 	}
 
 	doc := fometrics.Document{
@@ -48,7 +48,7 @@ func runWrapJscpd(stdin io.Reader, stdout, stderr io.Writer) int {
 	out, err := json.Marshal(doc)
 	if err != nil {
 		fmt.Fprintf(stderr, "fo wrap jscpd: marshal: %v\n", err)
-		return 1
+		return 2
 	}
 	fmt.Fprintf(stdout, "%s\n", out)
 	return 0
