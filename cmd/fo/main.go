@@ -125,13 +125,35 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runStream(stdin, br, stdout)
 	}
 
-	// Batch mode
-	patterns, code := runBatch(br, format, *formatFlag, *themeFlag, stdout, stderr)
-	if code >= 0 {
-		return code
+	// Batch mode: read all input, parse, render.
+	input, err := io.ReadAll(br)
+	if err != nil {
+		fmt.Fprintf(stderr, "fo: reading stdin: %v\n", err)
+		return 2
+	}
+	if len(input) == 0 {
+		fmt.Fprintf(stderr, "fo: no input on stdin\n")
+		return 2
+	}
+	if format == detect.Unknown {
+		format = detect.Sniff(input)
 	}
 
-	output := selectRenderer(resolveFormat(*formatFlag, stdout), *themeFlag, stdout).Render(patterns)
+	patterns, parseCode := parseInput(format, input, stderr)
+	if parseCode >= 0 {
+		return parseCode
+	}
+
+	mode := resolveFormat(*formatFlag, stdout)
+	switch mode {
+	case "terminal", "llm", "json":
+		// valid
+	default:
+		fmt.Fprintf(stderr, "fo: unknown format %q (expected auto, terminal, llm, json)\n", *formatFlag)
+		return 2
+	}
+
+	output := selectRenderer(mode, *themeFlag, stdout).Render(patterns)
 	fmt.Fprint(stdout, output)
 	return exitCode(patterns)
 }
@@ -170,39 +192,6 @@ func runStream(stdin io.Reader, br *bufio.Reader, stdout io.Writer) int {
 	}
 	width, height := termSize(stdout)
 	return stream.Run(ctx, br, stdout, width, height)
-}
-
-// runBatch reads, detects, parses, and validates input in batch mode.
-// Returns (patterns, -1) on success; (nil, exitCode) on error.
-func runBatch(br *bufio.Reader, format detect.Format, formatFlag, themeFlag string, stdout, stderr io.Writer) ([]pattern.Pattern, int) {
-	input, err := io.ReadAll(br)
-	if err != nil {
-		fmt.Fprintf(stderr, "fo: reading stdin: %v\n", err)
-		return nil, 2
-	}
-	if len(input) == 0 {
-		fmt.Fprintf(stderr, "fo: no input on stdin\n")
-		return nil, 2
-	}
-	if format == detect.Unknown {
-		format = detect.Sniff(input)
-	}
-
-	patterns, parseCode := parseInput(format, input, stderr)
-	if parseCode >= 0 {
-		return nil, parseCode
-	}
-
-	mode := resolveFormat(formatFlag, stdout)
-	switch mode {
-	case "terminal", "llm", "json":
-		// valid
-	default:
-		fmt.Fprintf(stderr, "fo: unknown format %q (expected auto, terminal, llm, json)\n", formatFlag)
-		return nil, 2
-	}
-	_ = themeFlag // consumed by caller via selectRenderer
-	return patterns, -1
 }
 
 // parseInput parses raw bytes according to the detected format.
