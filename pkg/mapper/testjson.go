@@ -33,31 +33,18 @@ func fromTestJSON(results []testjson.TestPackageResult, stats testjson.Stats) []
 		return sorted[i].Name < sorted[j].Name
 	})
 
-	// 2. Panic packages — highest priority
-	for _, r := range sorted {
-		if r.Panicked {
-			patterns = append(patterns, panicTable(r))
-		}
-	}
-
-	// 3. Build error packages
-	for _, r := range sorted {
-		if r.BuildError != "" && !r.Panicked {
-			patterns = append(patterns, buildErrorTable(r))
-		}
-	}
-
-	// 4. Failed packages with test details
-	for _, r := range sorted {
-		if r.Failed > 0 && r.BuildError == "" && !r.Panicked {
-			patterns = append(patterns, failedPkgTable(r))
-		}
-	}
-
-	// 5. Passing packages — collapsed into one table
+	// 2. Emit patterns by priority: panics, build errors, test failures, then passes.
+	// sorted is already ordered by pkgPriority, so a single pass suffices.
 	var passItems []pattern.TestTableItem
 	for _, r := range sorted {
-		if r.Status() == "pass" {
+		switch {
+		case r.Panicked:
+			patterns = append(patterns, panicTable(r))
+		case r.BuildError != "":
+			patterns = append(patterns, buildErrorTable(r))
+		case r.Failed > 0:
+			patterns = append(patterns, failedPkgTable(r))
+		default:
 			passItems = append(passItems, pattern.TestTableItem{
 				Name:     shortPkgName(r.Name),
 				Status:   pattern.StatusPass,
