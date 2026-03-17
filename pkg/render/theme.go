@@ -11,11 +11,11 @@ type Theme struct {
 	Error   lipgloss.Style
 	Muted   lipgloss.Style
 	Bold    lipgloss.Style
-	Icons   ThemeIcons
+	Icons   themeIcons
 }
 
-// ThemeIcons defines the icon set for a theme.
-type ThemeIcons struct {
+// themeIcons defines the icon set for a theme.
+type themeIcons struct {
 	Pass   string
 	Fail   string
 	Warn   string
@@ -24,8 +24,8 @@ type ThemeIcons struct {
 	Bullet string
 }
 
-// DefaultTheme returns a vibrant color theme.
-func DefaultTheme() Theme {
+// defaultTheme returns a vibrant color theme.
+func defaultTheme() Theme {
 	return Theme{
 		Name:    "default",
 		Primary: lipgloss.NewStyle().Foreground(lipgloss.Color("39")),  // blue
@@ -34,7 +34,7 @@ func DefaultTheme() Theme {
 		Error:   lipgloss.NewStyle().Foreground(lipgloss.Color("196")), // red
 		Muted:   lipgloss.NewStyle().Foreground(lipgloss.Color("242")), // gray
 		Bold:    lipgloss.NewStyle().Bold(true),
-		Icons: ThemeIcons{
+		Icons: themeIcons{
 			Pass:   "✓",
 			Fail:   "✗",
 			Warn:   "⚠",
@@ -45,8 +45,8 @@ func DefaultTheme() Theme {
 	}
 }
 
-// OrcaTheme returns a muted, professional theme.
-func OrcaTheme() Theme {
+// orcaTheme returns a muted, professional theme.
+func orcaTheme() Theme {
 	return Theme{
 		Name:    "orca",
 		Primary: lipgloss.NewStyle().Foreground(lipgloss.Color("75")),  // pale blue
@@ -55,7 +55,7 @@ func OrcaTheme() Theme {
 		Error:   lipgloss.NewStyle().Foreground(lipgloss.Color("167")), // muted red
 		Muted:   lipgloss.NewStyle().Foreground(lipgloss.Color("245")), // lighter gray
 		Bold:    lipgloss.NewStyle().Bold(true),
-		Icons: ThemeIcons{
+		Icons: themeIcons{
 			Pass:   "✓",
 			Fail:   "✗",
 			Warn:   "!",
@@ -76,7 +76,7 @@ func MonoTheme() Theme {
 		Error:   lipgloss.NewStyle(),
 		Muted:   lipgloss.NewStyle(),
 		Bold:    lipgloss.NewStyle().Bold(true),
-		Icons: ThemeIcons{
+		Icons: themeIcons{
 			Pass:   "+",
 			Fail:   "x",
 			Warn:   "!",
@@ -87,14 +87,14 @@ func MonoTheme() Theme {
 	}
 }
 
-// ThemeByName returns a theme by name, defaulting to DefaultTheme.
+// ThemeByName returns a theme by name, defaulting to the vibrant theme.
 func ThemeByName(name string) Theme {
 	switch name {
 	case "orca":
-		return OrcaTheme()
+		return orcaTheme()
 	case "mono":
 		return MonoTheme()
 	default:
-		return DefaultTheme()
+		return defaultTheme()
 	}
 }
