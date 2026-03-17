@@ -84,9 +84,12 @@ func (s *streamer) handleEvent(e testjson.TestEvent) {
 			s.handleTestSkip(e)
 		}
 	case "output":
-		s.handleOutput(e)
+		if !s.handleOutput(e) {
+			return
+		}
 	case "pause", "cont":
 		// ignored
+		return
 	}
 
 	s.redrawFooter()
@@ -165,6 +168,18 @@ func (s *streamer) handlePkgDone(e testjson.TestEvent, failed bool) {
 	}
 	s.recordPkg(pkg, e.Elapsed)
 	delete(s.active, e.Package)
+	delete(s.outputBuf, bufKey(e.Package, ""))
+	s.removeOrder(e.Package)
+}
+
+// removeOrder removes a package from the render-order slice.
+func (s *streamer) removeOrder(pkg string) {
+	for i, name := range s.order {
+		if name == pkg {
+			s.order = append(s.order[:i], s.order[i+1:]...)
+			return
+		}
+	}
 }
 
 // flushOutputBuf writes buffered output lines for key, filtering boilerplate.
@@ -192,10 +207,12 @@ func (s *streamer) recordPkg(pkg *pkgProgress, elapsed float64) {
 	}
 }
 
-func (s *streamer) handleOutput(e testjson.TestEvent) {
+// handleOutput buffers test output. Returns true if the footer was disturbed
+// and needs redrawing (panic/goroutine lines are flushed immediately).
+func (s *streamer) handleOutput(e testjson.TestEvent) bool {
 	output := strings.TrimRight(e.Output, "\n")
 	if output == "" {
-		return
+		return false
 	}
 
 	key := bufKey(e.Package, e.Test)
@@ -206,8 +223,10 @@ func (s *streamer) handleOutput(e testjson.TestEvent) {
 		if strings.Contains(output, "panic:") || strings.HasPrefix(output, "goroutine ") {
 			s.tw.EraseFooter()
 			s.tw.PrintLine("  " + output)
+			return true
 		}
 	}
+	return false
 }
 
 // isBoilerplate returns true for go test output lines that should be filtered.
@@ -215,7 +234,8 @@ func isBoilerplate(s string) bool {
 	trimmed := strings.TrimSpace(s)
 	return strings.HasPrefix(trimmed, "=== RUN") ||
 		strings.HasPrefix(trimmed, "--- FAIL") ||
-		strings.HasPrefix(trimmed, "--- PASS")
+		strings.HasPrefix(trimmed, "--- PASS") ||
+		strings.HasPrefix(trimmed, "--- SKIP")
 }
 
 // redrawFooter rebuilds the active-packages footer.
