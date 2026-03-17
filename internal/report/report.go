@@ -12,6 +12,8 @@ var DelimiterRe = regexp.MustCompile(
 	`^--- tool:(\w[\w-]*) format:(sarif|testjson|text|metrics|archlint|jscpd)(?: status:(pass|fail))? ---$`,
 )
 
+var newline = []byte("\n")
+
 // Section represents one tool's output within a report.
 type Section struct {
 	Tool    string // e.g. "lint", "test", "vuln"
@@ -22,15 +24,15 @@ type Section struct {
 
 // Parse splits delimited report input into sections.
 func Parse(data []byte) ([]Section, error) {
-	data = trimTrailingNewline(data)
-	lines := bytes.Split(data, []byte("\n"))
+	data = bytes.TrimSuffix(data, newline)
+	lines := bytes.Split(data, newline)
 	var sections []Section
 	var current *Section
 
 	for _, line := range lines {
 		if m := DelimiterRe.FindSubmatch(line); m != nil {
 			if current != nil {
-				current.Content = trimTrailingNewline(current.Content)
+				current.Content = bytes.TrimSuffix(current.Content, newline)
 				sections = append(sections, *current)
 			}
 			current = &Section{
@@ -46,7 +48,7 @@ func Parse(data []byte) ([]Section, error) {
 		}
 	}
 	if current != nil {
-		current.Content = trimTrailingNewline(current.Content)
+		current.Content = bytes.TrimSuffix(current.Content, newline)
 		sections = append(sections, *current)
 	}
 
@@ -54,12 +56,4 @@ func Parse(data []byte) ([]Section, error) {
 		return nil, fmt.Errorf("no sections found in report input")
 	}
 	return sections, nil
-}
-
-// trimTrailingNewline removes exactly one trailing newline byte, if present.
-func trimTrailingNewline(b []byte) []byte {
-	if len(b) > 0 && b[len(b)-1] == '\n' {
-		return b[:len(b)-1]
-	}
-	return b
 }
