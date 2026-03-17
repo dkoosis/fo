@@ -1,12 +1,20 @@
 package pattern
 
+// Direction controls sort order for ranked lists.
+type Direction string
+
+const (
+	Highest Direction = "highest"
+	Lowest  Direction = "lowest"
+)
+
 // Leaderboard represents a ranked list of items by metric.
 type Leaderboard struct {
 	Label      string
 	MetricName string // e.g., "Issues", "Duration"
 	Items      []LeaderboardItem
-	Direction  string // "highest" or "lowest"
-	TotalCount int    // total before filtering to top N
+	Direction  Direction
+	TotalCount int // total before filtering to top N
 	ShowRank   bool
 }
 

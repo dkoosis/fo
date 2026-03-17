@@ -47,17 +47,17 @@ func sarifSummary(stats sarif.Stats) *pattern.Summary {
 	var metrics []pattern.SummaryItem
 	if n := stats.ByLevel["error"]; n > 0 {
 		metrics = append(metrics, pattern.SummaryItem{
-			Label: "Errors", Value: fmt.Sprintf("%d", n), Kind: "error",
+			Label: "Errors", Value: fmt.Sprintf("%d", n), Kind: pattern.KindError,
 		})
 	}
 	if n := stats.ByLevel["warning"]; n > 0 {
 		metrics = append(metrics, pattern.SummaryItem{
-			Label: "Warnings", Value: fmt.Sprintf("%d", n), Kind: "warning",
+			Label: "Warnings", Value: fmt.Sprintf("%d", n), Kind: pattern.KindWarning,
 		})
 	}
 	if n := stats.ByLevel["note"]; n > 0 {
 		metrics = append(metrics, pattern.SummaryItem{
-			Label: "Notes", Value: fmt.Sprintf("%d", n), Kind: "info",
+			Label: "Notes", Value: fmt.Sprintf("%d", n), Kind: pattern.KindInfo,
 		})
 	}
 
@@ -97,7 +97,7 @@ func sarifLeaderboard(doc *sarif.Document, stats sarif.Stats) *pattern.Leaderboa
 		Label:      "Files with Most Issues",
 		MetricName: "Issues",
 		Items:      items,
-		Direction:  "highest",
+		Direction:  pattern.Highest,
 		TotalCount: len(stats.ByFile),
 		ShowRank:   true,
 	}
@@ -137,14 +137,14 @@ func sarifFileTable(g sarif.GroupedResults) *pattern.TestTable {
 	}
 }
 
-func mapLevel(level string) string {
+func mapLevel(level string) pattern.Status {
 	switch level {
 	case "error":
-		return statusFail
+		return pattern.StatusFail
 	case "warning":
-		return "skip"
+		return pattern.StatusSkip
 	default:
-		return statusPass
+		return pattern.StatusPass
 	}
 }
 

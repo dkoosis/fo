@@ -60,7 +60,7 @@ func fromTestJSON(results []testjson.TestPackageResult, stats testjson.Stats) []
 		if r.Status() == "pass" {
 			passItems = append(passItems, pattern.TestTableItem{
 				Name:     shortPkgName(r.Name),
-				Status:   "pass",
+				Status:   pattern.StatusPass,
 				Duration: formatDuration(r.Duration),
 				Count:    r.TotalTests(),
 			})
@@ -81,17 +81,17 @@ func testSummary(s testjson.Stats) *pattern.Summary {
 
 	if s.Panics > 0 {
 		metrics = append(metrics, pattern.SummaryItem{
-			Label: "Panics", Value: fmt.Sprintf("%d", s.Panics), Kind: "error",
+			Label: "Panics", Value: fmt.Sprintf("%d", s.Panics), Kind: pattern.KindError,
 		})
 	}
 	if s.BuildErrors > 0 {
 		metrics = append(metrics, pattern.SummaryItem{
-			Label: "Build Errors", Value: fmt.Sprintf("%d", s.BuildErrors), Kind: "error",
+			Label: "Build Errors", Value: fmt.Sprintf("%d", s.BuildErrors), Kind: pattern.KindError,
 		})
 	}
 	if s.Failed > 0 {
 		metrics = append(metrics, pattern.SummaryItem{
-			Label: "Failed", Value: fmt.Sprintf("%d/%d tests", s.Failed, s.TotalTests), Kind: "error",
+			Label: "Failed", Value: fmt.Sprintf("%d/%d tests", s.Failed, s.TotalTests), Kind: pattern.KindError,
 		})
 	}
 	if s.Passed > 0 {
@@ -105,11 +105,11 @@ func testSummary(s testjson.Stats) *pattern.Summary {
 	}
 	if s.Skipped > 0 {
 		metrics = append(metrics, pattern.SummaryItem{
-			Label: "Skipped", Value: fmt.Sprintf("%d", s.Skipped), Kind: "warning",
+			Label: "Skipped", Value: fmt.Sprintf("%d", s.Skipped), Kind: pattern.KindWarning,
 		})
 	}
 	metrics = append(metrics, pattern.SummaryItem{
-		Label: "Packages", Value: fmt.Sprintf("%d", s.Packages), Kind: "info",
+		Label: "Packages", Value: fmt.Sprintf("%d", s.Packages), Kind: pattern.KindInfo,
 	})
 
 	label := fmt.Sprintf("PASS (%s)", formatDuration(s.Duration))
@@ -128,7 +128,7 @@ func testSummary(s testjson.Stats) *pattern.Summary {
 func panicTable(r testjson.TestPackageResult) *pattern.TestTable {
 	items := []pattern.TestTableItem{{
 		Name:    "PANIC",
-		Status:  "fail",
+		Status:  pattern.StatusFail,
 		Details: truncateLines(r.PanicOutput, 5),
 	}}
 	return &pattern.TestTable{
@@ -140,7 +140,7 @@ func panicTable(r testjson.TestPackageResult) *pattern.TestTable {
 func buildErrorTable(r testjson.TestPackageResult) *pattern.TestTable {
 	items := []pattern.TestTableItem{{
 		Name:    "BUILD ERROR",
-		Status:  "fail",
+		Status:  pattern.StatusFail,
 		Details: truncateString(r.BuildError, 300),
 	}}
 	return &pattern.TestTable{
@@ -154,7 +154,7 @@ func failedPkgTable(r testjson.TestPackageResult) *pattern.TestTable {
 	for _, ft := range r.FailedTests {
 		items = append(items, pattern.TestTableItem{
 			Name:    ft.Name,
-			Status:  "fail",
+			Status:  pattern.StatusFail,
 			Details: truncateLines(ft.Output, 3),
 		})
 	}

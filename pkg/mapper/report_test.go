@@ -142,7 +142,7 @@ func TestFromReport_MetricsFailSection(t *testing.T) {
 			if len(tt.Results) != 1 {
 				t.Errorf("expected 1 detail item, got %d", len(tt.Results))
 			}
-			if tt.Results[0].Status != statusFail {
+			if tt.Results[0].Status != pattern.StatusFail {
 				t.Errorf("severity error should map to fail, got %q", tt.Results[0].Status)
 			}
 		}
@@ -178,7 +178,7 @@ func TestFromReport_MetricsFailNoDetails(t *testing.T) {
 	for _, p := range patterns[1:] {
 		if tt, ok := p.(*pattern.TestTable); ok {
 			for _, r := range tt.Results {
-				if r.Status == statusFail {
+				if r.Status == pattern.StatusFail {
 					hasFailItem = true
 				}
 			}

@@ -29,7 +29,7 @@ func TestLLMRender_KeyUserVisibleOutput(t *testing.T) {
 					Label:  "lint violations",
 					Source: "lint",
 					Results: []pattern.TestTableItem{
-						{Name: "store → eval", Status: "fail", Details: "forbidden dependency"},
+						{Name: "store → eval", Status: pattern.StatusFail, Details: "forbidden dependency"},
 					},
 				},
 			},
@@ -42,7 +42,7 @@ func TestLLMRender_KeyUserVisibleOutput(t *testing.T) {
 				&pattern.TestTable{
 					Label: "failed tests",
 					Results: []pattern.TestTableItem{
-						{Name: "TestParser", Status: "fail", Duration: "0.02s", Details: "panic: boom"},
+						{Name: "TestParser", Status: pattern.StatusFail, Duration: "0.02s", Details: "panic: boom"},
 					},
 				},
 			},
@@ -54,7 +54,7 @@ func TestLLMRender_KeyUserVisibleOutput(t *testing.T) {
 				&pattern.TestTable{
 					Label: "pkg/a.go",
 					Results: []pattern.TestTableItem{
-						{Name: "RULE001:12:3", Status: "fail", Details: "bad thing"},
+						{Name: "RULE001:12:3", Status: pattern.StatusFail, Details: "bad thing"},
 					},
 				},
 			},

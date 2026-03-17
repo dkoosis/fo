@@ -9,7 +9,6 @@ import (
 	"github.com/dkoosis/fo/pkg/pattern"
 )
 
-const statusFail = "fail"
 
 // LLM renders patterns as terse plain text optimized for AI consumption.
 // Zero ANSI codes, deterministic sort, SCOPE line, importance-budgeted truncation.
@@ -96,7 +95,7 @@ func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestT
 			}
 			for _, item := range t.Results {
 				prefix := "  "
-				if item.Status == statusFail {
+				if item.Status == pattern.StatusFail {
 					prefix = "  FAIL "
 				}
 				sb.WriteString(prefix + item.Name)
@@ -134,9 +133,9 @@ func (l *LLM) renderSARIFOutput(tables []*pattern.TestTable) string {
 		for _, item := range t.Results {
 			var level string
 			switch item.Status {
-			case statusFail:
+			case pattern.StatusFail:
 				level = "ERR"
-			case "pass":
+			case pattern.StatusPass:
 				level = "NOTE"
 			default:
 				level = "WARN"
@@ -201,9 +200,9 @@ func (l *LLM) renderTestOutput(summaries []*pattern.Summary, tables []*pattern.T
 		for _, item := range t.Results {
 			prefix := "  PASS"
 			switch item.Status {
-			case statusFail:
+			case pattern.StatusFail:
 				prefix = "  FAIL"
-			case "skip":
+			case pattern.StatusSkip:
 				prefix = "  SKIP"
 			}
 
@@ -226,9 +225,9 @@ func sarifScope(tables []*pattern.TestTable) string {
 	for _, t := range tables {
 		for _, item := range t.Results {
 			switch item.Status {
-			case statusFail:
+			case pattern.StatusFail:
 				errCount++
-			case "skip":
+			case pattern.StatusSkip:
 				warnCount++
 			default:
 				noteCount++

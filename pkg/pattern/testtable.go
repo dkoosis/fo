@@ -1,5 +1,14 @@
 package pattern
 
+// Status represents the outcome of a test or diagnostic item.
+type Status string
+
+const (
+	StatusPass Status = "pass"
+	StatusFail Status = "fail"
+	StatusSkip Status = "skip"
+)
+
 // TestTable represents test results with status and timing.
 type TestTable struct {
 	Label   string
@@ -10,7 +19,7 @@ type TestTable struct {
 // TestTableItem is a single test/package result.
 type TestTableItem struct {
 	Name     string // test or package name
-	Status   string // "pass", "fail", "skip"
+	Status   Status
 	Duration string // formatted duration
 	Count    int    // number of tests (package-level)
 	Details  string // error message or extra info

@@ -263,16 +263,14 @@ func (t *Terminal) iconStyle(kind pattern.ItemKind) (string, lipgloss.Style) {
 	}
 }
 
-func (t *Terminal) statusIconStyle(status string) (string, lipgloss.Style) {
+func (t *Terminal) statusIconStyle(status pattern.Status) (string, lipgloss.Style) {
 	switch status {
-	case "pass":
+	case pattern.StatusPass:
 		return t.theme.Icons.Pass, t.theme.Success
-	case "fail":
+	case pattern.StatusFail:
 		return t.theme.Icons.Fail, t.theme.Error
-	case "skip":
+	case pattern.StatusSkip:
 		return t.theme.Icons.Warn, t.theme.Warning
-	case "wip":
-		return t.theme.Icons.WIP, t.theme.Muted
 	default:
 		return t.theme.Icons.Info, t.theme.Muted
 	}

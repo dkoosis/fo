@@ -13,10 +13,6 @@ import (
 	"github.com/dkoosis/fo/pkg/testjson"
 )
 
-const (
-	statusFail = "fail"
-	statusPass = "pass"
-)
 
 // FromReport converts multi-section report data into patterns.
 // Individual section parse failures are reported as error patterns, not
@@ -181,7 +177,7 @@ func mapMetricsSection(sec report.Section) ([]pattern.Pattern, pattern.ItemKind,
 		patterns = append(patterns, &pattern.TestTable{
 			Label: sec.Tool,
 			Results: []pattern.TestTableItem{
-				{Name: "metrics check failed", Status: "fail"},
+				{Name: "metrics check failed", Status: pattern.StatusFail},
 			},
 		})
 	}
@@ -232,14 +228,14 @@ func formatMetricValue(m fometrics.Metric) string {
 	return s
 }
 
-func mapDetailSeverity(severity string) string {
+func mapDetailSeverity(severity string) pattern.Status {
 	switch severity {
 	case "error":
-		return "fail"
+		return pattern.StatusFail
 	case "warn":
-		return "skip"
+		return pattern.StatusSkip
 	default:
-		return "pass"
+		return pattern.StatusPass
 	}
 }
 
@@ -258,7 +254,7 @@ func mapArchLintSection(sec report.Section) ([]pattern.Pattern, pattern.ItemKind
 	for _, v := range result.Violations {
 		items = append(items, pattern.TestTableItem{
 			Name:   fmt.Sprintf("%s → %s", v.From, v.To),
-			Status: statusFail,
+			Status: pattern.StatusFail,
 		})
 	}
 	patterns := []pattern.Pattern{
@@ -288,7 +284,7 @@ func mapJSCPDSection(sec report.Section) ([]pattern.Pattern, pattern.ItemKind, s
 	for _, c := range clones {
 		items = append(items, pattern.TestTableItem{
 			Name:    fmt.Sprintf("%s:%d-%d ↔ %s:%d-%d", c.FileA, c.StartA, c.EndA, c.FileB, c.StartB, c.EndB),
-			Status:  "skip",
+			Status:  pattern.StatusSkip,
 			Details: fmt.Sprintf("%d lines (%s)", c.Lines, c.Format),
 		})
 	}
@@ -306,12 +302,12 @@ func mapJSCPDSection(sec report.Section) ([]pattern.Pattern, pattern.ItemKind, s
 // Text sections rely on explicit status from the delimiter; content is opaque.
 func mapTextSection(sec report.Section) ([]pattern.Pattern, pattern.ItemKind, string) {
 	kind := pattern.KindSuccess
-	if sec.Status == statusFail {
+	if sec.Status == "fail" {
 		kind = pattern.KindError
 	}
 	status := sec.Status
 	if status == "" {
-		status = statusPass
+		status = "pass"
 	}
 	label := status
 	if len(sec.Content) > 0 {
