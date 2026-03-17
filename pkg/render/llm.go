@@ -37,15 +37,13 @@ func (l *LLM) Render(patterns []pattern.Pattern) string {
 		}
 	}
 
-	// Dispatch on Summary.Kind
-	for _, s := range summaries {
-		switch s.Kind {
+	// Dispatch on the first Summary's Kind (one format per invocation).
+	if len(summaries) > 0 {
+		switch summaries[0].Kind {
 		case pattern.SummaryKindReport:
 			return l.renderReport(summaries, tables, errors)
 		case pattern.SummaryKindTest:
 			return l.renderTestOutput(summaries, tables)
-		case pattern.SummaryKindSARIF:
-			return l.renderSARIFOutput(tables)
 		}
 	}
 	return l.renderSARIFOutput(tables)

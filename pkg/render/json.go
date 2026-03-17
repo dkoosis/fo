@@ -22,7 +22,7 @@ type jsonOutput struct {
 
 type jsonPattern struct {
 	Type string      `json:"type"`
-	Data interface{} `json:"data"`
+	Data any `json:"data"`
 }
 
 // Render formats all patterns as JSON.

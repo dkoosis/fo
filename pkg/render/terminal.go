@@ -11,15 +11,13 @@ import (
 // Terminal renders patterns as styled terminal output via lipgloss.
 type Terminal struct {
 	theme Theme
-	width int
 }
 
 // NewTerminal creates a terminal renderer with the given theme.
-func NewTerminal(theme Theme, width int) *Terminal {
-	if width <= 0 {
-		width = 80
-	}
-	return &Terminal{theme: theme, width: width}
+// The width parameter is accepted for future use (e.g., table truncation)
+// but not currently referenced.
+func NewTerminal(theme Theme, _ int) *Terminal {
+	return &Terminal{theme: theme}
 }
 
 // Render formats all patterns for terminal display.
@@ -281,15 +279,17 @@ func (t *Terminal) renderError(e *pattern.Error) string {
 }
 
 func padRight(s string, width int) string {
-	if len(s) >= width {
+	n := len([]rune(s))
+	if n >= width {
 		return s
 	}
-	return s + strings.Repeat(" ", width-len(s))
+	return s + strings.Repeat(" ", width-n)
 }
 
 func padLeft(s string, width int) string {
-	if len(s) >= width {
+	n := len([]rune(s))
+	if n >= width {
 		return s
 	}
-	return strings.Repeat(" ", width-len(s)) + s
+	return strings.Repeat(" ", width-n) + s
 }
