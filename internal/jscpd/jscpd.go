@@ -1,6 +1,9 @@
 package jscpd
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // Clone records a single code duplication instance.
 type Clone struct {
@@ -33,7 +36,7 @@ func Parse(data []byte) ([]Clone, error) {
 		} `json:"duplicates"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("jscpd: %w", err)
 	}
 
 	clones := make([]Clone, 0, len(raw.Duplicates))
