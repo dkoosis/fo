@@ -2,11 +2,6 @@ package jscpd
 
 import "encoding/json"
 
-// Result represents parsed jscpd duplicate detection output.
-type Result struct {
-	Clones []Clone
-}
-
 // Clone records a single code duplication instance.
 type Clone struct {
 	Format string
@@ -19,8 +14,8 @@ type Clone struct {
 	EndB   int
 }
 
-// Parse decodes jscpd JSON report into a Result.
-func Parse(data []byte) (*Result, error) {
+// Parse decodes jscpd JSON report into a slice of clones.
+func Parse(data []byte) ([]Clone, error) {
 	var raw struct {
 		Duplicates []struct {
 			Format     string `json:"format"`
@@ -41,13 +36,13 @@ func Parse(data []byte) (*Result, error) {
 		return nil, err
 	}
 
-	r := &Result{}
+	clones := make([]Clone, 0, len(raw.Duplicates))
 	for _, d := range raw.Duplicates {
-		r.Clones = append(r.Clones, Clone{
+		clones = append(clones, Clone{
 			Format: d.Format, Lines: d.Lines,
 			FileA: d.FirstFile.Name, StartA: d.FirstFile.StartLoc.Line, EndA: d.FirstFile.EndLoc.Line,
 			FileB: d.SecondFile.Name, StartB: d.SecondFile.StartLoc.Line, EndB: d.SecondFile.EndLoc.Line,
 		})
 	}
-	return r, nil
+	return clones, nil
 }

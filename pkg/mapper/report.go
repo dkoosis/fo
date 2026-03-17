@@ -275,17 +275,17 @@ func mapArchLintSection(sec report.Section) ([]pattern.Pattern, pattern.ItemKind
 }
 
 func mapJSCPDSection(sec report.Section) ([]pattern.Pattern, pattern.ItemKind, string) {
-	result, err := jscpd.Parse(sec.Content)
+	clones, err := jscpd.Parse(sec.Content)
 	if err != nil {
 		return sectionError(sec.Tool, err), pattern.KindError, fmt.Sprintf("parse error: %v", err)
 	}
 
-	if len(result.Clones) == 0 {
+	if len(clones) == 0 {
 		return nil, pattern.KindSuccess, "pass (0 clones)"
 	}
 
 	var items []pattern.TestTableItem
-	for _, c := range result.Clones {
+	for _, c := range clones {
 		items = append(items, pattern.TestTableItem{
 			Name:    fmt.Sprintf("%s:%d-%d ↔ %s:%d-%d", c.FileA, c.StartA, c.EndA, c.FileB, c.StartB, c.EndB),
 			Status:  "skip",
@@ -298,7 +298,7 @@ func mapJSCPDSection(sec report.Section) ([]pattern.Pattern, pattern.ItemKind, s
 			Results: items,
 		},
 	}
-	label := fmt.Sprintf("%d clones", len(result.Clones))
+	label := fmt.Sprintf("%d clones", len(clones))
 	return patterns, pattern.KindSuccess, label // clones don't fail the report
 }
 

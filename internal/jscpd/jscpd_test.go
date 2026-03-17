@@ -4,12 +4,12 @@ import "testing"
 
 func TestParse_NoClones(t *testing.T) {
 	input := []byte(`{"duplicates": [], "statistics": {}}`)
-	result, err := Parse(input)
+	clones, err := Parse(input)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Clones) != 0 {
-		t.Errorf("got %d clones, want 0", len(result.Clones))
+	if len(clones) != 0 {
+		t.Errorf("got %d clones, want 0", len(clones))
 	}
 }
 
@@ -28,14 +28,14 @@ func TestParse_WithClones(t *testing.T) {
 			}
 		]
 	}`)
-	result, err := Parse(input)
+	clones, err := Parse(input)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Clones) != 1 {
-		t.Fatalf("got %d clones, want 1", len(result.Clones))
+	if len(clones) != 1 {
+		t.Fatalf("got %d clones, want 1", len(clones))
 	}
-	c := result.Clones[0]
+	c := clones[0]
 	if c.FileA != "a.go" || c.FileB != "b.go" {
 		t.Errorf("files = %s, %s", c.FileA, c.FileB)
 	}
