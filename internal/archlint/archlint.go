@@ -1,6 +1,9 @@
 package archlint
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // Result represents parsed go-arch-lint check output.
 type Result struct {
@@ -33,7 +36,7 @@ func Parse(data []byte) (*Result, error) {
 		} `json:"Payload"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("archlint: %w", err)
 	}
 
 	r := &Result{HasWarnings: raw.Payload.ArchHasWarnings}
