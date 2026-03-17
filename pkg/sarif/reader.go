@@ -9,8 +9,8 @@ import (
 	"slices"
 )
 
-// read parses SARIF from an io.Reader.
-func read(r io.Reader) (*Document, error) {
+// Read parses SARIF from an io.Reader.
+func Read(r io.Reader) (*Document, error) {
 	dec := json.NewDecoder(r)
 	var doc Document
 	if err := dec.Decode(&doc); err != nil {
@@ -24,7 +24,7 @@ func read(r io.Reader) (*Document, error) {
 
 // ReadBytes parses SARIF from a byte slice.
 func ReadBytes(data []byte) (*Document, error) {
-	return read(bytes.NewReader(data))
+	return Read(bytes.NewReader(data))
 }
 
 func validateDocument(doc *Document) (*Document, error) {

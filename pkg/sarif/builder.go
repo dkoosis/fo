@@ -9,26 +9,23 @@ import (
 // Designed for fo wrap and as an importable library.
 type Builder struct {
 	doc *Document
-	run *Run
 }
 
 // NewBuilder creates a SARIF builder for the given tool.
 func NewBuilder(toolName, toolVersion string) *Builder {
-	run := Run{
-		Tool: Tool{
-			Driver: Driver{
-				Name:    toolName,
-				Version: toolVersion,
-			},
-		},
-	}
 	return &Builder{
 		doc: &Document{
 			Version: "2.1.0",
 			Schema:  "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
-			Runs:    []Run{run},
+			Runs: []Run{{
+				Tool: Tool{
+					Driver: Driver{
+						Name:    toolName,
+						Version: toolVersion,
+					},
+				},
+			}},
 		},
-		run: &run,
 	}
 }
 
@@ -50,9 +47,7 @@ func (b *Builder) AddResult(ruleID, level, message, file string, line, col int) 
 			},
 		}}
 	}
-	b.run.Results = append(b.run.Results, r)
-	// Keep doc in sync
-	b.doc.Runs[0] = *b.run
+	b.doc.Runs[0].Results = append(b.doc.Runs[0].Results, r)
 	return b
 }
 
