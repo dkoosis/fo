@@ -2,6 +2,7 @@ package testjson
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -39,7 +40,7 @@ func ParseStream(r io.Reader) ([]TestPackageResult, int, error) {
 
 // ParseBytes is a convenience for parsing from a byte slice.
 func ParseBytes(data []byte) ([]TestPackageResult, int, error) {
-	return ParseStream(strings.NewReader(string(data)))
+	return ParseStream(bytes.NewReader(data))
 }
 
 // scanResult carries a scanned line or terminal error from the scanner goroutine.
@@ -56,7 +57,7 @@ type scanResult struct {
 // Stream closes r (if it implements io.Closer) to unblock the scanner. If r
 // does not implement io.Closer (e.g. *bufio.Reader), the caller must close the
 // underlying reader externally to prevent a goroutine leak.
-func Stream(ctx context.Context, r io.Reader, fn ProcessFunc) (int, error) {
+func Stream(ctx context.Context, r io.Reader, fn func(TestEvent)) (int, error) {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
@@ -121,21 +122,13 @@ type pkgState struct {
 	skipped     int
 	duration    time.Duration
 	coverage    float64
-	failedTests map[string]*testState
-	allTests    map[string]*testState
-	testOrder   []string
+	failedTests map[string][]string // test name → output lines
+	failedOrder []string            // failed test names in run order
 	buildError  string
 	panicked    bool
 	panicOutput []string
 	// Track output for tests in progress
 	outputBuf map[string][]string
-}
-
-type testState struct {
-	name     string
-	status   string // "PASS", "FAIL", "SKIP"
-	duration time.Duration
-	output   []string
 }
 
 func newAggregator() *aggregator {
@@ -150,8 +143,7 @@ func (a *aggregator) getOrCreate(name string) *pkgState {
 	}
 	pkg := &pkgState{
 		name:        name,
-		failedTests: make(map[string]*testState),
-		allTests:    make(map[string]*testState),
+		failedTests: make(map[string][]string),
 		outputBuf:   make(map[string][]string),
 	}
 	a.packages[name] = pkg
@@ -166,9 +158,6 @@ func (a *aggregator) processEvent(e TestEvent) {
 	case StatusPass:
 		if e.Test != "" {
 			pkg.passed++
-			ts := pkg.getOrCreateTest(e.Test)
-			ts.status = "PASS"
-			ts.duration = time.Duration(e.Elapsed * float64(time.Second))
 		} else {
 			pkg.duration = time.Duration(e.Elapsed * float64(time.Second))
 		}
@@ -176,11 +165,8 @@ func (a *aggregator) processEvent(e TestEvent) {
 	case StatusFail:
 		if e.Test != "" {
 			pkg.failed++
-			ts := pkg.getOrCreateTest(e.Test)
-			ts.status = "FAIL"
-			ts.duration = time.Duration(e.Elapsed * float64(time.Second))
-			ts.output = pkg.outputBuf[e.Test]
-			pkg.failedTests[e.Test] = ts
+			pkg.failedTests[e.Test] = pkg.outputBuf[e.Test]
+			pkg.failedOrder = append(pkg.failedOrder, e.Test)
 		} else {
 			pkg.duration = time.Duration(e.Elapsed * float64(time.Second))
 			// Check if this is a build error (failed with no tests run)
@@ -192,8 +178,6 @@ func (a *aggregator) processEvent(e TestEvent) {
 	case StatusSkip:
 		if e.Test != "" {
 			pkg.skipped++
-			ts := pkg.getOrCreateTest(e.Test)
-			ts.status = "SKIP"
 		}
 
 	case "output":
@@ -221,16 +205,6 @@ func (a *aggregator) processEvent(e TestEvent) {
 	}
 }
 
-func (pkg *pkgState) getOrCreateTest(name string) *testState {
-	if ts, ok := pkg.allTests[name]; ok {
-		return ts
-	}
-	ts := &testState{name: name}
-	pkg.allTests[name] = ts
-	pkg.testOrder = append(pkg.testOrder, name)
-	return ts
-}
-
 func (a *aggregator) results() []TestPackageResult {
 	results := make([]TestPackageResult, 0, len(a.order))
 	for _, name := range a.order {
@@ -255,25 +229,12 @@ func (a *aggregator) results() []TestPackageResult {
 			r.PanicOutput = pkg.panicOutput
 		}
 
-		// Build ordered test results
-		for _, testName := range pkg.testOrder {
-			ts := pkg.allTests[testName]
-			r.AllTests = append(r.AllTests, TestResult{
-				Name:     ts.name,
-				Status:   ts.status,
-				Duration: ts.duration,
-				Output:   ts.output,
+		// Build failed tests list in run order
+		for _, testName := range pkg.failedOrder {
+			r.FailedTests = append(r.FailedTests, FailedTest{
+				Name:   testName,
+				Output: pkg.failedTests[testName],
 			})
-		}
-
-		// Build failed tests list
-		for _, testName := range pkg.testOrder {
-			if ft, ok := pkg.failedTests[testName]; ok {
-				r.FailedTests = append(r.FailedTests, FailedTest{
-					Name:   ft.name,
-					Output: ft.output,
-				})
-			}
 		}
 
 		results = append(results, r)

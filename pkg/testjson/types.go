@@ -3,7 +3,7 @@ package testjson
 
 import "time"
 
-// Status values returned by TestPackageResult.Status and TestResult.Status.
+// Status values returned by TestPackageResult.Status.
 const (
 	StatusPass = "pass"
 	StatusFail = "fail"
@@ -20,17 +20,6 @@ type TestEvent struct {
 	Output  string    `json:"Output"`
 }
 
-// ProcessFunc is called for each parsed event during streaming.
-type ProcessFunc func(TestEvent)
-
-// TestResult represents a single test with its status.
-type TestResult struct {
-	Name     string
-	Status   string // "PASS", "FAIL", "SKIP"
-	Duration time.Duration
-	Output   []string // failure output lines
-}
-
 // TestPackageResult represents aggregated results for one package.
 type TestPackageResult struct {
 	Name        string
@@ -40,7 +29,6 @@ type TestPackageResult struct {
 	Duration    time.Duration
 	Coverage    float64
 	FailedTests []FailedTest
-	AllTests    []TestResult
 	BuildError  string // non-empty if package failed to build
 	Panicked    bool
 	PanicOutput []string
