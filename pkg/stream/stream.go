@@ -10,23 +10,6 @@ import (
 	"github.com/dkoosis/fo/pkg/testjson"
 )
 
-// LineKind identifies the type of output line for styling.
-type LineKind int
-
-const (
-	KindPass LineKind = iota
-	KindFail
-	KindSkip
-	KindPkgPass
-	KindPkgFail
-	KindOutput
-	KindSeparator
-)
-
-// StyleFunc formats a line with colors/symbols.
-// If nil, no styling is applied.
-type StyleFunc func(kind LineKind, text string) string
-
 // pkgProgress tracks state for one active package.
 type pkgProgress struct {
 	name        string // full package path
@@ -41,8 +24,7 @@ type pkgProgress struct {
 
 // streamer is the core state machine for streaming go test -json output.
 type streamer struct {
-	tw    *termWriter
-	style StyleFunc
+	tw *termWriter
 
 	active map[string]*pkgProgress // active packages by full name
 	order  []string                // package order for footer rendering
@@ -57,10 +39,9 @@ type streamer struct {
 	hasFailed    bool // any test or package failed
 }
 
-func newStreamer(tw *termWriter, style StyleFunc) *streamer {
+func newStreamer(tw *termWriter) *streamer {
 	return &streamer{
 		tw:        tw,
-		style:     style,
 		active:    make(map[string]*pkgProgress),
 		outputBuf: make(map[string][]string),
 	}
@@ -77,14 +58,6 @@ func shortPkg(pkg string) string {
 // bufKey returns the output buffer key for a package/test pair.
 func bufKey(pkg, test string) string {
 	return pkg + "\x00" + test
-}
-
-// styleLine applies the style function if set, otherwise returns text unchanged.
-func (s *streamer) styleLine(kind LineKind, text string) string {
-	if s.style != nil {
-		return s.style(kind, text)
-	}
-	return text
 }
 
 // handleEvent processes a single test event according to the event matrix.
@@ -140,9 +113,9 @@ func (s *streamer) handleTestPass(e testjson.TestEvent) {
 		pkg.passed++
 		pkg.finished++
 	}
-	line := fmt.Sprintf("  %-10s \u00b7 %-40s %5.2fs", shortPkg(e.Package), e.Test, e.Elapsed)
+	line := fmt.Sprintf("  %-10s · %-40s %5.2fs", shortPkg(e.Package), e.Test, e.Elapsed)
 	s.tw.EraseFooter()
-	s.tw.PrintLine(s.styleLine(KindPass, line))
+	s.tw.PrintLine(line)
 
 	// Discard output buffer on pass
 	delete(s.outputBuf, bufKey(e.Package, e.Test))
@@ -154,9 +127,9 @@ func (s *streamer) handleTestFail(e testjson.TestEvent) {
 		pkg.finished++
 	}
 	s.hasFailed = true
-	line := fmt.Sprintf("  %-10s \u2717 %-40s %5.2fs", shortPkg(e.Package), e.Test, e.Elapsed)
+	line := fmt.Sprintf("  %-10s ✗ %-40s %5.2fs", shortPkg(e.Package), e.Test, e.Elapsed)
 	s.tw.EraseFooter()
-	s.tw.PrintLine(s.styleLine(KindFail, line))
+	s.tw.PrintLine(line)
 
 	// Flush buffered output
 	key := bufKey(e.Package, e.Test)
@@ -165,8 +138,7 @@ func (s *streamer) handleTestFail(e testjson.TestEvent) {
 			if isBoilerplate(l) {
 				continue
 			}
-			outLine := fmt.Sprintf("             %s", l)
-			s.tw.PrintLine(s.styleLine(KindOutput, outLine))
+			s.tw.PrintLine(fmt.Sprintf("             %s", l))
 		}
 		delete(s.outputBuf, key)
 	}
@@ -177,9 +149,9 @@ func (s *streamer) handleTestSkip(e testjson.TestEvent) {
 		pkg.skipped++
 		pkg.finished++
 	}
-	line := fmt.Sprintf("  %-10s \u25cb %-40s", shortPkg(e.Package), e.Test)
+	line := fmt.Sprintf("  %-10s ○ %-40s", shortPkg(e.Package), e.Test)
 	s.tw.EraseFooter()
-	s.tw.PrintLine(s.styleLine(KindSkip, line))
+	s.tw.PrintLine(line)
 
 	// Discard output buffer on skip
 	delete(s.outputBuf, bufKey(e.Package, e.Test))
@@ -191,18 +163,11 @@ func (s *streamer) handlePkgPass(e testjson.TestEvent) {
 		return
 	}
 	total := pkg.passed + pkg.failed + pkg.skipped
-	line := fmt.Sprintf("  \u2713 %-28s %d/%d  %.1fs", pkg.short, pkg.passed, total, e.Elapsed)
+	line := fmt.Sprintf("  ✓ %-28s %d/%d  %.1fs", pkg.short, pkg.passed, total, e.Elapsed)
 	s.tw.EraseFooter()
-	s.tw.PrintLine(s.styleLine(KindPkgPass, line))
+	s.tw.PrintLine(line)
 
-	s.totalPassed += pkg.passed
-	s.totalFailed += pkg.failed
-	s.totalSkipped += pkg.skipped
-	s.totalPkgs++
-	if e.Elapsed > s.maxDuration {
-		s.maxDuration = e.Elapsed
-	}
-
+	s.recordPkg(pkg, e.Elapsed)
 	delete(s.active, e.Package)
 }
 
@@ -213,9 +178,9 @@ func (s *streamer) handlePkgFail(e testjson.TestEvent) {
 	}
 	s.hasFailed = true
 	total := pkg.passed + pkg.failed + pkg.skipped
-	line := fmt.Sprintf("  \u2717 %-28s %d/%d  %.1fs", pkg.short, pkg.passed, total, e.Elapsed)
+	line := fmt.Sprintf("  ✗ %-28s %d/%d  %.1fs", pkg.short, pkg.passed, total, e.Elapsed)
 	s.tw.EraseFooter()
-	s.tw.PrintLine(s.styleLine(KindPkgFail, line))
+	s.tw.PrintLine(line)
 
 	// Flush any remaining package-level output
 	key := bufKey(e.Package, "")
@@ -224,21 +189,24 @@ func (s *streamer) handlePkgFail(e testjson.TestEvent) {
 			if isBoilerplate(l) {
 				continue
 			}
-			outLine := fmt.Sprintf("             %s", l)
-			s.tw.PrintLine(s.styleLine(KindOutput, outLine))
+			s.tw.PrintLine(fmt.Sprintf("             %s", l))
 		}
 		delete(s.outputBuf, key)
 	}
 
+	s.recordPkg(pkg, e.Elapsed)
+	delete(s.active, e.Package)
+}
+
+// recordPkg accumulates totals from a finished package.
+func (s *streamer) recordPkg(pkg *pkgProgress, elapsed float64) {
 	s.totalPassed += pkg.passed
 	s.totalFailed += pkg.failed
 	s.totalSkipped += pkg.skipped
 	s.totalPkgs++
-	if e.Elapsed > s.maxDuration {
-		s.maxDuration = e.Elapsed
+	if elapsed > s.maxDuration {
+		s.maxDuration = elapsed
 	}
-
-	delete(s.active, e.Package)
 }
 
 func (s *streamer) handleOutput(e testjson.TestEvent) {
@@ -254,7 +222,7 @@ func (s *streamer) handleOutput(e testjson.TestEvent) {
 	if e.Test == "" {
 		if strings.Contains(output, "panic:") || strings.HasPrefix(output, "goroutine ") {
 			s.tw.EraseFooter()
-			s.tw.PrintLine(s.styleLine(KindOutput, "  "+output))
+			s.tw.PrintLine("  " + output)
 		}
 	}
 }
@@ -274,7 +242,7 @@ func (s *streamer) redrawFooter() {
 	}
 
 	var lines []string
-	lines = append(lines, "  \u2500\u2500\u2500 active \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")
+	lines = append(lines, "  ─── active ─────────────────────────────────────")
 
 	now := time.Now()
 	for _, name := range s.order {
@@ -299,26 +267,22 @@ func (s *streamer) finish() {
 	s.tw.EraseFooter()
 
 	totalTests := s.totalPassed + s.totalFailed + s.totalSkipped
-	sep := "  \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
-	s.tw.PrintLine(s.styleLine(KindSeparator, sep))
+	s.tw.PrintLine("  ─────────────────────────────────────────────────")
 
-	var summary string
 	if s.hasFailed {
-		summary = fmt.Sprintf("  FAIL (%.1fs) %d/%d tests, %d packages",
-			s.maxDuration, s.totalFailed, totalTests, s.totalPkgs)
-		s.tw.PrintLine(s.styleLine(KindFail, summary))
+		s.tw.PrintLine(fmt.Sprintf("  FAIL (%.1fs) %d/%d tests, %d packages",
+			s.maxDuration, s.totalFailed, totalTests, s.totalPkgs))
 	} else {
-		summary = fmt.Sprintf("  PASS (%.1fs) %d tests, %d packages",
-			s.maxDuration, totalTests, s.totalPkgs)
-		s.tw.PrintLine(s.styleLine(KindPass, summary))
+		s.tw.PrintLine(fmt.Sprintf("  PASS (%.1fs) %d tests, %d packages",
+			s.maxDuration, totalTests, s.totalPkgs))
 	}
 }
 
 // Run reads go test -json events from r and renders them to out.
 // Returns exit code: 0=all pass, 1=failures, 2=error.
-func Run(ctx context.Context, r io.Reader, out io.Writer, width, height int, style StyleFunc) int {
+func Run(ctx context.Context, r io.Reader, out io.Writer, width, height int) int {
 	tw := newTermWriter(out, width, height)
-	s := newStreamer(tw, style)
+	s := newStreamer(tw)
 
 	malformed, err := testjson.Stream(ctx, r, func(e testjson.TestEvent) {
 		s.handleEvent(e)

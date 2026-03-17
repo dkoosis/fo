@@ -169,7 +169,7 @@ func runStream(stdin io.Reader, br *bufio.Reader, stdout io.Writer) int {
 		defer stopClose()
 	}
 	width, height := termSize(stdout)
-	return stream.Run(ctx, br, stdout, width, height, nil)
+	return stream.Run(ctx, br, stdout, width, height)
 }
 
 // runBatch reads, detects, parses, and validates input in batch mode.

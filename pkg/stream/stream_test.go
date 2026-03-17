@@ -17,18 +17,12 @@ func runStream(t *testing.T, events []testjson.TestEvent, width, height int) str
 	t.Helper()
 	var buf bytes.Buffer
 	tw := newTermWriter(&buf, width, height)
-	s := newStreamer(tw, nil) // nil style = no styling
+	s := newStreamer(tw)
 	for _, e := range events {
 		s.handleEvent(e)
 	}
 	s.finish()
 	return buf.String()
-}
-
-// plainOutput strips ANSI escapes from runStream output so tests can check
-// visible text without fighting cursor-movement sequences.
-func plainOutput(raw string) string {
-	return stripANSI(raw)
 }
 
 func TestStreamer_PassingTest_PrintsResultLine(t *testing.T) {
@@ -38,7 +32,7 @@ func TestStreamer_PassingTest_PrintsResultLine(t *testing.T) {
 		{Action: "pass", Package: "example.com/foo/bar", Test: "TestHello", Elapsed: 0.01},
 		{Action: "pass", Package: "example.com/foo/bar", Elapsed: 0.5},
 	}
-	out := plainOutput(runStream(t, events, 120, 24))
+	out := stripANSI(runStream(t, events, 120, 24))
 
 	if !strings.Contains(out, "bar") {
 		t.Error("output missing package short name 'bar'")
@@ -59,7 +53,7 @@ func TestStreamer_FailingTest_FlushesOutput(t *testing.T) {
 		{Action: "fail", Package: "example.com/pkg/eval", Test: "TestBar", Elapsed: 0.02},
 		{Action: "fail", Package: "example.com/pkg/eval", Elapsed: 1.0},
 	}
-	out := plainOutput(runStream(t, events, 120, 24))
+	out := stripANSI(runStream(t, events, 120, 24))
 
 	if !strings.Contains(out, "\u2717") {
 		t.Error("output missing fail symbol '\u2717'")
@@ -77,7 +71,7 @@ func TestStreamer_PassingTest_DiscardsOutput(t *testing.T) {
 		{Action: "pass", Package: "example.com/pkg/eval", Test: "TestOK", Elapsed: 0.01},
 		{Action: "pass", Package: "example.com/pkg/eval", Elapsed: 0.5},
 	}
-	out := plainOutput(runStream(t, events, 120, 24))
+	out := stripANSI(runStream(t, events, 120, 24))
 
 	if strings.Contains(out, "some debug noise") {
 		t.Error("passing test output should be discarded, but 'some debug noise' appeared")
@@ -95,7 +89,7 @@ func TestStreamer_PackageSummary_ShowsCounts(t *testing.T) {
 		{Action: "pass", Package: "example.com/pkg/embedder", Test: "TestC", Elapsed: 0.03},
 		{Action: "pass", Package: "example.com/pkg/embedder", Elapsed: 2.6},
 	}
-	out := plainOutput(runStream(t, events, 120, 24))
+	out := stripANSI(runStream(t, events, 120, 24))
 
 	if !strings.Contains(out, "3/3") {
 		t.Errorf("package summary should contain '3/3', got:\n%s", out)
@@ -117,7 +111,7 @@ func TestStreamer_MultiplePackages_Interleaved(t *testing.T) {
 		{Action: "pass", Package: "example.com/alpha", Elapsed: 0.5},
 		{Action: "pass", Package: "example.com/beta", Elapsed: 0.6},
 	}
-	out := plainOutput(runStream(t, events, 120, 24))
+	out := stripANSI(runStream(t, events, 120, 24))
 
 	if !strings.Contains(out, "alpha") {
 		t.Error("output missing package prefix 'alpha'")
@@ -136,7 +130,7 @@ func TestStreamer_Run_WithContext(t *testing.T) {
 	}, "\n") + "\n"
 
 	var buf bytes.Buffer
-	code := Run(context.Background(), strings.NewReader(input), &buf, 120, 24, nil)
+	code := Run(context.Background(), strings.NewReader(input), &buf, 120, 24)
 	if code != 0 {
 		t.Errorf("Run() = %d, want 0 for all-pass", code)
 	}
@@ -152,7 +146,7 @@ func TestStreamer_HasFailures_ExitCode1(t *testing.T) {
 	}, "\n") + "\n"
 
 	var buf bytes.Buffer
-	code := Run(context.Background(), strings.NewReader(input), &buf, 120, 24, nil)
+	code := Run(context.Background(), strings.NewReader(input), &buf, 120, 24)
 	if code != 1 {
 		t.Errorf("Run() = %d, want 1 for failures", code)
 	}
@@ -169,7 +163,7 @@ func TestStreamer_Finish_PrintsSummary(t *testing.T) {
 		{Action: "pass", Package: "example.com/pkg/b", Test: "TestY", Elapsed: 0.02},
 		{Action: "pass", Package: "example.com/pkg/b", Elapsed: 2.0},
 	}
-	out := plainOutput(runStream(t, events, 120, 24))
+	out := stripANSI(runStream(t, events, 120, 24))
 
 	if !strings.Contains(out, "PASS") {
 		t.Error("summary missing 'PASS'")
@@ -191,7 +185,7 @@ func TestStreamer_FailSummary_ShowsFailCount(t *testing.T) {
 		{Action: "fail", Package: "example.com/pkg/x", Test: "TestBad", Elapsed: 0.02},
 		{Action: "fail", Package: "example.com/pkg/x", Elapsed: 1.0},
 	}
-	out := plainOutput(runStream(t, events, 80, 24))
+	out := stripANSI(runStream(t, events, 80, 24))
 
 	if !strings.Contains(out, "FAIL") {
 		t.Errorf("summary missing FAIL, got: %s", out)
@@ -211,7 +205,7 @@ func TestStreamer_BoilerplateFiltered(t *testing.T) {
 		{Action: "fail", Package: "example.com/pkg", Test: "TestFail", Elapsed: 0.01},
 		{Action: "fail", Package: "example.com/pkg", Elapsed: 0.5},
 	}
-	out := plainOutput(runStream(t, events, 120, 24))
+	out := stripANSI(runStream(t, events, 120, 24))
 
 	if !strings.Contains(out, "actual error message") {
 		t.Error("real error message should be present")
@@ -233,7 +227,7 @@ func TestRun_Integration_TrixiData(t *testing.T) {
 	defer f.Close()
 
 	var buf bytes.Buffer
-	exitCode := Run(context.Background(), f, &buf, 80, 24, nil)
+	exitCode := Run(context.Background(), f, &buf, 80, 24)
 	if exitCode != 0 {
 		t.Errorf("exit code = %d, want 0 (all pass)", exitCode)
 	}
