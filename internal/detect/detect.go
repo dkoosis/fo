@@ -21,10 +21,7 @@ const (
 // Sniff examines the first bytes of input to determine format.
 // Returns the detected format. Input must contain at least the first line.
 func Sniff(data []byte) Format {
-	// Trim leading whitespace
-	for len(data) > 0 && (data[0] == ' ' || data[0] == '\t' || data[0] == '\n' || data[0] == '\r') {
-		data = data[1:]
-	}
+	data = bytes.TrimLeft(data, " \t\n\r")
 	if len(data) == 0 {
 		return Unknown
 	}
@@ -68,18 +65,11 @@ func isSARIF(data []byte) bool {
 }
 
 func isGoTestJSON(data []byte) bool {
-	// Find first complete line
-	end := 0
-	for end < len(data) && data[end] != '\n' {
-		end++
-	}
-	firstLine := data[:end]
-
 	var event struct {
 		Action  string `json:"Action"`
 		Package string `json:"Package"`
 	}
-	if err := json.Unmarshal(firstLine, &event); err != nil {
+	if err := json.Unmarshal(extractFirstLine(data), &event); err != nil {
 		return false
 	}
 
