@@ -201,8 +201,16 @@ func buildMetricsLabel(doc *fometrics.Document) string {
 
 	parts := make([]string, 0, len(doc.Metrics))
 	for _, m := range doc.Metrics {
-		formatted := formatMetricValue(m)
-		parts = append(parts, fmt.Sprintf("%s=%s", m.Name, formatted))
+		var val string
+		if m.Value == float64(int64(m.Value)) {
+			val = fmt.Sprintf("%d", int64(m.Value))
+		} else {
+			val = fmt.Sprintf("%.3f", m.Value)
+		}
+		if m.Unit != "" {
+			val += m.Unit
+		}
+		parts = append(parts, fmt.Sprintf("%s=%s", m.Name, val))
 	}
 
 	label := prefix
@@ -213,19 +221,6 @@ func buildMetricsLabel(doc *fometrics.Document) string {
 		label += " (" + doc.Summary + ")"
 	}
 	return label
-}
-
-func formatMetricValue(m fometrics.Metric) string {
-	var s string
-	if m.Value == float64(int64(m.Value)) {
-		s = fmt.Sprintf("%d", int64(m.Value))
-	} else {
-		s = fmt.Sprintf("%.3f", m.Value)
-	}
-	if m.Unit != "" {
-		s += m.Unit
-	}
-	return s
 }
 
 func mapDetailSeverity(severity string) pattern.Status {
