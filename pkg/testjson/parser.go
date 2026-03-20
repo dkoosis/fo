@@ -215,18 +215,15 @@ func (a *aggregator) results() []TestPackageResult {
 		}
 
 		r := TestPackageResult{
-			Name:       pkg.name,
-			Passed:     pkg.passed,
-			Failed:     pkg.failed,
-			Skipped:    pkg.skipped,
-			Duration:   pkg.duration,
-			Coverage:   pkg.coverage,
-			BuildError: pkg.buildError,
-			Panicked:   pkg.panicked,
-		}
-
-		if pkg.panicked {
-			r.PanicOutput = pkg.panicOutput
+			Name:        pkg.name,
+			Passed:      pkg.passed,
+			Failed:      pkg.failed,
+			Skipped:     pkg.skipped,
+			Duration:    pkg.duration,
+			Coverage:    pkg.coverage,
+			BuildError:  pkg.buildError,
+			Panicked:    pkg.panicked,
+			PanicOutput: pkg.panicOutput,
 		}
 
 		// Build failed tests list in run order
