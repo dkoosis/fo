@@ -19,8 +19,6 @@ func IsDelimiter(line []byte) bool {
 	return delimiterRe.Match(line)
 }
 
-var newline = []byte("\n")
-
 // Section represents one tool's output within a report.
 type Section struct {
 	Tool    string // e.g. "lint", "test", "vuln"
@@ -32,15 +30,16 @@ type Section struct {
 // Parse splits delimited report input into sections.
 // Lines before the first delimiter are silently discarded.
 func Parse(data []byte) ([]Section, error) {
-	data = bytes.TrimSuffix(data, newline)
-	lines := bytes.Split(data, newline)
+	nl := []byte{'\n'}
+	data = bytes.TrimSuffix(data, nl)
+	lines := bytes.Split(data, nl)
 	var sections []Section
 	var current *Section
 
 	for _, line := range lines {
 		if m := delimiterRe.FindSubmatch(line); m != nil {
 			if current != nil {
-				current.Content = bytes.TrimSuffix(current.Content, newline)
+				current.Content = bytes.TrimSuffix(current.Content, nl)
 				sections = append(sections, *current)
 			}
 			current = &Section{
@@ -56,7 +55,7 @@ func Parse(data []byte) ([]Section, error) {
 		}
 	}
 	if current != nil {
-		current.Content = bytes.TrimSuffix(current.Content, newline)
+		current.Content = bytes.TrimSuffix(current.Content, nl)
 		sections = append(sections, *current)
 	}
 
