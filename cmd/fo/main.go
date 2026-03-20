@@ -158,7 +158,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	output := selectRenderer(mode, *themeFlag, stdout).Render(patterns)
+	output := selectRenderer(mode, *themeFlag).Render(patterns)
 	fmt.Fprint(stdout, output)
 	return exitCode(patterns)
 }
@@ -233,7 +233,7 @@ func parseInput(format detect.Format, input []byte, stderr io.Writer) ([]pattern
 	}
 }
 
-func selectRenderer(mode, themeName string, w io.Writer) render.Renderer {
+func selectRenderer(mode, themeName string) render.Renderer {
 	switch mode {
 	case "json":
 		return render.NewJSON()
@@ -244,8 +244,7 @@ func selectRenderer(mode, themeName string, w io.Writer) render.Renderer {
 		if os.Getenv("NO_COLOR") != "" {
 			theme = render.MonoTheme()
 		}
-		width, _ := termSize(w)
-		return render.NewTerminal(theme, width)
+		return render.NewTerminal(theme)
 	}
 }
 

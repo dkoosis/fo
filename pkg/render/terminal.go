@@ -14,9 +14,7 @@ type Terminal struct {
 }
 
 // NewTerminal creates a terminal renderer with the given theme.
-// The width parameter is accepted for future use (e.g., table truncation)
-// but not currently referenced.
-func NewTerminal(theme Theme, _ int) *Terminal {
+func NewTerminal(theme Theme) *Terminal {
 	return &Terminal{theme: theme}
 }
 
@@ -40,10 +38,6 @@ func (t *Terminal) renderOne(p pattern.Pattern) string {
 		return t.renderLeaderboard(v)
 	case *pattern.TestTable:
 		return t.renderTestTable(v)
-	case *pattern.Sparkline:
-		return t.renderSparkline(v)
-	case *pattern.Comparison:
-		return t.renderComparison(v)
 	case *pattern.Error:
 		return t.renderError(v)
 	default:
@@ -159,90 +153,6 @@ func (t *Terminal) renderTestTable(tt *pattern.TestTable) string {
 				sb.WriteString(t.theme.Muted.Render(line))
 			}
 		}
-		sb.WriteString("\n")
-	}
-	return sb.String()
-}
-
-func (t *Terminal) renderSparkline(s *pattern.Sparkline) string {
-	if len(s.Values) == 0 {
-		return ""
-	}
-	var sb strings.Builder
-	if s.Label != "" {
-		sb.WriteString(t.theme.Primary.Render(s.Label + ": "))
-	}
-
-	minVal, maxVal := s.Min, s.Max
-	if minVal == 0 && maxVal == 0 {
-		minVal, maxVal = s.Values[0], s.Values[0]
-		for _, v := range s.Values {
-			if v < minVal {
-				minVal = v
-			}
-			if v > maxVal {
-				maxVal = v
-			}
-		}
-	}
-	valueRange := maxVal - minVal
-	if valueRange == 0 {
-		valueRange = 1
-	}
-
-	blocks := []rune{'▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
-	var spark strings.Builder
-	for _, v := range s.Values {
-		idx := int((v - minVal) / valueRange * 7)
-		if idx < 0 {
-			idx = 0
-		}
-		if idx > 7 {
-			idx = 7
-		}
-		spark.WriteRune(blocks[idx])
-	}
-	sb.WriteString(t.theme.Success.Render(spark.String()))
-
-	latest := s.Values[len(s.Values)-1]
-	sb.WriteString(t.theme.Muted.Render(fmt.Sprintf(" %.1f%s", latest, s.Unit)))
-	sb.WriteString("\n")
-	return sb.String()
-}
-
-func (t *Terminal) renderComparison(c *pattern.Comparison) string {
-	if len(c.Changes) == 0 {
-		return ""
-	}
-	var sb strings.Builder
-	if c.Label != "" {
-		sb.WriteString(t.theme.Bold.Render(c.Label))
-		sb.WriteString("\n")
-	}
-	for _, item := range c.Changes {
-		sb.WriteString("  ")
-		sb.WriteString(item.Label + ": ")
-		sb.WriteString(t.theme.Muted.Render(item.Before + " → " + item.After))
-		sb.WriteString(" ")
-
-		var arrow string
-		var style lipgloss.Style
-		switch {
-		case item.Change > 0:
-			arrow = "↑"
-			style = t.theme.Warning
-		case item.Change < 0:
-			arrow = "↓"
-			style = t.theme.Success
-		default:
-			arrow = "="
-			style = t.theme.Muted
-		}
-		abs := item.Change
-		if abs < 0 {
-			abs = -abs
-		}
-		sb.WriteString(style.Render(fmt.Sprintf("%s %.1f%s", arrow, abs, item.Unit)))
 		sb.WriteString("\n")
 	}
 	return sb.String()
