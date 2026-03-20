@@ -5,7 +5,6 @@ type Direction string
 
 const (
 	Highest Direction = "highest"
-	Lowest  Direction = "lowest"
 )
 
 // Leaderboard represents a ranked list of items by metric.
