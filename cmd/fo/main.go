@@ -20,6 +20,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -108,6 +109,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	formatFlag := fs.String("format", "auto", "Output format: auto, terminal, llm, json")
 	themeFlag := fs.String("theme", "default", "Theme: default, orca, mono")
 	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
 		return 2
 	}
 
@@ -249,11 +253,8 @@ func resolveFormat(format string, w io.Writer) string {
 	if format != "auto" {
 		return format
 	}
-	// Auto-detect: TTY = terminal, piped = llm
-	if f, ok := w.(*os.File); ok {
-		if term.IsTerminal(int(f.Fd())) { //nolint:gosec // file descriptor fits in int on all supported platforms
-			return "terminal"
-		}
+	if isTTYWriter(w) {
+		return "terminal"
 	}
 	return "llm"
 }
@@ -328,6 +329,9 @@ func runWrapSarif(args []string, stdin io.Reader, stdout, stderr io.Writer) int 
 	level := fs.String("level", "warning", "Default severity: error|warning|note")
 	version := fs.String("version", "", "Tool version string")
 	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
 		return 2
 	}
 
