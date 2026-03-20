@@ -19,19 +19,15 @@ func Read(r io.Reader) (*Document, error) {
 	// Trailing data is tolerated: golangci-lint v2 appends a text summary
 	// after the SARIF JSON document, and the decoder already consumed the
 	// complete first JSON value successfully.
-	return validateDocument(&doc)
+	if doc.Version == "" {
+		return nil, fmt.Errorf("missing sarif version")
+	}
+	return &doc, nil
 }
 
 // ReadBytes parses SARIF from a byte slice.
 func ReadBytes(data []byte) (*Document, error) {
 	return Read(bytes.NewReader(data))
-}
-
-func validateDocument(doc *Document) (*Document, error) {
-	if doc.Version == "" {
-		return nil, fmt.Errorf("missing sarif version")
-	}
-	return doc, nil
 }
 
 // Stats aggregates statistics from SARIF results.
