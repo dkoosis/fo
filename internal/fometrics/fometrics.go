@@ -42,46 +42,35 @@ func Parse(data []byte) (*Document, error) {
 		return nil, err
 	}
 
-	if err := validate(&doc); err != nil {
-		return nil, err
-	}
-
-	applyDefaults(&doc)
-	return &doc, nil
-}
-
-func validate(doc *Document) error {
 	switch {
 	case doc.Schema == "":
-		return fmt.Errorf("missing required field: schema")
+		return nil, fmt.Errorf("missing required field: schema")
 	case doc.Schema == "fo-metrics/v1":
 		// exact match, ok
 	case strings.HasPrefix(doc.Schema, "fo-metrics/v1."):
 		// minor version, ok
 	default:
-		return fmt.Errorf("unsupported schema: %s", doc.Schema)
+		return nil, fmt.Errorf("unsupported schema: %s", doc.Schema)
 	}
 
 	if doc.Tool == "" {
-		return fmt.Errorf("missing required field: tool")
+		return nil, fmt.Errorf("missing required field: tool")
 	}
 
 	switch doc.Status {
 	case "pass", "fail", "warn":
 		// valid
 	case "":
-		return fmt.Errorf("missing required field: status")
+		return nil, fmt.Errorf("missing required field: status")
 	default:
-		return fmt.Errorf("invalid status: %q (expected pass, fail, or warn)", doc.Status)
+		return nil, fmt.Errorf("invalid status: %q (expected pass, fail, or warn)", doc.Status)
 	}
 
-	return nil
-}
-
-func applyDefaults(doc *Document) {
 	for i := range doc.Metrics {
 		if doc.Metrics[i].Direction == "" {
 			doc.Metrics[i].Direction = "higher_is_better"
 		}
 	}
+
+	return &doc, nil
 }
