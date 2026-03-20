@@ -12,8 +12,7 @@ import (
 
 // pkgProgress tracks state for one active package.
 type pkgProgress struct {
-	name        string // full package path
-	short       string // last segment
+	short       string // last path segment
 	startTime   time.Time
 	finished    int // tests completed
 	passed      int
@@ -97,7 +96,6 @@ func (s *streamer) handleEvent(e testjson.TestEvent) {
 
 func (s *streamer) handleStart(e testjson.TestEvent) {
 	pkg := &pkgProgress{
-		name:      e.Package,
 		short:     shortPkg(e.Package),
 		startTime: e.Time,
 	}

@@ -51,38 +51,28 @@ func (w *termWriter) EraseFooter() {
 // DrawFooter prints footer lines, truncated to terminal width.
 // Caps to min(count, max(3, height/3)).
 func (w *termWriter) DrawFooter(lines []string) {
-	maxLines := w.maxFooterLines(len(lines))
-	capped := len(lines) > maxLines
-
-	printLines := lines
-	if capped && maxLines > 0 {
-		printLines = lines[:maxLines-1]
+	maxLines := w.height / 3
+	if maxLines < 3 {
+		maxLines = 3
 	}
 
-	printed := 0
-	for _, line := range printLines {
-		truncated := truncateToWidth(line, w.width)
-		fmt.Fprintln(w.out, truncated)
-		printed++
+	capped := len(lines) > maxLines
+	show := lines
+	if capped {
+		show = lines[:maxLines-1]
+	}
+
+	for _, line := range show {
+		fmt.Fprintln(w.out, truncateToWidth(line, w.width))
 	}
 	if capped {
-		overflow := len(lines) - len(printLines)
-		more := truncateToWidth(fmt.Sprintf("  ... and %d more", overflow), w.width)
-		fmt.Fprintln(w.out, more)
-		printed++
+		overflow := len(lines) - len(show)
+		fmt.Fprintln(w.out, truncateToWidth(fmt.Sprintf("  ... and %d more", overflow), w.width))
 	}
-	w.footerLines = printed
-}
-
-func (w *termWriter) maxFooterLines(count int) int {
-	maxH := w.height / 3
-	if maxH < 3 {
-		maxH = 3
+	w.footerLines = len(show)
+	if capped {
+		w.footerLines++
 	}
-	if count <= maxH {
-		return count
-	}
-	return maxH
 }
 
 func truncateToWidth(s string, width int) string {
