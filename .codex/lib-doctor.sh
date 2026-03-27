@@ -11,8 +11,8 @@ REPAIRED_ACTIONS=()
 REPAIRED_SUCCESS=()
 
 # Canonical tool lists — single source of truth
-REQUIRED_TOOLS=(go golangci-lint snipe jq rg fd bat gofumpt goimports govulncheck dtree mage)
-OPTIONAL_TOOLS=(jscpd)
+REQUIRED_TOOLS=(go golangci-lint snipe jq rg fd bat gofumpt goimports dtree)
+OPTIONAL_TOOLS=(jscpd govulncheck)
 
 have() {
   command -v "$1" >/dev/null 2>&1
