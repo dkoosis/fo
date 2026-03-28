@@ -482,6 +482,14 @@ func TestJscpd_InvalidJSON(t *testing.T) {
 	}
 }
 
+func TestJscpd_EmptyInput(t *testing.T) {
+	var buf bytes.Buffer
+	err := New().Wrap(nil, strings.NewReader(""), &buf)
+	if err == nil {
+		t.Error("expected error for empty input")
+	}
+}
+
 func TestParseClones(t *testing.T) {
 	input := []byte(`{"duplicates":[{
 		"format":"go","lines":10,
@@ -544,6 +552,7 @@ func New() *Jscpd { return &Jscpd{} }
 func (j *Jscpd) OutputFormat() wrapper.Format { return wrapper.FormatSARIF }
 
 // Wrap reads jscpd JSON from r and writes SARIF to w.
+// Reads entire input into memory — fine for jscpd reports (typically <1MB).
 func (j *Jscpd) Wrap(args []string, r io.Reader, w io.Writer) error {
 	data, err := io.ReadAll(r)
 	if err != nil {
@@ -726,6 +735,36 @@ func TestArchlint_InvalidJSON(t *testing.T) {
 	}
 }
 
+func TestArchlint_EmptyInput(t *testing.T) {
+	var buf bytes.Buffer
+	err := New().Wrap(nil, strings.NewReader(""), &buf)
+	if err == nil {
+		t.Error("expected error for empty input")
+	}
+}
+
+func TestArchlint_FullImportPath(t *testing.T) {
+	input := `{"Type":"models.Check","Payload":{"ArchHasWarnings":true,"ArchWarningsDeps":[
+		{"ComponentName":"agentSupervisor","FileRelativePath":"/internal/agent/supervisor/supervisor.go","ResolvedImportName":"github.com/example/project/internal/agent/shell"}
+	],"Qualities":[{"ID":"component_imports","Used":true}]}}`
+	var buf bytes.Buffer
+	if err := New().Wrap(nil, strings.NewReader(input), &buf); err != nil {
+		t.Fatal(err)
+	}
+
+	var doc sarif.Document
+	if err := json.Unmarshal(buf.Bytes(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Runs[0].Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(doc.Runs[0].Results))
+	}
+	r := doc.Runs[0].Results[0]
+	if !strings.Contains(r.Message.Text, "github.com/example/project/internal/agent/shell") {
+		t.Errorf("expected full import path in message, got %q", r.Message.Text)
+	}
+}
+
 func TestParseResult(t *testing.T) {
 	input := []byte(`{"Type":"models.Check","Payload":{"ArchHasWarnings":true,"ArchWarningsDeps":[
 		{"ComponentName":"a","FileRelativePath":"a.go","ResolvedImportName":"b"},
@@ -789,6 +828,7 @@ func New() *Archlint { return &Archlint{} }
 func (a *Archlint) OutputFormat() wrapper.Format { return wrapper.FormatSARIF }
 
 // Wrap reads go-arch-lint JSON from r and writes SARIF to w.
+// Reads entire input into memory — fine for arch-lint reports (typically <100KB).
 func (a *Archlint) Wrap(args []string, r io.Reader, w io.Writer) error {
 	data, err := io.ReadAll(r)
 	if err != nil {
@@ -900,10 +940,10 @@ In `cmd/fo/main_test.go`, update wrapper name references. Replace `"sarif"` as t
 - `TestJTBD_WrapSARIFMissingToolFlag`: `runWrap([]string{"sarif"}` → `runWrap([]string{"diag"}`
 - `TestJTBD_WrapSARIFLongLine`: `runWrap([]string{"sarif", "--tool", "big"}` → `runWrap([]string{"diag", "--tool", "big"}`
 
-Delete the old wrapper test files entirely — their coverage is replaced by tests in `pkg/wrapper/wrapjscpd/` (Task 3) and `pkg/wrapper/wraparchlint/` (Task 4):
+Delete the old wrapper test files entirely — their coverage is replaced by tests in `pkg/wrapper/wrapjscpd/` (Task 3) and `pkg/wrapper/wraparchlint/` (Task 4). Use `git rm` so the commit step doesn't fail:
 
 ```bash
-rm cmd/fo/wrap_jscpd_test.go cmd/fo/wrap_archlint_test.go
+git rm cmd/fo/wrap_jscpd_test.go cmd/fo/wrap_archlint_test.go
 ```
 
 - [ ] **Step 2: Replace `runWrap` in `cmd/fo/main.go`**
@@ -943,13 +983,11 @@ Add to imports:
 - `"github.com/dkoosis/fo/pkg/wrapper"`
 
 Remove from imports:
-- `"github.com/dkoosis/fo/pkg/sarif"` (no longer used directly in main.go for wrapping)
-- `"strconv"` (no longer used)
+- `"strconv"` (only used by `parseDiagLine`, which is now in `wrapdiag`)
 
-Note: keep `"bufio"` (used by `run()` for stdin peeking) and `"github.com/dkoosis/fo/pkg/sarif"` if still used by `parseInput`.
-
-Check: `sarif` is imported for `sarif.ReadBytes` in `parseInput`. Keep it.
-Check: `strconv` — only used in `parseDiagLine`. Remove it.
+Keep these imports — they're still used by `run()`/`parseInput`:
+- `"bufio"` (stdin peeking in `run()`)
+- `"github.com/dkoosis/fo/pkg/sarif"` (used for `sarif.ReadBytes` in `parseInput`)
 
 - [ ] **Step 3: Delete `cmd/fo/wrap_jscpd.go`**
 
@@ -963,7 +1001,12 @@ rm cmd/fo/wrap_jscpd.go
 rm cmd/fo/wrap_archlint.go
 ```
 
-- [ ] **Step 5: Run tests to verify**
+- [ ] **Step 5: Verify no stale references to deleted functions**
+
+Run: `rg 'runWrapSarif|runWrapJscpd|runWrapArchlint|parseDiagLine' --type go`
+Expected: no matches. If any remain, fix them before proceeding.
+
+- [ ] **Step 6: Run tests to verify**
 
 Run: `go test ./cmd/fo/ -v -run TestJTBD_Wrap`
 Expected: all wrap tests PASS.
@@ -971,19 +1014,20 @@ Expected: all wrap tests PASS.
 Run: `go test ./cmd/fo/ -v -run TestWrap`
 Expected: all wrapper integration tests PASS.
 
-- [ ] **Step 6: Run full test suite**
+- [ ] **Step 7: Run full test suite**
 
 Run: `go test ./... 2>&1 | tail -20`
 Expected: all tests PASS. Some tests may fail due to testdata files with old formats — those are fixed in Task 7.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add cmd/fo/main.go cmd/fo/main_test.go
 git rm cmd/fo/wrap_jscpd.go cmd/fo/wrap_archlint.go
-git rm cmd/fo/wrap_jscpd_test.go cmd/fo/wrap_archlint_test.go
+git add cmd/fo/main.go cmd/fo/main_test.go
 git commit -m "refactor(cmd/fo): replace format-specific wrap with generic wrapper dispatch"
 ```
+
+Note: `wrap_jscpd_test.go` and `wrap_archlint_test.go` were already `git rm`'d in Step 1.
 
 ---
 
@@ -1017,18 +1061,28 @@ Also update the `Section.Format` field comment from `"sarif", "testjson", "text"
 
 - [ ] **Step 2: Update `internal/report/report_test.go`**
 
-Remove any tests that use `format:text`, `format:metrics`, `format:archlint`, or `format:jscpd` in delimiters. Add a test verifying the old formats are rejected:
+Remove any tests that use `format:text`, `format:metrics`, `format:archlint`, or `format:jscpd` in delimiters. Specifically:
+- `TestParse_MultipleSections`: remove the `format:text` section, expect 2 sections not 3
+- `TestIsDelimiter`: `"--- tool:arch format:text status:pass ---"` → `false`, `"--- tool:m format:metrics ---"` → `false`
+
+Add a test verifying the old formats are no longer recognized as delimiters (they become preamble/content, and Parse returns `ErrNoSections` when no valid delimiters exist):
 
 ```go
-func TestParse_RejectsOldFormats(t *testing.T) {
+func TestParse_OldFormatsNotRecognized(t *testing.T) {
 	for _, format := range []string{"text", "metrics", "archlint", "jscpd"} {
 		input := []byte(fmt.Sprintf("--- tool:x format:%s ---\ncontent\n", format))
-		_, err := Parse(input)
+		sections, err := Parse(input)
+		// Old format delimiter is not recognized by the narrowed regex.
+		// It becomes preamble, and with no valid delimiters, Parse returns ErrNoSections.
 		if err == nil {
-			t.Errorf("format:%s should be rejected, but was accepted", format)
+			t.Errorf("format:%s — expected ErrNoSections, got %d sections", format, len(sections))
+		}
+		if !errors.Is(err, ErrNoSections) {
+			t.Errorf("format:%s — expected ErrNoSections, got %v", format, err)
 		}
 	}
 }
+```
 ```
 
 - [ ] **Step 3: Run report tests**
@@ -1093,7 +1147,10 @@ func TestFromReport_MultiSection(t *testing.T) {
 		{Tool: "lint", Format: "sarif", Content: []byte(sarifDoc)},
 	}
 	patterns := FromReport(sections)
-	sum := patterns[0].(*pattern.Summary)
+	sum, ok := patterns[0].(*pattern.Summary)
+	if !ok {
+		t.Fatalf("patterns[0] is %T, want *pattern.Summary", patterns[0])
+	}
 	if len(sum.Metrics) != 2 {
 		t.Errorf("expected 2 tool metrics, got %d", len(sum.Metrics))
 	}
@@ -1223,6 +1280,7 @@ func TestRun_ReportFullFormats(t *testing.T) {
 		t.Errorf("full report exit code = %d, want 0; stderr: %s", code, stderr.String())
 	}
 	out := stdout.String()
+	// Coupled to renderer phrasing — update if Summary label format changes.
 	if !strings.Contains(out, "4 tools") {
 		t.Errorf("expected '4 tools' in output:\n%s", out)
 	}
@@ -1285,10 +1343,16 @@ rm -rf internal/fometrics internal/jscpd internal/archlint
 Run: `go test ./...`
 Expected: all PASS.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Tidy module dependencies**
+
+Run: `go mod tidy`
+Check: `git diff go.mod go.sum` — if any dependencies were removed, that's expected.
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git rm -r internal/fometrics internal/jscpd internal/archlint
+git add go.mod go.sum
 git commit -m "refactor: delete obsolete internal/fometrics, internal/jscpd, internal/archlint"
 ```
 
@@ -1412,16 +1476,18 @@ git commit -m "docs: update usage text and CLAUDE.md for wrapper system"
 - [ ] **Step 1: Run full QA**
 
 Run: `make qa`
-Expected: clean pass.
+Expected: clean pass. (`make qa` = build + test + lint — it does not produce or consume report-format output, so the regex narrowing has no effect here.)
 
 - [ ] **Step 2: Verify wrapper round-trip**
 
-Test each wrapper produces valid SARIF that fo can render:
+Build fo, then test each wrapper produces valid SARIF that fo can render:
 
 ```bash
-echo 'main.go:15:3: unreachable code' | go run ./cmd/fo wrap diag --tool govet | go run ./cmd/fo --format llm
-echo '{"duplicates":[],"statistics":{}}' | go run ./cmd/fo wrap jscpd | go run ./cmd/fo --format llm
-echo '{"Type":"models.Check","Payload":{"ArchHasWarnings":false,"ArchWarningsDeps":[],"Qualities":[]}}' | go run ./cmd/fo wrap archlint | go run ./cmd/fo --format llm
+go build -o /tmp/fo ./cmd/fo
+echo 'main.go:15:3: unreachable code' | /tmp/fo wrap diag --tool govet | /tmp/fo --format llm
+echo '{"duplicates":[],"statistics":{}}' | /tmp/fo wrap jscpd | /tmp/fo --format llm
+echo '{"Type":"models.Check","Payload":{"ArchHasWarnings":false,"ArchWarningsDeps":[],"Qualities":[]}}' | /tmp/fo wrap archlint | /tmp/fo --format llm
+rm /tmp/fo
 ```
 
 Expected: each produces clean fo output. First should show the diagnostic. Second and third should produce clean SARIF (no findings = empty output or clean summary).
