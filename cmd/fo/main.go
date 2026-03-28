@@ -52,13 +52,11 @@ const usage = `fo — focused build output renderer
 
 USAGE
   <input-command> | fo [FLAGS]
-  <tool-output>   | fo wrap sarif --tool <name> [FLAGS]
+  <tool-output>   | fo wrap <name> [FLAGS]
 
 INPUT FORMATS (auto-detected from stdin)
   SARIF 2.1.0     Static analysis results (golangci-lint, gosec, etc.)
   go test -json   Test execution stream (supports live + batch)
-  fo-metrics/v1   Scalar metrics, conformance, summaries (eval, jscpd, go-arch-lint)
-  report          Multi-tool delimited report (--- tool:X format:Y ---)
 
 OUTPUT FORMATS (--format)
   auto            TTY → terminal, piped → llm (default)
@@ -71,13 +69,16 @@ FLAGS
   --theme <name>    Color theme: default | orca | mono (default: default)
 
 SUBCOMMANDS
-  fo wrap sarif      Convert line-based diagnostics to SARIF 2.1.0
-    --tool <name>      Tool name for SARIF driver (required)
-    --rule <id>        Default rule ID (default: finding)
-    --level <level>    Severity: error | warning | note (default: warning)
-    --version <str>    Tool version string
-  fo wrap jscpd      Convert jscpd JSON report to fo-metrics/v1
-  fo wrap archlint   Convert go-arch-lint JSON to fo-metrics/v1
+  fo wrap <name>     Convert tool output to SARIF or go-test-json
+
+  Available wrappers:
+    diag             Convert line diagnostics (file:line:col: msg) to SARIF
+      --tool <name>    Tool name for SARIF driver (required)
+      --rule <id>      Default rule ID (default: finding)
+      --level <level>  Severity: error | warning | note (default: warning)
+      --version <str>  Tool version string
+    archlint         Convert go-arch-lint JSON to SARIF
+    jscpd            Convert jscpd JSON report to SARIF
 
 EXIT CODES
   0   Clean — no errors or test failures
@@ -88,8 +89,9 @@ EXAMPLES
   golangci-lint run --output.sarif.path=stdout ./... | fo
   go test -json ./... | fo
   go test -json ./... | fo --format llm
-  go vet ./... 2>&1 | fo wrap sarif --tool govet | fo
-  gofmt -l ./... | fo wrap sarif --tool gofmt --rule needs-formatting
+  go vet ./... 2>&1 | fo wrap diag --tool govet | fo
+  gofmt -l ./... | fo wrap diag --tool gofmt --rule needs-formatting
+  jscpd --reporters json . | fo wrap jscpd | fo
 
 BEHAVIOR NOTES
   - Reads all input from stdin; does not accept file arguments
@@ -97,7 +99,6 @@ BEHAVIOR NOTES
   - Live streaming mode activates for go test -json when stdout is a TTY
   - NO_COLOR env var forces mono theme
   - SARIF input supports multiple runs (multiple tools in one document)
-  - Report format: sections delimited by "--- tool:<name> format:<fmt> ---"
 `
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {

@@ -16,13 +16,18 @@ Three outputs: terminal (TTY), llm (piped), json (--format json)
 
 ## Package Structure
 
-- `cmd/fo/` — CLI entry, flags, subcommands (fo, fo wrap sarif)
+- `cmd/fo/` — CLI entry, flags, subcommands
+- `pkg/wrapper/` — Wrapper plugin interface, registry
+- `pkg/wrapper/wrapdiag/` — Line diagnostics → SARIF
+- `pkg/wrapper/wrapjscpd/` — jscpd JSON → SARIF
+- `pkg/wrapper/wraparchlint/` — go-arch-lint JSON → SARIF
 - `pkg/pattern/` — Pure data structs: Summary, Leaderboard, TestTable, Sparkline, Comparison
 - `pkg/sarif/` — SARIF types, reader, stats, builder
 - `pkg/testjson/` — go test -json stream parser
 - `pkg/mapper/` — SARIF → patterns, testjson → patterns
 - `pkg/render/` — Renderer interface + terminal, llm, json implementations + themes
 - `internal/detect/` — Format sniffing (SARIF vs go test -json)
+- `internal/report/` — Report delimiter protocol (multiplexer for multi-tool pipelines)
 
 ## Key Design Decisions
 
@@ -30,6 +35,8 @@ Three outputs: terminal (TTY), llm (piped), json (--format json)
 - TTY auto-detection: `--format auto` (default) → TTY=terminal, piped=LLM
 - Exit codes: 0=clean, 1=failures, 2=fo error
 - Dependencies: lipgloss + x/term only
+- Wrappers are compiled-in plugins behind a `Wrapper` interface (pkg/wrapper)
+- Adding a new wrapper: implement interface, register in registry.go
 
 ## Search Scope
 Skip: vendor, node_modules, build, .trash, dist, .git, .worktrees
