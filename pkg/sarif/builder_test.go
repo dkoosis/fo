@@ -67,3 +67,37 @@ func TestBuilder_Chaining(t *testing.T) {
 	}
 }
 
+func TestBuilder_EmptyDriverNameError(t *testing.T) {
+	b := NewBuilder("", "1.0")
+	b.AddResult("r1", "warning", "msg", "f.go", 1, 0)
+
+	var buf bytes.Buffer
+	_, err := b.WriteTo(&buf)
+	if err == nil {
+		t.Error("expected error for empty driver name")
+	}
+}
+
+func TestBuilder_InvalidLevelError(t *testing.T) {
+	b := NewBuilder("tool", "1.0")
+	b.AddResult("r1", "critical", "msg", "f.go", 1, 0)
+
+	var buf bytes.Buffer
+	_, err := b.WriteTo(&buf)
+	if err == nil {
+		t.Error("expected error for invalid SARIF level")
+	}
+}
+
+func TestBuilder_ValidLevels(t *testing.T) {
+	for _, level := range []string{"error", "warning", "note", "none"} {
+		b := NewBuilder("tool", "1.0")
+		b.AddResult("r1", level, "msg", "f.go", 1, 0)
+
+		var buf bytes.Buffer
+		if _, err := b.WriteTo(&buf); err != nil {
+			t.Errorf("level %q should be valid, got error: %v", level, err)
+		}
+	}
+}
+
