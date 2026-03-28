@@ -142,9 +142,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		format = detect.Sniff(input)
 	}
 
-	patterns, parseCode := parseInput(format, input, stderr)
-	if parseCode >= 0 {
-		return parseCode
+	patterns, err := parseInput(format, input, stderr)
+	if err != nil {
+		fmt.Fprintf(stderr, "fo: %v\n", err)
+		return 2
 	}
 
 	mode := resolveFormat(*formatFlag, stdout)
@@ -198,36 +199,32 @@ func runStream(stdin io.Reader, br *bufio.Reader, stdout io.Writer) int {
 }
 
 // parseInput parses raw bytes according to the detected format.
-// Returns (patterns, -1) on success; (nil, exitCode) on error.
-func parseInput(format detect.Format, input []byte, stderr io.Writer) ([]pattern.Pattern, int) {
+// Malformed-line warnings are written to stderr; parse failures return an error.
+func parseInput(format detect.Format, input []byte, stderr io.Writer) ([]pattern.Pattern, error) {
 	switch format {
 	case detect.SARIF:
 		doc, err := sarif.ReadBytes(input)
 		if err != nil {
-			fmt.Fprintf(stderr, "fo: parsing SARIF: %v\n", err)
-			return nil, 2
+			return nil, fmt.Errorf("parsing SARIF: %w", err)
 		}
-		return mapper.FromSARIF(doc), -1
+		return mapper.FromSARIF(doc), nil
 	case detect.GoTestJSON:
 		results, malformed, err := testjson.ParseBytes(input)
 		if err != nil {
-			fmt.Fprintf(stderr, "fo: parsing go test -json: %v\n", err)
-			return nil, 2
+			return nil, fmt.Errorf("parsing go test -json: %w", err)
 		}
 		if malformed > 0 {
 			fmt.Fprintf(stderr, "fo: warning: %d malformed line(s) skipped\n", malformed)
 		}
-		return mapper.FromTestJSON(results), -1
+		return mapper.FromTestJSON(results), nil
 	case detect.Report:
 		sections, err := report.Parse(input)
 		if err != nil {
-			fmt.Fprintf(stderr, "fo: parsing report: %v\n", err)
-			return nil, 2
+			return nil, fmt.Errorf("parsing report: %w", err)
 		}
-		return mapper.FromReport(sections), -1
+		return mapper.FromReport(sections), nil
 	default:
-		fmt.Fprintf(stderr, "fo: unrecognized input format (expected SARIF, go test -json, or report)\n")
-		return nil, 2
+		return nil, fmt.Errorf("unrecognized input format (expected SARIF, go test -json, or report)")
 	}
 }
 
