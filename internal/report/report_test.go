@@ -89,6 +89,7 @@ func TestIsDelimiter(t *testing.T) {
 		{"--- tool:lint format:sarif ---", true},
 		{"--- tool:test format:testjson ---", true},
 		{"--- tool:arch format:text status:pass ---", false},
+		{"--- tool:lint format:sarif status:pass ---", false},
 		{"--- tool:m format:metrics ---", false},
 		{"not a delimiter", false},
 		{"--- tool: format:sarif ---", false},
