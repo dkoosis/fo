@@ -26,7 +26,6 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 
 	"golang.org/x/term"
@@ -39,6 +38,10 @@ import (
 	"github.com/dkoosis/fo/pkg/sarif"
 	"github.com/dkoosis/fo/pkg/stream"
 	"github.com/dkoosis/fo/pkg/testjson"
+	"github.com/dkoosis/fo/pkg/wrapper"
+	_ "github.com/dkoosis/fo/pkg/wrapper/wraparchlint"
+	_ "github.com/dkoosis/fo/pkg/wrapper/wrapdiag"
+	_ "github.com/dkoosis/fo/pkg/wrapper/wrapjscpd"
 )
 
 func main() {
@@ -277,137 +280,21 @@ func exitCode(patterns []pattern.Pattern) int {
 	return 0
 }
 
-// --- fo wrap sarif subcommand ---
-
-const wrapUsage = `fo wrap — convert tool output to fo-compatible formats
-
-SUBCOMMANDS
-  fo wrap sarif      Convert line diagnostics to SARIF 2.1.0
-  fo wrap jscpd      Convert jscpd JSON report to fo-metrics/v1
-  fo wrap archlint   Convert go-arch-lint JSON to fo-metrics/v1
-
-SARIF FLAGS
-  --tool <name>     Tool name for SARIF driver.name (required)
-  --rule <id>       Default rule ID (default: finding)
-  --level <level>   Severity: error | warning | note (default: warning)
-  --version <str>   Tool version string
-
-EXAMPLES
-  go vet ./... 2>&1 | fo wrap sarif --tool govet
-  gofmt -l ./...    | fo wrap sarif --tool gofmt --rule needs-formatting
-  jscpd --reporters json . | fo wrap jscpd | fo
-  go-arch-lint check --json | fo wrap archlint | fo
-`
-
 func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintf(stderr, "fo wrap: subcommand required (sarif, jscpd, archlint)\n\n")
-		fmt.Fprint(stderr, wrapUsage)
+		fmt.Fprintf(stderr, "fo wrap: wrapper name required\n\nAvailable wrappers: %s\n",
+			strings.Join(wrapper.Names(), ", "))
 		return 2
 	}
-	switch args[0] {
-	case "sarif":
-		return runWrapSarif(args[1:], stdin, stdout, stderr)
-	case "jscpd":
-		return runWrapJscpd(stdin, stdout, stderr)
-	case "archlint":
-		return runWrapArchlint(stdin, stdout, stderr)
-	default:
-		fmt.Fprintf(stderr, "fo wrap: unknown subcommand %q (expected sarif, jscpd, archlint)\n\n", args[0])
-		fmt.Fprint(stderr, wrapUsage)
+	w := wrapper.Get(args[0])
+	if w == nil {
+		fmt.Fprintf(stderr, "fo wrap: unknown wrapper %q\n\nAvailable wrappers: %s\n",
+			args[0], strings.Join(wrapper.Names(), ", "))
 		return 2
 	}
-}
-
-func runWrapSarif(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	fs := flag.NewFlagSet("fo wrap sarif", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	fs.Usage = func() { fmt.Fprint(stderr, wrapUsage) }
-	toolName := fs.String("tool", "", "Tool name for SARIF driver.name (required)")
-	ruleID := fs.String("rule", "finding", "Default rule ID")
-	level := fs.String("level", "warning", "Default severity: error|warning|note")
-	version := fs.String("version", "", "Tool version string")
-	if err := fs.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			return 0
-		}
+	if err := w.Wrap(args[1:], stdin, stdout); err != nil {
+		fmt.Fprintf(stderr, "fo wrap %s: %v\n", args[0], err)
 		return 2
 	}
-
-	if *toolName == "" {
-		fmt.Fprintf(stderr, "fo wrap sarif: --tool is required\n")
-		return 2
-	}
-
-	b := sarif.NewBuilder(*toolName, *version)
-	scanner := bufio.NewScanner(stdin)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "" {
-			continue
-		}
-		file, ln, col, msg := parseDiagLine(line)
-		if file == "" {
-			continue // silently drop unrecognized lines
-		}
-		b.AddResult(*ruleID, *level, msg, file, ln, col)
-	}
-
-	if err := scanner.Err(); err != nil {
-		fmt.Fprintf(stderr, "fo wrap sarif: reading stdin: %v\n", err)
-		return 2
-	}
-
-	if _, err := b.WriteTo(stdout); err != nil {
-		fmt.Fprintf(stderr, "fo wrap sarif: writing output: %v\n", err)
-		return 2
-	}
-
 	return 0
-}
-
-// parseDiagLine parses Go diagnostic formats:
-//  1. file.go:line:col: message
-//  2. file.go:line: message
-//  3. path/to/file.go  (file-only, e.g., gofmt -l)
-//
-// Handles Windows drive-letter prefixes (e.g. C:\path\file.go:10:5: msg).
-func parseDiagLine(line string) (file string, ln, col int, msg string) {
-	rest := line
-	var prefix string
-
-	// Strip Windows drive letter (e.g. "C:") so the colon-split works.
-	if len(rest) >= 3 && rest[1] == ':' && (rest[2] == '\\' || rest[2] == '/') {
-		prefix = rest[:2]
-		rest = rest[2:]
-	}
-
-	// Try file:line:col: message
-	parts := strings.SplitN(rest, ":", 4)
-	if len(parts) >= 4 {
-		if l, err := strconv.Atoi(parts[1]); err == nil {
-			if c, err := strconv.Atoi(parts[2]); err == nil {
-				return prefix + parts[0], l, c, strings.TrimSpace(parts[3])
-			}
-		}
-	}
-
-	// Try file:line: message
-	if len(parts) >= 3 {
-		if l, err := strconv.Atoi(parts[1]); err == nil {
-			return prefix + parts[0], l, 0, strings.TrimSpace(strings.Join(parts[2:], ":"))
-		}
-	}
-
-	// Try file-only (must end in .go or have path separators)
-	trimmed := strings.TrimSpace(line)
-	if strings.HasSuffix(trimmed, ".go") || strings.Contains(trimmed, "/") {
-		if !strings.Contains(trimmed, " ") {
-			return trimmed, 0, 0, "needs formatting"
-		}
-	}
-
-	return "", 0, 0, ""
 }

@@ -5,6 +5,10 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	_ "github.com/dkoosis/fo/pkg/wrapper/wraparchlint"
+	_ "github.com/dkoosis/fo/pkg/wrapper/wrapdiag"
+	_ "github.com/dkoosis/fo/pkg/wrapper/wrapjscpd"
 )
 
 // --- JTBD E2E Tests ---
@@ -126,7 +130,7 @@ func TestJTBD_WrapSARIFConvertsLineDiagnostics(t *testing.T) {
 	input := "main.go:15:3: unreachable code after return\npkg/util.go:42: unused variable x\n"
 
 	var stdout, stderr bytes.Buffer
-	code := runWrap([]string{"sarif", "--tool", "govet"}, strings.NewReader(input), &stdout, &stderr)
+	code := runWrap([]string{"diag", "--tool", "govet"}, strings.NewReader(input), &stdout, &stderr)
 
 	if code != 0 {
 		t.Errorf("expected exit code 0, got %d; stderr: %s", code, stderr.String())
@@ -155,7 +159,7 @@ func TestJTBD_WrapSARIFFileOnly(t *testing.T) {
 	input := "pkg/handler.go\nmain.go\n"
 
 	var stdout, stderr bytes.Buffer
-	code := runWrap([]string{"sarif", "--tool", "gofmt", "--rule", "needs-formatting", "--level", "warning"},
+	code := runWrap([]string{"diag", "--tool", "gofmt", "--rule", "needs-formatting", "--level", "warning"},
 		strings.NewReader(input), &stdout, &stderr)
 
 	if code != 0 {
@@ -210,7 +214,7 @@ func TestJTBD_UnrecognizedFormatExitTwo(t *testing.T) {
 
 func TestJTBD_WrapSARIFMissingToolFlag(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	code := runWrap([]string{"sarif"}, strings.NewReader("x.go:1: msg\n"), &stdout, &stderr)
+	code := runWrap([]string{"diag"}, strings.NewReader("x.go:1: msg\n"), &stdout, &stderr)
 
 	if code != 2 {
 		t.Errorf("expected exit code 2, got %d", code)
@@ -233,30 +237,6 @@ func TestRun_ReportFormat(t *testing.T) {
 	}
 }
 
-// --- Unit: parseDiagLine ---
-
-func TestParseDiagLine(t *testing.T) {
-	tests := []struct {
-		input            string
-		wantFile         string
-		wantLine, wantCol int
-		wantMsg          string
-	}{
-		{"main.go:15:3: unreachable code", "main.go", 15, 3, "unreachable code"},
-		{"pkg/util.go:42: unused variable x", "pkg/util.go", 42, 0, "unused variable x"},
-		{"pkg/handler.go", "pkg/handler.go", 0, 0, "needs formatting"},
-		{`C:\Users\dev\main.go:15:3: unreachable code`, `C:\Users\dev\main.go`, 15, 3, "unreachable code"},
-		{`D:\proj\util.go:42: unused`, `D:\proj\util.go`, 42, 0, "unused"},
-		{"not a diagnostic", "", 0, 0, ""},
-	}
-	for _, tt := range tests {
-		file, ln, col, msg := parseDiagLine(tt.input)
-		if file != tt.wantFile || ln != tt.wantLine || col != tt.wantCol || msg != tt.wantMsg {
-			t.Errorf("parseDiagLine(%q) = (%q,%d,%d,%q), want (%q,%d,%d,%q)",
-				tt.input, file, ln, col, msg, tt.wantFile, tt.wantLine, tt.wantCol, tt.wantMsg)
-		}
-	}
-}
 
 // --- JTBD: Deterministic sort order (LLM spec) ---
 
@@ -341,7 +321,7 @@ func TestJTBD_WrapSARIFLongLine(t *testing.T) {
 	input := "main.go:1:1: " + longMsg + "\n"
 
 	var stdout, stderr bytes.Buffer
-	code := runWrap([]string{"sarif", "--tool", "big"}, strings.NewReader(input), &stdout, &stderr)
+	code := runWrap([]string{"diag", "--tool", "big"}, strings.NewReader(input), &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("expected exit 0, got %d; stderr: %s", code, stderr.String())
