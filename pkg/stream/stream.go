@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"time"
 
@@ -66,32 +67,40 @@ func (s *streamer) handleEvent(e testjson.TestEvent) {
 		s.handleStart(e)
 	case "run":
 		s.handleRun(e)
-	case "pass":
-		if e.Test != "" {
-			s.handleTestPass(e)
-		} else {
-			s.handlePkgDone(e, false)
-		}
-	case "fail":
-		if e.Test != "" {
-			s.handleTestFail(e)
-		} else {
-			s.handlePkgDone(e, true)
-		}
-	case "skip":
-		if e.Test != "" {
-			s.handleTestSkip(e)
-		}
+	case "pass", "fail", "skip":
+		s.handleResult(e)
 	case "output":
 		if !s.handleOutput(e) {
 			return
 		}
 	case "pause", "cont":
-		// ignored
 		return
 	}
 
 	s.redrawFooter()
+}
+
+// handleResult dispatches pass/fail/skip events to the appropriate handler,
+// distinguishing test-level from package-level events.
+func (s *streamer) handleResult(e testjson.TestEvent) {
+	if e.Test != "" {
+		switch e.Action {
+		case "pass":
+			s.handleTestPass(e)
+		case "fail":
+			s.handleTestFail(e)
+		case "skip":
+			s.handleTestSkip(e)
+		}
+		return
+	}
+	// Package-level result (skip at package level is a no-op).
+	switch e.Action {
+	case "pass":
+		s.handlePkgDone(e, false)
+	case "fail":
+		s.handlePkgDone(e, true)
+	}
 }
 
 func (s *streamer) handleStart(e testjson.TestEvent) {
@@ -172,12 +181,9 @@ func (s *streamer) handlePkgDone(e testjson.TestEvent, failed bool) {
 
 // removeOrder removes a package from the render-order slice.
 func (s *streamer) removeOrder(pkg string) {
-	for i, name := range s.order {
-		if name == pkg {
-			s.order = append(s.order[:i], s.order[i+1:]...)
-			return
-		}
-	}
+	s.order = slices.DeleteFunc(s.order, func(name string) bool {
+		return name == pkg
+	})
 }
 
 // flushOutputBuf writes buffered output lines for key, filtering boilerplate.
@@ -228,13 +234,18 @@ func (s *streamer) handleOutput(e testjson.TestEvent) bool {
 	return false
 }
 
+// boilerplatePrefixes are go test output prefixes filtered from failure output.
+var boilerplatePrefixes = []string{"=== RUN", "--- FAIL", "--- PASS", "--- SKIP"}
+
 // isBoilerplate returns true for go test output lines that should be filtered.
 func isBoilerplate(s string) bool {
 	trimmed := strings.TrimSpace(s)
-	return strings.HasPrefix(trimmed, "=== RUN") ||
-		strings.HasPrefix(trimmed, "--- FAIL") ||
-		strings.HasPrefix(trimmed, "--- PASS") ||
-		strings.HasPrefix(trimmed, "--- SKIP")
+	for _, prefix := range boilerplatePrefixes {
+		if strings.HasPrefix(trimmed, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // redrawFooter rebuilds the active-packages footer.
