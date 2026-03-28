@@ -18,26 +18,24 @@ import (
 	"github.com/dkoosis/fo/pkg/wrapper"
 )
 
-// Diag converts line-based diagnostics to SARIF.
-type Diag struct {
+// diag converts line-based diagnostics to SARIF.
+type diag struct {
 	toolName *string
 	ruleID   *string
 	level    *string
 	version  *string
 }
 
-// New returns a new Diag wrapper.
-func New() *Diag { return &Diag{} }
+func newDiag() *diag { return &diag{} }
 
 func init() {
-	wrapper.Register("diag", "Convert line diagnostics (file:line:col: msg) to SARIF", New())
+	wrapper.Register("diag", "Convert line diagnostics (file:line:col: msg) to SARIF", newDiag())
 }
 
-// OutputFormat returns FormatSARIF.
-func (d *Diag) OutputFormat() wrapper.Format { return wrapper.FormatSARIF }
+func (d *diag) OutputFormat() wrapper.Format { return wrapper.FormatSARIF }
 
 // RegisterFlags adds diag-specific flags to the provided FlagSet.
-func (d *Diag) RegisterFlags(fs *flag.FlagSet) {
+func (d *diag) RegisterFlags(fs *flag.FlagSet) {
 	d.toolName = fs.String("tool", "", "Tool name for SARIF driver.name (required)")
 	d.ruleID = fs.String("rule", "finding", "Default rule ID")
 	d.level = fs.String("level", "warning", "Default severity: error|warning|note")
@@ -46,7 +44,7 @@ func (d *Diag) RegisterFlags(fs *flag.FlagSet) {
 
 // Convert reads line diagnostics from r and writes SARIF to w.
 // Must be called after RegisterFlags + FlagSet.Parse.
-func (d *Diag) Convert(r io.Reader, w io.Writer) error {
+func (d *diag) Convert(r io.Reader, w io.Writer) error {
 	if d.toolName == nil || *d.toolName == "" {
 		return fmt.Errorf("--tool is required")
 	}

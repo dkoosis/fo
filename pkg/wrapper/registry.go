@@ -44,7 +44,3 @@ func Names() []string {
 	sort.Strings(names)
 	return names
 }
-
-// TODO: add ResetForTesting() to clear the global registry for test isolation.
-// Not urgent with init()-based registration, but needed if tests ever register
-// wrappers dynamically. See wrapper DX discussion #10.

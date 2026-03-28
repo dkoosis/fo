@@ -17,25 +17,23 @@ type violation struct {
 	FileFrom string
 }
 
-// Archlint converts go-arch-lint JSON to SARIF.
-type Archlint struct{}
+// archlint converts go-arch-lint JSON to SARIF.
+type archlint struct{}
 
-// New returns a new Archlint wrapper.
-func New() *Archlint { return &Archlint{} }
+func newArchlint() *archlint { return &archlint{} }
 
 func init() {
-	wrapper.Register("archlint", "Convert go-arch-lint JSON to SARIF", New())
+	wrapper.Register("archlint", "Convert go-arch-lint JSON to SARIF", newArchlint())
 }
 
-// OutputFormat returns FormatSARIF.
-func (a *Archlint) OutputFormat() wrapper.Format { return wrapper.FormatSARIF }
+func (a *archlint) OutputFormat() wrapper.Format { return wrapper.FormatSARIF }
 
 // RegisterFlags is a no-op — archlint wrapper has no flags.
-func (a *Archlint) RegisterFlags(_ *flag.FlagSet) {}
+func (a *archlint) RegisterFlags(_ *flag.FlagSet) {}
 
 // Convert reads go-arch-lint JSON from r and writes SARIF to w.
 // Reads entire input into memory — fine for arch-lint reports (typically <100KB).
-func (a *Archlint) Convert(r io.Reader, w io.Writer) error {
+func (a *archlint) Convert(r io.Reader, w io.Writer) error {
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return fmt.Errorf("reading input: %w", err)

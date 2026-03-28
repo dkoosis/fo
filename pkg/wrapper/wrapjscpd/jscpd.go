@@ -13,35 +13,31 @@ import (
 
 // clone records a single code duplication instance.
 type clone struct {
-	Format string
 	Lines  int
 	FileA  string
 	StartA int
-	EndA   int
 	FileB  string
 	StartB int
 	EndB   int
 }
 
-// Jscpd converts jscpd JSON to SARIF.
-type Jscpd struct{}
+// jscpd converts jscpd JSON to SARIF.
+type jscpd struct{}
 
-// New returns a new Jscpd wrapper.
-func New() *Jscpd { return &Jscpd{} }
+func newJscpd() *jscpd { return &jscpd{} }
 
 func init() {
-	wrapper.Register("jscpd", "Convert jscpd JSON duplication report to SARIF", New())
+	wrapper.Register("jscpd", "Convert jscpd JSON duplication report to SARIF", newJscpd())
 }
 
-// OutputFormat returns FormatSARIF.
-func (j *Jscpd) OutputFormat() wrapper.Format { return wrapper.FormatSARIF }
+func (j *jscpd) OutputFormat() wrapper.Format { return wrapper.FormatSARIF }
 
 // RegisterFlags is a no-op — jscpd wrapper has no flags.
-func (j *Jscpd) RegisterFlags(_ *flag.FlagSet) {}
+func (j *jscpd) RegisterFlags(_ *flag.FlagSet) {}
 
 // Convert reads jscpd JSON from r and writes SARIF to w.
 // Reads entire input into memory — fine for jscpd reports (typically <1MB).
-func (j *Jscpd) Convert(r io.Reader, w io.Writer) error {
+func (j *jscpd) Convert(r io.Reader, w io.Writer) error {
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return fmt.Errorf("reading input: %w", err)
@@ -66,8 +62,7 @@ func (j *Jscpd) Convert(r io.Reader, w io.Writer) error {
 func parseClones(data []byte) ([]clone, error) {
 	var raw struct {
 		Duplicates []struct {
-			Format    string `json:"format"`
-			Lines     int    `json:"lines"`
+			Lines int `json:"lines"`
 			FirstFile struct {
 				Name     string `json:"name"`
 				StartLoc struct{ Line int } `json:"startLoc"`
@@ -87,9 +82,9 @@ func parseClones(data []byte) ([]clone, error) {
 	clones := make([]clone, 0, len(raw.Duplicates))
 	for _, d := range raw.Duplicates {
 		clones = append(clones, clone{
-			Format: d.Format, Lines: d.Lines,
-			FileA: d.FirstFile.Name, StartA: d.FirstFile.StartLoc.Line, EndA: d.FirstFile.EndLoc.Line,
-			FileB: d.SecondFile.Name, StartB: d.SecondFile.StartLoc.Line, EndB: d.SecondFile.EndLoc.Line,
+			Lines:  d.Lines,
+			FileA:  d.FirstFile.Name, StartA: d.FirstFile.StartLoc.Line,
+			FileB:  d.SecondFile.Name, StartB: d.SecondFile.StartLoc.Line, EndB: d.SecondFile.EndLoc.Line,
 		})
 	}
 	return clones, nil

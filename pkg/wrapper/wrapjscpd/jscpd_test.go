@@ -11,7 +11,7 @@ import (
 )
 
 func TestJscpd_OutputFormat(t *testing.T) {
-	w := New()
+	w := newJscpd()
 	if w.OutputFormat() != wrapper.FormatSARIF {
 		t.Errorf("expected FormatSARIF, got %q", w.OutputFormat())
 	}
@@ -20,7 +20,7 @@ func TestJscpd_OutputFormat(t *testing.T) {
 func TestJscpd_EmptyDuplicates(t *testing.T) {
 	input := `{"duplicates":[],"statistics":{}}`
 	var buf bytes.Buffer
-	if err := New().Convert(strings.NewReader(input), &buf); err != nil {
+	if err := newJscpd().Convert(strings.NewReader(input), &buf); err != nil {
 		t.Fatal(err)
 	}
 
@@ -47,7 +47,7 @@ func TestJscpd_WithClones(t *testing.T) {
 		"secondFile":{"name":"b.go","startLoc":{"line":10},"endLoc":{"line":31}}
 	}],"statistics":{}}`
 	var buf bytes.Buffer
-	if err := New().Convert(strings.NewReader(input), &buf); err != nil {
+	if err := newJscpd().Convert(strings.NewReader(input), &buf); err != nil {
 		t.Fatal(err)
 	}
 
@@ -79,7 +79,7 @@ func TestJscpd_WithClones(t *testing.T) {
 
 func TestJscpd_InvalidJSON(t *testing.T) {
 	var buf bytes.Buffer
-	err := New().Convert(strings.NewReader("not json"), &buf)
+	err := newJscpd().Convert(strings.NewReader("not json"), &buf)
 	if err == nil {
 		t.Error("expected error for invalid JSON")
 	}
@@ -87,7 +87,7 @@ func TestJscpd_InvalidJSON(t *testing.T) {
 
 func TestJscpd_EmptyInput(t *testing.T) {
 	var buf bytes.Buffer
-	err := New().Convert(strings.NewReader(""), &buf)
+	err := newJscpd().Convert(strings.NewReader(""), &buf)
 	if err == nil {
 		t.Error("expected error for empty input")
 	}

@@ -13,7 +13,7 @@ import (
 
 func diagConvert(t *testing.T, args []string, input string) (bytes.Buffer, error) {
 	t.Helper()
-	d := New()
+	d := newDiag()
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
 	d.RegisterFlags(fs)
 	if err := fs.Parse(args); err != nil {
@@ -25,7 +25,7 @@ func diagConvert(t *testing.T, args []string, input string) (bytes.Buffer, error
 }
 
 func TestDiag_OutputFormat(t *testing.T) {
-	d := New()
+	d := newDiag()
 	if d.OutputFormat() != wrapper.FormatSARIF {
 		t.Errorf("expected FormatSARIF, got %q", d.OutputFormat())
 	}
@@ -77,7 +77,7 @@ func TestDiag_FileOnly(t *testing.T) {
 }
 
 func TestDiag_MissingToolFlag(t *testing.T) {
-	d := New()
+	d := newDiag()
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
 	d.RegisterFlags(fs)
 	_ = fs.Parse([]string{})
