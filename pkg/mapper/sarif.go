@@ -61,6 +61,15 @@ func sarifSummary(stats sarif.Stats) *pattern.Summary {
 		})
 	}
 
+	// Catch issues with unexpected levels (e.g., "none", empty string)
+	// so the metric breakdown accounts for every issue in TotalIssues.
+	counted := stats.ByLevel["error"] + stats.ByLevel["warning"] + stats.ByLevel["note"]
+	if other := stats.TotalIssues - counted; other > 0 {
+		metrics = append(metrics, pattern.SummaryItem{
+			Label: "Other", Value: fmt.Sprintf("%d", other), Kind: pattern.KindInfo,
+		})
+	}
+
 	return &pattern.Summary{
 		Label:   fmt.Sprintf("Analysis: %d issues", stats.TotalIssues),
 		Kind:    pattern.SummaryKindSARIF,
