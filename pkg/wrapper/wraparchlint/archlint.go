@@ -37,7 +37,7 @@ func (a *Archlint) OutputFormat() wrapper.Format { return wrapper.FormatSARIF }
 
 // Wrap reads go-arch-lint JSON from r and writes SARIF to w.
 // Reads entire input into memory — fine for arch-lint reports (typically <100KB).
-func (a *Archlint) Wrap(args []string, r io.Reader, w io.Writer) error {
+func (a *Archlint) Wrap(_ []string, r io.Reader, w io.Writer) error {
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return fmt.Errorf("reading input: %w", err)

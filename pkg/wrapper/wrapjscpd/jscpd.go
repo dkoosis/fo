@@ -37,7 +37,7 @@ func (j *Jscpd) OutputFormat() wrapper.Format { return wrapper.FormatSARIF }
 
 // Wrap reads jscpd JSON from r and writes SARIF to w.
 // Reads entire input into memory — fine for jscpd reports (typically <1MB).
-func (j *Jscpd) Wrap(args []string, r io.Reader, w io.Writer) error {
+func (j *Jscpd) Wrap(_ []string, r io.Reader, w io.Writer) error {
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return fmt.Errorf("reading input: %w", err)
