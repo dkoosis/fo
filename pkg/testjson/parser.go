@@ -16,7 +16,11 @@ import (
 func ParseStream(r io.Reader) ([]TestPackageResult, int, error) {
 	agg := newAggregator()
 	scanner := bufio.NewScanner(r)
-	// Allow large lines for verbose test output
+	// Allow large lines for verbose test output.
+	// BUG: a line exceeding 1 MiB (e.g. huge panic trace) triggers
+	// bufio.ErrTooLong, which is fatal — all remaining events are lost.
+	// To fix: switch to bufio.Reader.ReadBytes('\n') or skip oversized
+	// lines as malformed instead of aborting.
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
 	var malformed int
@@ -59,6 +63,7 @@ type scanResult struct {
 // underlying reader externally to prevent a goroutine leak.
 func Stream(ctx context.Context, r io.Reader, fn func(TestEvent)) (int, error) {
 	scanner := bufio.NewScanner(r)
+	// Same 1 MiB limit as ParseStream — see BUG note there.
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
 	lines := make(chan scanResult)
