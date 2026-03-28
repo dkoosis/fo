@@ -127,12 +127,12 @@ type pkgState struct {
 	skipped     int
 	duration    time.Duration
 	coverage    float64
-	failedTests map[string][]string // test name → output lines
-	failedOrder []string            // failed test names in run order
+	failedOrder []string // failed test names in run order
 	buildError  string
 	panicked    bool
 	panicOutput []string
-	// Track output for tests in progress
+	// Track output per test (empty test name = package-level output).
+	// On failure, output is read directly from here via failedOrder keys.
 	outputBuf map[string][]string
 }
 
@@ -147,9 +147,8 @@ func (a *aggregator) getOrCreate(name string) *pkgState {
 		return pkg
 	}
 	pkg := &pkgState{
-		name:        name,
-		failedTests: make(map[string][]string),
-		outputBuf:   make(map[string][]string),
+		name:      name,
+		outputBuf: make(map[string][]string),
 	}
 	a.packages[name] = pkg
 	a.order = append(a.order, name)
@@ -170,7 +169,6 @@ func (a *aggregator) processEvent(e TestEvent) {
 	case "fail":
 		if e.Test != "" {
 			pkg.failed++
-			pkg.failedTests[e.Test] = pkg.outputBuf[e.Test]
 			pkg.failedOrder = append(pkg.failedOrder, e.Test)
 		} else {
 			pkg.duration = time.Duration(e.Elapsed * float64(time.Second))
@@ -235,7 +233,7 @@ func (a *aggregator) results() []TestPackageResult {
 		for _, testName := range pkg.failedOrder {
 			r.FailedTests = append(r.FailedTests, FailedTest{
 				Name:   testName,
-				Output: pkg.failedTests[testName],
+				Output: pkg.outputBuf[testName],
 			})
 		}
 
