@@ -28,11 +28,10 @@ type Driver struct {
 
 // Result represents a single issue found by the tool.
 type Result struct {
-	RuleID    string           `json:"ruleId"`
-	Level     string           `json:"level"` // "error", "warning", "note", "none"
-	Message   Message          `json:"message"`
-	Locations []Location       `json:"locations,omitempty"`
-	Related   []Location       `json:"relatedLocations,omitempty"`
+	RuleID    string     `json:"ruleId"`
+	Level     string     `json:"level"` // "error", "warning", "note", "none"
+	Message   Message    `json:"message"`
+	Locations []Location `json:"locations,omitempty"`
 }
 
 // Message contains the issue description.
@@ -53,8 +52,7 @@ type PhysicalLocation struct {
 
 // ArtifactLocation identifies the file.
 type ArtifactLocation struct {
-	URI   string `json:"uri"`
-	Index int    `json:"index,omitempty"`
+	URI string `json:"uri"`
 }
 
 // Region identifies the specific location within the file.
