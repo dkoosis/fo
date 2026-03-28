@@ -2,6 +2,7 @@ package report
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 )
 
@@ -23,16 +24,13 @@ func TestParse_SingleSARIF(t *testing.T) {
 }
 
 func TestParse_MultipleSections(t *testing.T) {
-	input := "--- tool:vet format:sarif ---\n{}\n--- tool:test format:testjson ---\n{\"Action\":\"pass\"}\n--- tool:arch format:text status:pass ---\nOK\n"
+	input := "--- tool:vet format:sarif ---\n{}\n--- tool:test format:testjson ---\n{\"Action\":\"pass\"}\n"
 	sections, err := Parse([]byte(input))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(sections) != 3 {
-		t.Fatalf("got %d sections, want 3", len(sections))
-	}
-	if sections[2].Status != "pass" {
-		t.Errorf("status = %q, want pass", sections[2].Status)
+	if len(sections) != 2 {
+		t.Fatalf("got %d sections, want 2", len(sections))
 	}
 }
 
@@ -90,8 +88,8 @@ func TestIsDelimiter(t *testing.T) {
 	}{
 		{"--- tool:lint format:sarif ---", true},
 		{"--- tool:test format:testjson ---", true},
-		{"--- tool:arch format:text status:pass ---", true},
-		{"--- tool:m format:metrics ---", true},
+		{"--- tool:arch format:text status:pass ---", false},
+		{"--- tool:m format:metrics ---", false},
 		{"not a delimiter", false},
 		{"--- tool: format:sarif ---", false},
 		{"", false},
@@ -99,6 +97,21 @@ func TestIsDelimiter(t *testing.T) {
 	for _, tt := range tests {
 		if got := IsDelimiter([]byte(tt.line)); got != tt.want {
 			t.Errorf("IsDelimiter(%q) = %v, want %v", tt.line, got, tt.want)
+		}
+	}
+}
+
+func TestParse_OldFormatsNotRecognized(t *testing.T) {
+	for _, format := range []string{"text", "metrics", "archlint", "jscpd"} {
+		input := []byte(fmt.Sprintf("--- tool:x format:%s ---\ncontent\n", format))
+		sections, err := Parse(input)
+		// Old format delimiter is not recognized by the narrowed regex.
+		// It becomes preamble, and with no valid delimiters, Parse returns ErrNoSections.
+		if err == nil {
+			t.Errorf("format:%s — expected ErrNoSections, got %d sections", format, len(sections))
+		}
+		if !errors.Is(err, ErrNoSections) {
+			t.Errorf("format:%s — expected ErrNoSections, got %v", format, err)
 		}
 	}
 }
