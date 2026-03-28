@@ -85,11 +85,10 @@ func sarifLeaderboard(doc *sarif.Document, stats sarif.Stats) *pattern.Leaderboa
 			displayName = filepath.Join(filepath.Base(dir), displayName)
 		}
 		items[i] = pattern.LeaderboardItem{
-			Name:    displayName,
-			Metric:  fmt.Sprintf("%d issues", f.IssueCount),
-			Value:   float64(f.IssueCount),
-			Rank:    i + 1,
-			Context: f.File,
+			Name:   displayName,
+			Metric: fmt.Sprintf("%d issues", f.IssueCount),
+			Value:  float64(f.IssueCount),
+			Rank:   i + 1,
 		}
 	}
 
@@ -97,7 +96,6 @@ func sarifLeaderboard(doc *sarif.Document, stats sarif.Stats) *pattern.Leaderboa
 		Label:      "Files with Most Issues",
 		MetricName: "Issues",
 		Items:      items,
-		Direction:  pattern.Highest,
 		TotalCount: len(stats.ByFile),
 		ShowRank:   true,
 	}

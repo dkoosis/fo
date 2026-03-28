@@ -77,8 +77,8 @@ func TestFromSARIF_MapsSummaryLeaderboardAndFileTables_When_DocumentHasMultipleF
 	if !ok {
 		t.Fatalf("patterns[1] type = %T, want *pattern.Leaderboard", got[1])
 	}
-	if len(leaderboard.Items) == 0 || leaderboard.Items[0].Context != "src/a/file1.go" {
-		t.Fatalf("leaderboard top file = %q, want src/a/file1.go", leaderboard.Items[0].Context)
+	if len(leaderboard.Items) == 0 || leaderboard.Items[0].Name != "a/file1.go" {
+		t.Fatalf("leaderboard top file = %q, want a/file1.go", leaderboard.Items[0].Name)
 	}
 
 	firstFileTable, ok := got[2].(*pattern.TestTable)
