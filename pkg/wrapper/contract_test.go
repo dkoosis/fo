@@ -45,7 +45,7 @@ func TestAllWrappers_OutputFormat(t *testing.T) {
 func TestAllWrappers_EmptyInputNoPanic(t *testing.T) {
 	for _, name := range wrapper.Names() {
 		w := wrapper.Get(name)
-		t.Run(name, func(t *testing.T) {
+		t.Run(name, func(_ *testing.T) {
 			fs := flag.NewFlagSet("test", flag.ContinueOnError)
 			w.RegisterFlags(fs)
 			_ = fs.Parse([]string{})
@@ -58,7 +58,7 @@ func TestAllWrappers_EmptyInputNoPanic(t *testing.T) {
 func TestAllWrappers_RegisterFlagsNoPanic(t *testing.T) {
 	for _, name := range wrapper.Names() {
 		w := wrapper.Get(name)
-		t.Run(name, func(t *testing.T) {
+		t.Run(name, func(_ *testing.T) {
 			fs := flag.NewFlagSet("test", flag.ContinueOnError)
 			w.RegisterFlags(fs)
 		})
@@ -68,5 +68,14 @@ func TestAllWrappers_RegisterFlagsNoPanic(t *testing.T) {
 func TestAllWrappers_GetNilForUnknown(t *testing.T) {
 	if w := wrapper.Get("nonexistent"); w != nil {
 		t.Error("expected nil for unknown wrapper")
+	}
+}
+
+func TestAllWrappers_HaveDescriptions(t *testing.T) {
+	for _, name := range wrapper.Names() {
+		desc := wrapper.Description(name)
+		if desc == "" {
+			t.Errorf("wrapper %q has no description", name)
+		}
 	}
 }

@@ -30,7 +30,7 @@ type Diag struct {
 func New() *Diag { return &Diag{} }
 
 func init() {
-	wrapper.Register("diag", New())
+	wrapper.Register("diag", "Convert line diagnostics (file:line:col: msg) to SARIF", New())
 }
 
 // OutputFormat returns FormatSARIF.

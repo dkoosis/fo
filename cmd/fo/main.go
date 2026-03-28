@@ -70,15 +70,7 @@ FLAGS
 
 SUBCOMMANDS
   fo wrap <name>     Convert tool output to SARIF or go-test-json
-
-  Available wrappers:
-    diag             Convert line diagnostics (file:line:col: msg) to SARIF
-      --tool <name>    Tool name for SARIF driver (required)
-      --rule <id>      Default rule ID (default: finding)
-      --level <level>  Severity: error | warning | note (default: warning)
-      --version <str>  Tool version string
-    archlint         Convert go-arch-lint JSON to SARIF
-    jscpd            Convert jscpd JSON report to SARIF
+  fo wrap --help     Show available wrappers and their flags
 
 EXIT CODES
   0   Clean — no errors or test failures
@@ -290,8 +282,22 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 	if args[0] == "-h" || args[0] == "--help" || args[0] == "help" {
-		fmt.Fprintf(stderr, "fo wrap: convert tool output to SARIF or go-test-json\n\nAvailable wrappers: %s\n",
-			strings.Join(wrapper.Names(), ", "))
+		fmt.Fprintf(stderr, "fo wrap: convert tool output to SARIF or go-test-json\n\n")
+		for _, name := range wrapper.Names() {
+			fmt.Fprintf(stderr, "  %-12s %s\n", name, wrapper.Description(name))
+			w := wrapper.Get(name)
+			fs := flag.NewFlagSet(name, flag.ContinueOnError)
+			w.RegisterFlags(fs)
+			// Single iteration: print flags if any exist.
+			fs.VisitAll(func(f *flag.Flag) {
+				fmt.Fprintf(stderr, "    --%-10s %s", f.Name, f.Usage)
+				if f.DefValue != "" && f.DefValue != "false" {
+					fmt.Fprintf(stderr, " (default: %s)", f.DefValue)
+				}
+				fmt.Fprintln(stderr)
+			})
+			fmt.Fprintln(stderr)
+		}
 		return 0
 	}
 	w := wrapper.Get(args[0])

@@ -30,7 +30,7 @@ type Jscpd struct{}
 func New() *Jscpd { return &Jscpd{} }
 
 func init() {
-	wrapper.Register("jscpd", New())
+	wrapper.Register("jscpd", "Convert jscpd JSON duplication report to SARIF", New())
 }
 
 // OutputFormat returns FormatSARIF.

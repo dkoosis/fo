@@ -24,7 +24,7 @@ type Archlint struct{}
 func New() *Archlint { return &Archlint{} }
 
 func init() {
-	wrapper.Register("archlint", New())
+	wrapper.Register("archlint", "Convert go-arch-lint JSON to SARIF", New())
 }
 
 // OutputFormat returns FormatSARIF.
