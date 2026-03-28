@@ -1,12 +1,18 @@
 package wrapper
 
-import "sort"
+import (
+	"fmt"
+	"sort"
+)
 
 var registry = map[string]Wrapper{}
 
 // Register adds a wrapper to the global registry under the given name.
 // Intended for use in sub-package init() functions.
 func Register(name string, w Wrapper) {
+	if _, exists := registry[name]; exists {
+		panic(fmt.Sprintf("wrapper: duplicate registration %q", name))
+	}
 	registry[name] = w
 }
 

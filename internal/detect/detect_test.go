@@ -55,7 +55,7 @@ func TestSniff_Report(t *testing.T) {
 	}{
 		{"sarif delimiter", "--- tool:vet format:sarif ---\n{\"version\":\"2.1.0\"}"},
 		{"testjson delimiter", "--- tool:test format:testjson ---\n{\"Action\":\"run\"}"},
-		{"sarif with status", "--- tool:vet format:sarif status:pass ---\nAll checks passed."},
+		{"sarif with extra fields", "--- tool:vet format:sarif ---\nAll checks passed."},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

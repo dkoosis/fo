@@ -219,6 +219,27 @@ func TestStreamer_BoilerplateFiltered(t *testing.T) {
 	}
 }
 
+func TestStreamer_PanicOutput_NotDuplicated(t *testing.T) {
+	events := []testjson.TestEvent{
+		{Action: "start", Package: "example.com/pkg/boom", Time: time.Now()},
+		{Action: "run", Package: "example.com/pkg/boom", Test: "TestCrash"},
+		{Action: "output", Package: "example.com/pkg/boom", Output: "panic: runtime error: index out of range\n"},
+		{Action: "output", Package: "example.com/pkg/boom", Output: "goroutine 1 [running]:\n"},
+		{Action: "fail", Package: "example.com/pkg/boom", Elapsed: 0.1},
+	}
+	out := stripANSI(runStream(t, events, 120, 24))
+
+	// Panic line should appear exactly once, not duplicated by flushOutputBuf.
+	count := strings.Count(out, "panic: runtime error")
+	if count != 1 {
+		t.Errorf("panic line appeared %d times, want exactly 1:\n%s", count, out)
+	}
+	count = strings.Count(out, "goroutine 1 [running]")
+	if count != 1 {
+		t.Errorf("goroutine line appeared %d times, want exactly 1:\n%s", count, out)
+	}
+}
+
 func TestRun_Integration_TrixiData(t *testing.T) {
 	f, err := os.Open("testdata/gotest-pass.json")
 	if err != nil {

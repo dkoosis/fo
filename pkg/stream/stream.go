@@ -213,10 +213,8 @@ func (s *streamer) handleOutput(e testjson.TestEvent) bool {
 		return false
 	}
 
-	key := bufKey(e.Package, e.Test)
-	s.outputBuf[key] = append(s.outputBuf[key], output)
-
 	// Package-level output: flush panic/goroutine lines immediately
+	// without buffering (they'd be duplicated on package fail otherwise).
 	if e.Test == "" {
 		if strings.Contains(output, "panic:") || strings.HasPrefix(output, "goroutine ") {
 			s.tw.EraseFooter()
@@ -224,6 +222,9 @@ func (s *streamer) handleOutput(e testjson.TestEvent) bool {
 			return true
 		}
 	}
+
+	key := bufKey(e.Package, e.Test)
+	s.outputBuf[key] = append(s.outputBuf[key], output)
 	return false
 }
 

@@ -140,10 +140,6 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "fo: reading stdin: %v\n", err)
 		return 2
 	}
-	if len(input) == 0 {
-		fmt.Fprintf(stderr, "fo: no input on stdin\n")
-		return 2
-	}
 	if format == detect.Unknown {
 		format = detect.Sniff(input)
 	}
@@ -270,7 +266,7 @@ func exitCode(patterns []pattern.Pattern) int {
 		switch v := p.(type) {
 		case *pattern.TestTable:
 			for _, r := range v.Results {
-				if r.Status == "fail" {
+				if r.Status == pattern.StatusFail {
 					return 1
 				}
 			}

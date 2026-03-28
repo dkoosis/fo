@@ -111,17 +111,11 @@ func TestParseResult(t *testing.T) {
 		{"ComponentName":"a","FileRelativePath":"a.go","ResolvedImportName":"b"},
 		{"ComponentName":"c","FileRelativePath":"c.go","ResolvedImportName":"d"}
 	],"Qualities":[{"ID":"q1","Used":true},{"ID":"q2","Used":false}]}}`)
-	result, err := parseResult(input)
+	vs, err := parseResult(input)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !result.HasWarnings {
-		t.Error("expected HasWarnings true")
-	}
-	if len(result.Violations) != 2 {
-		t.Errorf("expected 2 violations, got %d", len(result.Violations))
-	}
-	if result.CheckCount != 2 {
-		t.Errorf("expected 2 checks, got %d", result.CheckCount)
+	if len(vs) != 2 {
+		t.Errorf("expected 2 violations, got %d", len(vs))
 	}
 }

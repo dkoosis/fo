@@ -11,7 +11,7 @@ var ErrNoSections = errors.New("no sections found in report input")
 
 // delimiterRe matches report section delimiter lines.
 var delimiterRe = regexp.MustCompile(
-	`^--- tool:(\w[\w-]*) format:(sarif|testjson)(?: status:(pass|fail))? ---$`,
+	`^--- tool:(\w[\w-]*) format:(sarif|testjson) ---$`,
 )
 
 // IsDelimiter reports whether line is a section delimiter.
@@ -23,7 +23,6 @@ func IsDelimiter(line []byte) bool {
 type Section struct {
 	Tool    string // e.g. "lint", "test", "vuln"
 	Format  string // "sarif" or "testjson"
-	Status  string // "pass" or "fail" (required for text, derived for others)
 	Content []byte // raw tool output
 }
 
@@ -45,7 +44,6 @@ func Parse(data []byte) ([]Section, error) {
 			current = &Section{
 				Tool:   string(m[1]),
 				Format: string(m[2]),
-				Status: string(m[3]),
 			}
 			continue
 		}

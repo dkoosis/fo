@@ -49,6 +49,7 @@ func (d *Diag) Wrap(args []string, r io.Reader, w io.Writer) error {
 
 	b := sarif.NewBuilder(*toolName, *version)
 	scanner := bufio.NewScanner(r)
+	// Same 1 MiB limit as testjson.ParseStream — see BUG note there.
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
 	for scanner.Scan() {
@@ -101,10 +102,8 @@ func parseDiagLine(line string) (file string, ln, col int, msg string) {
 	}
 
 	trimmed := strings.TrimSpace(line)
-	if strings.HasSuffix(trimmed, ".go") || strings.Contains(trimmed, "/") {
-		if !strings.Contains(trimmed, " ") {
-			return trimmed, 0, 0, "needs formatting"
-		}
+	if strings.HasSuffix(trimmed, ".go") && !strings.Contains(trimmed, " ") {
+		return trimmed, 0, 0, "needs formatting"
 	}
 
 	return "", 0, 0, ""

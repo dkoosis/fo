@@ -9,8 +9,6 @@ const (
 	PatternTypeSummary     PatternType = "summary"
 	PatternTypeLeaderboard PatternType = "leaderboard"
 	PatternTypeTestTable   PatternType = "test-table"
-	PatternTypeSparkline   PatternType = "sparkline"
-	PatternTypeComparison  PatternType = "comparison"
 	PatternTypeError       PatternType = "error"
 )
 
