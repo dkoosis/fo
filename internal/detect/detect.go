@@ -61,9 +61,8 @@ func Sniff(data []byte) Format {
 
 func isSARIF(data []byte) bool {
 	var probe struct {
-		Version string             `json:"version"`
-		Schema  string             `json:"$schema"`
-		Runs    []json.RawMessage  `json:"runs"`
+		Version string            `json:"version"`
+		Runs    []json.RawMessage `json:"runs"`
 	}
 	// Use Decoder instead of Unmarshal to tolerate trailing text
 	// (golangci-lint v2 appends a text summary after the SARIF JSON).
