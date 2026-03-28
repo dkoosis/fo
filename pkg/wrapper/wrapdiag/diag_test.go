@@ -104,6 +104,8 @@ func TestParseDiagLine(t *testing.T) {
 		{"C:\\Users\\dev\\main.go:15:3: unreachable code", "C:\\Users\\dev\\main.go", 15, 3, "unreachable code"},
 		{"D:\\proj\\util.go:42: unused", "D:\\proj\\util.go", 42, 0, "unused"},
 		{"not a diagnostic", "", 0, 0, ""},
+		{"src/main.rs", "", 0, 0, ""},           // non-.go file-only path: not matched
+		{"some/path/to/file.txt", "", 0, 0, ""}, // non-.go with slash: not matched
 	}
 	for _, tt := range tests {
 		file, ln, col, msg := parseDiagLine(tt.input)
