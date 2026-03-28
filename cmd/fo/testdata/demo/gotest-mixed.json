@@ -1,0 +1,32 @@
+{"Time":"2024-06-15T10:00:00Z","Action":"start","Package":"example.com/app/pkg/handler"}
+{"Time":"2024-06-15T10:00:00Z","Action":"run","Package":"example.com/app/pkg/handler","Test":"TestCreateUser_Valid"}
+{"Time":"2024-06-15T10:00:00Z","Action":"pass","Package":"example.com/app/pkg/handler","Test":"TestCreateUser_Valid","Elapsed":0.12}
+{"Time":"2024-06-15T10:00:00Z","Action":"run","Package":"example.com/app/pkg/handler","Test":"TestCreateUser_DuplicateEmail"}
+{"Time":"2024-06-15T10:00:00Z","Action":"output","Package":"example.com/app/pkg/handler","Test":"TestCreateUser_DuplicateEmail","Output":"    handler_test.go:45: expected error \"email already exists\", got nil\n"}
+{"Time":"2024-06-15T10:00:01Z","Action":"fail","Package":"example.com/app/pkg/handler","Test":"TestCreateUser_DuplicateEmail","Elapsed":0.34}
+{"Time":"2024-06-15T10:00:01Z","Action":"run","Package":"example.com/app/pkg/handler","Test":"TestDeleteUser_NotFound"}
+{"Time":"2024-06-15T10:00:01Z","Action":"output","Package":"example.com/app/pkg/handler","Test":"TestDeleteUser_NotFound","Output":"    handler_test.go:78: expected 404, got 500\n"}
+{"Time":"2024-06-15T10:00:01Z","Action":"fail","Package":"example.com/app/pkg/handler","Test":"TestDeleteUser_NotFound","Elapsed":0.08}
+{"Time":"2024-06-15T10:00:01Z","Action":"run","Package":"example.com/app/pkg/handler","Test":"TestListUsers_Pagination"}
+{"Time":"2024-06-15T10:00:01Z","Action":"pass","Package":"example.com/app/pkg/handler","Test":"TestListUsers_Pagination","Elapsed":0.05}
+{"Time":"2024-06-15T10:00:01Z","Action":"run","Package":"example.com/app/pkg/handler","Test":"TestUpdateUser_ReadOnly"}
+{"Time":"2024-06-15T10:00:01Z","Action":"skip","Package":"example.com/app/pkg/handler","Test":"TestUpdateUser_ReadOnly","Elapsed":0.0}
+{"Time":"2024-06-15T10:00:01Z","Action":"fail","Package":"example.com/app/pkg/handler","Elapsed":1.8}
+{"Time":"2024-06-15T10:00:01Z","Action":"start","Package":"example.com/app/pkg/store"}
+{"Time":"2024-06-15T10:00:01Z","Action":"run","Package":"example.com/app/pkg/store","Test":"TestConnect"}
+{"Time":"2024-06-15T10:00:02Z","Action":"pass","Package":"example.com/app/pkg/store","Test":"TestConnect","Elapsed":0.5}
+{"Time":"2024-06-15T10:00:02Z","Action":"run","Package":"example.com/app/pkg/store","Test":"TestMigrate"}
+{"Time":"2024-06-15T10:00:02Z","Action":"output","Package":"example.com/app/pkg/store","Test":"TestMigrate","Output":"panic: runtime error: nil pointer dereference\n"}
+{"Time":"2024-06-15T10:00:02Z","Action":"output","Package":"example.com/app/pkg/store","Test":"TestMigrate","Output":"goroutine 1 [running]:\n"}
+{"Time":"2024-06-15T10:00:02Z","Action":"output","Package":"example.com/app/pkg/store","Test":"TestMigrate","Output":"example.com/app/pkg/store.(*DB).Migrate(0x0)\n"}
+{"Time":"2024-06-15T10:00:02Z","Action":"output","Package":"example.com/app/pkg/store","Test":"TestMigrate","Output":"\tstore.go:112 +0x1a\n"}
+{"Time":"2024-06-15T10:00:02Z","Action":"fail","Package":"example.com/app/pkg/store","Test":"TestMigrate","Elapsed":0.0}
+{"Time":"2024-06-15T10:00:02Z","Action":"fail","Package":"example.com/app/pkg/store","Elapsed":0.8}
+{"Time":"2024-06-15T10:00:02Z","Action":"start","Package":"example.com/app/pkg/config"}
+{"Time":"2024-06-15T10:00:02Z","Action":"run","Package":"example.com/app/pkg/config","Test":"TestLoadDefaults"}
+{"Time":"2024-06-15T10:00:02Z","Action":"pass","Package":"example.com/app/pkg/config","Test":"TestLoadDefaults","Elapsed":0.01}
+{"Time":"2024-06-15T10:00:02Z","Action":"run","Package":"example.com/app/pkg/config","Test":"TestLoadFromFile"}
+{"Time":"2024-06-15T10:00:02Z","Action":"pass","Package":"example.com/app/pkg/config","Test":"TestLoadFromFile","Elapsed":0.03}
+{"Time":"2024-06-15T10:00:02Z","Action":"run","Package":"example.com/app/pkg/config","Test":"TestValidateRequired"}
+{"Time":"2024-06-15T10:00:02Z","Action":"pass","Package":"example.com/app/pkg/config","Test":"TestValidateRequired","Elapsed":0.01}
+{"Time":"2024-06-15T10:00:02Z","Action":"pass","Package":"example.com/app/pkg/config","Elapsed":0.1}

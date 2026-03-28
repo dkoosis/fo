@@ -12,7 +12,7 @@ stdin → detect format → parse → map to patterns → render → stdout
 ```
 
 Two inputs: SARIF 2.1.0, go test -json
-Three outputs: terminal (TTY), llm (piped), json (--format json)
+Three outputs: human (TTY), llm (piped), json (--format json)
 
 ## Package Structure
 
@@ -25,14 +25,14 @@ Three outputs: terminal (TTY), llm (piped), json (--format json)
 - `pkg/sarif/` — SARIF types, reader, stats, builder
 - `pkg/testjson/` — go test -json stream parser
 - `pkg/mapper/` — SARIF → patterns, testjson → patterns
-- `pkg/render/` — Renderer interface + terminal, llm, json implementations + themes
+- `pkg/render/` — Renderer interface + human, llm, json implementations + themes
 - `internal/detect/` — Format sniffing (SARIF vs go test -json)
 - `internal/report/` — Report delimiter protocol (multiplexer for multi-tool pipelines)
 
 ## Key Design Decisions
 
 - Patterns are pure data, not renderers (renderer decides presentation)
-- TTY auto-detection: `--format auto` (default) → TTY=terminal, piped=LLM
+- TTY auto-detection: `--format auto` (default) → TTY=human, piped=LLM
 - Exit codes: 0=clean, 1=failures, 2=fo error
 - Dependencies: lipgloss + x/term only
 - Wrappers are compiled-in plugins behind a `Wrapper` interface (pkg/wrapper)

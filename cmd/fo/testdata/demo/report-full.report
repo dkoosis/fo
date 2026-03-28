@@ -1,0 +1,13 @@
+--- tool:vet format:sarif ---
+{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"govet"}},"results":[{"ruleId":"printf","level":"warning","message":{"text":"fmt.Sprintf format %d has arg of wrong type"},"locations":[{"physicalLocation":{"artifactLocation":{"uri":"cmd/server/main.go"},"region":{"startLine":44,"startColumn":12}}}]}]}]}
+--- tool:lint format:sarif ---
+{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"golangci-lint"}},"results":[{"ruleId":"errcheck","level":"error","message":{"text":"error return value of `f.Close` is not checked"},"locations":[{"physicalLocation":{"artifactLocation":{"uri":"internal/store/store.go"},"region":{"startLine":42,"startColumn":5}}}]},{"ruleId":"unused","level":"error","message":{"text":"func `deprecatedHelper` is unused"},"locations":[{"physicalLocation":{"artifactLocation":{"uri":"internal/store/store.go"},"region":{"startLine":90,"startColumn":6}}}]}]}]}
+--- tool:test format:testjson ---
+{"Time":"2024-06-15T10:00:00Z","Action":"run","Package":"example.com/app/pkg/handler","Test":"TestCreateUser"}
+{"Time":"2024-06-15T10:00:00Z","Action":"pass","Package":"example.com/app/pkg/handler","Test":"TestCreateUser","Elapsed":0.1}
+{"Time":"2024-06-15T10:00:00Z","Action":"run","Package":"example.com/app/pkg/handler","Test":"TestDeleteUser"}
+{"Time":"2024-06-15T10:00:00Z","Action":"output","Package":"example.com/app/pkg/handler","Test":"TestDeleteUser","Output":"    handler_test.go:55: expected 204, got 500\n"}
+{"Time":"2024-06-15T10:00:01Z","Action":"fail","Package":"example.com/app/pkg/handler","Test":"TestDeleteUser","Elapsed":0.2}
+{"Time":"2024-06-15T10:00:01Z","Action":"fail","Package":"example.com/app/pkg/handler","Elapsed":0.5}
+--- tool:vuln format:sarif ---
+{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"govulncheck"}},"results":[]}]}

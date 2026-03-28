@@ -12,9 +12,9 @@
 //
 // Output modes (auto-detected):
 //
-//	terminal  — styled Unicode output (default when TTY)
-//	llm       — terse plain text for AI consumption (default when piped)
-//	json      — structured JSON for automation
+//	human  — styled Unicode output (default when TTY)
+//	llm    — terse plain text for AI consumption (default when piped)
+//	json   — structured JSON for automation
 package main
 
 import (
@@ -59,13 +59,13 @@ INPUT FORMATS (auto-detected from stdin)
   go test -json   Test execution stream (supports live + batch)
 
 OUTPUT FORMATS (--format)
-  auto            TTY → terminal, piped → llm (default)
-  terminal        Styled Unicode with color and sparklines
+  auto            TTY → human, piped → llm (default)
+  human           Styled Unicode with color and sparklines
   llm             Terse plain text, no ANSI — optimized for AI consumption
   json            Structured JSON for automation
 
 FLAGS
-  --format <mode>   Output format: auto | terminal | llm | json (default: auto)
+  --format <mode>   Output format: auto | human | llm | json (default: auto)
   --theme <name>    Color theme: default | orca | mono (default: default)
 
 SUBCOMMANDS
@@ -87,7 +87,7 @@ EXAMPLES
 
 BEHAVIOR NOTES
   - Reads all input from stdin; does not accept file arguments
-  - TTY auto-detection: terminal style when stdout is a TTY, LLM mode when piped
+  - TTY auto-detection: human style when stdout is a TTY, LLM mode when piped
   - Live streaming mode activates for go test -json when stdout is a TTY
   - NO_COLOR env var forces mono theme
   - SARIF input supports multiple runs (multiple tools in one document)
@@ -108,7 +108,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("fo", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() { fmt.Fprint(stderr, usage) }
-	formatFlag := fs.String("format", "auto", "Output format: auto, terminal, llm, json")
+	formatFlag := fs.String("format", "auto", "Output format: auto, human, llm, json")
 	themeFlag := fs.String("theme", "default", "Theme: default, orca, mono")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -149,10 +149,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	mode := resolveFormat(*formatFlag, stdout)
 	switch mode {
-	case "terminal", "llm", "json":
+	case "human", "llm", "json":
 		// valid
 	default:
-		fmt.Fprintf(stderr, "fo: unknown format %q (expected auto, terminal, llm, json)\n", *formatFlag)
+		fmt.Fprintf(stderr, "fo: unknown format %q (expected auto, human, llm, json)\n", *formatFlag)
 		return 2
 	}
 
@@ -242,7 +242,7 @@ func selectRenderer(mode, themeName string) render.Renderer {
 		if os.Getenv("NO_COLOR") != "" {
 			theme = render.MonoTheme()
 		}
-		return render.NewTerminal(theme)
+		return render.NewHuman(theme)
 	}
 }
 
@@ -251,7 +251,7 @@ func resolveFormat(format string, w io.Writer) string {
 		return format
 	}
 	if isTTYWriter(w) {
-		return "terminal"
+		return "human"
 	}
 	return "llm"
 }

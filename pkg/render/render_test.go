@@ -12,8 +12,8 @@ type unknownPattern struct{}
 
 func (unknownPattern) Type() pattern.PatternType { return "unknown" }
 
-func TestTerminalRender_ShowsSummaryAndSkipsUnknownPatterns(t *testing.T) {
-	r := render.NewTerminal(render.MonoTheme())
+func TestHumanRender_ShowsSummaryAndSkipsUnknownPatterns(t *testing.T) {
+	r := render.NewHuman(render.MonoTheme())
 
 	out := r.Render([]pattern.Pattern{
 		&pattern.Summary{

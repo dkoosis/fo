@@ -8,18 +8,18 @@ import (
 	"github.com/dkoosis/fo/pkg/pattern"
 )
 
-// Terminal renders patterns as styled terminal output via lipgloss.
-type Terminal struct {
+// Human renders patterns as styled terminal output via lipgloss.
+type Human struct {
 	theme Theme
 }
 
-// NewTerminal creates a terminal renderer with the given theme.
-func NewTerminal(theme Theme) *Terminal {
-	return &Terminal{theme: theme}
+// NewHuman creates a human renderer with the given theme.
+func NewHuman(theme Theme) *Human {
+	return &Human{theme: theme}
 }
 
-// Render formats all patterns for terminal display.
-func (t *Terminal) Render(patterns []pattern.Pattern) string {
+// Render formats all patterns for human display.
+func (t *Human) Render(patterns []pattern.Pattern) string {
 	var sections []string
 	for _, p := range patterns {
 		s := t.renderOne(p)
@@ -30,7 +30,7 @@ func (t *Terminal) Render(patterns []pattern.Pattern) string {
 	return strings.Join(sections, "\n")
 }
 
-func (t *Terminal) renderOne(p pattern.Pattern) string {
+func (t *Human) renderOne(p pattern.Pattern) string {
 	switch v := p.(type) {
 	case *pattern.Summary:
 		return t.renderSummary(v)
@@ -45,7 +45,7 @@ func (t *Terminal) renderOne(p pattern.Pattern) string {
 	}
 }
 
-func (t *Terminal) renderSummary(s *pattern.Summary) string {
+func (t *Human) renderSummary(s *pattern.Summary) string {
 	var sb strings.Builder
 	if s.Label != "" {
 		sb.WriteString(t.theme.Bold.Render(s.Label))
@@ -60,7 +60,7 @@ func (t *Terminal) renderSummary(s *pattern.Summary) string {
 	return sb.String()
 }
 
-func (t *Terminal) renderLeaderboard(l *pattern.Leaderboard) string {
+func (t *Human) renderLeaderboard(l *pattern.Leaderboard) string {
 	if len(l.Items) == 0 {
 		return ""
 	}
@@ -104,7 +104,7 @@ func (t *Terminal) renderLeaderboard(l *pattern.Leaderboard) string {
 	return sb.String()
 }
 
-func (t *Terminal) renderTestTable(tt *pattern.TestTable) string {
+func (t *Human) renderTestTable(tt *pattern.TestTable) string {
 	if len(tt.Results) == 0 {
 		return ""
 	}
@@ -158,7 +158,7 @@ func (t *Terminal) renderTestTable(tt *pattern.TestTable) string {
 	return sb.String()
 }
 
-func (t *Terminal) iconStyle(kind pattern.ItemKind) (string, lipgloss.Style) {
+func (t *Human) iconStyle(kind pattern.ItemKind) (string, lipgloss.Style) {
 	switch kind {
 	case pattern.KindSuccess:
 		return t.theme.Icons.Pass, t.theme.Success
@@ -171,7 +171,7 @@ func (t *Terminal) iconStyle(kind pattern.ItemKind) (string, lipgloss.Style) {
 	}
 }
 
-func (t *Terminal) statusIconStyle(status pattern.Status) (string, lipgloss.Style) {
+func (t *Human) statusIconStyle(status pattern.Status) (string, lipgloss.Style) {
 	switch status {
 	case pattern.StatusPass:
 		return t.theme.Icons.Pass, t.theme.Success
@@ -184,7 +184,7 @@ func (t *Terminal) statusIconStyle(status pattern.Status) (string, lipgloss.Styl
 	}
 }
 
-func (t *Terminal) renderError(e *pattern.Error) string {
+func (t *Human) renderError(e *pattern.Error) string {
 	return t.theme.Error.Render(fmt.Sprintf("  %s %s: %s", t.theme.Icons.Fail, e.Source, e.Message)) + "\n"
 }
 
