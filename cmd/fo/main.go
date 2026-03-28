@@ -103,8 +103,14 @@ BEHAVIOR NOTES
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	// Check for subcommands before flag parsing
-	if len(args) > 0 && args[0] == "wrap" {
-		return runWrap(args[1:], stdin, stdout, stderr)
+	if len(args) > 0 {
+		switch args[0] {
+		case "wrap":
+			return runWrap(args[1:], stdin, stdout, stderr)
+		case "help":
+			fmt.Fprint(stderr, usage)
+			return 0
+		}
 	}
 
 	fs := flag.NewFlagSet("fo", flag.ContinueOnError)
@@ -282,6 +288,11 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "fo wrap: wrapper name required\n\nAvailable wrappers: %s\n",
 			strings.Join(wrapper.Names(), ", "))
 		return 2
+	}
+	if args[0] == "-h" || args[0] == "--help" || args[0] == "help" {
+		fmt.Fprintf(stderr, "fo wrap: convert tool output to SARIF or go-test-json\n\nAvailable wrappers: %s\n",
+			strings.Join(wrapper.Names(), ", "))
+		return 0
 	}
 	w := wrapper.Get(args[0])
 	if w == nil {
