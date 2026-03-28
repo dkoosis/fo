@@ -3,6 +3,7 @@ package wraparchlint
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 
@@ -29,9 +30,12 @@ func init() {
 // OutputFormat returns FormatSARIF.
 func (a *Archlint) OutputFormat() wrapper.Format { return wrapper.FormatSARIF }
 
-// Wrap reads go-arch-lint JSON from r and writes SARIF to w.
+// RegisterFlags is a no-op — archlint wrapper has no flags.
+func (a *Archlint) RegisterFlags(_ *flag.FlagSet) {}
+
+// Convert reads go-arch-lint JSON from r and writes SARIF to w.
 // Reads entire input into memory — fine for arch-lint reports (typically <100KB).
-func (a *Archlint) Wrap(_ []string, r io.Reader, w io.Writer) error {
+func (a *Archlint) Convert(r io.Reader, w io.Writer) error {
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return fmt.Errorf("reading input: %w", err)

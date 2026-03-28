@@ -2,6 +2,7 @@ package wrapper_test
 
 import (
 	"bytes"
+	"flag"
 	"strings"
 	"testing"
 
@@ -45,11 +46,21 @@ func TestAllWrappers_EmptyInputNoPanic(t *testing.T) {
 	for _, name := range wrapper.Names() {
 		w := wrapper.Get(name)
 		t.Run(name, func(t *testing.T) {
+			fs := flag.NewFlagSet("test", flag.ContinueOnError)
+			w.RegisterFlags(fs)
+			_ = fs.Parse([]string{})
 			var buf bytes.Buffer
-			// No wrapper-specific args — tests the interface contract, not business logic.
-			// Wrappers with required flags (e.g. diag --tool) will return an error, which is fine.
-			// The contract: empty input must not panic, regardless of flag state.
-			_ = w.Wrap([]string{}, strings.NewReader(""), &buf)
+			_ = w.Convert(strings.NewReader(""), &buf)
+		})
+	}
+}
+
+func TestAllWrappers_RegisterFlagsNoPanic(t *testing.T) {
+	for _, name := range wrapper.Names() {
+		w := wrapper.Get(name)
+		t.Run(name, func(t *testing.T) {
+			fs := flag.NewFlagSet("test", flag.ContinueOnError)
+			w.RegisterFlags(fs)
 		})
 	}
 }

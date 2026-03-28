@@ -3,12 +3,26 @@ package wrapdiag
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"strings"
 	"testing"
 
 	"github.com/dkoosis/fo/pkg/sarif"
 	"github.com/dkoosis/fo/pkg/wrapper"
 )
+
+func diagConvert(t *testing.T, args []string, input string) (bytes.Buffer, error) {
+	t.Helper()
+	d := New()
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	d.RegisterFlags(fs)
+	if err := fs.Parse(args); err != nil {
+		t.Fatalf("flag parse: %v", err)
+	}
+	var buf bytes.Buffer
+	err := d.Convert(strings.NewReader(input), &buf)
+	return buf, err
+}
 
 func TestDiag_OutputFormat(t *testing.T) {
 	d := New()
@@ -19,8 +33,8 @@ func TestDiag_OutputFormat(t *testing.T) {
 
 func TestDiag_FileLineColMessage(t *testing.T) {
 	input := "main.go:15:3: unreachable code after return\npkg/util.go:42: unused variable x\n"
-	var buf bytes.Buffer
-	if err := New().Wrap([]string{"--tool", "govet"}, strings.NewReader(input), &buf); err != nil {
+	buf, err := diagConvert(t, []string{"--tool", "govet"}, input)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -45,8 +59,7 @@ func TestDiag_FileLineColMessage(t *testing.T) {
 
 func TestDiag_FileOnly(t *testing.T) {
 	input := "pkg/handler.go\nmain.go\n"
-	var buf bytes.Buffer
-	err := New().Wrap([]string{"--tool", "gofmt", "--rule", "needs-formatting", "--level", "warning"}, strings.NewReader(input), &buf)
+	buf, err := diagConvert(t, []string{"--tool", "gofmt", "--rule", "needs-formatting", "--level", "warning"}, input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,8 +77,12 @@ func TestDiag_FileOnly(t *testing.T) {
 }
 
 func TestDiag_MissingToolFlag(t *testing.T) {
+	d := New()
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	d.RegisterFlags(fs)
+	_ = fs.Parse([]string{})
 	var buf bytes.Buffer
-	err := New().Wrap([]string{}, strings.NewReader("x.go:1: msg\n"), &buf)
+	err := d.Convert(strings.NewReader("x.go:1: msg\n"), &buf)
 	if err == nil {
 		t.Error("expected error for missing --tool flag")
 	}
@@ -73,8 +90,8 @@ func TestDiag_MissingToolFlag(t *testing.T) {
 
 func TestDiag_WindowsDriveLetter(t *testing.T) {
 	input := "C:\\Users\\dev\\main.go:15:3: unreachable code\n"
-	var buf bytes.Buffer
-	if err := New().Wrap([]string{"--tool", "govet"}, strings.NewReader(input), &buf); err != nil {
+	buf, err := diagConvert(t, []string{"--tool", "govet"}, input)
+	if err != nil {
 		t.Fatal(err)
 	}
 

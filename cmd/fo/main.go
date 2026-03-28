@@ -300,7 +300,19 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			args[0], strings.Join(wrapper.Names(), ", "))
 		return 2
 	}
-	if err := w.Wrap(args[1:], stdin, stdout); err != nil {
+
+	// Framework owns flag lifecycle — wrapper just registers its flags.
+	fs := flag.NewFlagSet("fo wrap "+args[0], flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	w.RegisterFlags(fs)
+	if err := fs.Parse(args[1:]); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 2
+	}
+
+	if err := w.Convert(stdin, stdout); err != nil {
 		fmt.Fprintf(stderr, "fo wrap %s: %v\n", args[0], err)
 		return 2
 	}

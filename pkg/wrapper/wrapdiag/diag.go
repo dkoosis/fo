@@ -19,7 +19,12 @@ import (
 )
 
 // Diag converts line-based diagnostics to SARIF.
-type Diag struct{}
+type Diag struct {
+	toolName *string
+	ruleID   *string
+	level    *string
+	version  *string
+}
 
 // New returns a new Diag wrapper.
 func New() *Diag { return &Diag{} }
@@ -31,23 +36,22 @@ func init() {
 // OutputFormat returns FormatSARIF.
 func (d *Diag) OutputFormat() wrapper.Format { return wrapper.FormatSARIF }
 
-// Wrap parses line diagnostics from r and writes SARIF to w.
-// Required flag: --tool <name>. Optional: --rule, --level, --version.
-func (d *Diag) Wrap(args []string, r io.Reader, w io.Writer) error {
-	fs := flag.NewFlagSet("fo wrap diag", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	toolName := fs.String("tool", "", "Tool name for SARIF driver.name (required)")
-	ruleID := fs.String("rule", "finding", "Default rule ID")
-	level := fs.String("level", "warning", "Default severity: error|warning|note")
-	version := fs.String("version", "", "Tool version string")
-	if err := fs.Parse(args); err != nil {
-		return err
-	}
-	if *toolName == "" {
+// RegisterFlags adds diag-specific flags to the provided FlagSet.
+func (d *Diag) RegisterFlags(fs *flag.FlagSet) {
+	d.toolName = fs.String("tool", "", "Tool name for SARIF driver.name (required)")
+	d.ruleID = fs.String("rule", "finding", "Default rule ID")
+	d.level = fs.String("level", "warning", "Default severity: error|warning|note")
+	d.version = fs.String("version", "", "Tool version string")
+}
+
+// Convert reads line diagnostics from r and writes SARIF to w.
+// Must be called after RegisterFlags + FlagSet.Parse.
+func (d *Diag) Convert(r io.Reader, w io.Writer) error {
+	if d.toolName == nil || *d.toolName == "" {
 		return fmt.Errorf("--tool is required")
 	}
 
-	b := sarif.NewBuilder(*toolName, *version)
+	b := sarif.NewBuilder(*d.toolName, *d.version)
 	scanner := bufio.NewScanner(r)
 	// Same 1 MiB limit as testjson.ParseStream — see BUG note there.
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -61,7 +65,7 @@ func (d *Diag) Wrap(args []string, r io.Reader, w io.Writer) error {
 		if file == "" {
 			continue
 		}
-		b.AddResult(*ruleID, *level, msg, file, ln, col)
+		b.AddResult(*d.ruleID, *d.level, msg, file, ln, col)
 	}
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("reading input: %w", err)
