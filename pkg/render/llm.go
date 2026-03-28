@@ -44,25 +44,20 @@ func (l *LLM) Render(patterns []pattern.Pattern) string {
 			return l.renderReport(summaries, tables, errors)
 		case pattern.SummaryKindTest:
 			return l.renderTestOutput(summaries, tables)
+		case pattern.SummaryKindSARIF:
+			return l.renderSARIFOutput(tables)
 		}
 	}
+
+	// No summaries or unrecognized kind — fall back to SARIF diagnostic format.
 	return l.renderSARIFOutput(tables)
 }
 
 func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestTable, errors []*pattern.Error) string {
 	var sb strings.Builder
 
-	var reportSummary *pattern.Summary
-	for _, s := range summaries {
-		if s.Kind == pattern.SummaryKindReport {
-			reportSummary = s
-			break
-		}
-	}
-	if reportSummary == nil {
-		return ""
-	}
-
+	// Caller dispatches here only when summaries[0].Kind == SummaryKindReport.
+	reportSummary := summaries[0]
 	sb.WriteString(reportSummary.Label + "\n")
 
 	// Group tables by originating tool
