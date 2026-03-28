@@ -46,12 +46,10 @@ func FromReport(sections []report.Section) []pattern.Pattern {
 	label := fmt.Sprintf("REPORT: %d tools", len(sections))
 	if fail == 0 {
 		label += " — all pass"
+	} else if pass > 0 {
+		label += fmt.Sprintf(" — %d fail, %d pass", fail, pass)
 	} else {
-		parts := []string{fmt.Sprintf("%d fail", fail)}
-		if pass > 0 {
-			parts = append(parts, fmt.Sprintf("%d pass", pass))
-		}
-		label += " — " + strings.Join(parts, ", ")
+		label += fmt.Sprintf(" — %d fail", fail)
 	}
 
 	topSummary := &pattern.Summary{
