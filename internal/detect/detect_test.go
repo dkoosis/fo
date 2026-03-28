@@ -54,10 +54,8 @@ func TestSniff_Report(t *testing.T) {
 		input string
 	}{
 		{"sarif delimiter", "--- tool:vet format:sarif ---\n{\"version\":\"2.1.0\"}"},
-		{"with status", "--- tool:arch format:text status:pass ---\nAll checks passed."},
-		{"metrics format", "--- tool:eval format:metrics ---\n{\"scope\":\"86 queries\"}"},
-		{"archlint format", "--- tool:arch format:archlint ---\n{}"},
-		{"jscpd format", "--- tool:dupl format:jscpd ---\n{}"},
+		{"testjson delimiter", "--- tool:test format:testjson ---\n{\"Action\":\"run\"}"},
+		{"sarif with status", "--- tool:vet format:sarif status:pass ---\nAll checks passed."},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
