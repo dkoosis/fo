@@ -128,28 +128,13 @@ func (l *LLM) Render(patterns []pattern.Pattern) string {
 	return sb.String()
 }
 
-func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestTable, errors []*pattern.Error) string {
-	var sb strings.Builder
-
-	reportSummary := summaries[0]
-
-	// Group tables and errors by tool
-	tablesByTool := make(map[string][]*pattern.TestTable)
-	for _, t := range tables {
-		if t.Source != "" {
-			tablesByTool[t.Source] = append(tablesByTool[t.Source], t)
-		}
-	}
-	errorsByTool := make(map[string][]*pattern.Error)
-	for _, e := range errors {
-		errorsByTool[e.Source] = append(errorsByTool[e.Source], e)
-	}
-
-	// Count findings and classify tools
-	var errTotal, warnTotal, noteTotal int
-	var failingTools, passingTools []string
-
-	for _, m := range reportSummary.Metrics {
+// classifyTools counts findings per severity and splits tools into failing/passing.
+func classifyTools(
+	metrics []pattern.SummaryItem,
+	tablesByTool map[string][]*pattern.TestTable,
+	errorsByTool map[string][]*pattern.Error,
+) (errTotal, warnTotal, noteTotal int, failingTools, passingTools []string) {
+	for _, m := range metrics {
 		tool := m.Label
 		toolErrors := len(errorsByTool[tool])
 
@@ -168,7 +153,6 @@ func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestT
 					}
 				}
 			} else {
-				// Test-mode: only count failures
 				for _, item := range t.Results {
 					if item.Status == pattern.StatusFail {
 						errTotal++
@@ -178,7 +162,6 @@ func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestT
 			}
 		}
 
-		// Error patterns count as errors
 		errTotal += len(errorsByTool[tool])
 
 		if toolErrors > 0 {
@@ -187,6 +170,30 @@ func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestT
 			passingTools = append(passingTools, tool)
 		}
 	}
+	return errTotal, warnTotal, noteTotal, failingTools, passingTools
+}
+
+func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestTable, errors []*pattern.Error) string {
+	var sb strings.Builder
+
+	reportSummary := summaries[0]
+
+	// Group tables and errors by tool
+	tablesByTool := make(map[string][]*pattern.TestTable)
+	for _, t := range tables {
+		if t.Source != "" {
+			tablesByTool[t.Source] = append(tablesByTool[t.Source], t)
+		}
+	}
+	errorsByTool := make(map[string][]*pattern.Error)
+	for _, e := range errors {
+		errorsByTool[e.Source] = append(errorsByTool[e.Source], e)
+	}
+
+	// Count findings and classify tools
+	errTotal, warnTotal, noteTotal, failingTools, passingTools := classifyTools(
+		reportSummary.Metrics, tablesByTool, errorsByTool,
+	)
 
 	// Triage line — guard empty groups
 	sb.WriteString(triageCounts(errTotal, warnTotal, noteTotal))
@@ -260,7 +267,9 @@ type diagEntry struct {
 }
 
 // collectSARIFDiags extracts diagnostic entries from SARIF-mode tables.
-func collectSARIFDiags(tables []*pattern.TestTable) (diags []diagEntry, errCount, warnCount, noteCount int) {
+func collectSARIFDiags(tables []*pattern.TestTable) ([]diagEntry, int, int, int) {
+	var diags []diagEntry
+	var errCount, warnCount, noteCount int
 	for _, t := range tables {
 		for _, item := range t.Results {
 			sym := severitySymbol(item.Status)
@@ -279,7 +288,7 @@ func collectSARIFDiags(tables []*pattern.TestTable) (diags []diagEntry, errCount
 			})
 		}
 	}
-	return
+	return diags, errCount, warnCount, noteCount
 }
 
 // sortDiags sorts diagnostics by severity desc → file asc → line asc → rule asc.
@@ -304,7 +313,7 @@ func renderDiags(sb *strings.Builder, diags []diagEntry) {
 	for _, d := range diags {
 		sb.WriteString("  " + d.sym + " ")
 		if d.line > 0 {
-			sb.WriteString(fmt.Sprintf("%s:%d:%d %s", d.file, d.line, d.col, d.rule))
+			fmt.Fprintf(sb, "%s:%d:%d %s", d.file, d.line, d.col, d.rule)
 		} else {
 			sb.WriteString(d.file + " " + d.rule)
 		}
@@ -351,18 +360,18 @@ func (l *LLM) renderTestOutput(summaries []*pattern.Summary, tables []*pattern.T
 		for _, m := range summaries[0].Metrics {
 			switch m.Label {
 			case "Failed":
-				fmt.Sscanf(m.Value, "%d/", &failCount)
+				_, _ = fmt.Sscanf(m.Value, "%d/", &failCount)
 			case "Passed":
-				fmt.Sscanf(m.Value, "%d/%d", new(int), &totalTests)
+				_, _ = fmt.Sscanf(m.Value, "%d/%d", new(int), &totalTests)
 			case "Packages":
-				fmt.Sscanf(m.Value, "%d", &pkgCount)
+				_, _ = fmt.Sscanf(m.Value, "%d", &pkgCount)
 			case "Panics":
 				n := 0
-				fmt.Sscanf(m.Value, "%d", &n)
+				_, _ = fmt.Sscanf(m.Value, "%d", &n)
 				failCount += n
 			case "Build Errors":
 				n := 0
-				fmt.Sscanf(m.Value, "%d", &n)
+				_, _ = fmt.Sscanf(m.Value, "%d", &n)
 				failCount += n
 			}
 		}
@@ -381,7 +390,7 @@ func (l *LLM) renderTestOutput(summaries []*pattern.Summary, tables []*pattern.T
 	}
 
 	// Triage line
-	sb.WriteString(fmt.Sprintf("%d %s / %d tests %d pkg", failCount, symError, totalTests, pkgCount))
+	fmt.Fprintf(&sb, "%d %s / %d tests %d pkg", failCount, symError, totalTests, pkgCount)
 	if duration != "" {
 		sb.WriteString(" (" + duration + ")")
 	}
