@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dkoosis/fo/internal/detect"
+	"github.com/dkoosis/fo/pkg/pattern"
 	_ "github.com/dkoosis/fo/pkg/wrapper/wraparchlint"
 	_ "github.com/dkoosis/fo/pkg/wrapper/wrapdiag"
 	_ "github.com/dkoosis/fo/pkg/wrapper/wrapjscpd"
@@ -249,7 +251,6 @@ func TestRun_ReportFormat(t *testing.T) {
 		t.Errorf("expected ✔ for passing tools, got:\n%s", out)
 	}
 }
-
 
 // --- JTBD: Deterministic sort order (LLM spec) ---
 
@@ -511,3 +512,168 @@ func TestJTBD_MultiRunSARIF(t *testing.T) {
 	}
 }
 
+func TestParseInput_ReturnsError_When_InputFormatUnknown(t *testing.T) {
+	var stderr bytes.Buffer
+	patterns, err := parseInput(detect.Unknown, []byte("not-json"), &stderr)
+	if err == nil {
+		t.Fatal("expected parseInput to fail for unknown format")
+	}
+	if patterns != nil {
+		t.Fatalf("expected nil patterns on error, got %#v", patterns)
+	}
+	if !strings.Contains(err.Error(), "unrecognized input format") {
+		t.Fatalf("expected unrecognized format error, got %v", err)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no warnings on unknown format, got %q", stderr.String())
+	}
+}
+
+func TestParseInput_WritesWarning_When_GoTestJSONContainsMalformedLines(t *testing.T) {
+	input := strings.Join([]string{
+		`{"Time":"2024-01-01T00:00:00Z","Action":"run","Package":"example.com/pkg","Test":"TestA"}`,
+		`{"this":"is malformed"`,
+		`{"Time":"2024-01-01T00:00:00Z","Action":"pass","Package":"example.com/pkg","Test":"TestA","Elapsed":0.01}`,
+		`{"Time":"2024-01-01T00:00:00Z","Action":"pass","Package":"example.com/pkg","Elapsed":0.02}`,
+	}, "\n")
+
+	var stderr bytes.Buffer
+	patterns, err := parseInput(detect.GoTestJSON, []byte(input), &stderr)
+	if err != nil {
+		t.Fatalf("expected parseInput success, got %v", err)
+	}
+	if len(patterns) == 0 {
+		t.Fatal("expected mapped patterns for valid events")
+	}
+	if !strings.Contains(stderr.String(), "malformed line(s) skipped") {
+		t.Fatalf("expected malformed-line warning, got %q", stderr.String())
+	}
+}
+
+func TestParseInput_ReturnsWrappedError_When_ReportSectionInvalid(t *testing.T) {
+	input := []byte("--- tool:lint format:sarif ---\n{ definitely not json }\n")
+	var stderr bytes.Buffer
+
+	patterns, err := parseInput(detect.Report, input, &stderr)
+	if err != nil {
+		t.Fatalf("expected parseInput to degrade gracefully for bad section, got %v", err)
+	}
+	if len(patterns) == 0 {
+		t.Fatal("expected a mapped error pattern for invalid report section")
+	}
+	foundError := false
+	for _, p := range patterns {
+		if _, ok := p.(*pattern.Error); ok {
+			foundError = true
+			break
+		}
+	}
+	if !foundError {
+		t.Fatalf("expected at least one pattern.Error, got %#v", patterns)
+	}
+}
+
+func TestExitCode_ReturnsOne_When_FailurePatternPresent(t *testing.T) {
+	cases := []struct {
+		name     string
+		patterns []pattern.Pattern
+		wantCode int
+	}{
+		{
+			name: "test table has failing row",
+			patterns: []pattern.Pattern{
+				&pattern.TestTable{
+					Results: []pattern.TestTableItem{
+						{Status: pattern.StatusPass},
+						{Status: pattern.StatusFail},
+					},
+				},
+			},
+			wantCode: 1,
+		},
+		{
+			name: "error pattern present",
+			patterns: []pattern.Pattern{
+				&pattern.Error{Message: "bad input"},
+			},
+			wantCode: 1,
+		},
+		{
+			name: "only passing test rows",
+			patterns: []pattern.Pattern{
+				&pattern.TestTable{
+					Results: []pattern.TestTableItem{
+						{Status: pattern.StatusPass},
+					},
+				},
+			},
+			wantCode: 0,
+		},
+		{
+			name:     "empty pattern list",
+			patterns: nil,
+			wantCode: 0,
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got := exitCode(tc.patterns)
+			if got != tc.wantCode {
+				t.Fatalf("exitCode() = %d, want %d", got, tc.wantCode)
+			}
+		})
+	}
+}
+
+func TestRunWrap_ReturnsZero_When_HelpRequested(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+	}{
+		{name: "short help flag", args: []string{"-h"}},
+		{name: "long help flag", args: []string{"--help"}},
+		{name: "help command", args: []string{"help"}},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := runWrap(tc.args, strings.NewReader(""), &stdout, &stderr)
+			if code != 0 {
+				t.Fatalf("runWrap() code = %d, want 0; stderr: %s", code, stderr.String())
+			}
+			if !strings.Contains(stderr.String(), "archlint") ||
+				!strings.Contains(stderr.String(), "diag") ||
+				!strings.Contains(stderr.String(), "jscpd") {
+				t.Fatalf("expected help output to include wrappers, got: %q", stderr.String())
+			}
+		})
+	}
+}
+
+func TestRun_ReturnsUsageError_When_FormatFlagInvalid(t *testing.T) {
+	sarif := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"test"}},"results":[]}]}`
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "markdown"}, strings.NewReader(sarif), &stdout, &stderr)
+
+	if code != 2 {
+		t.Fatalf("run() code = %d, want 2", code)
+	}
+	if !strings.Contains(stderr.String(), `unknown format "markdown"`) {
+		t.Fatalf("expected unknown format error, got: %q", stderr.String())
+	}
+}
+
+func TestRun_ReturnsUsageError_When_FlagParsingFails(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--not-a-real-flag"}, strings.NewReader(`{"version":"2.1.0","runs":[]}`), &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("run() code = %d, want 2", code)
+	}
+	if !strings.Contains(stderr.String(), "flag provided but not defined") {
+		t.Fatalf("expected flag parsing failure, got: %q", stderr.String())
+	}
+}
