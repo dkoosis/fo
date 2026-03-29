@@ -2,11 +2,30 @@ package render_test
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/dkoosis/fo/pkg/pattern"
 	"github.com/dkoosis/fo/pkg/render"
 )
+
+// unmarshalablePattern contains a chan field that json.Marshal cannot encode.
+type unmarshalablePattern struct{ C chan int }
+
+func (unmarshalablePattern) Type() pattern.PatternType { return "unsupported" }
+
+func TestJSONRender_MarshalError_ReturnsErrorEnvelope(t *testing.T) {
+	t.Parallel()
+	r := render.NewJSON()
+	out := r.Render([]pattern.Pattern{unmarshalablePattern{C: make(chan int)}})
+
+	if !json.Valid([]byte(out)) {
+		t.Fatalf("expected valid JSON error envelope, got %q", out)
+	}
+	if !strings.Contains(out, "unsupported type") {
+		t.Fatalf("expected marshal error in output, got %q", out)
+	}
+}
 
 func TestJSONRender(t *testing.T) {
 	t.Parallel()
