@@ -112,11 +112,9 @@ func (l *LLM) Render(patterns []pattern.Pattern) string {
 func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestTable, errors []*pattern.Error) string {
 	var sb strings.Builder
 
-	// Caller dispatches here only when summaries[0].Kind == SummaryKindReport.
 	reportSummary := summaries[0]
-	sb.WriteString(reportSummary.Label + "\n")
 
-	// Group tables by originating tool
+	// Group tables and errors by tool
 	tablesByTool := make(map[string][]*pattern.TestTable)
 	for _, t := range tables {
 		if t.Source != "" {
@@ -128,31 +126,102 @@ func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestT
 		errorsByTool[e.Source] = append(errorsByTool[e.Source], e)
 	}
 
-	for _, m := range reportSummary.Metrics {
-		sb.WriteString("\n" + m.Label + ": " + m.Value + "\n")
+	// Count findings and classify tools
+	var errTotal, warnTotal, noteTotal int
+	var failingTools, passingTools []string
 
-		// Render parse errors for this tool
-		for _, e := range errorsByTool[m.Label] {
-			sb.WriteString("  ERROR: " + e.Message + "\n")
+	for _, m := range reportSummary.Metrics {
+		tool := m.Label
+		toolErrors := len(errorsByTool[tool])
+
+		for _, t := range tablesByTool[tool] {
+			if isSARIFTable(t) {
+				for _, item := range t.Results {
+					sym := severitySymbol(item.Status)
+					switch sym {
+					case symError:
+						errTotal++
+						toolErrors++
+					case symWarning:
+						warnTotal++
+					default:
+						noteTotal++
+					}
+				}
+			} else {
+				// Test-mode: only count failures
+				for _, item := range t.Results {
+					if item.Status == pattern.StatusFail {
+						errTotal++
+						toolErrors++
+					}
+				}
+			}
 		}
 
-		for _, t := range tablesByTool[m.Label] {
-			if t.Label != "" {
-				sb.WriteString("\n## " + t.Label + "\n")
-			} else {
-				sb.WriteString("\n")
+		// Error patterns count as errors
+		errTotal += len(errorsByTool[tool])
+
+		if toolErrors > 0 {
+			failingTools = append(failingTools, tool)
+		} else {
+			passingTools = append(passingTools, tool)
+		}
+	}
+
+	// Triage line — guard empty groups
+	sb.WriteString(triageCounts(errTotal, warnTotal, noteTotal))
+	if len(failingTools) > 0 {
+		sb.WriteString(" | " + strings.Join(failingTools, " "))
+	}
+	if len(passingTools) > 0 {
+		sb.WriteString(" | " + strings.Join(passingTools, " ") + " " + symPass)
+	}
+	sb.WriteString("\n")
+
+	// Tool sections — only tools with findings, in report delimiter order
+	for _, m := range reportSummary.Metrics {
+		tool := m.Label
+		toolTables := tablesByTool[tool]
+		toolErrors := errorsByTool[tool]
+		if len(toolTables) == 0 && len(toolErrors) == 0 {
+			continue
+		}
+
+		sb.WriteString("\n## " + tool + "\n")
+
+		// Error patterns first
+		for _, e := range toolErrors {
+			sb.WriteString("  " + symError + " " + e.Message + "\n")
+		}
+
+		// Branch: SARIF vs test rendering
+		hasSARIF := false
+		for _, t := range toolTables {
+			if isSARIFTable(t) {
+				hasSARIF = true
+				break
 			}
-			for _, item := range t.Results {
-				prefix := "  "
-				if item.Status == pattern.StatusFail {
-					prefix = "  FAIL "
+		}
+
+		if hasSARIF {
+			diags, _, _, _ := collectSARIFDiags(toolTables)
+			sortDiags(diags)
+			renderDiags(&sb, diags)
+		} else {
+			for _, t := range toolTables {
+				for _, item := range t.Results {
+					if item.Status != pattern.StatusFail {
+						continue
+					}
+					pkg := extractPackage(t.Label)
+					sb.WriteString("  " + symError + " " + pkg + " " + item.Name)
+					if item.Duration != "" {
+						sb.WriteString(" (" + item.Duration + ")")
+					}
+					sb.WriteString("\n")
+					writeDetails(&sb, item.Details)
 				}
-				sb.WriteString(prefix + item.Name)
-				if item.Duration != "" {
-					sb.WriteString(" (" + item.Duration + ")")
-				}
-				sb.WriteString("\n")
-				writeDetails(&sb, item.Details)
 			}
 		}
 	}

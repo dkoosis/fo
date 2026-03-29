@@ -17,7 +17,7 @@ func TestLLMRender_KeyUserVisibleOutput(t *testing.T) {
 		wants    []string
 	}{
 		{
-			name: "report includes per-tool summary and failed checks",
+			name: "report includes triage line and tool sections",
 			patterns: []pattern.Pattern{
 				&pattern.Summary{
 					Label: "REPORT: 3 tools — 1 fail, 2 pass",
@@ -35,7 +35,7 @@ func TestLLMRender_KeyUserVisibleOutput(t *testing.T) {
 					},
 				},
 			},
-			wants: []string{"REPORT: 3 tools — 1 fail, 2 pass", "vet: 0 diags", "## lint violations", "FAIL store → eval", "forbidden dependency"},
+			wants: []string{"1 ✗ 0 ⚠", "## lint", "store → eval", "forbidden dependency", "vet ✔"},
 		},
 		{
 			name: "test summary mode shows triage line and failure details",
@@ -113,7 +113,7 @@ func TestLLMRender_KeyUserVisibleOutput(t *testing.T) {
 				},
 				&pattern.Error{Source: "lint", Message: "config parse failed"},
 			},
-			wants: []string{"ERROR: config parse failed"},
+			wants: []string{"✗ config parse failed", "## lint"},
 		},
 		{
 			name: "test skip items suppressed in output",
@@ -470,5 +470,207 @@ func TestLLM_SARIF_FindingFormat(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestLLM_Report_TriageAndSections(t *testing.T) {
+	t.Parallel()
+	r := render.NewLLM()
+
+	out := r.Render([]pattern.Pattern{
+		&pattern.Summary{
+			Label: "REPORT: 3 tools — 1 fail, 2 pass",
+			Kind:  pattern.SummaryKindReport,
+			Metrics: []pattern.SummaryItem{
+				{Label: "vet", Value: "0 diags", Kind: pattern.KindSuccess},
+				{Label: "lint", Value: "2 err", Kind: pattern.KindError},
+				{Label: "test", Value: "PASS", Kind: pattern.KindSuccess},
+			},
+		},
+		&pattern.TestTable{
+			Label: "internal/store/store.go", Source: "lint",
+			Results: []pattern.TestTableItem{
+				{Name: "errcheck:42:5", Status: pattern.StatusFail, Details: "error return not checked"},
+				{Name: "unused:90:6", Status: pattern.StatusFail, Details: "func `helper` unused"},
+			},
+		},
+	})
+
+	if !strings.Contains(out, "2 ✗ 0 ⚠") {
+		t.Fatalf("expected triage counts, got:\n%s", out)
+	}
+	if !strings.Contains(out, "✔") {
+		t.Fatalf("expected ✔ for passing tools, got:\n%s", out)
+	}
+	if !strings.Contains(out, "## lint") {
+		t.Fatalf("expected ## lint section, got:\n%s", out)
+	}
+	if strings.Contains(out, "## vet") {
+		t.Fatalf("clean tool vet should not have section, got:\n%s", out)
+	}
+	if strings.Contains(out, "## test") {
+		t.Fatalf("clean tool test should not have section, got:\n%s", out)
+	}
+	if !strings.Contains(out, "✗ internal/store/store.go:42:5 errcheck — error return not checked") {
+		t.Fatalf("expected formatted finding, got:\n%s", out)
+	}
+}
+
+func TestLLM_Report_AllPass(t *testing.T) {
+	t.Parallel()
+	r := render.NewLLM()
+
+	out := r.Render([]pattern.Pattern{
+		&pattern.Summary{
+			Label: "REPORT: 3 tools — all pass",
+			Kind:  pattern.SummaryKindReport,
+			Metrics: []pattern.SummaryItem{
+				{Label: "vet", Value: "0 diags", Kind: pattern.KindSuccess},
+				{Label: "lint", Value: "0 diags", Kind: pattern.KindSuccess},
+				{Label: "test", Value: "PASS", Kind: pattern.KindSuccess},
+			},
+		},
+	})
+
+	if !strings.Contains(out, "0 ✗ 0 ⚠") {
+		t.Fatalf("expected zero counts, got:\n%s", out)
+	}
+	if !strings.Contains(out, "vet lint test ✔") {
+		t.Fatalf("expected all tools passing, got:\n%s", out)
+	}
+	if strings.Contains(out, "##") {
+		t.Fatalf("all-pass should have no sections, got:\n%s", out)
+	}
+}
+
+func TestLLM_Report_MixedSARIFAndTest(t *testing.T) {
+	t.Parallel()
+	r := render.NewLLM()
+
+	out := r.Render([]pattern.Pattern{
+		&pattern.Summary{
+			Label: "REPORT: 2 tools — 2 fail",
+			Kind:  pattern.SummaryKindReport,
+			Metrics: []pattern.SummaryItem{
+				{Label: "lint", Value: "1 err", Kind: pattern.KindError},
+				{Label: "test", Value: "FAIL — 1 failed", Kind: pattern.KindError},
+			},
+		},
+		&pattern.TestTable{
+			Label: "internal/store.go", Source: "lint",
+			Results: []pattern.TestTableItem{
+				{Name: "errcheck:42:5", Status: pattern.StatusFail, Details: "error return not checked"},
+			},
+		},
+		&pattern.TestTable{
+			Label: "FAIL pkg/handler (1/3 failed)", Source: "test",
+			Results: []pattern.TestTableItem{
+				{Name: "TestDelete", Status: pattern.StatusFail, Duration: "0.2s", Details: "expected 204, got 500"},
+				{Name: "TestCreate", Status: pattern.StatusPass, Duration: "0.1s"},
+			},
+		},
+	})
+
+	if !strings.Contains(out, "## lint") {
+		t.Fatalf("expected ## lint, got:\n%s", out)
+	}
+	if !strings.Contains(out, "✗ internal/store.go:42:5 errcheck") {
+		t.Fatalf("expected SARIF-format lint finding, got:\n%s", out)
+	}
+	if !strings.Contains(out, "## test") {
+		t.Fatalf("expected ## test, got:\n%s", out)
+	}
+	if !strings.Contains(out, "✗ pkg/handler TestDelete") {
+		t.Fatalf("expected test-format finding, got:\n%s", out)
+	}
+	if strings.Contains(out, "TestCreate") {
+		t.Fatalf("passing test should be suppressed, got:\n%s", out)
+	}
+}
+
+func TestLLM_Report_ErrorPattern(t *testing.T) {
+	t.Parallel()
+	r := render.NewLLM()
+
+	out := r.Render([]pattern.Pattern{
+		&pattern.Summary{
+			Label: "REPORT",
+			Kind:  pattern.SummaryKindReport,
+			Metrics: []pattern.SummaryItem{
+				{Label: "lint", Value: "crashed", Kind: pattern.KindError},
+			},
+		},
+		&pattern.Error{Source: "lint", Message: "config parse failed"},
+	})
+
+	if !strings.Contains(out, "1 ✗") {
+		t.Fatalf("expected error count, got:\n%s", out)
+	}
+	if !strings.Contains(out, "## lint") {
+		t.Fatalf("expected lint section, got:\n%s", out)
+	}
+	if !strings.Contains(out, "✗ config parse failed") {
+		t.Fatalf("expected error finding, got:\n%s", out)
+	}
+}
+
+func TestLLM_Report_NoteCountOmission(t *testing.T) {
+	t.Parallel()
+	r := render.NewLLM()
+
+	out := r.Render([]pattern.Pattern{
+		&pattern.Summary{
+			Label: "REPORT",
+			Kind:  pattern.SummaryKindReport,
+			Metrics: []pattern.SummaryItem{
+				{Label: "lint", Value: "1 err", Kind: pattern.KindError},
+			},
+		},
+		&pattern.TestTable{
+			Label: "a.go", Source: "lint",
+			Results: []pattern.TestTableItem{
+				{Name: "r:1:1", Status: pattern.StatusFail, Details: "bad"},
+			},
+		},
+	})
+	if strings.Contains(out, "ℹ") {
+		t.Fatalf("ℹ count should be omitted when zero, got:\n%s", out)
+	}
+}
+
+func TestLLM_Report_ToolOrder(t *testing.T) {
+	t.Parallel()
+	r := render.NewLLM()
+
+	out := r.Render([]pattern.Pattern{
+		&pattern.Summary{
+			Label: "REPORT",
+			Kind:  pattern.SummaryKindReport,
+			Metrics: []pattern.SummaryItem{
+				{Label: "vet", Value: "1 warn", Kind: pattern.KindWarning},
+				{Label: "lint", Value: "1 err", Kind: pattern.KindError},
+			},
+		},
+		&pattern.TestTable{
+			Label: "a.go", Source: "vet",
+			Results: []pattern.TestTableItem{
+				{Name: "printf:1:1", Status: pattern.StatusSkip, Details: "format"},
+			},
+		},
+		&pattern.TestTable{
+			Label: "b.go", Source: "lint",
+			Results: []pattern.TestTableItem{
+				{Name: "unused:1:1", Status: pattern.StatusFail, Details: "unused"},
+			},
+		},
+	})
+
+	vetIdx := strings.Index(out, "## vet")
+	lintIdx := strings.Index(out, "## lint")
+	if vetIdx == -1 || lintIdx == -1 {
+		t.Fatalf("expected both sections, got:\n%s", out)
+	}
+	if vetIdx > lintIdx {
+		t.Fatalf("vet should appear before lint (delimiter order), got:\n%s", out)
 	}
 }
