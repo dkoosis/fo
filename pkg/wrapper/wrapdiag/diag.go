@@ -51,6 +51,11 @@ func (d *diag) Convert(r io.Reader, w io.Writer) error {
 	if *d.toolName == "" {
 		return fmt.Errorf("--tool is required")
 	}
+	switch *d.level {
+	case "error", "warning", "note", "none":
+	default:
+		return fmt.Errorf("--level %q: must be error, warning, note, or none", *d.level)
+	}
 
 	b := sarif.NewBuilder(*d.toolName, *d.version)
 	scanner := bufio.NewScanner(r)
