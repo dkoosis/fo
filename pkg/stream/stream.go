@@ -82,8 +82,9 @@ func (s *streamer) handleEvent(e testjson.TestEvent) {
 	case "skip":
 		if e.Test != "" {
 			s.handleTestSkip(e)
+		} else {
+			s.handlePkgSkip(e)
 		}
-		// Package-level skip is a no-op.
 	case "output":
 		if !s.handleOutput(e) {
 			return
@@ -166,6 +167,14 @@ func (s *streamer) handlePkgDone(e testjson.TestEvent, failed bool) {
 		s.flushOutputBuf(bufKey(e.Package, ""))
 	}
 	s.recordPkg(pkg, e.Elapsed)
+	delete(s.active, e.Package)
+	delete(s.outputBuf, bufKey(e.Package, ""))
+	s.removeOrder(e.Package)
+}
+
+// handlePkgSkip cleans up a package that was skipped (e.g. [no test files]).
+// No summary line is printed and the package is not counted in totals.
+func (s *streamer) handlePkgSkip(e testjson.TestEvent) {
 	delete(s.active, e.Package)
 	delete(s.outputBuf, bufKey(e.Package, ""))
 	s.removeOrder(e.Package)
