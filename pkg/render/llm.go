@@ -255,35 +255,85 @@ func (l *LLM) renderSARIFOutput(tables []*pattern.TestTable) string {
 func (l *LLM) renderTestOutput(summaries []*pattern.Summary, tables []*pattern.TestTable) string {
 	var sb strings.Builder
 
-	// SCOPE line from summary
-	for _, s := range summaries {
-		sb.WriteString("SCOPE: " + s.Label + "\n")
+	// Count failures and totals from summary metrics (reliable source)
+	failCount, totalTests, pkgCount := 0, 0, 0
+	duration := ""
+	if len(summaries) > 0 {
+		for _, m := range summaries[0].Metrics {
+			switch m.Label {
+			case "Failed":
+				fmt.Sscanf(m.Value, "%d/", &failCount)
+			case "Passed":
+				fmt.Sscanf(m.Value, "%d/%d", new(int), &totalTests)
+			case "Packages":
+				fmt.Sscanf(m.Value, "%d", &pkgCount)
+			case "Panics":
+				n := 0
+				fmt.Sscanf(m.Value, "%d", &n)
+				failCount += n
+			case "Build Errors":
+				n := 0
+				fmt.Sscanf(m.Value, "%d", &n)
+				failCount += n
+			}
+		}
+		// Extract duration from summary label
+		label := summaries[0].Label
+		if idx := strings.LastIndex(label, "("); idx >= 0 {
+			if end := strings.Index(label[idx:], ")"); end >= 0 {
+				duration = label[idx+1 : idx+end]
+			}
+		}
+		if totalTests == 0 {
+			for _, t := range tables {
+				totalTests += len(t.Results)
+			}
+		}
 	}
 
-	// Render tables in order (panics → build errors → failures → passes)
+	// Triage line
+	sb.WriteString(fmt.Sprintf("%d %s / %d tests %d pkg", failCount, symError, totalTests, pkgCount))
+	if duration != "" {
+		sb.WriteString(" (" + duration + ")")
+	}
+	sb.WriteString("\n")
+
+	// Only render failed tests
+	hasFailures := false
 	for _, t := range tables {
-		sb.WriteString("\n")
-		sb.WriteString(t.Label + "\n")
 		for _, item := range t.Results {
-			prefix := "  PASS"
-			switch item.Status {
-			case pattern.StatusFail:
-				prefix = "  FAIL"
-			case pattern.StatusSkip:
-				prefix = "  SKIP"
+			if item.Status != pattern.StatusFail {
+				continue
 			}
-
-			dur := ""
+			if !hasFailures {
+				sb.WriteString("\n")
+				hasFailures = true
+			}
+			pkg := extractPackage(t.Label)
+			sb.WriteString("  " + symError + " " + pkg + " " + item.Name)
 			if item.Duration != "" {
-				dur = " (" + item.Duration + ")"
+				sb.WriteString(" (" + item.Duration + ")")
 			}
-			fmt.Fprintf(&sb, "%s %s%s\n", prefix, item.Name, dur)
-
+			sb.WriteString("\n")
 			writeDetails(&sb, item.Details)
 		}
 	}
 
 	return sb.String()
+}
+
+// extractPackage pulls the package name from a test table label.
+func extractPackage(label string) string {
+	for _, prefix := range []string{"PANIC ", "BUILD FAIL ", "FAIL "} {
+		if strings.HasPrefix(label, prefix) {
+			rest := label[len(prefix):]
+			if idx := strings.Index(rest, " ("); idx >= 0 {
+				return rest[:idx]
+			}
+			return rest
+		}
+	}
+	return label
 }
 
 // parseRuleLocation splits "ruleId:line:col" into components.
@@ -306,21 +356,21 @@ func parseRuleLocation(name string) (rule string, line, col int) {
 	return name, 0, 0
 }
 
-// writeDetails appends a truncated detail block (max 3 lines, 4-space indent).
+// writeDetails appends a truncated detail block (max maxDetailLines lines, 4-space indent).
 func writeDetails(sb *strings.Builder, details string) {
 	if details == "" {
 		return
 	}
 	lines := strings.Split(details, "\n")
-	show := 3
+	show := maxDetailLines
 	if len(lines) < show {
 		show = len(lines)
 	}
 	for _, line := range lines[:show] {
 		sb.WriteString("    " + line + "\n")
 	}
-	if len(lines) > 3 {
-		fmt.Fprintf(sb, "    ... (%d more lines)\n", len(lines)-3)
+	if len(lines) > maxDetailLines {
+		fmt.Fprintf(sb, "    ... (%d more lines)\n", len(lines)-maxDetailLines)
 	}
 }
 
