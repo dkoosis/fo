@@ -11,12 +11,6 @@ import (
 	"github.com/dkoosis/fo/pkg/wrapper"
 )
 
-type violation struct {
-	From     string
-	To       string
-	FileFrom string
-}
-
 // archlint converts go-arch-lint JSON to SARIF.
 type archlint struct{}
 
@@ -39,23 +33,6 @@ func (a *archlint) Convert(r io.Reader, w io.Writer) error {
 		return fmt.Errorf("reading input: %w", err)
 	}
 
-	violations, err := parseResult(data)
-	if err != nil {
-		return err
-	}
-
-	b := sarif.NewBuilder("go-arch-lint", "")
-	for _, v := range violations {
-		msg := fmt.Sprintf("%s \u2192 %s", v.From, v.To)
-		b.AddResult("dependency-violation", "error", msg, v.FileFrom, 0, 0)
-	}
-
-	_, err = b.WriteTo(w)
-	return err
-}
-
-// parseResult decodes go-arch-lint --json output.
-func parseResult(data []byte) ([]violation, error) {
 	var raw struct {
 		Payload struct {
 			ArchWarningsDeps []struct {
@@ -66,16 +43,15 @@ func parseResult(data []byte) ([]violation, error) {
 		} `json:"Payload"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, fmt.Errorf("archlint: %w", err)
+		return fmt.Errorf("archlint: %w", err)
 	}
 
-	vs := make([]violation, len(raw.Payload.ArchWarningsDeps))
-	for i, d := range raw.Payload.ArchWarningsDeps {
-		vs[i] = violation{
-			From:     d.ComponentName,
-			To:       d.ResolvedImportName,
-			FileFrom: d.FileRelativePath,
-		}
+	b := sarif.NewBuilder("go-arch-lint", "")
+	for _, d := range raw.Payload.ArchWarningsDeps {
+		msg := fmt.Sprintf("%s \u2192 %s", d.ComponentName, d.ResolvedImportName)
+		b.AddResult("dependency-violation", "error", msg, d.FileRelativePath, 0, 0)
 	}
-	return vs, nil
+
+	_, err = b.WriteTo(w)
+	return err
 }

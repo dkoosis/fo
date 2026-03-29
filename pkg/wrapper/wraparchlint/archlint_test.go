@@ -106,16 +106,3 @@ func TestArchlint_FullImportPath(t *testing.T) {
 	}
 }
 
-func TestParseResult(t *testing.T) {
-	input := []byte(`{"Type":"models.Check","Payload":{"ArchHasWarnings":true,"ArchWarningsDeps":[
-		{"ComponentName":"a","FileRelativePath":"a.go","ResolvedImportName":"b"},
-		{"ComponentName":"c","FileRelativePath":"c.go","ResolvedImportName":"d"}
-	],"Qualities":[{"ID":"q1","Used":true},{"ID":"q2","Used":false}]}}`)
-	vs, err := parseResult(input)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(vs) != 2 {
-		t.Errorf("expected 2 violations, got %d", len(vs))
-	}
-}
