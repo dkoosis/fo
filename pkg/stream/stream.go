@@ -67,8 +67,23 @@ func (s *streamer) handleEvent(e testjson.TestEvent) {
 		s.handleStart(e)
 	case "run":
 		s.handleRun(e)
-	case "pass", "fail", "skip":
-		s.handleResult(e)
+	case "pass":
+		if e.Test != "" {
+			s.handleTestPass(e)
+		} else {
+			s.handlePkgDone(e, false)
+		}
+	case "fail":
+		if e.Test != "" {
+			s.handleTestFail(e)
+		} else {
+			s.handlePkgDone(e, true)
+		}
+	case "skip":
+		if e.Test != "" {
+			s.handleTestSkip(e)
+		}
+		// Package-level skip is a no-op.
 	case "output":
 		if !s.handleOutput(e) {
 			return
@@ -78,29 +93,6 @@ func (s *streamer) handleEvent(e testjson.TestEvent) {
 	}
 
 	s.redrawFooter()
-}
-
-// handleResult dispatches pass/fail/skip events to the appropriate handler,
-// distinguishing test-level from package-level events.
-func (s *streamer) handleResult(e testjson.TestEvent) {
-	if e.Test != "" {
-		switch e.Action {
-		case "pass":
-			s.handleTestPass(e)
-		case "fail":
-			s.handleTestFail(e)
-		case "skip":
-			s.handleTestSkip(e)
-		}
-		return
-	}
-	// Package-level result (skip at package level is a no-op).
-	switch e.Action {
-	case "pass":
-		s.handlePkgDone(e, false)
-	case "fail":
-		s.handlePkgDone(e, true)
-	}
 }
 
 func (s *streamer) handleStart(e testjson.TestEvent) {
