@@ -13,6 +13,7 @@ type unknownPattern struct{}
 func (unknownPattern) Type() pattern.PatternType { return "unknown" }
 
 func TestHumanRender_ShowsSummaryAndSkipsUnknownPatterns(t *testing.T) {
+	t.Parallel()
 	r := render.NewHuman(render.MonoTheme())
 
 	out := r.Render([]pattern.Pattern{
