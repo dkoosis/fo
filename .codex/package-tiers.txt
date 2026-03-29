@@ -1,26 +1,27 @@
-# Package Test Tiers — measured on macOS, expect 2-3x on sandbox cold cache
-# Updated: 2026-03-27
-# fo is fast — all packages under 2s local. No need for selective testing.
+# Package Test Tiers — measured on macOS with -race, expect 2-3x on sandbox
+# Updated: 2026-03-29
+# fo is fast — all packages under 2.5s local. No need for selective testing.
 #
-# Tier 1 (green, <1s): safe to test freely
-# Tier 2 (yellow, 1-2s): still fast, test all
+# Tier 1 (green, <1.5s): safe to test freely
+# Tier 2 (yellow, 1.5-2.5s): still fast, test all
 
-# --- Tier 1: <1s each ---
-internal/archlint           0.2s
-internal/fometrics          0.4s
-internal/detect             0.5s
-cmd/fo                      0.7s
-internal/jscpd              0.8s
-internal/report             0.9s
+# --- Tier 1: <1.5s each ---
+pkg/wrapper                 1.2s
+pkg/wrapper/wraparchlint    1.2s
+pkg/wrapper/wrapdiag        1.2s
+pkg/wrapper/wrapjscpd       1.2s
+pkg/mapper                  1.3s
+cmd/fo                      1.5s
 
-# --- Tier 2: 1-2s each ---
-pkg/mapper                  1.1s
-pkg/sarif                   1.1s
-pkg/stream                  1.1s
-pkg/testjson                1.2s
-pkg/render                  1.2s
+# --- Tier 2: 1.5-2.5s each ---
+internal/detect             1.6s
+pkg/render                  1.7s
+internal/report             1.8s
+pkg/stream                  1.9s
+pkg/sarif                   2.0s
+pkg/testjson                2.2s
 
-# pkg/pattern has no tests (pure data structs, 0% coverage)
+# pkg/pattern has no tests (pure data structs, tested transitively)
 
-# Total: ~8s local. Budget ~20s on sandbox.
+# Total: ~20s local (parallel). Budget ~45s on sandbox.
 # No package dominates — always run full suite.
