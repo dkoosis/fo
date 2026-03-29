@@ -85,6 +85,49 @@ func TestFromReport_AllPassLabel(t *testing.T) {
 	}
 }
 
+func TestFromReport_TestJSONMalformedLinesSurfaced(t *testing.T) {
+	// Mix of valid go test -json events and malformed lines
+	content := strings.Join([]string{
+		`{"Action":"start","Package":"example.com/pkg"}`,
+		`{"Action":"run","Package":"example.com/pkg","Test":"TestOne"}`,
+		`{"Action":"pass","Package":"example.com/pkg","Test":"TestOne","Elapsed":0.01}`,
+		`not valid json at all`,
+		`{"Action":"pass","Package":"example.com/pkg","Elapsed":0.02}`,
+		`another bad line`,
+	}, "\n") + "\n"
+
+	sections := []report.Section{
+		{Tool: "gotest", Format: "testjson", Content: []byte(content)},
+	}
+	patterns := FromReport(sections)
+
+	// Summary should still show the section
+	sum, ok := patterns[0].(*pattern.Summary)
+	if !ok {
+		t.Fatalf("patterns[0] is %T, want *pattern.Summary", patterns[0])
+	}
+	if !strings.Contains(sum.Metrics[0].Value, "malformed") {
+		t.Errorf("expected 'malformed' in scope label, got %q", sum.Metrics[0].Value)
+	}
+
+	// Should contain an Error pattern warning about malformed lines
+	var foundWarning bool
+	for _, p := range patterns {
+		if e, ok := p.(*pattern.Error); ok && strings.Contains(e.Message, "malformed") {
+			foundWarning = true
+			if e.Source != "gotest" {
+				t.Errorf("error source = %q, want 'gotest'", e.Source)
+			}
+			if !strings.Contains(e.Message, "2") {
+				t.Errorf("expected malformed count of 2 in message, got %q", e.Message)
+			}
+		}
+	}
+	if !foundWarning {
+		t.Error("expected Error pattern warning about malformed lines")
+	}
+}
+
 func TestFromReport_FailLabel(t *testing.T) {
 	sarifDoc := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"tool"}},"results":[{"ruleId":"E001","level":"error","message":{"text":"fail"}}]}]}`
 	sections := []report.Section{
