@@ -124,17 +124,19 @@ func mapTestJSONSection(sec report.Section) ([]pattern.Pattern, pattern.ItemKind
 	}
 
 	passed := stats.Failed == 0 && stats.BuildErrors == 0 && stats.Panics == 0
+
+	var label string
+	var kind pattern.ItemKind
 	if passed {
-		label := fmt.Sprintf("PASS — %d tests, %d packages", stats.TotalTests, stats.Packages)
-		if malformed > 0 {
-			label += fmt.Sprintf(" (%d malformed lines skipped)", malformed)
-		}
-		return patterns, pattern.KindSuccess, label
+		label = fmt.Sprintf("PASS — %d tests, %d packages", stats.TotalTests, stats.Packages)
+		kind = pattern.KindSuccess
+	} else {
+		label = fmt.Sprintf("FAIL — %d failed, %d passed", stats.Failed, stats.Passed)
+		kind = pattern.KindError
 	}
-	label := fmt.Sprintf("FAIL — %d failed, %d passed", stats.Failed, stats.Passed)
 	if malformed > 0 {
 		label += fmt.Sprintf(" (%d malformed lines skipped)", malformed)
 	}
-	return patterns, pattern.KindError, label
+	return patterns, kind, label
 }
 
