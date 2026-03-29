@@ -171,7 +171,7 @@ func TestProcessEvent_FreesOutputOnPassAndSkip(t *testing.T) {
 		fmt.Sprintf(`{"Action":"output","Package":"%s","Test":"TestFail","Output":"expected X got Y\n"}`, pkg),
 		fmt.Sprintf(`{"Action":"fail","Package":"%s","Test":"TestFail","Elapsed":0.1}`, pkg),
 	)
-	// Package-level pass
+	// Package-level fail (package contains a failing test)
 	lines = append(lines,
 		fmt.Sprintf(`{"Action":"fail","Package":"%s","Elapsed":1.0}`, pkg),
 	)

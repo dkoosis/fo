@@ -118,8 +118,8 @@ func TestFromReport_TestJSONMalformedLinesSurfaced(t *testing.T) {
 			if e.Source != "gotest" {
 				t.Errorf("error source = %q, want 'gotest'", e.Source)
 			}
-			if !strings.Contains(e.Message, "2") {
-				t.Errorf("expected malformed count of 2 in message, got %q", e.Message)
+			if !strings.Contains(e.Message, "2 malformed") {
+				t.Errorf("expected '2 malformed' in message, got %q", e.Message)
 			}
 		}
 	}

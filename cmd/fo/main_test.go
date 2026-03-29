@@ -8,6 +8,7 @@ import (
 
 	"github.com/dkoosis/fo/internal/detect"
 	"github.com/dkoosis/fo/pkg/pattern"
+	"github.com/dkoosis/fo/pkg/wrapper"
 	_ "github.com/dkoosis/fo/pkg/wrapper/wraparchlint"
 	_ "github.com/dkoosis/fo/pkg/wrapper/wrapdiag"
 	_ "github.com/dkoosis/fo/pkg/wrapper/wrapjscpd"
@@ -645,10 +646,11 @@ func TestRunWrap_ReturnsZero_When_HelpRequested(t *testing.T) {
 			if code != 0 {
 				t.Fatalf("runWrap() code = %d, want 0; stderr: %s", code, stderr.String())
 			}
-			if !strings.Contains(stderr.String(), "archlint") ||
-				!strings.Contains(stderr.String(), "diag") ||
-				!strings.Contains(stderr.String(), "jscpd") {
-				t.Fatalf("expected help output to include wrappers, got: %q", stderr.String())
+			output := stderr.String()
+			for _, name := range wrapper.Names() {
+				if !strings.Contains(output, name) {
+					t.Fatalf("expected help output to include wrapper %q, got: %q", name, output)
+				}
 			}
 		})
 	}
