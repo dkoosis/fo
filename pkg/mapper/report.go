@@ -109,19 +109,34 @@ func mapSARIFSection(sec report.Section) ([]pattern.Pattern, pattern.ItemKind, s
 }
 
 func mapTestJSONSection(sec report.Section) ([]pattern.Pattern, pattern.ItemKind, string) {
-	results, _, err := testjson.ParseBytes(sec.Content)
+	results, malformed, err := testjson.ParseBytes(sec.Content)
 	if err != nil {
 		return sectionError(sec.Tool, err), pattern.KindError, fmt.Sprintf("parse error: %v", err)
 	}
 	stats := testjson.ComputeStats(results)
 	patterns := fromTestJSON(results, stats)
 
-	passed := stats.Failed == 0 && stats.BuildErrors == 0 && stats.Panics == 0
-	if passed {
-		label := fmt.Sprintf("PASS — %d tests, %d packages", stats.TotalTests, stats.Packages)
-		return patterns, pattern.KindSuccess, label
+	if malformed > 0 {
+		patterns = append(patterns, &pattern.Error{
+			Source:  sec.Tool,
+			Message: fmt.Sprintf("warning: %d malformed line(s) skipped", malformed),
+		})
 	}
-	label := fmt.Sprintf("FAIL — %d failed, %d passed", stats.Failed, stats.Passed)
-	return patterns, pattern.KindError, label
+
+	passed := stats.Failed == 0 && stats.BuildErrors == 0 && stats.Panics == 0
+
+	var label string
+	var kind pattern.ItemKind
+	if passed {
+		label = fmt.Sprintf("PASS — %d tests, %d packages", stats.TotalTests, stats.Packages)
+		kind = pattern.KindSuccess
+	} else {
+		label = fmt.Sprintf("FAIL — %d failed, %d passed", stats.Failed, stats.Passed)
+		kind = pattern.KindError
+	}
+	if malformed > 0 {
+		label += fmt.Sprintf(" (%d malformed lines skipped)", malformed)
+	}
+	return patterns, kind, label
 }
 
