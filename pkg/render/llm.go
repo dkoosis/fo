@@ -9,9 +9,17 @@ import (
 	"github.com/dkoosis/fo/pkg/pattern"
 )
 
+const (
+	formatVersion  = "fo:llm:v1"
+	maxDetailLines = 5
+	symError       = "✗"
+	symWarning     = "⚠"
+	symNote        = "ℹ"
+	symPass        = "✔"
+)
 
-// LLM renders patterns as terse plain text optimized for AI consumption.
-// Zero ANSI codes, deterministic sort, SCOPE line, importance-budgeted truncation.
+// LLM renders patterns as terse plain text optimized for LLM consumption.
+// Zero ANSI codes, deterministic sort, severity-first, action-oriented.
 type LLM struct{}
 
 // NewLLM creates an LLM renderer.
@@ -19,9 +27,55 @@ func NewLLM() *LLM {
 	return &LLM{}
 }
 
+// severitySymbol maps a SARIF-context Status to a severity symbol.
+// ONLY use for SARIF-mode items where StatusFail=error, StatusSkip=warning, StatusPass=note.
+// For test-mode items, always use symError for failures and drop passes/skips.
+func severitySymbol(status pattern.Status) string {
+	switch status {
+	case pattern.StatusFail:
+		return symError
+	case pattern.StatusSkip:
+		return symWarning
+	case pattern.StatusPass:
+		return symNote
+	default:
+		return symNote
+	}
+}
+
+// severityPriority returns sort priority (lower = more severe).
+func severityPriority(sym string) int {
+	switch sym {
+	case symError:
+		return 0
+	case symWarning:
+		return 1
+	default:
+		return 2
+	}
+}
+
+// isSARIFTable returns true if the table contains SARIF-style rule:line:col items.
+func isSARIFTable(t *pattern.TestTable) bool {
+	for _, item := range t.Results {
+		_, line, _ := parseRuleLocation(item.Name)
+		if line > 0 {
+			return true
+		}
+	}
+	for _, item := range t.Results {
+		if strings.Contains(item.Name, ":") {
+			return true
+		}
+	}
+	return false
+}
+
 // Render formats all patterns for LLM consumption.
 func (l *LLM) Render(patterns []pattern.Pattern) string {
-	// Separate by type to build appropriate output
+	var sb strings.Builder
+	sb.WriteString(formatVersion + "\n\n")
+
 	var summaries []*pattern.Summary
 	var tables []*pattern.TestTable
 	var errors []*pattern.Error
@@ -37,20 +91,22 @@ func (l *LLM) Render(patterns []pattern.Pattern) string {
 		}
 	}
 
-	// Dispatch on the first Summary's Kind (one format per invocation).
 	if len(summaries) > 0 {
 		switch summaries[0].Kind {
 		case pattern.SummaryKindReport:
-			return l.renderReport(summaries, tables, errors)
+			sb.WriteString(l.renderReport(summaries, tables, errors))
 		case pattern.SummaryKindTest:
-			return l.renderTestOutput(summaries, tables)
+			sb.WriteString(l.renderTestOutput(summaries, tables))
 		case pattern.SummaryKindSARIF:
-			return l.renderSARIFOutput(tables)
+			sb.WriteString(l.renderSARIFOutput(tables))
+		default:
+			sb.WriteString(l.renderSARIFOutput(tables))
 		}
+	} else {
+		sb.WriteString(l.renderSARIFOutput(tables))
 	}
 
-	// No summaries or unrecognized kind — fall back to SARIF diagnostic format.
-	return l.renderSARIFOutput(tables)
+	return sb.String()
 }
 
 func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestTable, errors []*pattern.Error) string {

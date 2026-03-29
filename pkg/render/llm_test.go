@@ -166,3 +166,28 @@ func TestLLMRender_KeyUserVisibleOutput(t *testing.T) {
 		})
 	}
 }
+
+func TestLLM_VersionPreamble(t *testing.T) {
+	t.Parallel()
+	r := render.NewLLM()
+	out := r.Render(nil)
+	if !strings.HasPrefix(out, "fo:llm:v1\n") {
+		t.Fatalf("expected version preamble, got:\n%s", out)
+	}
+}
+
+func TestLLM_ZeroANSI(t *testing.T) {
+	t.Parallel()
+	r := render.NewLLM()
+	out := r.Render([]pattern.Pattern{
+		&pattern.TestTable{
+			Label: "file.go",
+			Results: []pattern.TestTableItem{
+				{Name: "rule:1:1", Status: pattern.StatusFail, Details: "bad"},
+			},
+		},
+	})
+	if strings.Contains(out, "\033[") {
+		t.Fatal("LLM output contains ANSI escape codes")
+	}
+}
