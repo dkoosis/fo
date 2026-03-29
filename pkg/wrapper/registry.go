@@ -14,7 +14,15 @@ var registry = map[string]entry{}
 
 // Register adds a wrapper to the global registry under the given name.
 // Intended for use in sub-package init() functions.
+// Panics on duplicate names, empty names, or nil wrappers — these are
+// programming errors that should fail fast at init time.
 func Register(name, description string, w Wrapper) {
+	if name == "" {
+		panic("wrapper: Register called with empty name")
+	}
+	if w == nil {
+		panic(fmt.Sprintf("wrapper: Register called with nil wrapper for %q", name))
+	}
 	if _, exists := registry[name]; exists {
 		panic(fmt.Sprintf("wrapper: duplicate registration %q", name))
 	}

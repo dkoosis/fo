@@ -45,7 +45,10 @@ func (d *diag) RegisterFlags(fs *flag.FlagSet) {
 // Convert reads line diagnostics from r and writes SARIF to w.
 // Must be called after RegisterFlags + FlagSet.Parse.
 func (d *diag) Convert(r io.Reader, w io.Writer) error {
-	if d.toolName == nil || *d.toolName == "" {
+	if d.toolName == nil {
+		return fmt.Errorf("diag: RegisterFlags must be called before Convert")
+	}
+	if *d.toolName == "" {
 		return fmt.Errorf("--tool is required")
 	}
 
