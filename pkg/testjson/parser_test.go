@@ -1,6 +1,8 @@
 package testjson
 
 import (
+	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -132,6 +134,96 @@ func TestParseStream_Behavior(t *testing.T) {
 				t.Fatalf("panicked = %t, want %t", got.Panicked, tt.wantPanicked)
 			}
 		})
+	}
+}
+
+func TestProcessEvent_FreesOutputOnPassAndSkip(t *testing.T) {
+	t.Parallel()
+
+	// Generate a stream with many passing/skipped tests that produce output,
+	// plus one failing test. Verify:
+	// - counts are correct
+	// - failed test output is preserved in results
+	// - outputBuf entries for pass/skip are cleaned up (verified structurally
+	//   by confirming correct results — the delete calls are the fix)
+	const passingTests = 100
+	lines := make([]string, 0, 4*passingTests+7)
+
+	pkg := "example.com/leak"
+	for i := range passingTests {
+		name := fmt.Sprintf("TestPass%d", i)
+		lines = append(lines,
+			fmt.Sprintf(`{"Action":"run","Package":"%s","Test":"%s"}`, pkg, name),
+			fmt.Sprintf(`{"Action":"output","Package":"%s","Test":"%s","Output":"log line %d\n"}`, pkg, name, i),
+			fmt.Sprintf(`{"Action":"output","Package":"%s","Test":"%s","Output":"more output %d\n"}`, pkg, name, i),
+			fmt.Sprintf(`{"Action":"pass","Package":"%s","Test":"%s","Elapsed":0.01}`, pkg, name),
+		)
+	}
+	// One skipped test with output
+	lines = append(lines,
+		fmt.Sprintf(`{"Action":"run","Package":"%s","Test":"TestSkipped"}`, pkg),
+		fmt.Sprintf(`{"Action":"output","Package":"%s","Test":"TestSkipped","Output":"skip reason\n"}`, pkg),
+		fmt.Sprintf(`{"Action":"skip","Package":"%s","Test":"TestSkipped","Elapsed":0.0}`, pkg),
+	)
+	// One failing test with output (output must survive)
+	lines = append(lines,
+		fmt.Sprintf(`{"Action":"run","Package":"%s","Test":"TestFail"}`, pkg),
+		fmt.Sprintf(`{"Action":"output","Package":"%s","Test":"TestFail","Output":"expected X got Y\n"}`, pkg),
+		fmt.Sprintf(`{"Action":"fail","Package":"%s","Test":"TestFail","Elapsed":0.1}`, pkg),
+	)
+	// Package-level pass
+	lines = append(lines,
+		fmt.Sprintf(`{"Action":"fail","Package":"%s","Elapsed":1.0}`, pkg),
+	)
+
+	input := strings.Join(lines, "\n") + "\n"
+	results, malformed, err := ParseStream(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("ParseStream() error = %v", err)
+	}
+	if malformed != 0 {
+		t.Fatalf("malformed = %d, want 0", malformed)
+	}
+	if len(results) != 1 {
+		t.Fatalf("packages = %d, want 1", len(results))
+	}
+
+	got := results[0]
+	if got.Passed != passingTests {
+		t.Fatalf("passed = %d, want %d", got.Passed, passingTests)
+	}
+	if got.Skipped != 1 {
+		t.Fatalf("skipped = %d, want 1", got.Skipped)
+	}
+	if got.Failed != 1 {
+		t.Fatalf("failed = %d, want 1", got.Failed)
+	}
+	if len(got.FailedTests) != 1 {
+		t.Fatalf("FailedTests = %d, want 1", len(got.FailedTests))
+	}
+	if got.FailedTests[0].Name != "TestFail" {
+		t.Fatalf("FailedTests[0].Name = %q, want TestFail", got.FailedTests[0].Name)
+	}
+	if len(got.FailedTests[0].Output) == 0 {
+		t.Fatal("FailedTests[0].Output is empty — failed test output was lost")
+	}
+
+	// Verify the aggregator freed pass/skip buffers by checking internal state.
+	// We re-parse and inspect the aggregator directly.
+	agg := newAggregator()
+	for _, line := range strings.Split(strings.TrimSpace(input), "\n") {
+		var event TestEvent
+		if err := json.Unmarshal([]byte(line), &event); err != nil {
+			continue
+		}
+		agg.processEvent(event)
+	}
+	pkgState := agg.packages[pkg]
+	// Only the failed test and package-level ("") output should remain.
+	for testName := range pkgState.outputBuf {
+		if testName != "" && testName != "TestFail" {
+			t.Errorf("outputBuf still contains %q — should have been freed on pass/skip", testName)
+		}
 	}
 }
 
