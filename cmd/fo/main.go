@@ -117,11 +117,17 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	// Peek stdin to detect format without consuming
+	// Peek stdin to detect format without consuming.
+	// Peek returns err on short reads (io.EOF, ErrBufferFull) — those are fine
+	// as long as we got bytes. A real read error with zero bytes is distinct.
 	br := bufio.NewReaderSize(stdin, 8*1024)
-	peeked, _ := br.Peek(4096)
+	peeked, peekErr := br.Peek(4096)
 	if len(peeked) == 0 {
-		fmt.Fprintf(stderr, "fo: no input on stdin\n")
+		if peekErr != nil && peekErr != io.EOF {
+			fmt.Fprintf(stderr, "fo: reading stdin: %v\n", peekErr)
+		} else {
+			fmt.Fprintf(stderr, "fo: no input on stdin\n")
+		}
 		return 2
 	}
 
