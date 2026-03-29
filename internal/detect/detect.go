@@ -22,7 +22,7 @@ var formatNames = [...]string{"Unknown", "SARIF", "GoTestJSON", "Report"}
 
 // String returns the human-readable name of the format.
 func (f Format) String() string {
-	if int(f) < len(formatNames) {
+	if f >= 0 && int(f) < len(formatNames) {
 		return formatNames[f]
 	}
 	return formatNames[0]
