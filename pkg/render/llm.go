@@ -71,6 +71,25 @@ func isSARIFTable(t *pattern.TestTable) bool {
 	return false
 }
 
+// hasActionableContent returns true if the tool's tables or errors contain
+// anything worth rendering (SARIF diags, test failures, or error patterns).
+func hasActionableContent(tables []*pattern.TestTable, errors []*pattern.Error) bool {
+	if len(errors) > 0 {
+		return true
+	}
+	for _, t := range tables {
+		if isSARIFTable(t) {
+			return true
+		}
+		for _, item := range t.Results {
+			if item.Status == pattern.StatusFail {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // Render formats all patterns for LLM consumption.
 func (l *LLM) Render(patterns []pattern.Pattern) string {
 	var sb strings.Builder
@@ -184,7 +203,8 @@ func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestT
 		tool := m.Label
 		toolTables := tablesByTool[tool]
 		toolErrors := errorsByTool[tool]
-		if len(toolTables) == 0 && len(toolErrors) == 0 {
+
+		if !hasActionableContent(toolTables, toolErrors) {
 			continue
 		}
 

@@ -31,25 +31,27 @@ func TestJTBD_RenderSARIFLintResults(t *testing.T) {
 		t.Errorf("expected exit code 1, got %d", code)
 	}
 
-	// SCOPE line present
-	if !strings.Contains(output, "SCOPE:") {
-		t.Error("missing SCOPE line")
+	// Version preamble
+	if !strings.HasPrefix(output, "fo:llm:v1\n") {
+		t.Error("missing fo:llm:v1 preamble")
 	}
 
-	// Files grouped
-	if !strings.Contains(output, "## internal/handler.go") {
-		t.Error("missing file group for internal/handler.go")
-	}
-	if !strings.Contains(output, "## pkg/api/client.go") {
-		t.Error("missing file group for pkg/api/client.go")
+	// Triage line with error and warning counts
+	if !strings.Contains(output, "2 ✗ 1 ⚠") {
+		t.Errorf("missing triage counts; got:\n%s", output)
 	}
 
-	// Diagnostics present with file:line:col format
-	if !strings.Contains(output, "ERR ineffassign:12:5") {
-		t.Errorf("missing diagnostic; got:\n%s", output)
+	// Findings use severity symbols and flat file:line:col format (no ## headers)
+	if !strings.Contains(output, "✗ internal/handler.go:12:5 ineffassign") {
+		t.Errorf("missing error finding; got:\n%s", output)
 	}
-	if !strings.Contains(output, "WARN govet:23:8") {
-		t.Errorf("missing warning diagnostic; got:\n%s", output)
+	if !strings.Contains(output, "⚠ pkg/api/client.go:23:8 govet") {
+		t.Errorf("missing warning finding; got:\n%s", output)
+	}
+
+	// No ## file headers in standalone SARIF mode
+	if strings.Contains(output, "## internal/handler.go") {
+		t.Error("standalone SARIF should not have ## file headers")
 	}
 
 	// Zero ANSI codes in LLM mode
@@ -79,17 +81,22 @@ func TestJTBD_RenderGoTestResults(t *testing.T) {
 		t.Errorf("expected exit code 1, got %d", code)
 	}
 
-	// SCOPE line indicates failure
-	if !strings.Contains(output, "SCOPE: FAIL") {
-		t.Errorf("expected SCOPE: FAIL, got:\n%s", output)
+	// Triage line shows failure count
+	if !strings.Contains(output, "1 ✗ /") {
+		t.Errorf("expected triage line with failure count, got:\n%s", output)
 	}
 
-	// Failed test listed with output
-	if !strings.Contains(output, "FAIL TestCreateUser_InvalidEmail") {
+	// Failed test listed with ✗ symbol and package
+	if !strings.Contains(output, "✗ pkg/handler TestCreateUser_InvalidEmail") {
 		t.Errorf("missing failed test; got:\n%s", output)
 	}
 	if !strings.Contains(output, "handler_test.go:45") {
 		t.Errorf("missing failure output; got:\n%s", output)
+	}
+
+	// Passing tests suppressed
+	if strings.Contains(output, "TestCreateUser_Valid") {
+		t.Errorf("passing test should be suppressed; got:\n%s", output)
 	}
 }
 
@@ -110,8 +117,8 @@ func TestJTBD_AllTestsPass(t *testing.T) {
 	}
 
 	output := stdout.String()
-	if !strings.Contains(output, "SCOPE: PASS") {
-		t.Errorf("expected SCOPE: PASS, got:\n%s", output)
+	if !strings.Contains(output, "0 ✗ /") {
+		t.Errorf("expected zero-failure triage line, got:\n%s", output)
 	}
 }
 
@@ -233,8 +240,13 @@ func TestRun_ReportFormat(t *testing.T) {
 	if code != 0 {
 		t.Errorf("exit code = %d, want 0; stderr: %s", code, stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "REPORT:") {
-		t.Errorf("output should contain REPORT header, got:\n%s", stdout.String())
+	out := stdout.String()
+	// New format: triage line with ✔ for passing tools, no REPORT: header
+	if !strings.Contains(out, "0 ✗ 0 ⚠") {
+		t.Errorf("expected triage counts, got:\n%s", out)
+	}
+	if !strings.Contains(out, "✔") {
+		t.Errorf("expected ✔ for passing tools, got:\n%s", out)
 	}
 }
 
@@ -255,28 +267,28 @@ func TestJTBD_LLMSortOrderSeverityThenFileThenLine(t *testing.T) {
 	output := stdout.String()
 	lines := strings.Split(output, "\n")
 
-	// Find diagnostic lines
+	// Find diagnostic lines (new format uses ✗ and ⚠ symbols)
 	var diagLines []string
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "ERR ") || strings.HasPrefix(trimmed, "WARN ") {
+		if strings.HasPrefix(trimmed, "✗ ") || strings.HasPrefix(trimmed, "⚠ ") {
 			diagLines = append(diagLines, trimmed)
 		}
 	}
 
 	if len(diagLines) < 3 {
-		t.Fatalf("expected 3 diag lines, got %d: %v", len(diagLines), diagLines)
+		t.Fatalf("expected 3 diag lines, got %d: %v\nfull output:\n%s", len(diagLines), diagLines, output)
 	}
 
-	// Errors should come before warnings
-	if !strings.HasPrefix(diagLines[0], "ERR") {
-		t.Errorf("first diag should be ERR, got: %s", diagLines[0])
+	// Errors (✗) should come before warnings (⚠)
+	if !strings.HasPrefix(diagLines[0], "✗") {
+		t.Errorf("first diag should be ✗, got: %s", diagLines[0])
 	}
-	if !strings.HasPrefix(diagLines[1], "ERR") {
-		t.Errorf("second diag should be ERR, got: %s", diagLines[1])
+	if !strings.HasPrefix(diagLines[1], "✗") {
+		t.Errorf("second diag should be ✗, got: %s", diagLines[1])
 	}
-	if !strings.HasPrefix(diagLines[2], "WARN") {
-		t.Errorf("third diag should be WARN, got: %s", diagLines[2])
+	if !strings.HasPrefix(diagLines[2], "⚠") {
+		t.Errorf("third diag should be ⚠, got: %s", diagLines[2])
 	}
 
 	// Within errors: a.go before b.go (file asc)
@@ -301,17 +313,21 @@ func TestJTBD_PanicsSurfaceFirst(t *testing.T) {
 	_ = run([]string{"--format", "llm"}, strings.NewReader(testJSON), &stdout, &stderr)
 
 	output := stdout.String()
-	panicIdx := strings.Index(output, "PANIC")
-	passIdx := strings.Index(output, "Passing")
 
-	if panicIdx == -1 {
-		t.Fatalf("missing PANIC section; got:\n%s", output)
+	// Panic surfaces as a failure
+	if !strings.Contains(output, "PANIC") {
+		t.Fatalf("missing PANIC in output; got:\n%s", output)
 	}
-	if passIdx == -1 {
-		t.Fatalf("missing Passing section; got:\n%s", output)
+	if !strings.Contains(output, "panic: runtime error") {
+		t.Fatalf("missing panic details; got:\n%s", output)
 	}
-	if panicIdx > passIdx {
-		t.Error("PANIC should appear before Passing packages")
+
+	// Passing tests/packages suppressed in new format
+	if strings.Contains(output, "Passing") {
+		t.Errorf("passing packages should be suppressed; got:\n%s", output)
+	}
+	if strings.Contains(output, "TestOK") {
+		t.Errorf("passing test should be suppressed; got:\n%s", output)
 	}
 }
 
@@ -350,8 +366,16 @@ func TestRun_ReportClean(t *testing.T) {
 		t.Errorf("clean report exit code = %d, want 0; stderr: %s", code, stderr.String())
 	}
 	out := stdout.String()
-	if !strings.Contains(out, "all pass") {
-		t.Errorf("expected 'all pass' in output:\n%s", out)
+	// Clean report: zero triage counts and all tools passing
+	if !strings.Contains(out, "0 ✗ 0 ⚠") {
+		t.Errorf("expected zero triage counts, got:\n%s", out)
+	}
+	if !strings.Contains(out, "✔") {
+		t.Errorf("expected ✔ for passing tools, got:\n%s", out)
+	}
+	// No sections for clean tools
+	if strings.Contains(out, "##") {
+		t.Errorf("clean report should have no sections, got:\n%s", out)
 	}
 }
 
@@ -411,13 +435,20 @@ func TestRun_ReportBrokenSection(t *testing.T) {
 		t.Errorf("broken section report exit code = %d, want 1; stderr: %s", code, stderr.String())
 	}
 	out := stdout.String()
-	// Broken lint section should surface as a visible error
-	if !strings.Contains(out, "ERROR:") {
-		t.Errorf("expected 'ERROR:' for broken section in output:\n%s", out)
+	// Broken lint section should surface with ✗ symbol
+	if !strings.Contains(out, "## lint") {
+		t.Errorf("expected ## lint section for broken tool, got:\n%s", out)
 	}
-	// Valid test section should still render
-	if !strings.Contains(out, "test:") {
-		t.Errorf("expected valid test section to still render:\n%s", out)
+	if !strings.Contains(out, "✗") {
+		t.Errorf("expected ✗ for error, got:\n%s", out)
+	}
+	// Valid passing test section should be suppressed (no failures)
+	if strings.Contains(out, "## test") {
+		t.Errorf("passing test section should be suppressed, got:\n%s", out)
+	}
+	// Passing tools still listed in triage line
+	if !strings.Contains(out, "test ✔") || !strings.Contains(out, "vet") {
+		t.Errorf("expected passing tools in triage line, got:\n%s", out)
 	}
 }
 
@@ -432,17 +463,22 @@ func TestRun_ReportFullFormats(t *testing.T) {
 		t.Errorf("full report exit code = %d, want 0; stderr: %s", code, stderr.String())
 	}
 	out := stdout.String()
-	// Coupled to renderer phrasing — update if Summary label format changes.
-	if !strings.Contains(out, "4 tools") {
-		t.Errorf("expected '4 tools' in output:\n%s", out)
+	// All tools pass: zero counts, all tools in passing group
+	if !strings.Contains(out, "0 ✗ 0 ⚠") {
+		t.Errorf("expected zero triage counts, got:\n%s", out)
 	}
-	if !strings.Contains(out, "all pass") {
-		t.Errorf("expected 'all pass' in output:\n%s", out)
+	if !strings.Contains(out, "✔") {
+		t.Errorf("expected ✔ for passing tools, got:\n%s", out)
 	}
-	for _, tool := range []string{"vet:", "lint:", "test:", "vuln:"} {
+	// All four tool names appear in triage line
+	for _, tool := range []string{"vet", "lint", "test", "vuln"} {
 		if !strings.Contains(out, tool) {
 			t.Errorf("expected tool %q in output:\n%s", tool, out)
 		}
+	}
+	// No sections for all-clean report
+	if strings.Contains(out, "##") {
+		t.Errorf("all-pass report should have no sections, got:\n%s", out)
 	}
 }
 
