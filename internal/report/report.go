@@ -30,6 +30,7 @@ type Section struct {
 // Lines before the first delimiter are silently discarded.
 func Parse(data []byte) ([]Section, error) {
 	nl := []byte{'\n'}
+	data = bytes.ReplaceAll(data, []byte("\r\n"), nl)
 	data = bytes.TrimSuffix(data, nl)
 	lines := bytes.Split(data, nl)
 	var sections []Section

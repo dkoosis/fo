@@ -102,6 +102,47 @@ func TestIsDelimiter(t *testing.T) {
 	}
 }
 
+func TestParse_CRLFLineEndings(t *testing.T) {
+	input := "--- tool:lint format:sarif ---\r\n{\"version\":\"2.1.0\"}\r\n--- tool:test format:testjson ---\r\n{\"Action\":\"pass\"}\r\n"
+	sections, err := Parse([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sections) != 2 {
+		t.Fatalf("got %d sections, want 2", len(sections))
+	}
+	if sections[0].Tool != "lint" {
+		t.Errorf("tool = %q, want lint", sections[0].Tool)
+	}
+	if sections[0].Format != "sarif" {
+		t.Errorf("format = %q, want sarif", sections[0].Format)
+	}
+	if string(sections[0].Content) != "{\"version\":\"2.1.0\"}" {
+		t.Errorf("content = %q, want %q", sections[0].Content, "{\"version\":\"2.1.0\"}")
+	}
+	if sections[1].Tool != "test" {
+		t.Errorf("tool = %q, want test", sections[1].Tool)
+	}
+}
+
+func TestParse_MixedLineEndings(t *testing.T) {
+	// First section uses CRLF, second uses LF
+	input := "--- tool:vet format:sarif ---\r\n{}\r\n--- tool:test format:testjson ---\n{\"Action\":\"pass\"}\n"
+	sections, err := Parse([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sections) != 2 {
+		t.Fatalf("got %d sections, want 2", len(sections))
+	}
+	if sections[0].Tool != "vet" {
+		t.Errorf("tool = %q, want vet", sections[0].Tool)
+	}
+	if sections[1].Tool != "test" {
+		t.Errorf("tool = %q, want test", sections[1].Tool)
+	}
+}
+
 func TestParse_OldFormatsNotRecognized(t *testing.T) {
 	for _, format := range []string{"text", "metrics", "archlint", "jscpd"} {
 		input := []byte(fmt.Sprintf("--- tool:x format:%s ---\ncontent\n", format))
