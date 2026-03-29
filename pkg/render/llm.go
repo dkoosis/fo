@@ -63,11 +63,6 @@ func isSARIFTable(t *pattern.TestTable) bool {
 			return true
 		}
 	}
-	for _, item := range t.Results {
-		if strings.Contains(item.Name, ":") {
-			return true
-		}
-	}
 	return false
 }
 

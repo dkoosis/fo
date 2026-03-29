@@ -16,12 +16,10 @@ type Theme struct {
 
 // themeIcons defines the icon set for a theme.
 type themeIcons struct {
-	Pass   string
-	Fail   string
-	Warn   string
-	Info   string
-	WIP    string
-	Bullet string
+	Pass string
+	Fail string
+	Warn string
+	Info string
 }
 
 // defaultTheme returns a vibrant color theme.
@@ -35,12 +33,10 @@ func defaultTheme() Theme {
 		Muted:   lipgloss.NewStyle().Foreground(lipgloss.Color("242")), // gray
 		Bold:    lipgloss.NewStyle().Bold(true),
 		Icons: themeIcons{
-			Pass:   "✓",
-			Fail:   "✗",
-			Warn:   "⚠",
-			Info:   "●",
-			WIP:    "○",
-			Bullet: "·",
+			Pass: "✓",
+			Fail: "✗",
+			Warn: "⚠",
+			Info: "●",
 		},
 	}
 }
@@ -56,12 +52,10 @@ func orcaTheme() Theme {
 		Muted:   lipgloss.NewStyle().Foreground(lipgloss.Color("245")), // lighter gray
 		Bold:    lipgloss.NewStyle().Bold(true),
 		Icons: themeIcons{
-			Pass:   "✓",
-			Fail:   "✗",
-			Warn:   "!",
-			Info:   "·",
-			WIP:    "○",
-			Bullet: "·",
+			Pass: "✓",
+			Fail: "✗",
+			Warn: "!",
+			Info: "·",
 		},
 	}
 }
@@ -77,12 +71,10 @@ func MonoTheme() Theme {
 		Muted:   lipgloss.NewStyle(),
 		Bold:    lipgloss.NewStyle().Bold(true),
 		Icons: themeIcons{
-			Pass:   "+",
-			Fail:   "x",
-			Warn:   "!",
-			Info:   "*",
-			WIP:    "-",
-			Bullet: "-",
+			Pass: "+",
+			Fail: "x",
+			Warn: "!",
+			Info: "*",
 		},
 	}
 }
