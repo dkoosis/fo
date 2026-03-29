@@ -162,6 +162,7 @@ func (a *aggregator) processEvent(e TestEvent) {
 	case "pass":
 		if e.Test != "" {
 			pkg.passed++
+			delete(pkg.outputBuf, e.Test)
 		} else {
 			pkg.duration = time.Duration(e.Elapsed * float64(time.Second))
 		}
@@ -181,6 +182,7 @@ func (a *aggregator) processEvent(e TestEvent) {
 	case "skip":
 		if e.Test != "" {
 			pkg.skipped++
+			delete(pkg.outputBuf, e.Test)
 		}
 
 	case "output":
