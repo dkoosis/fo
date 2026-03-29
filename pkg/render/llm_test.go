@@ -191,3 +191,137 @@ func TestLLM_ZeroANSI(t *testing.T) {
 		t.Fatal("LLM output contains ANSI escape codes")
 	}
 }
+
+func TestLLM_SARIF_TriageLine(t *testing.T) {
+	t.Parallel()
+	r := render.NewLLM()
+
+	tests := []struct {
+		name     string
+		patterns []pattern.Pattern
+		wants    []string
+	}{
+		{
+			name:     "empty input shows zero counts",
+			patterns: nil,
+			wants:    []string{"0 ✗ 0 ⚠"},
+		},
+		{
+			name: "errors and warnings counted",
+			patterns: []pattern.Pattern{
+				&pattern.TestTable{
+					Label: "a.go",
+					Results: []pattern.TestTableItem{
+						{Name: "r1:1:1", Status: pattern.StatusFail},
+						{Name: "r2:2:1", Status: pattern.StatusFail},
+					},
+				},
+				&pattern.TestTable{
+					Label: "b.go",
+					Results: []pattern.TestTableItem{
+						{Name: "r3:1:1", Status: pattern.StatusSkip},
+					},
+				},
+			},
+			wants: []string{"2 ✗ 1 ⚠"},
+		},
+		{
+			name: "note count shown when non-zero",
+			patterns: []pattern.Pattern{
+				&pattern.TestTable{
+					Label: "c.go",
+					Results: []pattern.TestTableItem{
+						{Name: "r1:1:1", Status: pattern.StatusPass},
+					},
+				},
+			},
+			wants: []string{"0 ✗ 0 ⚠ 1 ℹ"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			out := r.Render(tc.patterns)
+			for _, want := range tc.wants {
+				if !strings.Contains(out, want) {
+					t.Fatalf("expected %q, got:\n%s", want, out)
+				}
+			}
+		})
+	}
+}
+
+func TestLLM_SARIF_FindingFormat(t *testing.T) {
+	t.Parallel()
+	r := render.NewLLM()
+
+	tests := []struct {
+		name     string
+		patterns []pattern.Pattern
+		wants    []string
+	}{
+		{
+			name: "error with file:line:col",
+			patterns: []pattern.Pattern{
+				&pattern.TestTable{
+					Label: "store.go",
+					Results: []pattern.TestTableItem{
+						{Name: "errcheck:42:5", Status: pattern.StatusFail, Details: "error return not checked"},
+					},
+				},
+			},
+			wants: []string{"✗ store.go:42:5 errcheck — error return not checked"},
+		},
+		{
+			name: "warning finding",
+			patterns: []pattern.Pattern{
+				&pattern.TestTable{
+					Label: "main.go",
+					Results: []pattern.TestTableItem{
+						{Name: "printf:10:3", Status: pattern.StatusSkip, Details: "format mismatch"},
+					},
+				},
+			},
+			wants: []string{"⚠ main.go:10:3 printf — format mismatch"},
+		},
+		{
+			name: "rule without line number",
+			patterns: []pattern.Pattern{
+				&pattern.TestTable{
+					Label: "pkg/b.go",
+					Results: []pattern.TestTableItem{
+						{Name: "RULE999", Status: pattern.StatusFail, Details: "no location"},
+					},
+				},
+			},
+			wants: []string{"✗ pkg/b.go RULE999 — no location"},
+		},
+		{
+			name: "severity sort: ✗ before ⚠ before ℹ",
+			patterns: []pattern.Pattern{
+				&pattern.TestTable{
+					Label: "file.go",
+					Results: []pattern.TestTableItem{
+						{Name: "note1:1:1", Status: pattern.StatusPass},
+						{Name: "err1:2:1", Status: pattern.StatusFail},
+						{Name: "warn1:3:1", Status: pattern.StatusSkip},
+					},
+				},
+			},
+			wants: []string{"✗ file.go:2:1 err1", "⚠ file.go:3:1 warn1", "ℹ file.go:1:1 note1"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			out := r.Render(tc.patterns)
+			for _, want := range tc.wants {
+				if !strings.Contains(out, want) {
+					t.Fatalf("expected %q, got:\n%s", want, out)
+				}
+			}
+		})
+	}
+}

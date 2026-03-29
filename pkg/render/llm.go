@@ -160,51 +160,43 @@ func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestT
 	return sb.String()
 }
 
-func (l *LLM) renderSARIFOutput(tables []*pattern.TestTable) string {
-	var sb strings.Builder
+// diagEntry represents a single diagnostic finding for LLM rendering.
+type diagEntry struct {
+	sym     string
+	file    string
+	rule    string
+	line    int
+	col     int
+	message string
+}
 
-	// SCOPE line
-	scope := sarifScope(tables)
-	sb.WriteString("SCOPE: " + scope + "\n")
-
-	// Collect all items across tables, grouped by file (table label = file path)
-	type diagEntry struct {
-		file    string
-		level   string
-		rule    string
-		line    int
-		col     int
-		message string
-	}
-
-	diags := make([]diagEntry, 0, len(tables)*4)
+// collectSARIFDiags extracts diagnostic entries from SARIF-mode tables.
+func collectSARIFDiags(tables []*pattern.TestTable) (diags []diagEntry, errCount, warnCount, noteCount int) {
 	for _, t := range tables {
 		for _, item := range t.Results {
-			var level string
-			switch item.Status {
-			case pattern.StatusFail:
-				level = "ERR"
-			case pattern.StatusPass:
-				level = "NOTE"
+			sym := severitySymbol(item.Status)
+			switch sym {
+			case symError:
+				errCount++
+			case symWarning:
+				warnCount++
 			default:
-				level = "WARN"
+				noteCount++
 			}
-
 			rule, line, col := parseRuleLocation(item.Name)
 			diags = append(diags, diagEntry{
-				file:    t.Label,
-				level:   level,
-				rule:    rule,
-				line:    line,
-				col:     col,
-				message: item.Details,
+				sym: sym, file: t.Label, rule: rule,
+				line: line, col: col, message: item.Details,
 			})
 		}
 	}
+	return
+}
 
-	// Sort: severity desc → file asc → line asc → rule asc
+// sortDiags sorts diagnostics by severity desc → file asc → line asc → rule asc.
+func sortDiags(diags []diagEntry) {
 	sort.Slice(diags, func(i, j int) bool {
-		pi, pj := llmLevelPriority(diags[i].level), llmLevelPriority(diags[j].level)
+		pi, pj := severityPriority(diags[i].sym), severityPriority(diags[j].sym)
 		if pi != pj {
 			return pi < pj
 		}
@@ -216,20 +208,46 @@ func (l *LLM) renderSARIFOutput(tables []*pattern.TestTable) string {
 		}
 		return diags[i].rule < diags[j].rule
 	})
+}
 
-	// Group by file and render
-	currentFile := ""
+// renderDiags writes sorted diagnostic lines to a builder.
+func renderDiags(sb *strings.Builder, diags []diagEntry) {
 	for _, d := range diags {
-		if d.file != currentFile {
-			currentFile = d.file
-			sb.WriteString("\n## " + d.file + "\n")
-		}
+		sb.WriteString("  " + d.sym + " ")
 		if d.line > 0 {
-			fmt.Fprintf(&sb, "  %s %s:%d:%d %s\n", d.level, d.rule, d.line, d.col, d.message)
+			sb.WriteString(fmt.Sprintf("%s:%d:%d %s", d.file, d.line, d.col, d.rule))
 		} else {
-			fmt.Fprintf(&sb, "  %s %s %s\n", d.level, d.rule, d.message)
+			sb.WriteString(d.file + " " + d.rule)
 		}
+		if d.message != "" {
+			sb.WriteString(" — " + d.message)
+		}
+		sb.WriteString("\n")
 	}
+}
+
+// triageCounts formats the triage count string, omitting ℹ when zero.
+func triageCounts(errCount, warnCount, noteCount int) string {
+	s := fmt.Sprintf("%d %s %d %s", errCount, symError, warnCount, symWarning)
+	if noteCount > 0 {
+		s += fmt.Sprintf(" %d %s", noteCount, symNote)
+	}
+	return s
+}
+
+func (l *LLM) renderSARIFOutput(tables []*pattern.TestTable) string {
+	var sb strings.Builder
+
+	diags, errCount, warnCount, noteCount := collectSARIFDiags(tables)
+	sb.WriteString(triageCounts(errCount, warnCount, noteCount) + "\n")
+
+	if len(diags) == 0 {
+		return sb.String()
+	}
+
+	sortDiags(diags)
+	sb.WriteString("\n")
+	renderDiags(&sb, diags)
 
 	return sb.String()
 }
@@ -266,40 +284,6 @@ func (l *LLM) renderTestOutput(summaries []*pattern.Summary, tables []*pattern.T
 	}
 
 	return sb.String()
-}
-
-func sarifScope(tables []*pattern.TestTable) string {
-	fileCount := len(tables)
-	var errCount, warnCount, noteCount int
-	for _, t := range tables {
-		for _, item := range t.Results {
-			switch item.Status {
-			case pattern.StatusFail:
-				errCount++
-			case pattern.StatusSkip:
-				warnCount++
-			default:
-				noteCount++
-			}
-		}
-	}
-	total := errCount + warnCount + noteCount
-
-	parts := []string{fmt.Sprintf("%d files", fileCount), fmt.Sprintf("%d diags", total)}
-	var breakdown []string
-	if errCount > 0 {
-		breakdown = append(breakdown, fmt.Sprintf("%d err", errCount))
-	}
-	if warnCount > 0 {
-		breakdown = append(breakdown, fmt.Sprintf("%d warn", warnCount))
-	}
-	if noteCount > 0 {
-		breakdown = append(breakdown, fmt.Sprintf("%d note", noteCount))
-	}
-	if len(breakdown) > 0 {
-		parts = append(parts, "("+strings.Join(breakdown, ", ")+")")
-	}
-	return strings.Join(parts, ", ")
 }
 
 // parseRuleLocation splits "ruleId:line:col" into components.
@@ -340,13 +324,3 @@ func writeDetails(sb *strings.Builder, details string) {
 	}
 }
 
-func llmLevelPriority(level string) int {
-	switch level {
-	case "ERR":
-		return 0
-	case "WARN":
-		return 1
-	default:
-		return 2
-	}
-}
