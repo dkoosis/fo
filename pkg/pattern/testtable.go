@@ -22,8 +22,9 @@ type TestTableItem struct {
 	Status     Status
 	Duration   string // formatted duration
 	Count      int    // number of tests (package-level)
-	Details    string // error message or extra info
-	FixCommand string // optional shell command that reproduces or fixes this finding
+	Details     string // error message or extra info
+	FixCommand  string // optional shell command that reproduces or fixes this finding
+	Fingerprint string // stable per-finding identity = sha256(rule_id + file + normalized_message); see pattern.Fingerprint
 }
 
 func (t *TestTable) Type() PatternType { return PatternTypeTestTable }

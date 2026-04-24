@@ -132,9 +132,10 @@ func sarifFileTable(g sarif.GroupedResults) *pattern.TestTable {
 			loc = fmt.Sprintf(":%d:%d", r.Line(), r.Col())
 		}
 		items[i] = pattern.TestTableItem{
-			Name:    r.RuleID + loc,
-			Status:  mapLevel(r.Level),
-			Details: r.Message.Text,
+			Name:        r.RuleID + loc,
+			Status:      mapLevel(r.Level),
+			Details:     r.Message.Text,
+			Fingerprint: pattern.Fingerprint(r.RuleID, g.Key, r.Message.Text),
 		}
 	}
 

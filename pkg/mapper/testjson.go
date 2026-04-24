@@ -113,10 +113,12 @@ func testSummary(s testjson.Stats) *pattern.Summary {
 }
 
 func panicTable(r testjson.TestPackageResult) *pattern.TestTable {
+	details := truncateLines(r.PanicOutput, 5)
 	items := []pattern.TestTableItem{{
-		Name:    "PANIC",
-		Status:  pattern.StatusFail,
-		Details: truncateLines(r.PanicOutput, 5),
+		Name:        "PANIC",
+		Status:      pattern.StatusFail,
+		Details:     details,
+		Fingerprint: pattern.Fingerprint("PANIC", r.Name, details),
 	}}
 	return &pattern.TestTable{
 		Label:   "PANIC " + shortPkgName(r.Name),
@@ -125,10 +127,12 @@ func panicTable(r testjson.TestPackageResult) *pattern.TestTable {
 }
 
 func buildErrorTable(r testjson.TestPackageResult) *pattern.TestTable {
+	details := truncateString(r.BuildError, 300)
 	items := []pattern.TestTableItem{{
-		Name:    "BUILD ERROR",
-		Status:  pattern.StatusFail,
-		Details: truncateString(r.BuildError, 300),
+		Name:        "BUILD ERROR",
+		Status:      pattern.StatusFail,
+		Details:     details,
+		Fingerprint: pattern.Fingerprint("BUILD_ERROR", r.Name, details),
 	}}
 	return &pattern.TestTable{
 		Label:   "BUILD FAIL " + shortPkgName(r.Name),
@@ -139,10 +143,12 @@ func buildErrorTable(r testjson.TestPackageResult) *pattern.TestTable {
 func failedPkgTable(r testjson.TestPackageResult) *pattern.TestTable {
 	items := make([]pattern.TestTableItem, 0, len(r.FailedTests))
 	for _, ft := range r.FailedTests {
+		details := truncateLines(ft.Output, 3)
 		items = append(items, pattern.TestTableItem{
-			Name:    ft.Name,
-			Status:  pattern.StatusFail,
-			Details: truncateLines(ft.Output, 3),
+			Name:        ft.Name,
+			Status:      pattern.StatusFail,
+			Details:     details,
+			Fingerprint: pattern.Fingerprint(ft.Name, r.Name, details),
 		})
 	}
 	return &pattern.TestTable{
