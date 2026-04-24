@@ -20,11 +20,19 @@ const (
 
 // LLM renders patterns as terse plain text optimized for LLM consumption.
 // Zero ANSI codes, deterministic sort, severity-first, action-oriented.
-type LLM struct{}
+type LLM struct {
+	meta RunMeta
+}
 
 // NewLLM creates an LLM renderer.
 func NewLLM() *LLM {
 	return &LLM{}
+}
+
+// WithMeta attaches run envelope metadata for rendering.
+func (l *LLM) WithMeta(m RunMeta) *LLM {
+	l.meta = m
+	return l
 }
 
 // severitySymbol maps a SARIF-context Status to a severity symbol.
@@ -88,7 +96,14 @@ func hasActionableContent(tables []*pattern.TestTable, errors []*pattern.Error) 
 // Render formats all patterns for LLM consumption.
 func (l *LLM) Render(patterns []pattern.Pattern) string {
 	var sb strings.Builder
-	sb.WriteString(formatVersion + "\n\n")
+	sb.WriteString(formatVersion + "\n")
+	if l.meta.DataHash != "" {
+		sb.WriteString("data_hash: " + l.meta.DataHash + "\n")
+	}
+	if l.meta.GeneratedAt != "" {
+		sb.WriteString("generated_at: " + l.meta.GeneratedAt + "\n")
+	}
+	sb.WriteString("\n")
 
 	// Check for pattern types that use direct type-switch rendering
 	// (newer pattern types that don't fit the Summary/TestTable dispatch).
