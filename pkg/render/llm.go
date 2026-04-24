@@ -90,6 +90,16 @@ func (l *LLM) Render(patterns []pattern.Pattern) string {
 	var sb strings.Builder
 	sb.WriteString(formatVersion + "\n\n")
 
+	// Check for pattern types that use direct type-switch rendering
+	// (newer pattern types that don't fit the Summary/TestTable dispatch).
+	for _, p := range patterns {
+		if s := l.renderOne(p); s != "" {
+			sb.WriteString(s)
+			return sb.String()
+		}
+	}
+
+	// Legacy dispatch: collect summaries/tables/errors, dispatch by SummaryKind.
 	var summaries []*pattern.Summary
 	var tables []*pattern.TestTable
 	var errors []*pattern.Error
@@ -118,6 +128,51 @@ func (l *LLM) Render(patterns []pattern.Pattern) string {
 		}
 	} else {
 		sb.WriteString(l.renderSARIFOutput(tables))
+	}
+
+	return sb.String()
+}
+
+// renderOne handles pattern types via direct type switch.
+// Returns "" for pattern types handled by the legacy SummaryKind dispatch.
+func (l *LLM) renderOne(p pattern.Pattern) string {
+	switch v := p.(type) {
+	case *pattern.JTBDCoverage:
+		return l.renderJTBDCoverage(v)
+	default:
+		return ""
+	}
+}
+
+func (l *LLM) renderJTBDCoverage(j *pattern.JTBDCoverage) string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "JTBD Coverage  %d/%d jobs covered\n\n", j.CoveredJobs, j.TotalJobs)
+
+	// Header
+	sb.WriteString(" Code      Tests  Pass  Fail  Job\n")
+
+	for _, e := range j.Entries {
+		icon := "·"
+		if e.TestCount > 0 && e.Fail == 0 {
+			icon = "✓"
+		} else if e.Fail > 0 {
+			icon = "✗"
+		}
+
+		passStr := fmt.Sprintf("%d", e.Pass)
+		failStr := fmt.Sprintf("%d", e.Fail)
+		if e.TestCount == 0 {
+			passStr = "—"
+			failStr = "—"
+		}
+
+		name := e.Name
+		if name != "" {
+			name = icon + " " + name
+		}
+
+		fmt.Fprintf(&sb, " %-8s  %4d  %4s  %4s  %s\n",
+			e.Code, e.TestCount, passStr, failStr, name)
 	}
 
 	return sb.String()
@@ -243,6 +298,7 @@ func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestT
 					}
 					sb.WriteString("\n")
 					writeDetails(&sb, item.Details)
+					writeFixCommand(&sb, item.FixCommand)
 				}
 			}
 		}
@@ -253,12 +309,13 @@ func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestT
 
 // diagEntry represents a single diagnostic finding for LLM rendering.
 type diagEntry struct {
-	sym     string
-	file    string
-	rule    string
-	line    int
-	col     int
-	message string
+	sym        string
+	file       string
+	rule       string
+	line       int
+	col        int
+	message    string
+	fixCommand string
 }
 
 // collectSARIFDiags extracts diagnostic entries from SARIF-mode tables.
@@ -280,6 +337,7 @@ func collectSARIFDiags(tables []*pattern.TestTable) ([]diagEntry, int, int, int)
 			diags = append(diags, diagEntry{
 				sym: sym, file: t.Label, rule: rule,
 				line: line, col: col, message: item.Details,
+				fixCommand: item.FixCommand,
 			})
 		}
 	}
@@ -316,7 +374,19 @@ func renderDiags(sb *strings.Builder, diags []diagEntry) {
 			sb.WriteString(" — " + d.message)
 		}
 		sb.WriteString("\n")
+		writeFixCommand(sb, d.fixCommand)
 	}
+}
+
+// writeFixCommand renders a non-empty FixCommand as a fenced bash block.
+// Skips silently when empty so callers don't emit empty fences.
+func writeFixCommand(sb *strings.Builder, cmd string) {
+	if cmd == "" {
+		return
+	}
+	sb.WriteString("    ```bash\n")
+	sb.WriteString("    " + cmd + "\n")
+	sb.WriteString("    ```\n")
 }
 
 // triageCounts formats the triage count string, omitting ℹ when zero.
@@ -409,6 +479,7 @@ func (l *LLM) renderTestOutput(summaries []*pattern.Summary, tables []*pattern.T
 			}
 			sb.WriteString("\n")
 			writeDetails(&sb, item.Details)
+			writeFixCommand(&sb, item.FixCommand)
 		}
 	}
 

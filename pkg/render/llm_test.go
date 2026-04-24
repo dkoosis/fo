@@ -508,3 +508,81 @@ func TestLLM_Report_ToolOrder(t *testing.T) {
 		t.Fatalf("vet should appear before lint (delimiter order), got:\n%s", out)
 	}
 }
+
+func TestLLM_FixCommand_SARIF(t *testing.T) {
+	t.Parallel()
+	r := render.NewLLM()
+
+	t.Run("non-empty FixCommand renders fenced bash block", func(t *testing.T) {
+		t.Parallel()
+		out := r.Render([]pattern.Pattern{
+			&pattern.TestTable{
+				Label: "store.go",
+				Results: []pattern.TestTableItem{
+					{
+						Name:       "errcheck:42:5",
+						Status:     pattern.StatusFail,
+						Details:    "error return not checked",
+						FixCommand: "go fix ./...",
+					},
+				},
+			},
+		})
+		if !strings.Contains(out, "```bash") {
+			t.Fatalf("expected fenced bash block, got:\n%s", out)
+		}
+		if !strings.Contains(out, "go fix ./...") {
+			t.Fatalf("expected fix command in output, got:\n%s", out)
+		}
+	})
+
+	t.Run("empty FixCommand renders nothing", func(t *testing.T) {
+		t.Parallel()
+		out := r.Render([]pattern.Pattern{
+			&pattern.TestTable{
+				Label: "store.go",
+				Results: []pattern.TestTableItem{
+					{Name: "errcheck:42:5", Status: pattern.StatusFail, Details: "msg"},
+				},
+			},
+		})
+		if strings.Contains(out, "```") {
+			t.Fatalf("expected no fenced block when FixCommand empty, got:\n%s", out)
+		}
+	})
+}
+
+func TestLLM_FixCommand_TestFailure(t *testing.T) {
+	t.Parallel()
+	r := render.NewLLM()
+
+	out := r.Render([]pattern.Pattern{
+		&pattern.Summary{
+			Label: "tests (1.0s)",
+			Kind:  pattern.SummaryKindTest,
+			Metrics: []pattern.SummaryItem{
+				{Label: "Failed", Value: "1/1", Kind: pattern.KindError},
+				{Label: "Passed", Value: "0/1"},
+				{Label: "Packages", Value: "1"},
+			},
+		},
+		&pattern.TestTable{
+			Label: "FAIL pkg/foo (0.1s)",
+			Results: []pattern.TestTableItem{
+				{
+					Name:       "TestBad",
+					Status:     pattern.StatusFail,
+					Details:    "expected 200",
+					FixCommand: "go test -run TestBad ./pkg/foo",
+				},
+			},
+		},
+	})
+
+	if !strings.Contains(out, "```bash") {
+		t.Fatalf("expected fenced bash block for test failure, got:\n%s", out)
+	}
+	if !strings.Contains(out, "go test -run TestBad ./pkg/foo") {
+		t.Fatalf("expected fix command in output, got:\n%s", out)
+	}
+}

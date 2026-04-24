@@ -163,3 +163,50 @@ func assertEqual[T comparable](t *testing.T, got, want T) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
 }
+
+func TestJSONRender_FixCommand(t *testing.T) {
+	t.Parallel()
+	r := render.NewJSON()
+
+	t.Run("non-empty FixCommand appears in JSON", func(t *testing.T) {
+		t.Parallel()
+		out := r.Render([]pattern.Pattern{
+			&pattern.TestTable{
+				Label: "store.go",
+				Results: []pattern.TestTableItem{
+					{
+						Name:       "errcheck:42:5",
+						Status:     pattern.StatusFail,
+						FixCommand: "go fix ./...",
+					},
+				},
+			},
+		})
+		if !json.Valid([]byte(out)) {
+			t.Fatalf("invalid JSON: %s", out)
+		}
+		if !strings.Contains(out, `"FixCommand": "go fix ./..."`) {
+			t.Fatalf("expected FixCommand field in JSON, got:\n%s", out)
+		}
+	})
+
+	t.Run("empty FixCommand still round-trips as empty string", func(t *testing.T) {
+		t.Parallel()
+		out := r.Render([]pattern.Pattern{
+			&pattern.TestTable{
+				Label: "store.go",
+				Results: []pattern.TestTableItem{
+					{Name: "errcheck:42:5", Status: pattern.StatusFail},
+				},
+			},
+		})
+		if !json.Valid([]byte(out)) {
+			t.Fatalf("invalid JSON: %s", out)
+		}
+		// Empty string is acceptable; the contract is no fenced block in llm
+		// and a plain string field in json. Pass-through, no special encoding.
+		if !strings.Contains(out, `"FixCommand"`) {
+			t.Fatalf("expected FixCommand field present (even if empty), got:\n%s", out)
+		}
+	})
+}
