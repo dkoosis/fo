@@ -49,3 +49,8 @@ bin/
 .codex/cache/
 .codex/setup-report.json
 .codex/setup-issues.txt
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
