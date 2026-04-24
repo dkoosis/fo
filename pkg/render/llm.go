@@ -344,6 +344,7 @@ type diagEntry struct {
 	col        int
 	message    string
 	fixCommand string
+	score      float64
 }
 
 // collectSARIFDiags extracts diagnostic entries from SARIF-mode tables.
@@ -366,15 +367,22 @@ func collectSARIFDiags(tables []*pattern.TestTable) ([]diagEntry, int, int, int)
 				sym: sym, file: t.Label, rule: rule,
 				line: line, col: col, message: item.Details,
 				fixCommand: item.FixCommand,
+				score:      item.Score,
 			})
 		}
 	}
 	return diags, errCount, warnCount, noteCount
 }
 
-// sortDiags sorts diagnostics by severity desc → file asc → line asc → rule asc.
+// sortDiags sorts diagnostics by Score desc → severity desc → file asc → line asc → rule asc.
+// The Score-first ordering surfaces high-impact findings (severity × occurrence ×
+// file_centrality) ahead of low-impact ones; severity remains the first tie-breaker
+// for deterministic output when scores collide.
 func sortDiags(diags []diagEntry) {
 	sort.Slice(diags, func(i, j int) bool {
+		if diags[i].score != diags[j].score {
+			return diags[i].score > diags[j].score
+		}
 		pi, pj := severityPriority(diags[i].sym), severityPriority(diags[j].sym)
 		if pi != pj {
 			return pi < pj

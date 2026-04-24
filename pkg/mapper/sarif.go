@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/dkoosis/fo/pkg/pattern"
 	"github.com/dkoosis/fo/pkg/sarif"
@@ -34,13 +35,34 @@ func fromSARIF(doc *sarif.Document, stats sarif.Stats) []pattern.Pattern {
 
 	// 3. Issue list grouped by file
 	groups := sarif.GroupByFile(doc)
+
+	// Pre-pass: count occurrences by (rule_id, normalized_message) across the
+	// whole run so scoring reflects how widespread each defect is. Using the
+	// existing Fingerprint (which also includes the file path) would undercount
+	// identical defects spread across multiple files, so count on the
+	// (rule_id, normalized_message) tuple directly.
+	counts := sarifOccurrenceCounts(groups)
+
 	for _, g := range groups {
-		if t := sarifFileTable(g); t != nil {
+		if t := sarifFileTable(g, counts); t != nil {
 			patterns = append(patterns, t)
 		}
 	}
 
 	return patterns
+}
+
+// sarifOccurrenceCounts counts (rule_id, normalized_message) occurrences
+// across every result in the document.
+func sarifOccurrenceCounts(groups []sarif.GroupedResults) map[string]int {
+	counts := make(map[string]int)
+	for _, g := range groups {
+		for _, r := range g.Results {
+			k := r.RuleID + "\x00" + pattern.NormalizeMessage(r.Message.Text)
+			counts[k]++
+		}
+	}
+	return counts
 }
 
 func sarifSummary(stats sarif.Stats) *pattern.Summary {
@@ -110,20 +132,10 @@ func sarifLeaderboard(doc *sarif.Document, stats sarif.Stats) *pattern.Leaderboa
 	}
 }
 
-func sarifFileTable(g sarif.GroupedResults) *pattern.TestTable {
+func sarifFileTable(g sarif.GroupedResults, counts map[string]int) *pattern.TestTable {
 	if len(g.Results) == 0 {
 		return nil
 	}
-
-	// Sort: errors first, then warnings, then notes; within level by line number.
-	// GroupByFile returns fresh slices, so sorting in place is safe.
-	sort.Slice(g.Results, func(i, j int) bool {
-		li, lj := levelPriority(g.Results[i].Level), levelPriority(g.Results[j].Level)
-		if li != lj {
-			return li < lj
-		}
-		return g.Results[i].Line() < g.Results[j].Line()
-	})
 
 	items := make([]pattern.TestTableItem, len(g.Results))
 	for i, r := range g.Results {
@@ -131,19 +143,65 @@ func sarifFileTable(g sarif.GroupedResults) *pattern.TestTable {
 		if r.Line() > 0 {
 			loc = fmt.Sprintf(":%d:%d", r.Line(), r.Col())
 		}
+		occ := counts[r.RuleID+"\x00"+pattern.NormalizeMessage(r.Message.Text)]
+		if occ == 0 {
+			occ = 1 // defensive: an item exists, so it occurs at least once
+		}
 		items[i] = pattern.TestTableItem{
 			Name:        r.RuleID + loc,
 			Status:      mapLevel(r.Level),
 			Details:     r.Message.Text,
 			FixCommand:  r.FixCommand(),
 			Fingerprint: pattern.Fingerprint(r.RuleID, g.Key, r.Message.Text),
+			Score:       pattern.Score(pattern.SeverityWeight(r.Level), occ, g.Key),
 		}
 	}
+
+	// Sort by Score descending. Ties broken by status severity (fail > skip > pass)
+	// then by line number so output is deterministic when scores collide.
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].Score != items[j].Score {
+			return items[i].Score > items[j].Score
+		}
+		si, sj := statusPriority(items[i].Status), statusPriority(items[j].Status)
+		if si != sj {
+			return si < sj
+		}
+		_, lineI, _ := parseRuleLoc(items[i].Name)
+		_, lineJ, _ := parseRuleLoc(items[j].Name)
+		return lineI < lineJ
+	})
 
 	return &pattern.TestTable{
 		Label:   g.Key,
 		Results: items,
 	}
+}
+
+// parseRuleLoc extracts the :line:col suffix from a rule+location string
+// ("ruleID:line:col" or "ruleID:line"). Returns zeros when absent.
+func parseRuleLoc(name string) (rule string, line, col int) {
+	// Minimal splitter — colons in rule IDs are not expected.
+	parts := strings.Split(name, ":")
+	rule = parts[0]
+	if len(parts) >= 2 {
+		line = atoi(parts[1])
+	}
+	if len(parts) >= 3 {
+		col = atoi(parts[2])
+	}
+	return rule, line, col
+}
+
+func atoi(s string) int {
+	n := 0
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return 0
+		}
+		n = n*10 + int(c-'0')
+	}
+	return n
 }
 
 func mapLevel(level string) pattern.Status {
@@ -157,13 +215,14 @@ func mapLevel(level string) pattern.Status {
 	}
 }
 
-func levelPriority(level string) int {
-	switch level {
-	case "error":
+func statusPriority(s pattern.Status) int {
+	switch s {
+	case pattern.StatusFail:
 		return 0
-	case "warning":
+	case pattern.StatusSkip:
 		return 1
 	default:
 		return 2
 	}
 }
+

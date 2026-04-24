@@ -25,6 +25,7 @@ type TestTableItem struct {
 	Details     string // error message or extra info
 	FixCommand  string // optional shell command that reproduces or fixes this finding
 	Fingerprint string // stable per-finding identity = sha256(rule_id + file + normalized_message); see pattern.Fingerprint
+	Score       float64 // deterministic priority score; see pattern.Score. Higher = render first.
 }
 
 func (t *TestTable) Type() PatternType { return PatternTypeTestTable }

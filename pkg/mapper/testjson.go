@@ -122,6 +122,7 @@ func panicTable(r testjson.TestPackageResult) *pattern.TestTable {
 		Details:     details,
 		Fingerprint: pattern.Fingerprint("PANIC", r.Name, details),
 		FixCommand:  fixCmd,
+		Score:       pattern.Score(pattern.SeverityWeightError, 1, r.Name),
 	}}
 	return &pattern.TestTable{
 		Label:   "PANIC " + shortPkgName(r.Name),
@@ -137,6 +138,7 @@ func buildErrorTable(r testjson.TestPackageResult) *pattern.TestTable {
 		Details:     details,
 		Fingerprint: pattern.Fingerprint("BUILD_ERROR", r.Name, details),
 		FixCommand:  fmt.Sprintf("go build %s", r.Name),
+		Score:       pattern.Score(pattern.SeverityWeightError, 1, r.Name),
 	}}
 	return &pattern.TestTable{
 		Label:   "BUILD FAIL " + shortPkgName(r.Name),
@@ -146,6 +148,9 @@ func buildErrorTable(r testjson.TestPackageResult) *pattern.TestTable {
 
 func failedPkgTable(r testjson.TestPackageResult) *pattern.TestTable {
 	items := make([]pattern.TestTableItem, 0, len(r.FailedTests))
+	// Test failures are always error-severity with occurrence=1 per test;
+	// centrality is drawn from the package import path.
+	pathKey := r.Name
 	for _, ft := range r.FailedTests {
 		details := truncateLines(ft.Output, 3)
 		items = append(items, pattern.TestTableItem{
@@ -154,6 +159,7 @@ func failedPkgTable(r testjson.TestPackageResult) *pattern.TestTable {
 			Details:     details,
 			Fingerprint: pattern.Fingerprint(ft.Name, r.Name, details),
 			FixCommand:  testFixCommand(r.Name, ft.Name),
+			Score:       pattern.Score(pattern.SeverityWeightError, 1, pathKey),
 		})
 	}
 	return &pattern.TestTable{
