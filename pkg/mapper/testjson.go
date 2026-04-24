@@ -114,11 +114,14 @@ func testSummary(s testjson.Stats) *pattern.Summary {
 
 func panicTable(r testjson.TestPackageResult) *pattern.TestTable {
 	details := truncateLines(r.PanicOutput, 5)
+	// Panic without a specific test name: run the whole package verbosely.
+	fixCmd := fmt.Sprintf("go test %s -v", r.Name)
 	items := []pattern.TestTableItem{{
 		Name:        "PANIC",
 		Status:      pattern.StatusFail,
 		Details:     details,
 		Fingerprint: pattern.Fingerprint("PANIC", r.Name, details),
+		FixCommand:  fixCmd,
 	}}
 	return &pattern.TestTable{
 		Label:   "PANIC " + shortPkgName(r.Name),
@@ -133,6 +136,7 @@ func buildErrorTable(r testjson.TestPackageResult) *pattern.TestTable {
 		Status:      pattern.StatusFail,
 		Details:     details,
 		Fingerprint: pattern.Fingerprint("BUILD_ERROR", r.Name, details),
+		FixCommand:  fmt.Sprintf("go build %s", r.Name),
 	}}
 	return &pattern.TestTable{
 		Label:   "BUILD FAIL " + shortPkgName(r.Name),
@@ -149,12 +153,25 @@ func failedPkgTable(r testjson.TestPackageResult) *pattern.TestTable {
 			Status:      pattern.StatusFail,
 			Details:     details,
 			Fingerprint: pattern.Fingerprint(ft.Name, r.Name, details),
+			FixCommand:  testFixCommand(r.Name, ft.Name),
 		})
 	}
 	return &pattern.TestTable{
 		Label:   fmt.Sprintf("FAIL %s (%d/%d failed)", shortPkgName(r.Name), r.Failed, r.TotalTests()),
 		Results: items,
 	}
+}
+
+// testFixCommand builds a `go test -run` command that reproduces a single
+// failed test. Subtests (TestFoo/case_1) become anchored segments
+// (^TestFoo$/^case_1$) so the regex matches only that exact subtest path.
+func testFixCommand(pkg, testName string) string {
+	parts := strings.Split(testName, "/")
+	anchored := make([]string, len(parts))
+	for i, p := range parts {
+		anchored[i] = "^" + p + "$"
+	}
+	return fmt.Sprintf("go test -run %s %s -v", strings.Join(anchored, "/"), pkg)
 }
 
 func pkgPriority(r testjson.TestPackageResult) int {
