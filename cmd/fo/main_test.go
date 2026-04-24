@@ -375,9 +375,12 @@ func TestRun_ReportClean(t *testing.T) {
 	if !strings.Contains(out, "✔") {
 		t.Errorf("expected ✔ for passing tools, got:\n%s", out)
 	}
-	// No sections for clean tools
-	if strings.Contains(out, "##") {
-		t.Errorf("clean report should have no sections, got:\n%s", out)
+	// Per fo-s76, even clean tools get a header carrying status.
+	if !strings.Contains(out, "##") {
+		t.Errorf("expected per-tool section headers for status surface, got:\n%s", out)
+	}
+	if !strings.Contains(out, "[status:") {
+		t.Errorf("expected [status: ...] suffix in headers, got:\n%s", out)
 	}
 }
 
@@ -444,9 +447,11 @@ func TestRun_ReportBrokenSection(t *testing.T) {
 	if !strings.Contains(out, "✗") {
 		t.Errorf("expected ✗ for error, got:\n%s", out)
 	}
-	// Valid passing test section should be suppressed (no failures)
-	if strings.Contains(out, "## test") {
-		t.Errorf("passing test section should be suppressed, got:\n%s", out)
+	// Per fo-s76, every tool — including the passing test section — gets
+	// a header with status, so empty sections can't be mistaken for silent
+	// success.
+	if !strings.Contains(out, "## test") {
+		t.Errorf("expected ## test header for status surface, got:\n%s", out)
 	}
 	// Passing tools still listed in triage line
 	if !strings.Contains(out, "test ✔") || !strings.Contains(out, "vet") {
@@ -478,9 +483,15 @@ func TestRun_ReportFullFormats(t *testing.T) {
 			t.Errorf("expected tool %q in output:\n%s", tool, out)
 		}
 	}
-	// No sections for all-clean report
-	if strings.Contains(out, "##") {
-		t.Errorf("all-pass report should have no sections, got:\n%s", out)
+	// Per fo-s76, every tool gets a header carrying its status — even
+	// all-clean — so agents can't mistake a silent crash for a clean pass.
+	for _, tool := range []string{"## vet", "## lint", "## test", "## vuln"} {
+		if !strings.Contains(out, tool) {
+			t.Errorf("expected %q header (status surface), got:\n%s", tool, out)
+		}
+	}
+	if !strings.Contains(out, "[status:") {
+		t.Errorf("expected [status: ...] suffix in headers, got:\n%s", out)
 	}
 }
 

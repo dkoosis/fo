@@ -210,3 +210,29 @@ func TestJSONRender_FixCommand(t *testing.T) {
 		}
 	})
 }
+
+// fo-s76: per-tool Status field round-trips through JSON output.
+func TestJSONRender_SummaryStatusField(t *testing.T) {
+	t.Parallel()
+	r := render.NewJSON()
+
+	out := r.Render([]pattern.Pattern{
+		&pattern.Summary{
+			Label: "REPORT",
+			Kind:  pattern.SummaryKindReport,
+			Metrics: []pattern.SummaryItem{
+				{Label: "vet", Value: "0 diags", Kind: pattern.KindSuccess, Status: "clean"},
+				{Label: "scan", Value: "crashed", Kind: pattern.KindError, Status: "error"},
+			},
+		},
+	})
+
+	if !json.Valid([]byte(out)) {
+		t.Fatalf("invalid JSON: %s", out)
+	}
+	for _, want := range []string{`"Status": "clean"`, `"Status": "error"`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected %q in JSON, got:\n%s", want, out)
+		}
+	}
+}

@@ -336,14 +336,19 @@ func TestLLM_Report_TriageAndSections(t *testing.T) {
 	if !strings.Contains(out, "✔") {
 		t.Fatalf("expected ✔ for passing tools, got:\n%s", out)
 	}
+	// Per fo-s76, every tool gets a header carrying its status, so agents
+	// can't mistake a silent crash/empty slice for a clean pass.
 	if !strings.Contains(out, "## lint") {
 		t.Fatalf("expected ## lint section, got:\n%s", out)
 	}
-	if strings.Contains(out, "## vet") {
-		t.Fatalf("clean tool vet should not have section, got:\n%s", out)
+	if !strings.Contains(out, "## vet") {
+		t.Fatalf("expected ## vet header for clean tool, got:\n%s", out)
 	}
-	if strings.Contains(out, "## test") {
-		t.Fatalf("clean tool test should not have section, got:\n%s", out)
+	if !strings.Contains(out, "## test") {
+		t.Fatalf("expected ## test header for clean tool, got:\n%s", out)
+	}
+	if !strings.Contains(out, "[status:") {
+		t.Fatalf("expected [status: ...] in section headers, got:\n%s", out)
 	}
 	if !strings.Contains(out, "✗ internal/store/store.go:42:5 errcheck — error return not checked") {
 		t.Fatalf("expected formatted finding, got:\n%s", out)
@@ -372,8 +377,11 @@ func TestLLM_Report_AllPass(t *testing.T) {
 	if !strings.Contains(out, "vet lint test ✔") {
 		t.Fatalf("expected all tools passing, got:\n%s", out)
 	}
-	if strings.Contains(out, "##") {
-		t.Fatalf("all-pass should have no sections, got:\n%s", out)
+	// Per fo-s76, every tool gets a header line (with status), even all-pass.
+	for _, tool := range []string{"## vet", "## lint", "## test"} {
+		if !strings.Contains(out, tool) {
+			t.Fatalf("expected %q header, got:\n%s", tool, out)
+		}
 	}
 }
 
@@ -584,5 +592,38 @@ func TestLLM_FixCommand_TestFailure(t *testing.T) {
 	}
 	if !strings.Contains(out, "go test -run TestBad ./pkg/foo") {
 		t.Fatalf("expected fix command in output, got:\n%s", out)
+	}
+}
+
+// TestLLM_Report_StatusInHeaders verifies per-tool status is surfaced in
+// section headers (fo-s76). Distinguishes silent-crash (error/skipped/timeout)
+// from genuine clean pass.
+func TestLLM_Report_StatusInHeaders(t *testing.T) {
+	t.Parallel()
+	r := render.NewLLM()
+
+	out := r.Render([]pattern.Pattern{
+		&pattern.Summary{
+			Label: "REPORT: 4 tools",
+			Kind:  pattern.SummaryKindReport,
+			Metrics: []pattern.SummaryItem{
+				{Label: "vet", Value: "0 diags", Kind: pattern.KindSuccess, Status: "clean"},
+				{Label: "lint", Value: "0 diags", Kind: pattern.KindSuccess, Status: "skipped"},
+				{Label: "cov", Value: "PASS", Kind: pattern.KindSuccess, Status: "ok"},
+				{Label: "scan", Value: "parse error", Kind: pattern.KindError, Status: "error"},
+			},
+		},
+	})
+
+	cases := map[string]string{
+		"## vet":  "[status: clean,",
+		"## lint": "[status: skipped,",
+		"## cov":  "[status: ok,",
+		"## scan": "[status: error,",
+	}
+	for header, suffix := range cases {
+		if !strings.Contains(out, header+"  "+suffix) {
+			t.Fatalf("expected %q header with %q, got:\n%s", header, suffix, out)
+		}
 	}
 }

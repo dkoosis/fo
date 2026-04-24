@@ -207,3 +207,34 @@ func TestHumanRender_MultiplePatternTypes(t *testing.T) {
 		}
 	}
 }
+
+// fo-s76: per-tool status surfaces as a bracketed badge on summary metrics.
+func TestHuman_Summary_StatusBadge(t *testing.T) {
+	t.Parallel()
+	r := render.NewHuman(render.MonoTheme())
+
+	out := r.Render([]pattern.Pattern{
+		&pattern.Summary{
+			Label: "REPORT: 5 tools",
+			Kind:  pattern.SummaryKindReport,
+			Metrics: []pattern.SummaryItem{
+				{Label: "vet", Value: "0 diags", Kind: pattern.KindSuccess, Status: "clean"},
+				{Label: "lint", Value: "0 diags", Kind: pattern.KindSuccess, Status: "skipped"},
+				{Label: "cov", Value: "PASS", Kind: pattern.KindSuccess, Status: "ok"},
+				{Label: "scan", Value: "error", Kind: pattern.KindError, Status: "error"},
+				{Label: "legacy", Value: "0 diags", Kind: pattern.KindSuccess, Status: ""},
+			},
+		},
+	})
+
+	wantBadges := []string{"[clean]", "[skipped]", "[error]"}
+	for _, b := range wantBadges {
+		if !strings.Contains(out, b) {
+			t.Fatalf("expected %q badge, got:\n%s", b, out)
+		}
+	}
+	// "ok" and "" should NOT emit a badge — they're the default case.
+	if strings.Contains(out, "[ok]") {
+		t.Fatalf("did not expect [ok] badge (default case), got:\n%s", out)
+	}
+}

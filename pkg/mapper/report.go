@@ -28,10 +28,13 @@ func FromReport(sections []report.Section) []pattern.Pattern {
 			pass++
 		}
 
+		status := deriveStatus(sec, kind, scopeLabel)
+
 		toolSummaries = append(toolSummaries, pattern.SummaryItem{
-			Label: sec.Tool,
-			Value: scopeLabel,
-			Kind:  kind,
+			Label:  sec.Tool,
+			Value:  scopeLabel,
+			Kind:   kind,
+			Status: status,
 		})
 
 		// Tag tables with their tool source for renderer grouping
@@ -59,6 +62,40 @@ func FromReport(sections []report.Section) []pattern.Pattern {
 	}
 
 	return append([]pattern.Pattern{topSummary}, allPatterns...)
+}
+
+// deriveStatus returns the effective per-tool status for a section (fo-s76).
+//
+// Precedence: explicit status on the delimiter > derived from mapping result.
+// Derivation rules when the delimiter omitted status (backward compat):
+//   - parse error or format error          → "error"
+//   - content is empty AND kind is success → "clean"
+//   - otherwise                            → "ok"
+func deriveStatus(sec report.Section, kind pattern.ItemKind, _ string) string {
+	if sec.Status != "" {
+		return string(sec.Status)
+	}
+	// Whitespace-only body means the tool produced no output at all — treat
+	// as "clean" even if the format-specific parser would have errored on
+	// empty input. This is the common "ran, zero findings" case.
+	if isEmptyFindingsScope(sec) {
+		return string(report.StatusClean)
+	}
+	if kind == pattern.KindError {
+		return string(report.StatusError)
+	}
+	return string(report.StatusOK)
+}
+
+// isEmptyFindingsScope returns true if the section content is trivially empty
+// whitespace. Used to distinguish "clean" (ran, no findings) from "ok".
+func isEmptyFindingsScope(sec report.Section) bool {
+	for _, b := range sec.Content {
+		if b != ' ' && b != '\t' && b != '\n' && b != '\r' {
+			return false
+		}
+	}
+	return true
 }
 
 func mapSection(sec report.Section) ([]pattern.Pattern, pattern.ItemKind, string) {

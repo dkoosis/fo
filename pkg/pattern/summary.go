@@ -31,6 +31,10 @@ type SummaryItem struct {
 	Label string   // e.g., "Errors", "Warnings", "Passed"
 	Value string   // formatted value
 	Kind  ItemKind // KindSuccess, KindError, KindWarning, KindInfo — affects coloring
+	// Status is the per-tool outcome for report-kind summaries (fo-s76).
+	// One of: "ok", "clean", "partial", "timeout", "skipped", "error".
+	// Empty for non-report summaries or when source had no status info.
+	Status string
 }
 
 func (s *Summary) Type() PatternType { return PatternTypeSummary }

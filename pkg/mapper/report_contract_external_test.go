@@ -143,3 +143,63 @@ func mustSummary(t *testing.T, p pattern.Pattern) *pattern.Summary {
 	}
 	return summary
 }
+
+// fo-s76: per-tool status propagates from delimiter to summary metric.
+func TestFromReport_ExplicitStatusOnDelimiter_PropagatesToSummaryItem(t *testing.T) {
+	t.Parallel()
+
+	sections := []report.Section{
+		{Tool: "vet", Format: "sarif", Status: report.StatusSkipped, Content: []byte("")},
+		{Tool: "lint", Format: "sarif", Status: report.StatusTimeout, Content: []byte("")},
+	}
+	patterns := mapper.FromReport(sections)
+	s := mustSummary(t, patterns[0])
+	if got, want := s.Metrics[0].Status, "skipped"; got != want {
+		t.Fatalf("vet status = %q, want %q", got, want)
+	}
+	if got, want := s.Metrics[1].Status, "timeout"; got != want {
+		t.Fatalf("lint status = %q, want %q", got, want)
+	}
+}
+
+// fo-s76: backward-compat — no status on delimiter derives from content.
+func TestFromReport_MissingStatus_DerivesFromContent(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		section report.Section
+		want    string
+	}{
+		{
+			name:    "empty content derives to clean",
+			section: report.Section{Tool: "t", Format: "sarif", Content: []byte("")},
+			want:    "clean",
+		},
+		{
+			name:    "whitespace-only content derives to clean",
+			section: report.Section{Tool: "t", Format: "sarif", Content: []byte("\n\n  \t\n")},
+			want:    "clean",
+		},
+		{
+			name:    "malformed content derives to error",
+			section: report.Section{Tool: "t", Format: "sarif", Content: []byte("{definitely not json}")},
+			want:    "error",
+		},
+		{
+			name:    "unknown format derives to error",
+			section: report.Section{Tool: "t", Format: "binary", Content: []byte("x")},
+			want:    "error",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			patterns := mapper.FromReport([]report.Section{tc.section})
+			s := mustSummary(t, patterns[0])
+			if got := s.Metrics[0].Status; got != tc.want {
+				t.Fatalf("status = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

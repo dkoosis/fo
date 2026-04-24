@@ -270,17 +270,21 @@ func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestT
 	}
 	sb.WriteString("\n")
 
-	// Tool sections — only tools with findings, in report delimiter order
+	// Tool sections — in report delimiter order.
+	// Render a header for every tool (even clean ones) so status is always
+	// visible; body is omitted when there's no actionable content.
 	for _, m := range reportSummary.Metrics {
 		tool := m.Label
 		toolTables := tablesByTool[tool]
 		toolErrors := errorsByTool[tool]
+		actionable := hasActionableContent(toolTables, toolErrors)
 
-		if !hasActionableContent(toolTables, toolErrors) {
+		// Always surface a header line with status so empty sections
+		// can't be mistaken for silent success (fo-s76).
+		sb.WriteString("\n## " + tool + llmStatusSuffix(m.Status, m.Value) + "\n")
+		if !actionable {
 			continue
 		}
-
-		sb.WriteString("\n## " + tool + "\n")
 
 		// Error patterns first
 		for _, e := range toolErrors {
@@ -320,6 +324,15 @@ func (l *LLM) renderReport(summaries []*pattern.Summary, tables []*pattern.TestT
 	}
 
 	return sb.String()
+}
+
+// llmStatusSuffix returns the "  [status: X, Y]" suffix for a tool header.
+// Empty status renders as [status: unknown] so absence is always explicit.
+func llmStatusSuffix(status, value string) string {
+	if status == "" {
+		status = "unknown"
+	}
+	return "  [status: " + status + ", " + value + "]"
 }
 
 // diagEntry represents a single diagnostic finding for LLM rendering.
