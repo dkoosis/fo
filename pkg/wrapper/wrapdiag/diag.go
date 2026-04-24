@@ -71,7 +71,8 @@ func (d *diag) Convert(r io.Reader, w io.Writer) error {
 		if file == "" {
 			continue
 		}
-		b.AddResult(*d.ruleID, *d.level, msg, file, ln, col)
+		fixCmd := fixCommandFor(*d.toolName, *d.ruleID, file)
+		b.AddResultWithFix(*d.ruleID, *d.level, msg, file, ln, col, fixCmd)
 	}
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("reading input: %w", err)
@@ -79,6 +80,30 @@ func (d *diag) Convert(r io.Reader, w io.Writer) error {
 
 	_, err := b.WriteTo(w)
 	return err
+}
+
+// fixCommandFor returns a best-effort shell command the user can run to
+// fix the finding, or "" if the source tool has no known autofix idiom.
+// Dispatch is by the --tool name passed to the wrapper (e.g. "golangci-lint",
+// "gofmt"); unknown tools return "" so renderers omit the hint.
+func fixCommandFor(tool, ruleID, file string) string {
+	switch tool {
+	case "golangci-lint":
+		// Always emit: we're not gating on whether the rule is autofixable.
+		// If the rule isn't supported, golangci-lint will print a no-op.
+		if ruleID == "" || ruleID == "finding" {
+			return fmt.Sprintf("golangci-lint run --fix %s", file)
+		}
+		return fmt.Sprintf("golangci-lint run --fix --enable-only=%s %s", ruleID, file)
+	case "gofmt":
+		return fmt.Sprintf("gofmt -w %s", file)
+	case "goimports":
+		return fmt.Sprintf("goimports -w %s", file)
+	default:
+		// govulncheck needs a fixed-version we don't have here; generic tools
+		// get no hint. Renderer treats "" as "omit".
+		return ""
+	}
 }
 
 // parseDiagLine parses Go diagnostic formats:

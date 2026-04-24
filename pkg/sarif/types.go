@@ -32,6 +32,15 @@ type Result struct {
 	Level     string     `json:"level"` // "error", "warning", "note", "none"
 	Message   Message    `json:"message"`
 	Locations []Location `json:"locations,omitempty"`
+	Fixes     []Fix      `json:"fixes,omitempty"`
+}
+
+// Fix proposes an action to resolve a result. fo uses Description.Text to
+// carry a shell command (or grep-ready hint) that the user can run to fix
+// or investigate the finding — a fo-specific, spec-compatible use of the
+// SARIF 2.1.0 "fixes" field.
+type Fix struct {
+	Description Message `json:"description"`
 }
 
 // Message contains the issue description.
@@ -77,5 +86,14 @@ func (r *Result) Col() int {
 		return 0
 	}
 	return r.Locations[0].PhysicalLocation.Region.StartColumn
+}
+
+// FixCommand returns the first fix description text, or "" if no fix is
+// attached. fo wrappers put a shell command here during SARIF construction.
+func (r *Result) FixCommand() string {
+	if len(r.Fixes) == 0 {
+		return ""
+	}
+	return r.Fixes[0].Description.Text
 }
 

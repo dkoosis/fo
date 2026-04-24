@@ -47,9 +47,10 @@ func (a *archlint) Convert(r io.Reader, w io.Writer) error {
 	}
 
 	b := sarif.NewBuilder("go-arch-lint", "")
+	const fixCmd = "go-arch-lint check --arch-file .go-arch-lint.yml"
 	for _, d := range raw.Payload.ArchWarningsDeps {
 		msg := fmt.Sprintf("%s \u2192 %s", d.ComponentName, d.ResolvedImportName)
-		b.AddResult("dependency-violation", "error", msg, d.FileRelativePath, 0, 0)
+		b.AddResultWithFix("dependency-violation", "error", msg, d.FileRelativePath, 0, 0, fixCmd)
 	}
 
 	_, err = b.WriteTo(w)

@@ -77,6 +77,29 @@ func TestJscpd_WithClones(t *testing.T) {
 	}
 }
 
+func TestJscpd_FixCommand(t *testing.T) {
+	input := `{"duplicates":[{
+		"format":"go","lines":22,
+		"firstFile":{"name":"a.go","startLoc":{"line":1},"endLoc":{"line":22}},
+		"secondFile":{"name":"b.go","startLoc":{"line":10},"endLoc":{"line":31}}
+	}],"statistics":{}}`
+	var buf bytes.Buffer
+	if err := newJscpd().Convert(strings.NewReader(input), &buf); err != nil {
+		t.Fatal(err)
+	}
+	var doc sarif.Document
+	if err := json.Unmarshal(buf.Bytes(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	got := doc.Runs[0].Results[0].FixCommand()
+	// Grep-ready hint: both ends of the clone pair.
+	for _, want := range []string{"a.go:1-22", "b.go:10-31", "duplicate"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("FixCommand %q missing %q", got, want)
+		}
+	}
+}
+
 func TestJscpd_InvalidJSON(t *testing.T) {
 	var buf bytes.Buffer
 	err := newJscpd().Convert(strings.NewReader("not json"), &buf)

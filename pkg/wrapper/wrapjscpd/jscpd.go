@@ -51,7 +51,10 @@ func (j *jscpd) Convert(r io.Reader, w io.Writer) error {
 	b := sarif.NewBuilder("jscpd", "")
 	for _, c := range clones {
 		msg := fmt.Sprintf("%d lines duplicated with %s:%d-%d", c.Lines, c.FileB, c.StartB, c.EndB)
-		b.AddResult("code-clone", "warning", msg, c.FileA, c.StartA, 0)
+		endA := c.StartA + c.Lines - 1
+		// Diagnostic hint (not a fix): jump to both ends of the clone pair.
+		fixCmd := fmt.Sprintf("# duplicate: %s:%d-%d ↔ %s:%d-%d", c.FileA, c.StartA, endA, c.FileB, c.StartB, c.EndB)
+		b.AddResultWithFix("code-clone", "warning", msg, c.FileA, c.StartA, 0, fixCmd)
 	}
 
 	_, err = b.WriteTo(w)

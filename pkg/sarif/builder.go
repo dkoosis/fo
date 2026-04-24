@@ -69,6 +69,40 @@ func (b *Builder) AddResult(ruleID, level, message, file string, line, col int) 
 	return b
 }
 
+// AddResultWithFix is like AddResult but attaches a fix whose description
+// text is the shell command (or grep-ready hint) to resolve the finding.
+// An empty fixCommand is equivalent to AddResult (no fix attached).
+func (b *Builder) AddResultWithFix(ruleID, level, message, file string, line, col int, fixCommand string) *Builder {
+	if b.err != nil {
+		return b
+	}
+	if !validLevel(level) {
+		b.err = fmt.Errorf("sarif: invalid level %q; must be error, warning, note, or none", level)
+		return b
+	}
+	r := Result{
+		RuleID:  ruleID,
+		Level:   level,
+		Message: Message{Text: message},
+	}
+	if file != "" {
+		r.Locations = []Location{{
+			PhysicalLocation: PhysicalLocation{
+				ArtifactLocation: ArtifactLocation{URI: file},
+				Region: Region{
+					StartLine:   line,
+					StartColumn: col,
+				},
+			},
+		}}
+	}
+	if fixCommand != "" {
+		r.Fixes = []Fix{{Description: Message{Text: fixCommand}}}
+	}
+	b.doc.Runs[0].Results = append(b.doc.Runs[0].Results, r)
+	return b
+}
+
 // Document returns the constructed SARIF document without validation.
 // Use WriteTo for production output — it validates driver name and levels.
 // This method is the "I know what I'm doing" escape hatch for tests and inspection.

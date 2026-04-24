@@ -108,6 +108,79 @@ func TestDiag_WindowsDriveLetter(t *testing.T) {
 	}
 }
 
+func TestDiag_FixCommand_GolangciLint(t *testing.T) {
+	input := "main.go:15:3: unreachable code\n"
+	buf, err := diagConvert(t, []string{"--tool", "golangci-lint", "--rule", "SA4006"}, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc sarif.Document
+	if err := json.Unmarshal(buf.Bytes(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	got := doc.Runs[0].Results[0].FixCommand()
+	want := "golangci-lint run --fix --enable-only=SA4006 main.go"
+	if got != want {
+		t.Errorf("FixCommand = %q, want %q", got, want)
+	}
+}
+
+func TestDiag_FixCommand_Gofmt(t *testing.T) {
+	input := "pkg/handler.go\n"
+	buf, err := diagConvert(t, []string{"--tool", "gofmt"}, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc sarif.Document
+	if err := json.Unmarshal(buf.Bytes(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	got := doc.Runs[0].Results[0].FixCommand()
+	want := "gofmt -w pkg/handler.go"
+	if got != want {
+		t.Errorf("FixCommand = %q, want %q", got, want)
+	}
+}
+
+func TestDiag_FixCommand_UnknownToolOmitted(t *testing.T) {
+	input := "main.go:15:3: some finding\n"
+	buf, err := diagConvert(t, []string{"--tool", "govulncheck"}, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc sarif.Document
+	if err := json.Unmarshal(buf.Bytes(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if got := doc.Runs[0].Results[0].FixCommand(); got != "" {
+		t.Errorf("expected empty FixCommand for unknown tool, got %q", got)
+	}
+	if len(doc.Runs[0].Results[0].Fixes) != 0 {
+		t.Errorf("expected no Fixes attached for unknown tool, got %d", len(doc.Runs[0].Results[0].Fixes))
+	}
+}
+
+func TestFixCommandFor(t *testing.T) {
+	tests := []struct {
+		tool, rule, file string
+		want             string
+	}{
+		{"golangci-lint", "SA4006", "main.go", "golangci-lint run --fix --enable-only=SA4006 main.go"},
+		{"golangci-lint", "finding", "main.go", "golangci-lint run --fix main.go"},
+		{"golangci-lint", "", "main.go", "golangci-lint run --fix main.go"},
+		{"gofmt", "x", "a.go", "gofmt -w a.go"},
+		{"goimports", "x", "a.go", "goimports -w a.go"},
+		{"govulncheck", "x", "a.go", ""},
+		{"unknown", "x", "a.go", ""},
+	}
+	for _, tt := range tests {
+		got := fixCommandFor(tt.tool, tt.rule, tt.file)
+		if got != tt.want {
+			t.Errorf("fixCommandFor(%q,%q,%q) = %q, want %q", tt.tool, tt.rule, tt.file, got, tt.want)
+		}
+	}
+}
+
 func TestParseDiagLine(t *testing.T) {
 	tests := []struct {
 		input             string

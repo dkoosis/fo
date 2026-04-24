@@ -135,6 +135,7 @@ func sarifFileTable(g sarif.GroupedResults) *pattern.TestTable {
 			Name:        r.RuleID + loc,
 			Status:      mapLevel(r.Level),
 			Details:     r.Message.Text,
+			FixCommand:  r.FixCommand(),
 			Fingerprint: pattern.Fingerprint(r.RuleID, g.Key, r.Message.Text),
 		}
 	}

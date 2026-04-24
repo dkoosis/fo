@@ -68,6 +68,25 @@ func TestArchlint_WithViolations(t *testing.T) {
 	}
 }
 
+func TestArchlint_FixCommand(t *testing.T) {
+	input := `{"Type":"models.Check","Payload":{"ArchHasWarnings":true,"ArchWarningsDeps":[
+		{"ComponentName":"search","FileRelativePath":"pkg/search/search.go","ResolvedImportName":"embedder"}
+	],"ArchWarningsNotMatched":[],"ArchWarningsDeepScan":[],"OmittedCount":0,"Qualities":[]}}`
+	var buf bytes.Buffer
+	if err := newArchlint().Convert(strings.NewReader(input), &buf); err != nil {
+		t.Fatal(err)
+	}
+	var doc sarif.Document
+	if err := json.Unmarshal(buf.Bytes(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	got := doc.Runs[0].Results[0].FixCommand()
+	want := "go-arch-lint check --arch-file .go-arch-lint.yml"
+	if got != want {
+		t.Errorf("FixCommand = %q, want %q", got, want)
+	}
+}
+
 func TestArchlint_InvalidJSON(t *testing.T) {
 	var buf bytes.Buffer
 	err := newArchlint().Convert(strings.NewReader("bad"), &buf)
