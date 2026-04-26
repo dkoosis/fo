@@ -36,7 +36,6 @@ import (
 
 	"github.com/dkoosis/fo/internal/detect"
 	"github.com/dkoosis/fo/internal/report"
-	"github.com/dkoosis/fo/pkg/jtbd"
 	"github.com/dkoosis/fo/pkg/mapper"
 	"github.com/dkoosis/fo/pkg/pattern"
 	"github.com/dkoosis/fo/pkg/render"
@@ -76,7 +75,6 @@ FLAGS
 SUBCOMMANDS
   fo wrap <name>     Convert tool output to SARIF or go-test-json
   fo wrap --help     Show available wrappers and their flags
-  fo jtbd            JTBD coverage report from go test -json + // Serves: annotations
 
 EXIT CODES
   0   Clean — no errors or test failures
@@ -105,8 +103,6 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		switch args[0] {
 		case "wrap":
 			return runWrap(args[1:], stdin, stdout, stderr)
-		case "jtbd":
-			return runJTBD(args[1:], stdin, stdout, stderr)
 		case "help":
 			fmt.Fprint(stderr, usage)
 			return 0
@@ -279,9 +275,8 @@ func resolveFormat(format string, w io.Writer) string {
 }
 
 // exitCode returns 0 for clean, 1 for failures present.
-// Failures propagate through TestTable fail items (real failures), Error
-// patterns (parse failures), or JTBDCoverage with failing jobs.
-// Summary is display-only, not a decision input.
+// Failures propagate through TestTable fail items (real failures) or Error
+// patterns (parse failures). Summary is display-only, not a decision input.
 func exitCode(patterns []pattern.Pattern) int {
 	for _, p := range patterns {
 		switch v := p.(type) {
@@ -291,102 +286,9 @@ func exitCode(patterns []pattern.Pattern) int {
 					return 1
 				}
 			}
-		case *pattern.JTBDCoverage:
-			for _, e := range v.Entries {
-				if e.Fail > 0 {
-					return 1
-				}
-			}
 		case *pattern.Error:
 			return 1
 		}
-	}
-	return 0
-}
-
-func runJTBD(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	fs := flag.NewFlagSet("fo jtbd", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	sourceFlag := fs.String("source", "", "Source root (default: discover from cwd via go.mod)")
-	formatFlag := fs.String("format", "auto", "Output format: auto, human, llm, json")
-	themeFlag := fs.String("theme", "default", "Theme: default, orca, mono")
-	if err := fs.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			return 0
-		}
-		return 2
-	}
-
-	// Discover source root.
-	source := *sourceFlag
-	if source == "" {
-		var err error
-		source, err = os.Getwd()
-		if err != nil {
-			fmt.Fprintf(stderr, "fo jtbd: %v\n", err)
-			return 2
-		}
-	}
-
-	// Batch: read all stdin.
-	input, err := io.ReadAll(stdin)
-	if err != nil {
-		fmt.Fprintf(stderr, "fo jtbd: reading stdin: %v\n", err)
-		return 2
-	}
-	if len(input) == 0 {
-		fmt.Fprintf(stderr, "fo jtbd: no input on stdin\nUsage: go test -json ./... | fo jtbd\n")
-		return 2
-	}
-
-	// Parse go test -json events for per-function results.
-	events, malformed, err := parseEvents(input)
-	if err != nil {
-		fmt.Fprintf(stderr, "fo jtbd: parsing go test -json: %v\n", err)
-		return 2
-	}
-	if malformed > 0 {
-		fmt.Fprintf(stderr, "fo jtbd: warning: %d malformed line(s) skipped\n", malformed)
-	}
-	results := testjson.FuncResults(events)
-
-	// Scan annotations from source.
-	annotations, err := jtbd.Scan(source)
-	if err != nil {
-		fmt.Fprintf(stderr, "fo jtbd: scanning annotations: %v\n", err)
-		return 2
-	}
-
-	// Load optional manifest.
-	jobs := jtbd.LoadManifest(source)
-
-	// Assemble coverage.
-	entries := jtbd.Assemble(annotations, results, jobs, stderr)
-
-	// Compute summary counts.
-	totalJobs := len(entries)
-	coveredJobs := 0
-	hasFailing := false
-	for _, e := range entries {
-		if e.TestCount > 0 {
-			coveredJobs++
-		}
-		if e.Fail > 0 {
-			hasFailing = true
-		}
-	}
-
-	// Map to pattern.
-	p := mapper.MapJTBDCoverage(entries, totalJobs, coveredJobs)
-
-	// Render.
-	mode := resolveFormat(*formatFlag, stdout)
-	output := selectRenderer(mode, *themeFlag, newRunMeta(input)).Render([]pattern.Pattern{p})
-	fmt.Fprint(stdout, output)
-
-	// Exit codes per D6: 0=pass/uncovered, 1=any failing, 2=fo error.
-	if hasFailing {
-		return 1
 	}
 	return 0
 }

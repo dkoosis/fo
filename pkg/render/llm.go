@@ -151,46 +151,8 @@ func (l *LLM) Render(patterns []pattern.Pattern) string {
 // renderOne handles pattern types via direct type switch.
 // Returns "" for pattern types handled by the legacy SummaryKind dispatch.
 func (l *LLM) renderOne(p pattern.Pattern) string {
-	switch v := p.(type) {
-	case *pattern.JTBDCoverage:
-		return l.renderJTBDCoverage(v)
-	default:
-		return ""
-	}
-}
-
-func (l *LLM) renderJTBDCoverage(j *pattern.JTBDCoverage) string {
-	var sb strings.Builder
-	fmt.Fprintf(&sb, "JTBD Coverage  %d/%d jobs covered\n\n", j.CoveredJobs, j.TotalJobs)
-
-	// Header
-	sb.WriteString(" Code      Tests  Pass  Fail  Job\n")
-
-	for _, e := range j.Entries {
-		icon := "·"
-		if e.TestCount > 0 && e.Fail == 0 {
-			icon = "✓"
-		} else if e.Fail > 0 {
-			icon = "✗"
-		}
-
-		passStr := fmt.Sprintf("%d", e.Pass)
-		failStr := fmt.Sprintf("%d", e.Fail)
-		if e.TestCount == 0 {
-			passStr = "—"
-			failStr = "—"
-		}
-
-		name := e.Name
-		if name != "" {
-			name = icon + " " + name
-		}
-
-		fmt.Fprintf(&sb, " %-8s  %4d  %4s  %4s  %s\n",
-			e.Code, e.TestCount, passStr, failStr, name)
-	}
-
-	return sb.String()
+	_ = p
+	return ""
 }
 
 // classifyTools counts findings per severity and splits tools into failing/passing.

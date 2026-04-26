@@ -38,8 +38,6 @@ func (t *Human) renderOne(p pattern.Pattern) string {
 		return t.renderLeaderboard(v)
 	case *pattern.TestTable:
 		return t.renderTestTable(v)
-	case *pattern.JTBDCoverage:
-		return t.renderJTBDCoverage(v)
 	case *pattern.Error:
 		return t.renderError(v)
 	default:
@@ -198,49 +196,6 @@ func (t *Human) statusIconStyle(status pattern.Status) (string, lipgloss.Style) 
 	default:
 		return t.theme.Icons.Info, t.theme.Muted
 	}
-}
-
-func (t *Human) renderJTBDCoverage(j *pattern.JTBDCoverage) string {
-	var sb strings.Builder
-	sb.WriteString(t.theme.Bold.Render(
-		fmt.Sprintf("JTBD Coverage  %d/%d jobs covered", j.CoveredJobs, j.TotalJobs)))
-	sb.WriteString("\n\n")
-
-	maxCode := 4
-	for _, e := range j.Entries {
-		if len(e.Code) > maxCode {
-			maxCode = len(e.Code)
-		}
-	}
-
-	for _, e := range j.Entries {
-		sb.WriteString("  ")
-
-		if e.TestCount == 0 {
-			// Uncovered — dim
-			line := fmt.Sprintf("%-*s  %4d     —     —", maxCode, e.Code, e.TestCount)
-			if e.Name != "" {
-				line += "  · " + e.Name
-			}
-			sb.WriteString(t.theme.Muted.Render(line))
-		} else if e.Fail > 0 {
-			// Failing — red
-			line := fmt.Sprintf("%-*s  %4d  %4d  %4d", maxCode, e.Code, e.TestCount, e.Pass, e.Fail)
-			if e.Name != "" {
-				line += "  ✗ " + e.Name
-			}
-			sb.WriteString(t.theme.Error.Render(line))
-		} else {
-			// Passing — green
-			line := fmt.Sprintf("%-*s  %4d  %4d  %4d", maxCode, e.Code, e.TestCount, e.Pass, e.Fail)
-			if e.Name != "" {
-				line += "  ✓ " + e.Name
-			}
-			sb.WriteString(t.theme.Success.Render(line))
-		}
-		sb.WriteString("\n")
-	}
-	return sb.String()
 }
 
 func (t *Human) renderError(e *pattern.Error) string {
