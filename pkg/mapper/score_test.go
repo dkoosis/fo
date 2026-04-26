@@ -6,6 +6,7 @@ import (
 	"github.com/dkoosis/fo/pkg/mapper"
 	"github.com/dkoosis/fo/pkg/pattern"
 	"github.com/dkoosis/fo/pkg/sarif"
+	"github.com/dkoosis/fo/pkg/score"
 )
 
 // TestFromSARIF_ScoreUsesOccurrenceCountAcrossFiles verifies the mapper
@@ -31,8 +32,8 @@ func TestFromSARIF_ScoreUsesOccurrenceCountAcrossFiles(t *testing.T) {
 	patterns := mapper.FromSARIF(doc)
 
 	// Find the table for pkg/a/a.go and check its Score reflects occurrence=3.
-	wantDup := pattern.Score(pattern.SeverityWeightWarning, 3, "pkg/a/a.go") // 2 * 3 * 1.0 = 6
-	wantE1 := pattern.Score(pattern.SeverityWeightError, 1, "pkg/x/x.go")    // 3 * 1 * 1.0 = 3
+	wantDup := score.Score(score.SeverityWeightWarning, 3, "pkg/a/a.go") // 2 * 3 * 1.0 = 6
+	wantE1 := score.Score(score.SeverityWeightError, 1, "pkg/x/x.go")    // 3 * 1 * 1.0 = 3
 
 	if got := findScore(patterns, "pkg/a/a.go", "DUP:10:0"); got != wantDup {
 		t.Errorf("DUP score = %v, want %v", got, wantDup)

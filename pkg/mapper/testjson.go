@@ -6,7 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dkoosis/fo/pkg/fingerprint"
 	"github.com/dkoosis/fo/pkg/pattern"
+	"github.com/dkoosis/fo/pkg/score"
 	"github.com/dkoosis/fo/pkg/testjson"
 )
 
@@ -120,9 +122,9 @@ func panicTable(r testjson.TestPackageResult) *pattern.TestTable {
 		Name:        "PANIC",
 		Status:      pattern.StatusFail,
 		Details:     details,
-		Fingerprint: pattern.Fingerprint("PANIC", r.Name, details),
+		Fingerprint: fingerprint.Fingerprint("PANIC", r.Name, details),
 		FixCommand:  fixCmd,
-		Score:       pattern.Score(pattern.SeverityWeightError, 1, r.Name),
+		Score:       score.Score(score.SeverityWeightError, 1, r.Name),
 	}}
 	return &pattern.TestTable{
 		Label:   "PANIC " + shortPkgName(r.Name),
@@ -136,9 +138,9 @@ func buildErrorTable(r testjson.TestPackageResult) *pattern.TestTable {
 		Name:        "BUILD ERROR",
 		Status:      pattern.StatusFail,
 		Details:     details,
-		Fingerprint: pattern.Fingerprint("BUILD_ERROR", r.Name, details),
+		Fingerprint: fingerprint.Fingerprint("BUILD_ERROR", r.Name, details),
 		FixCommand:  fmt.Sprintf("go build %s", r.Name),
-		Score:       pattern.Score(pattern.SeverityWeightError, 1, r.Name),
+		Score:       score.Score(score.SeverityWeightError, 1, r.Name),
 	}}
 	return &pattern.TestTable{
 		Label:   "BUILD FAIL " + shortPkgName(r.Name),
@@ -157,9 +159,9 @@ func failedPkgTable(r testjson.TestPackageResult) *pattern.TestTable {
 			Name:        ft.Name,
 			Status:      pattern.StatusFail,
 			Details:     details,
-			Fingerprint: pattern.Fingerprint(ft.Name, r.Name, details),
+			Fingerprint: fingerprint.Fingerprint(ft.Name, r.Name, details),
 			FixCommand:  testFixCommand(r.Name, ft.Name),
-			Score:       pattern.Score(pattern.SeverityWeightError, 1, pathKey),
+			Score:       score.Score(score.SeverityWeightError, 1, pathKey),
 		})
 	}
 	return &pattern.TestTable{

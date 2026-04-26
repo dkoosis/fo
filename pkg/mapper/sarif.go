@@ -7,8 +7,10 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/dkoosis/fo/pkg/fingerprint"
 	"github.com/dkoosis/fo/pkg/pattern"
 	"github.com/dkoosis/fo/pkg/sarif"
+	"github.com/dkoosis/fo/pkg/score"
 )
 
 // FromSARIF converts a SARIF document into visualization patterns.
@@ -58,7 +60,7 @@ func sarifOccurrenceCounts(groups []sarif.GroupedResults) map[string]int {
 	counts := make(map[string]int)
 	for _, g := range groups {
 		for _, r := range g.Results {
-			k := r.RuleID + "\x00" + pattern.NormalizeMessage(r.Message.Text)
+			k := r.RuleID + "\x00" + fingerprint.NormalizeMessage(r.Message.Text)
 			counts[k]++
 		}
 	}
@@ -143,7 +145,7 @@ func sarifFileTable(g sarif.GroupedResults, counts map[string]int) *pattern.Test
 		if r.Line() > 0 {
 			loc = fmt.Sprintf(":%d:%d", r.Line(), r.Col())
 		}
-		occ := counts[r.RuleID+"\x00"+pattern.NormalizeMessage(r.Message.Text)]
+		occ := counts[r.RuleID+"\x00"+fingerprint.NormalizeMessage(r.Message.Text)]
 		if occ == 0 {
 			occ = 1 // defensive: an item exists, so it occurs at least once
 		}
@@ -152,8 +154,8 @@ func sarifFileTable(g sarif.GroupedResults, counts map[string]int) *pattern.Test
 			Status:      mapLevel(r.Level),
 			Details:     r.Message.Text,
 			FixCommand:  r.FixCommand(),
-			Fingerprint: pattern.Fingerprint(r.RuleID, g.Key, r.Message.Text),
-			Score:       pattern.Score(pattern.SeverityWeight(r.Level), occ, g.Key),
+			Fingerprint: fingerprint.Fingerprint(r.RuleID, g.Key, r.Message.Text),
+			Score:       score.Score(score.SeverityWeight(r.Level), occ, g.Key),
 		}
 	}
 

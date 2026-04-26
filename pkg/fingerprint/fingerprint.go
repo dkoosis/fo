@@ -1,4 +1,4 @@
-package pattern
+package fingerprint
 
 import (
 	"crypto/sha256"

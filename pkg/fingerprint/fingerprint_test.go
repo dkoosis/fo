@@ -1,4 +1,4 @@
-package pattern
+package fingerprint
 
 import (
 	"testing"
