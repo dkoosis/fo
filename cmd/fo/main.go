@@ -4,24 +4,24 @@
 //
 //	golangci-lint run --output.sarif.path=stdout ./... | fo
 //	go test -json ./... | fo
-//	go vet ./... 2>&1 | fo wrap sarif --tool govet
+//	go vet ./... 2>&1 | fo wrap diag --tool govet
 //
 // Accepts two input formats on stdin:
 //   - SARIF 2.1.0 (static analysis results)
 //   - go test -json (test execution results)
 //
-// Output modes (auto-detected):
+// Output formats (--format):
 //
-//	human  — styled Unicode output (default when TTY)
-//	llm    — terse plain text for AI consumption (default when piped)
-//	json   — structured JSON for automation
+//	auto   — TTY → human, piped → llm (default)
+//	human  — Tufte-Swiss styled terminal output
+//	llm    — token-dense plain text, no ANSI
+//	json   — machine-parseable Report JSON
 package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -30,23 +30,25 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"time"
 
 	"golang.org/x/term"
 
-	"github.com/dkoosis/fo/internal/detect"
-	"github.com/dkoosis/fo/internal/report"
-	"github.com/dkoosis/fo/pkg/mapper"
-	"github.com/dkoosis/fo/pkg/pattern"
-	"github.com/dkoosis/fo/pkg/render"
+	"github.com/dkoosis/fo/pkg/report"
 	"github.com/dkoosis/fo/pkg/sarif"
 	"github.com/dkoosis/fo/pkg/state"
-	"github.com/dkoosis/fo/pkg/stream"
 	"github.com/dkoosis/fo/pkg/testjson"
+	"github.com/dkoosis/fo/pkg/theme"
+	"github.com/dkoosis/fo/pkg/view"
 	"github.com/dkoosis/fo/pkg/wrapper"
-	_ "github.com/dkoosis/fo/pkg/wrapper/wraparchlint"
-	_ "github.com/dkoosis/fo/pkg/wrapper/wrapdiag"
-	_ "github.com/dkoosis/fo/pkg/wrapper/wrapjscpd"
+	"github.com/dkoosis/fo/pkg/wrapper/wraparchlint"
+	"github.com/dkoosis/fo/pkg/wrapper/wrapdiag"
+	"github.com/dkoosis/fo/pkg/wrapper/wrapjscpd"
+)
+
+const (
+	formatHuman = "human"
+	formatLLM   = "llm"
+	formatJSON  = "json"
 )
 
 func main() {
@@ -61,52 +63,36 @@ USAGE
 
 INPUT FORMATS (auto-detected from stdin)
   SARIF 2.1.0     Static analysis results (golangci-lint, gosec, etc.)
-  go test -json   Test execution stream (supports live + batch)
+  go test -json   Test execution stream
 
 OUTPUT FORMATS (--format)
   auto            TTY → human, piped → llm (default)
-  human           Styled Unicode with color and sparklines
-  llm             Terse plain text, no ANSI — optimized for AI consumption
-  json            Structured JSON for automation
+  human           Tufte-Swiss styled terminal output
+  llm             Token-dense plain text, no ANSI
+  json            Machine-parseable Report JSON
 
 FLAGS
-  --format <mode>   Output format: auto | human | llm | json (default: auto)
-  --theme <name>    Color theme: default | orca | mono (default: default)
+  --format <mode>   auto | human | llm | json (default: auto)
+  --theme <name>    color | mono (default: auto — color on TTY, mono otherwise)
 
 SUBCOMMANDS
-  fo wrap <name>     Convert tool output to SARIF or go-test-json
-  fo wrap --help     Show available wrappers and their flags
+  fo wrap <name>     Convert tool output to SARIF
+  fo wrap --help     Show available wrappers
 
 EXIT CODES
   0   Clean — no errors or test failures
   1   Failures — lint errors or test failures present
   2   Usage error — bad flags, unrecognized input, stdin problems
-
-EXAMPLES
-  golangci-lint run --output.sarif.path=stdout ./... | fo
-  go test -json ./... | fo
-  go test -json ./... | fo --format llm
-  go vet ./... 2>&1 | fo wrap diag --tool govet | fo
-  gofmt -l ./... | fo wrap diag --tool gofmt --rule needs-formatting
-  jscpd --reporters json . | fo wrap jscpd | fo
-
-BEHAVIOR NOTES
-  - Reads all input from stdin; does not accept file arguments
-  - TTY auto-detection: human style when stdout is a TTY, LLM mode when piped
-  - Live streaming mode activates for go test -json when stdout is a TTY
-  - NO_COLOR env var forces mono theme
-  - SARIF input supports multiple runs (multiple tools in one document)
 `
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	// Check for subcommands before flag parsing
 	if len(args) > 0 {
 		switch args[0] {
 		case "wrap":
 			return runWrap(args[1:], stdin, stdout, stderr)
 		case "state":
 			return runState(args[1:], stdout, stderr)
-		case "help":
+		case "help", "-h", "--help":
 			fmt.Fprint(stderr, usage)
 			return 0
 		}
@@ -116,9 +102,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	fs.Usage = func() { fmt.Fprint(stderr, usage) }
 	formatFlag := fs.String("format", "auto", "Output format: auto, human, llm, json")
-	themeFlag := fs.String("theme", "default", "Theme: default, orca, mono")
-	_ = fs.String("state-file", state.DefaultPath, "Sidecar state file for diff vs prior run")
-	_ = fs.Bool("no-state", false, "Disable read+write of sidecar state")
+	themeFlag := fs.String("theme", "auto", "Theme: auto, color, mono")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -126,9 +110,6 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	// Peek stdin to detect format without consuming.
-	// Peek returns err on short reads (io.EOF, ErrBufferFull) — those are fine
-	// as long as we got bytes. A real read error with zero bytes is distinct.
 	br := bufio.NewReaderSize(stdin, 8*1024)
 	peeked, peekErr := br.Peek(4096)
 	if len(peeked) == 0 {
@@ -140,55 +121,156 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	format := detect.Sniff(peeked)
-
-	// Stream mode: go test -json + TTY stdout + auto format
-	if format == detect.GoTestJSON && isTTYWriter(stdout) && *formatFlag == "auto" {
-		return runStream(stdin, br, stdout)
-	}
-
-	// Batch mode: read all input, parse, render.
-	input, err := io.ReadAll(br)
-	if err != nil {
-		fmt.Fprintf(stderr, "fo: reading stdin: %v\n", err)
-		return 2
-	}
-	meta := newRunMeta(input)
-	if format == detect.Unknown {
-		format = detect.Sniff(input)
-	}
-
-	patterns, err := parseInput(format, input, stderr)
+	mode, err := resolveFormat(*formatFlag, stdout)
 	if err != nil {
 		fmt.Fprintf(stderr, "fo: %v\n", err)
 		return 2
 	}
 
-	mode := resolveFormat(*formatFlag, stdout)
-	switch mode {
-	case "human", "llm", "json":
-		// valid
-	default:
-		fmt.Fprintf(stderr, "fo: unknown format %q (expected auto, human, llm, json)\n", *formatFlag)
+	// Stream mode: go test -json + TTY + format=auto. The streaming path
+	// owns its own parser → channel → RenderStream pump.
+	if *formatFlag == "auto" && isTTYWriter(stdout) && sniffGoTestJSON(peeked) {
+		return runStream(stdin, br, stdout, resolveTheme(*themeFlag, stdout))
+	}
+
+	input, err := io.ReadAll(br)
+	if err != nil {
+		fmt.Fprintf(stderr, "fo: reading stdin: %v\n", err)
 		return 2
 	}
 
-	output := selectRenderer(mode, *themeFlag, meta).Render(patterns)
-	fmt.Fprint(stdout, output)
-	return exitCode(patterns)
+	r, err := parseToReport(input, stderr)
+	if err != nil {
+		fmt.Fprintf(stderr, "fo: %v\n", err)
+		return 2
+	}
+
+	if err := renderMode(mode, r, stdout, *themeFlag); err != nil {
+		fmt.Fprintf(stderr, "fo: %v\n", err)
+		return 2
+	}
+	return exitCodeReport(r)
 }
 
-// isTTYWriter reports whether w is a terminal.
+func renderMode(mode string, r *report.Report, stdout io.Writer, themeName string) error {
+	if mode == formatJSON {
+		return writeReportJSON(stdout, r)
+	}
+	t := resolveTheme(themeName, stdout)
+	if mode == formatLLM {
+		t = theme.Mono()
+	}
+	width, _ := termSize(stdout)
+	return view.RenderReport(stdout, *r, t, width)
+}
+
+// sniffGoTestJSON returns true when peeked stdin starts with a go test -json
+// event line. Inlined so the v2 dispatch doesn't import internal/detect.
+func sniffGoTestJSON(data []byte) bool {
+	data = bytes.TrimLeft(data, " \t\n\r")
+	if len(data) == 0 || data[0] != '{' {
+		return false
+	}
+	first := data
+	if i := bytes.IndexAny(data, "\n\r"); i >= 0 {
+		first = data[:i]
+	}
+	var ev struct{ Action string }
+	if err := json.Unmarshal(first, &ev); err != nil {
+		return false
+	}
+	switch ev.Action {
+	case "start", "run", "pause", "cont", "pass", "bench", "fail", "output", "skip":
+		return true
+	}
+	return false
+}
+
+// sniffSARIF returns true when data is a SARIF 2.1.0 document. Tolerates
+// trailing text (golangci-lint v2 appends a summary).
+func sniffSARIF(data []byte) bool {
+	var probe struct {
+		Version string            `json:"version"`
+		Runs    []json.RawMessage `json:"runs"`
+	}
+	if err := json.NewDecoder(bytes.NewReader(data)).Decode(&probe); err != nil {
+		return false
+	}
+	return probe.Version == "2.1.0" && probe.Runs != nil
+}
+
+// parseToReport sniffs the input format and parses it into a *report.Report.
+// SARIF takes precedence; go test -json is the fallback when SARIF probe fails.
+func parseToReport(input []byte, stderr io.Writer) (*report.Report, error) {
+	trimmed := bytes.TrimLeft(input, " \t\n\r")
+	if len(trimmed) == 0 || trimmed[0] != '{' {
+		return nil, fmt.Errorf("unrecognized input (expected SARIF or go test -json)")
+	}
+	if sniffSARIF(input) {
+		doc, err := sarif.ReadBytes(input)
+		if err != nil {
+			return nil, fmt.Errorf("parsing SARIF: %w", err)
+		}
+		return sarif.ToReportWithMeta(doc, input), nil
+	}
+	if sniffGoTestJSON(input) {
+		results, malformed, err := testjson.ParseBytes(input)
+		if err != nil {
+			return nil, fmt.Errorf("parsing go test -json: %w", err)
+		}
+		if malformed > 0 {
+			fmt.Fprintf(stderr, "fo: warning: %d malformed line(s) skipped\n", malformed)
+		}
+		return testjson.ToReportWithMeta(results, input), nil
+	}
+	return nil, fmt.Errorf("unrecognized input (expected SARIF or go test -json)")
+}
+
+func writeReportJSON(w io.Writer, r *report.Report) error {
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(r)
+}
+
+func resolveFormat(format string, w io.Writer) (string, error) {
+	switch format {
+	case "auto":
+		if isTTYWriter(w) {
+			return formatHuman, nil
+		}
+		return formatLLM, nil
+	case formatHuman, formatLLM, formatJSON:
+		return format, nil
+	default:
+		return "", fmt.Errorf("unknown format %q (expected auto, human, llm, json)", format)
+	}
+}
+
+// resolveTheme picks the theme. NO_COLOR env or non-TTY stdout forces mono;
+// explicit --theme overrides auto.
+func resolveTheme(name string, w io.Writer) theme.Theme {
+	if os.Getenv("NO_COLOR") != "" {
+		return theme.Mono()
+	}
+	switch name {
+	case "color":
+		return theme.Color()
+	case "mono":
+		return theme.Mono()
+	default:
+		return theme.Default(isTTYWriter(w))
+	}
+}
+
 func isTTYWriter(w io.Writer) bool {
 	f, ok := w.(*os.File)
-	return ok && term.IsTerminal(int(f.Fd())) //nolint:gosec // file descriptor fits in int on all supported platforms
+	return ok && term.IsTerminal(int(f.Fd())) //nolint:gosec // file descriptor fits in int
 }
 
-// termSize returns the terminal dimensions for w, defaulting to 80x24.
 func termSize(w io.Writer) (width, height int) {
 	width, height = 80, 24
 	if f, ok := w.(*os.File); ok {
-		if tw, th, err := term.GetSize(int(f.Fd())); err == nil { //nolint:gosec // file descriptor fits in int on all supported platforms
+		if tw, th, err := term.GetSize(int(f.Fd())); err == nil { //nolint:gosec
 			if tw > 0 {
 				width = tw
 			}
@@ -200,124 +282,62 @@ func termSize(w io.Writer) (width, height int) {
 	return width, height
 }
 
-// runStream handles the live streaming path (go test -json + TTY).
-func runStream(stdin io.Reader, br *bufio.Reader, stdout io.Writer) int {
+// runStream pumps go test -json events into per-package Report snapshots and
+// hands them to view.RenderStream. One channel send per finished package
+// keeps PickView's total-driven thresholds meaningful.
+func runStream(stdin io.Reader, br *bufio.Reader, stdout io.Writer, t theme.Theme) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	// Close the underlying reader on cancel to unblock Stream's scanner goroutine.
-	// bufio.Reader doesn't implement io.Closer, so Stream can't close it itself.
 	if c, ok := stdin.(io.Closer); ok {
 		stopClose := context.AfterFunc(ctx, func() { _ = c.Close() })
 		defer stopClose()
 	}
-	width, height := termSize(stdout)
-	return stream.Run(ctx, br, stdout, width, height)
+	width, _ := termSize(stdout)
+
+	// Buffer all events, parse, then stream snapshots — keeps the streaming
+	// path simple for v2. fo-7f5.9 will swap in true incremental streaming.
+	data, err := io.ReadAll(br)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "fo: reading stdin: %v\n", err)
+		return 2
+	}
+	results, _, err := testjson.ParseBytes(data)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "fo: %v\n", err)
+		return 2
+	}
+	r := testjson.ToReportWithMeta(results, data)
+
+	ch := make(chan report.Report, 1)
+	ch <- *r
+	close(ch)
+	if err := view.RenderStream(ctx, stdout, ch, t, width); err != nil && !errors.Is(err, context.Canceled) {
+		fmt.Fprintf(os.Stderr, "fo: %v\n", err)
+		return 2
+	}
+	return exitCodeReport(r)
 }
 
-// parseInput parses raw bytes according to the detected format.
-// Malformed-line warnings are written to stderr; parse failures return an error.
-func parseInput(format detect.Format, input []byte, stderr io.Writer) ([]pattern.Pattern, error) {
-	switch format {
-	case detect.SARIF:
-		doc, err := sarif.ReadBytes(input)
-		if err != nil {
-			return nil, fmt.Errorf("parsing SARIF: %w", err)
-		}
-		return mapper.FromSARIF(doc), nil
-	case detect.GoTestJSON:
-		results, malformed, err := testjson.ParseBytes(input)
-		if err != nil {
-			return nil, fmt.Errorf("parsing go test -json: %w", err)
-		}
-		if malformed > 0 {
-			fmt.Fprintf(stderr, "fo: warning: %d malformed line(s) skipped\n", malformed)
-		}
-		return mapper.FromTestJSON(results), nil
-	case detect.Report:
-		sections, err := report.Parse(input)
-		if err != nil {
-			return nil, fmt.Errorf("parsing report: %w", err)
-		}
-		return mapper.FromReport(sections), nil
-	default:
-		return nil, fmt.Errorf("unrecognized input format (expected SARIF, go test -json, or report)")
+// exitCodeReport: 1 if any error finding or non-pass/skip test outcome.
+func exitCodeReport(r *report.Report) int {
+	if r == nil {
+		return 0
 	}
-}
-
-func selectRenderer(mode, themeName string, meta render.RunMeta) render.Renderer {
-	switch mode {
-	case "json":
-		return render.NewJSON().WithMeta(meta)
-	case "llm":
-		return render.NewLLM().WithMeta(meta)
-	default:
-		theme := render.ThemeByName(themeName)
-		if os.Getenv("NO_COLOR") != "" {
-			theme = render.MonoTheme()
+	for _, f := range r.Findings {
+		if f.Severity == report.SeverityError {
+			return 1
 		}
-		return render.NewHuman(theme)
 	}
-}
-
-// newRunMeta builds an envelope with a stable hash of the input bytes
-// (first 12 hex chars of sha256) and an RFC3339 timestamp.
-func newRunMeta(input []byte) render.RunMeta {
-	sum := sha256.Sum256(input)
-	return render.RunMeta{
-		DataHash:    hex.EncodeToString(sum[:])[:12],
-		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
-	}
-}
-
-func resolveFormat(format string, w io.Writer) string {
-	if format != "auto" {
-		return format
-	}
-	if isTTYWriter(w) {
-		return "human"
-	}
-	return "llm"
-}
-
-// exitCode returns 0 for clean, 1 for failures present.
-// Failures propagate through TestTable fail items (real failures) or Error
-// patterns (parse failures). Summary is display-only, not a decision input.
-func exitCode(patterns []pattern.Pattern) int {
-	for _, p := range patterns {
-		switch v := p.(type) {
-		case *pattern.TestTable:
-			for _, r := range v.Results {
-				if r.Status == pattern.StatusFail {
-					return 1
-				}
-			}
-		case *pattern.Error:
+	for _, t := range r.Tests {
+		switch t.Outcome {
+		case report.OutcomeFail, report.OutcomePanic, report.OutcomeBuildError:
 			return 1
 		}
 	}
 	return 0
 }
 
-// parseEvents decodes go test -json NDJSON into raw TestEvents for FuncResults.
-func parseEvents(data []byte) ([]testjson.TestEvent, int, error) {
-	var events []testjson.TestEvent
-	var malformed int
-	for _, line := range strings.Split(string(data), "\n") {
-		if line == "" {
-			continue
-		}
-		var e testjson.TestEvent
-		if err := json.Unmarshal([]byte(line), &e); err != nil {
-			malformed++
-			continue
-		}
-		events = append(events, e)
-	}
-	return events, malformed, nil
-}
-
-// runState handles `fo state <subcommand>`. Currently only `reset` is
-// supported; it deletes the sidecar so the next run starts fresh.
+// runState handles `fo state <subcommand>`. Currently only `reset`.
 func runState(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("fo state", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -347,6 +367,10 @@ func runState(args []string, stdout, stderr io.Writer) int {
 	}
 }
 
+// runWrap dispatches `fo wrap <name>`. The three canonical wrappers
+// (archlint, diag, jscpd) hit the new Convert functions directly; any other
+// registered wrapper falls back to the plugin interface so contract tests
+// keep passing.
 func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintf(stderr, "fo wrap: wrapper name required\n\nAvailable wrappers: %s\n",
@@ -354,33 +378,52 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 	if args[0] == "-h" || args[0] == "--help" || args[0] == "help" {
-		fmt.Fprintf(stderr, "fo wrap: convert tool output to SARIF or go-test-json\n\n")
-		for _, name := range wrapper.Names() {
-			fmt.Fprintf(stderr, "  %-12s %s\n", name, wrapper.Description(name))
-			w := wrapper.Get(name)
-			fs := flag.NewFlagSet(name, flag.ContinueOnError)
-			w.RegisterFlags(fs)
-			// Single iteration: print flags if any exist.
-			fs.VisitAll(func(f *flag.Flag) {
-				fmt.Fprintf(stderr, "    --%-10s %s", f.Name, f.Usage)
-				if f.DefValue != "" && f.DefValue != "false" {
-					fmt.Fprintf(stderr, " (default: %s)", f.DefValue)
-				}
-				fmt.Fprintln(stderr)
-			})
-			fmt.Fprintln(stderr)
-		}
-		return 0
-	}
-	w := wrapper.Get(args[0])
-	if w == nil {
-		fmt.Fprintf(stderr, "fo wrap: unknown wrapper %q\n\nAvailable wrappers: %s\n",
-			args[0], strings.Join(wrapper.Names(), ", "))
-		return 2
+		return runWrapHelp(stderr)
 	}
 
-	// Framework owns flag lifecycle — wrapper just registers its flags.
-	fs := flag.NewFlagSet("fo wrap "+args[0], flag.ContinueOnError)
+	name := args[0]
+	switch name {
+	case "archlint":
+		fs := flag.NewFlagSet("fo wrap archlint", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		if err := fs.Parse(args[1:]); err != nil {
+			if errors.Is(err, flag.ErrHelp) {
+				return 0
+			}
+			return 2
+		}
+		if err := wraparchlint.Convert(stdin, stdout); err != nil {
+			fmt.Fprintf(stderr, "fo wrap archlint: %v\n", err)
+			return 2
+		}
+		return 0
+	case "jscpd":
+		fs := flag.NewFlagSet("fo wrap jscpd", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		if err := fs.Parse(args[1:]); err != nil {
+			if errors.Is(err, flag.ErrHelp) {
+				return 0
+			}
+			return 2
+		}
+		if err := wrapjscpd.Convert(stdin, stdout); err != nil {
+			fmt.Fprintf(stderr, "fo wrap jscpd: %v\n", err)
+			return 2
+		}
+		return 0
+	case "diag":
+		return runWrapDiag(args[1:], stdin, stdout, stderr)
+	}
+
+	// Fallback: any other registered wrapper (none today, but keeps the
+	// plugin layer working for fo-7f5.9 cutover).
+	w := wrapper.Get(name)
+	if w == nil {
+		fmt.Fprintf(stderr, "fo wrap: unknown wrapper %q\n\nAvailable wrappers: %s\n",
+			name, strings.Join(wrapper.Names(), ", "))
+		return 2
+	}
+	fs := flag.NewFlagSet("fo wrap "+name, flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	w.RegisterFlags(fs)
 	if err := fs.Parse(args[1:]); err != nil {
@@ -389,10 +432,49 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 		return 2
 	}
-
 	if err := w.Convert(stdin, stdout); err != nil {
-		fmt.Fprintf(stderr, "fo wrap %s: %v\n", args[0], err)
+		fmt.Fprintf(stderr, "fo wrap %s: %v\n", name, err)
 		return 2
+	}
+	return 0
+}
+
+func runWrapDiag(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("fo wrap diag", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	var opts wrapdiag.DiagOpts
+	fs.StringVar(&opts.Tool, "tool", "", "Tool name for SARIF driver.name (required)")
+	fs.StringVar(&opts.Rule, "rule", "finding", "Default rule ID")
+	fs.StringVar(&opts.Level, "level", "warning", "Default severity: error|warning|note")
+	fs.StringVar(&opts.Version, "version", "", "Tool version string")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 2
+	}
+	if err := wrapdiag.Convert(stdin, stdout, opts); err != nil {
+		fmt.Fprintf(stderr, "fo wrap diag: %v\n", err)
+		return 2
+	}
+	return 0
+}
+
+func runWrapHelp(stderr io.Writer) int {
+	fmt.Fprintf(stderr, "fo wrap: convert tool output to SARIF\n\n")
+	for _, name := range wrapper.Names() {
+		fmt.Fprintf(stderr, "  %-12s %s\n", name, wrapper.Description(name))
+		w := wrapper.Get(name)
+		fs := flag.NewFlagSet(name, flag.ContinueOnError)
+		w.RegisterFlags(fs)
+		fs.VisitAll(func(f *flag.Flag) {
+			fmt.Fprintf(stderr, "    --%-10s %s", f.Name, f.Usage)
+			if f.DefValue != "" && f.DefValue != "false" {
+				fmt.Fprintf(stderr, " (default: %s)", f.DefValue)
+			}
+			fmt.Fprintln(stderr)
+		})
+		fmt.Fprintln(stderr)
 	}
 	return 0
 }
