@@ -1,15 +1,19 @@
 # fo Makefile
 #
-# Primary: check ci report deploy doctor cross
+# Primary: scan check audit report deploy doctor cross
+#   scan   — changed pkgs only (fast inner loop)
+#   check  — full repo: vet + lint + test + build
+#   audit  — everything: +race +dupl +vuln
 # Run `make help` for full target list.
 
 .DEFAULT_GOAL := check
 
-.PHONY: help check ci report deploy install doctor cross \
+.PHONY: help scan check audit report deploy install doctor cross \
         vet lint test race fmt fmt-fix dupl vuln \
-        changed snipe-index baseline \
+        snipe-index baseline \
         cross-amd64 cross-arm64 \
-        lint-sarif clean issues
+        lint-sarif clean issues \
+        demo demo-llm demo-live
 
 # ── Sandbox prebuilt versions ──
 # Keep in sync with what .codex/setup.sh expects.
@@ -29,8 +33,8 @@ REPORT_CMD = \
 	golangci-lint run --output.sarif.path=/dev/stdout --output.text.path=/dev/null ./... 2>/dev/null | head -1; echo; \
 	echo '--- tool:test format:testjson ---'; \
 	go test -json -count=1 ./... 2>&1; echo; \
-	echo '--- tool:dupl format:jscpd ---'; \
-	TMP_JSCPD=$$(mktemp -d); jscpd . --silent --reporters json --output $$TMP_JSCPD >/dev/null 2>&1; cat $$TMP_JSCPD/jscpd-report.json; echo; rm -rf $$TMP_JSCPD; \
+	echo '--- tool:dupl format:sarif ---'; \
+	TMP_JSCPD=$$(mktemp -d); jscpd . --silent --reporters json --output $$TMP_JSCPD >/dev/null 2>&1; cat $$TMP_JSCPD/jscpd-report.json | fo wrap jscpd; echo; rm -rf $$TMP_JSCPD; \
 	echo '--- tool:vuln format:sarif ---'; \
 	TMP_VULN=$$(mktemp); govulncheck -format sarif ./... >$$TMP_VULN 2>/dev/null; cat $$TMP_VULN; rm -f $$TMP_VULN; echo
 
@@ -43,12 +47,12 @@ help: ## Show this help
 		/^## [^-]/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 4) } \
 		/^[a-zA-Z0-9_-]+:.*?## / { printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
-check: vet lint test ## Fast validation: vet + lint + test + build
+check: vet lint test ## Full repo: vet + lint + test + build
 	@go build ./...
 	@echo "=== check pass ==="
 
-ci: snipe-index check race dupl vuln ## Full CI suite
-	@echo "=== ci pass ==="
+audit: snipe-index check race dupl vuln ## Exhaustive: +race +dupl +vuln
+	@echo "=== audit pass ==="
 
 report: snipe-index ## Structured QA output for agents/tools (always exits 0)
 	@( $(REPORT_CMD) ) | fo --format llm || true
@@ -123,7 +127,7 @@ lint-sarif: vet ## Run linters with SARIF output
 ## Advanced / Diagnostics
 ## ---------------------------------------------------------------------
 
-changed: ## Vet + lint + test changed packages only
+scan: ## Vet + lint + test changed packages only (fast inner loop)
 	@PKGS=$$( { git diff --name-only HEAD -- '*.go'; git ls-files --others --exclude-standard -- '*.go'; } \
 		| xargs dirname 2>/dev/null | sort -u | sed 's|^|./|' | grep -v '^\./$$'); \
 	if [ -z "$$PKGS" ]; then \
@@ -133,7 +137,7 @@ changed: ## Vet + lint + test changed packages only
 		go vet $$PKGS && \
 		golangci-lint run $$PKGS && \
 		go test -count=1 -cover $$PKGS && \
-		echo "=== changed pass ==="; \
+		echo "=== scan pass ==="; \
 	fi
 
 baseline: snipe-index ## Save QA report as baseline for sandbox diff
@@ -159,6 +163,29 @@ issues: ## Fetch open GitHub issues to docs/issues.json
 		> docs/issues.json && \
 	COUNT=$$(jq length docs/issues.json) && \
 	echo "Exported $$COUNT issues to docs/issues.json"
+
+DEMO_DIR := cmd/fo/testdata/demo
+
+demo: install ## Run all demo fixtures through fo (human mode)
+	@for f in $(DEMO_DIR)/*.json; do \
+		echo ""; \
+		echo "━━━ $$(basename $$f) ━━━"; \
+		fo --format human < "$$f" || true; \
+	done
+
+demo-llm: install ## Run all demo fixtures through fo (llm mode)
+	@for f in $(DEMO_DIR)/*.json; do \
+		echo ""; \
+		echo "━━━ $$(basename $$f) ━━━"; \
+		fo --format llm < "$$f" || true; \
+	done
+
+demo-live: install ## Run real go test + vet through fo
+	@echo "━━━ go test -json ━━━"
+	@go test -json -count=1 ./... 2>&1 | fo --format human || true
+	@echo ""
+	@echo "━━━ go vet (wrapped) ━━━"
+	@go vet ./... 2>&1 | fo wrap diag --tool govet | fo --format human || true
 
 clean: ## Remove build artifacts
 	rm -f fo
