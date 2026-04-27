@@ -1,0 +1,352 @@
+package view
+
+import (
+	"fmt"
+	"sort"
+
+	"github.com/dkoosis/fo/pkg/report"
+)
+
+// Thresholds locked at fo-7f5 design pass; tuning happens against real
+// fixtures, not by editing renderers.
+const (
+	leaderboardMinTotal    = 6
+	leaderboardHeadShare   = 0.50
+	smallMultiplesMinGroup = 3
+	smallMultiplesMinItems = 2
+	groupedMinCount        = 10
+	alertErrorThreshold    = 1
+)
+
+// PickView selects a ViewSpec from a Report. Pure and deterministic:
+// branches are evaluated in fixed priority order so the same Report
+// always yields the same shape. Delta wraps the inner pick when a
+// non-trivial Prior is present.
+func PickView(r report.Report) ViewSpec {
+	inner := pickInner(r)
+	if r.Prior != nil {
+		buckets := deltaBuckets(r, *r.Prior)
+		if hasNonZero(buckets) {
+			return Delta{Inner: inner, Buckets: buckets}
+		}
+	}
+	return inner
+}
+
+func pickInner(r report.Report) ViewSpec {
+	if isClean(r) {
+		return Clean{Message: "no findings"}
+	}
+	if h, ok := pickHeadline(r); ok {
+		return h
+	}
+	if a, ok := pickAlert(r); ok {
+		return a
+	}
+	if lb, ok := pickLeaderboard(r); ok {
+		return lb
+	}
+	if sm, ok := pickSmallMultiples(r); ok {
+		return sm
+	}
+	if g, ok := pickGrouped(r); ok {
+		return g
+	}
+	return pickBullet(r)
+}
+
+func isClean(r report.Report) bool {
+	if len(r.Findings) > 0 {
+		return false
+	}
+	for _, t := range r.Tests {
+		if t.Outcome != report.OutcomePass && t.Outcome != report.OutcomeSkip {
+			return false
+		}
+	}
+	return true
+}
+
+func pickHeadline(r report.Report) (Headline, bool) {
+	for _, t := range r.Tests {
+		if t.Outcome == report.OutcomePanic {
+			return Headline{Title: "PANIC", Detail: panicDetail(t)}, true
+		}
+	}
+	if buildErrorOnly(r) {
+		return Headline{Title: "BUILD FAILED", Detail: r.Tests[0].Package}, true
+	}
+	return Headline{}, false
+}
+
+func panicDetail(t report.TestResult) string {
+	if t.Test != "" {
+		return fmt.Sprintf("%s.%s", t.Package, t.Test)
+	}
+	return t.Package
+}
+
+// buildErrorOnly: at least one build_error and no other failure modes.
+func buildErrorOnly(r report.Report) bool {
+	if len(r.Findings) > 0 || len(r.Tests) == 0 {
+		return false
+	}
+	sawBuild := false
+	for _, t := range r.Tests {
+		switch t.Outcome {
+		case report.OutcomeBuildError:
+			sawBuild = true
+		case report.OutcomeFail, report.OutcomePanic:
+			return false
+		}
+	}
+	return sawBuild
+}
+
+func pickAlert(r report.Report) (Alert, bool) {
+	// Single-error breach — one finding deserves a one-line alert
+	// rather than a list. Uses count==1 to avoid stealing from Bullet.
+	if len(r.Findings) == alertErrorThreshold && len(r.Tests) == 0 {
+		f := r.Findings[0]
+		return Alert{
+			Severity: f.Severity,
+			Prefix:   alertPrefix(f.Severity),
+			Value:    f.Message,
+			Detail:   fmt.Sprintf("%s:%d", f.File, f.Line),
+		}, true
+	}
+	return Alert{}, false
+}
+
+func alertPrefix(s report.Severity) string {
+	switch s {
+	case report.SeverityError:
+		return "ERROR"
+	case report.SeverityWarning:
+		return "WARNING"
+	default:
+		return "NOTE"
+	}
+}
+
+func pickLeaderboard(r report.Report) (Leaderboard, bool) {
+	if len(r.Findings) < leaderboardMinTotal {
+		return Leaderboard{}, false
+	}
+	rows := make([]LbRow, 0, len(r.Findings))
+	var total float64
+	for _, f := range r.Findings {
+		v := f.Score
+		if v <= 0 {
+			v = 1
+		}
+		rows = append(rows, LbRow{Label: lbLabel(f), Value: v})
+		total += v
+	}
+	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Value > rows[j].Value })
+
+	head := 3
+	if head > len(rows) {
+		head = len(rows)
+	}
+	var headSum float64
+	for i := 0; i < head; i++ {
+		headSum += rows[i].Value
+	}
+	if total == 0 || headSum/total < leaderboardHeadShare {
+		return Leaderboard{}, false
+	}
+	return Leaderboard{Rows: rows, Total: total}, true
+}
+
+func lbLabel(f report.Finding) string {
+	if f.RuleID != "" {
+		return f.RuleID
+	}
+	return f.Message
+}
+
+func pickSmallMultiples(r report.Report) (SmallMultiples, bool) {
+	groups := groupFindingsByPackage(r.Findings)
+	if len(groups) < smallMultiplesMinGroup {
+		return SmallMultiples{}, false
+	}
+	for _, items := range groups {
+		if len(items) < smallMultiplesMinItems {
+			return SmallMultiples{}, false
+		}
+	}
+	keys := sortedKeys(groups)
+	cells := make([]MultipleCell, 0, len(keys))
+	for _, k := range keys {
+		cells = append(cells, MultipleCell{
+			Label:    k,
+			Counters: severityCounters(groups[k]),
+		})
+	}
+	return SmallMultiples{Cells: cells}, true
+}
+
+func groupFindingsByPackage(fs []report.Finding) map[string][]report.Finding {
+	out := make(map[string][]report.Finding)
+	for _, f := range fs {
+		key := packageOf(f.File)
+		out[key] = append(out[key], f)
+	}
+	return out
+}
+
+// packageOf reduces a file path to its directory, our proxy for
+// "package" without parsing Go source.
+func packageOf(path string) string {
+	for i := len(path) - 1; i >= 0; i-- {
+		if path[i] == '/' {
+			return path[:i]
+		}
+	}
+	return "."
+}
+
+func sortedKeys(m map[string][]report.Finding) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func severityCounters(fs []report.Finding) []Counter {
+	var e, w, n int
+	for _, f := range fs {
+		switch f.Severity {
+		case report.SeverityError:
+			e++
+		case report.SeverityWarning:
+			w++
+		case report.SeverityNote:
+			n++
+		}
+	}
+	out := make([]Counter, 0, 3)
+	if e > 0 {
+		out = append(out, Counter{Severity: report.SeverityError, Label: "err", Value: e})
+	}
+	if w > 0 {
+		out = append(out, Counter{Severity: report.SeverityWarning, Label: "warn", Value: w})
+	}
+	if n > 0 {
+		out = append(out, Counter{Severity: report.SeverityNote, Label: "note", Value: n})
+	}
+	return out
+}
+
+func pickGrouped(r report.Report) (Grouped, bool) {
+	if len(r.Findings) <= groupedMinCount {
+		return Grouped{}, false
+	}
+	bySev := map[report.Severity][]BulletItem{}
+	for _, f := range r.Findings {
+		bySev[f.Severity] = append(bySev[f.Severity], findingItem(f))
+	}
+	order := []report.Severity{report.SeverityError, report.SeverityWarning, report.SeverityNote}
+	sections := make([]GroupedSection, 0, len(order))
+	for _, s := range order {
+		if items := bySev[s]; len(items) > 0 {
+			sections = append(sections, GroupedSection{Label: string(s), Items: items})
+		}
+	}
+	return Grouped{Sections: sections}, true
+}
+
+func pickBullet(r report.Report) Bullet {
+	items := make([]BulletItem, 0, len(r.Findings)+len(r.Tests))
+	for _, f := range r.Findings {
+		items = append(items, findingItem(f))
+	}
+	for _, t := range r.Tests {
+		items = append(items, testItem(t))
+	}
+	return Bullet{Items: items}
+}
+
+func findingItem(f report.Finding) BulletItem {
+	return BulletItem{
+		Severity:   f.Severity,
+		Label:      f.Message,
+		Value:      fmt.Sprintf("%s:%d", f.File, f.Line),
+		FixCommand: f.FixCommand,
+	}
+}
+
+func testItem(t report.TestResult) BulletItem {
+	label := t.Test
+	if label == "" {
+		label = t.Package
+	}
+	return BulletItem{
+		Outcome:    t.Outcome,
+		Label:      label,
+		Value:      t.Package,
+		FixCommand: t.FixCommand,
+	}
+}
+
+// deltaBuckets summarises change vs prior across the standard buckets.
+func deltaBuckets(cur, prior report.Report) []DeltaBucket {
+	curE, curW, curN := severityCounts(cur.Findings)
+	priE, priW, priN := severityCounts(prior.Findings)
+	curF := failCount(cur.Tests)
+	priF := failCount(prior.Tests)
+	return []DeltaBucket{
+		{Label: "err", Count: curE, Direction: sign(curE - priE)},
+		{Label: "warn", Count: curW, Direction: sign(curW - priW)},
+		{Label: "note", Count: curN, Direction: sign(curN - priN)},
+		{Label: "fail", Count: curF, Direction: sign(curF - priF)},
+	}
+}
+
+func severityCounts(fs []report.Finding) (int, int, int) {
+	var e, w, n int
+	for _, f := range fs {
+		switch f.Severity {
+		case report.SeverityError:
+			e++
+		case report.SeverityWarning:
+			w++
+		case report.SeverityNote:
+			n++
+		}
+	}
+	return e, w, n
+}
+
+func failCount(ts []report.TestResult) int {
+	var c int
+	for _, t := range ts {
+		if t.Outcome == report.OutcomeFail || t.Outcome == report.OutcomePanic || t.Outcome == report.OutcomeBuildError {
+			c++
+		}
+	}
+	return c
+}
+
+func sign(n int) int {
+	switch {
+	case n > 0:
+		return 1
+	case n < 0:
+		return -1
+	default:
+		return 0
+	}
+}
+
+func hasNonZero(bs []DeltaBucket) bool {
+	for _, b := range bs {
+		if b.Direction != 0 {
+			return true
+		}
+	}
+	return false
+}
