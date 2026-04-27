@@ -1,11 +1,8 @@
 # Boot
-updated: 2026-04-26
+updated: 2026-04-27
 
-→ `bd ready` — pick from unblocked v2 children. fo-7f5.4 + fo-lxf shipped but in_progress pending dk review; `bd close` them after eyeball.
+→ `bd ready` — fo-7f5.9 (cutover) is the only P1 child. Read its NOTES: state+diff wiring folds in here (pkg/state API ready). Atomic delete commit; verify parity on testdata/golden/v1 first.
 
 ✓ done
-- fo-7f5.4: pkg/view (8 variants, mono goldens + color smokes)
-- fo-lxf: testdata/golden/v1 (11 fixtures × 3 formats)
-
-‡ traps
-- pre-commit doc-governance hook is local-only (.git/hooks/, untracked); .md allowlist fix won't survive fresh clone
+- fo-7f5.5/.7/.8/.10 shipped (pickView, streaming, v2 CLI, e2e tests)
+- fo-40z.2 + epic fo-40z closed (state+diff engine)
