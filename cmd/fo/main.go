@@ -367,12 +367,12 @@ func runStream(stdin io.Reader, br *bufio.Reader, stdout io.Writer, t theme.Them
 	// path simple for v2. fo-7f5.9 will swap in true incremental streaming.
 	data, err := io.ReadAll(br)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "fo: reading stdin: %v\n", err)
+		fmt.Fprintf(stderr, "fo: reading stdin: %v\n", err)
 		return 2
 	}
 	results, _, err := testjson.ParseBytes(data)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "fo: %v\n", err)
+		fmt.Fprintf(stderr, "fo: %v\n", err)
 		return 2
 	}
 	r := testjson.ToReportWithMeta(results, data)
@@ -382,7 +382,7 @@ func runStream(stdin io.Reader, br *bufio.Reader, stdout io.Writer, t theme.Them
 	ch <- *r
 	close(ch)
 	if err := view.RenderStream(ctx, stdout, ch, t, width); err != nil && !errors.Is(err, context.Canceled) {
-		fmt.Fprintf(os.Stderr, "fo: %v\n", err)
+		fmt.Fprintf(stderr, "fo: %v\n", err)
 		return 2
 	}
 	return exitCodeReport(r)

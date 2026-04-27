@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dkoosis/fo/internal/lineread"
 	"github.com/dkoosis/fo/pkg/sarif"
 )
 
@@ -46,28 +47,42 @@ func (d *diag) Convert(r io.Reader, w io.Writer) error {
 	}
 
 	b := sarif.NewBuilder(*d.toolName, *d.version)
-	scanner := bufio.NewScanner(r)
-	// Same 1 MiB limit as testjson.ParseStream — see BUG note there.
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "" {
-			continue
-		}
-		file, ln, col, msg := parseDiagLine(line)
-		if file == "" {
-			continue
-		}
-		fixCmd := fixCommandFor(*d.toolName, *d.ruleID, file)
-		b.AddResultWithFix(*d.ruleID, *d.level, msg, file, ln, col, fixCmd)
+	if err := d.readAndAdd(r, b); err != nil {
+		return err
 	}
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("reading input: %w", err)
-	}
-
 	_, err := b.WriteTo(w)
 	return err
+}
+
+// readAndAdd reads diagnostic lines from r and appends results to b.
+// Oversize lines are silently skipped — they cannot be valid diagnostics
+// (file:line:col: msg), and aborting would lose every subsequent
+// diagnostic (fo-gn0).
+func (d *diag) readAndAdd(r io.Reader, b *sarif.Builder) error {
+	br := bufio.NewReaderSize(r, 64*1024)
+	for {
+		line, _, err := lineread.Read(br)
+		d.addLine(b, line)
+		if err == nil {
+			continue
+		}
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		return fmt.Errorf("reading input: %w", err)
+	}
+}
+
+func (d *diag) addLine(b *sarif.Builder, line []byte) {
+	if len(line) == 0 {
+		return
+	}
+	file, ln, col, msg := parseDiagLine(string(line))
+	if file == "" {
+		return
+	}
+	fixCmd := fixCommandFor(*d.toolName, *d.ruleID, file)
+	b.AddResultWithFix(*d.ruleID, *d.level, msg, file, ln, col, fixCmd)
 }
 
 // fixCommandFor returns a best-effort shell command the user can run to

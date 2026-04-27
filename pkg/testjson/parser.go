@@ -5,41 +5,53 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
 	"time"
+
+	"github.com/dkoosis/fo/internal/lineread"
 )
 
 // ParseStream parses go test -json NDJSON from a reader, line by line.
 // Returns the parsed results, the number of malformed lines skipped, and any error.
+//
+// Oversize lines (>maxLineLen) are counted as malformed and skipped instead
+// of aborting the parse — fo-gn0.
 func ParseStream(r io.Reader) ([]TestPackageResult, int, error) {
 	agg := newAggregator()
-	scanner := bufio.NewScanner(r)
-	// Allow large lines for verbose test output.
-	// BUG: a line exceeding 1 MiB (e.g. huge panic trace) triggers
-	// bufio.ErrTooLong, which is fatal — all remaining events are lost.
-	// To fix: switch to bufio.Reader.ReadBytes('\n') or skip oversized
-	// lines as malformed instead of aborting.
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	br := bufio.NewReaderSize(r, 64*1024)
 
 	var malformed int
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			continue
-		}
-		var event TestEvent
-		if err := json.Unmarshal(line, &event); err != nil {
+	for {
+		line, oversize, err := lineread.Read(br)
+		if oversize {
 			malformed++
-			continue
+		} else if len(line) > 0 {
+			malformed += processEventLine(line, agg.processEvent)
 		}
-		agg.processEvent(event)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return agg.results(), malformed, nil
+			}
+			return agg.results(), malformed, fmt.Errorf("reading test output: %w", err)
+		}
 	}
-	if err := scanner.Err(); err != nil {
-		return nil, malformed, fmt.Errorf("scanning test output: %w", err)
+}
+
+// processEventLine parses one JSON event line and dispatches to fn. Returns
+// 1 when the line is non-empty but invalid JSON, 0 otherwise.
+func processEventLine(line []byte, fn func(TestEvent)) int {
+	if len(line) == 0 {
+		return 0
 	}
-	return agg.results(), malformed, nil
+	var event TestEvent
+	if err := json.Unmarshal(line, &event); err != nil {
+		return 1
+	}
+	fn(event)
+	return 0
 }
 
 // ParseBytes is a convenience for parsing from a byte slice.
@@ -47,10 +59,13 @@ func ParseBytes(data []byte) ([]TestPackageResult, int, error) {
 	return ParseStream(bytes.NewReader(data))
 }
 
-// scanResult carries a scanned line or terminal error from the scanner goroutine.
+// scanResult carries a scanned line or terminal error from the scanner
+// goroutine. oversize is set when the line exceeded maxLineLen and was
+// discarded; consumers count it as malformed but do not abort.
 type scanResult struct {
-	line []byte
-	err  error
+	line     []byte
+	oversize bool
+	err      error
 }
 
 // Stream parses go test -json events line by line and calls fn for each one.
@@ -66,32 +81,49 @@ func Stream(ctx context.Context, r io.Reader, fn func(TestEvent)) (int, error) {
 	return drainLines(ctx, r, lines, fn)
 }
 
-// scanAsync runs a scanner in a background goroutine and sends each line (or
-// terminal error) on the returned channel. The channel is closed on EOF.
+// scanAsync runs the line reader in a background goroutine and sends each
+// line (or terminal error) on the returned channel. The channel is closed
+// on EOF. Oversize lines are signaled via scanResult.oversize so the
+// consumer can count them as malformed without aborting the stream
+// (fo-gn0).
 func scanAsync(ctx context.Context, r io.Reader) <-chan scanResult {
-	scanner := bufio.NewScanner(r)
-	// Same 1 MiB limit as ParseStream — see BUG note there.
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-
+	br := bufio.NewReaderSize(r, 64*1024)
 	lines := make(chan scanResult)
-	go func() {
-		defer close(lines)
-		for scanner.Scan() {
-			cp := append([]byte(nil), scanner.Bytes()...)
-			select {
-			case lines <- scanResult{line: cp}:
-			case <-ctx.Done():
-				return
-			}
-		}
-		if err := scanner.Err(); err != nil {
-			select {
-			case lines <- scanResult{err: err}:
-			case <-ctx.Done():
-			}
-		}
-	}()
+	go scanLoop(ctx, br, lines)
 	return lines
+}
+
+func scanLoop(ctx context.Context, br *bufio.Reader, lines chan<- scanResult) {
+	defer close(lines)
+	for {
+		line, oversize, err := lineread.Read(br)
+		if (oversize || len(line) > 0) && !sendResult(ctx, lines, scanResult{line: copyBytes(line), oversize: oversize}) {
+			return
+		}
+		if err == nil {
+			continue
+		}
+		if !errors.Is(err, io.EOF) {
+			_ = sendResult(ctx, lines, scanResult{err: err})
+		}
+		return
+	}
+}
+
+func sendResult(ctx context.Context, lines chan<- scanResult, res scanResult) bool {
+	select {
+	case lines <- res:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
+func copyBytes(b []byte) []byte {
+	if len(b) == 0 {
+		return nil
+	}
+	return append([]byte(nil), b...)
 }
 
 // drainLines reads from lines, dispatching parsed events to fn. Returns when
@@ -109,6 +141,10 @@ func drainLines(ctx context.Context, r io.Reader, lines <-chan scanResult, fn fu
 			}
 			if res.err != nil {
 				return malformed, res.err
+			}
+			if res.oversize {
+				malformed++
+				continue
 			}
 			malformed += processLine(res.line, fn)
 		}
