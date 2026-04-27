@@ -62,8 +62,8 @@ type TestResult struct {
 // the renderer consumes it via pickView.
 //
 // Findings and Tests are flat — the renderer groups them when needed.
-// Prior carries a previous-run reference for the Delta view (fo-40z.2);
-// nil when no prior state exists.
+// Diff, when non-nil, drives both the JSON contract and the Delta view
+// wrapper in pickView.
 type Report struct {
 	Tool        string
 	GeneratedAt time.Time
@@ -72,12 +72,6 @@ type Report struct {
 	Findings []Finding
 	Tests    []TestResult
 
-	Prior *Report
-
-	// Diff is the optional state-vs-prior summary attached by the CLI when
-	// --no-state isn't set and a sidecar exists. Marshaled with omitempty
-	// so first runs and stateless invocations preserve the existing JSON
-	// contract.
 	Diff *DiffSummary `json:"diff,omitempty"`
 }
 

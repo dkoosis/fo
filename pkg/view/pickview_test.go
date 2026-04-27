@@ -171,10 +171,14 @@ func TestPickView_Bullet_DefaultFallback(t *testing.T) {
 }
 
 func TestPickView_Delta_WrapsInner(t *testing.T) {
-	prior := &report.Report{Findings: mkFindings(0, report.SeverityWarning, "a")}
 	r := report.Report{
 		Findings: mkFindings(2, report.SeverityWarning, "a"),
-		Prior:    prior,
+		Diff: &report.DiffSummary{
+			New: []report.DiffItem{
+				{Severity: string(report.SeverityWarning)},
+				{Severity: string(report.SeverityWarning)},
+			},
+		},
 	}
 	d, ok := view.PickView(r).(view.Delta)
 	if !ok {
@@ -186,10 +190,9 @@ func TestPickView_Delta_WrapsInner(t *testing.T) {
 }
 
 func TestPickView_Delta_NoChange_NoWrap(t *testing.T) {
-	prior := &report.Report{Findings: mkFindings(2, report.SeverityWarning, "a")}
 	r := report.Report{
 		Findings: mkFindings(2, report.SeverityWarning, "a"),
-		Prior:    prior,
+		Diff:     &report.DiffSummary{PersistentCount: 2},
 	}
 	if _, ok := view.PickView(r).(view.Delta); ok {
 		t.Fatalf("did not want Delta when buckets are identical")

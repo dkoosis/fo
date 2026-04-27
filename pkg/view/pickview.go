@@ -20,12 +20,12 @@ const (
 
 // PickView selects a ViewSpec from a Report. Pure and deterministic:
 // branches are evaluated in fixed priority order so the same Report
-// always yields the same shape. Delta wraps the inner pick when a
-// non-trivial Prior is present.
+// always yields the same shape. Delta wraps the inner pick when Diff
+// is present and at least one severity bucket moved.
 func PickView(r report.Report) ViewSpec {
 	inner := pickInner(r)
-	if r.Prior != nil {
-		buckets := deltaBuckets(r, *r.Prior)
+	if r.Diff != nil {
+		buckets := deltaBuckets(r, r.Diff)
 		if hasNonZero(buckets) {
 			return Delta{Inner: inner, Buckets: buckets}
 		}
@@ -293,17 +293,44 @@ func testItem(t report.TestResult) BulletItem {
 }
 
 // deltaBuckets summarises change vs prior across the standard buckets.
-func deltaBuckets(cur, prior report.Report) []DeltaBucket {
+// Direction is derived from Diff classification (New/Resolved/Regressed
+// per severity); the fail bucket is always 0-direction because state
+// does not persist test outcomes — the bucket stays for layout symmetry.
+func deltaBuckets(cur report.Report, d *report.DiffSummary) []DeltaBucket {
 	curE, curW, curN := severityCounts(cur.Findings)
-	priE, priW, priN := severityCounts(prior.Findings)
 	curF := failCount(cur.Tests)
-	priF := failCount(prior.Tests)
+	dE := severityDelta(d, string(report.SeverityError))
+	dW := severityDelta(d, string(report.SeverityWarning))
+	dN := severityDelta(d, string(report.SeverityNote))
 	return []DeltaBucket{
-		{Label: "err", Count: curE, Direction: sign(curE - priE)},
-		{Label: "warn", Count: curW, Direction: sign(curW - priW)},
-		{Label: "note", Count: curN, Direction: sign(curN - priN)},
-		{Label: "fail", Count: curF, Direction: sign(curF - priF)},
+		{Label: "err", Count: curE, Direction: sign(dE)},
+		{Label: "warn", Count: curW, Direction: sign(dW)},
+		{Label: "note", Count: curN, Direction: sign(dN)},
+		{Label: "fail", Count: curF, Direction: 0},
 	}
+}
+
+func severityDelta(d *report.DiffSummary, sev string) int {
+	delta := 0
+	for _, it := range d.New {
+		if it.Severity == sev {
+			delta++
+		}
+	}
+	for _, it := range d.Resolved {
+		if it.Severity == sev {
+			delta--
+		}
+	}
+	for _, it := range d.Regressed {
+		if it.Severity == sev {
+			delta++
+		}
+		if it.PriorSeverity == sev {
+			delta--
+		}
+	}
+	return delta
 }
 
 func severityCounts(fs []report.Finding) (int, int, int) {
