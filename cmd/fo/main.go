@@ -51,8 +51,9 @@ const (
 )
 
 var (
-	errUnrecognizedInput = errors.New("unrecognized input (expected SARIF or go test -json)")
-	errUnknownFormat     = errors.New("unknown format (expected auto, human, llm, json)")
+	errUnrecognizedInput    = errors.New("unrecognized input (expected SARIF or go test -json)")
+	errUnknownFormat        = errors.New("unknown format (expected auto, human, llm, json)")
+	errUnknownSectionFormat = errors.New("unknown section format")
 )
 
 func main() {
@@ -212,8 +213,12 @@ func sniffSARIF(data []byte) bool {
 }
 
 // parseToReport sniffs the input format and parses it into a *report.Report.
-// SARIF takes precedence; go test -json is the fallback when SARIF probe fails.
+// Multi-tool delimiter protocol takes precedence; SARIF next; go test -json
+// is the fallback when SARIF probe fails.
 func parseToReport(input []byte, stderr io.Writer) (*report.Report, error) {
+	if report.HasDelimiter(input) {
+		return parseMultiplex(input, stderr)
+	}
 	trimmed := bytes.TrimLeft(input, " \t\n\r")
 	if len(trimmed) == 0 || trimmed[0] != '{' {
 		return nil, errUnrecognizedInput
@@ -236,6 +241,61 @@ func parseToReport(input []byte, stderr io.Writer) (*report.Report, error) {
 		return testjson.ToReportWithMeta(results, input), nil
 	}
 	return nil, errUnrecognizedInput
+}
+
+// parseMultiplex parses a multi-tool delimited stream and merges every
+// section's findings/tests into one Report. Per-section parse failures
+// surface as synthetic error-severity findings so silent crashes can't
+// masquerade as a clean run.
+func parseMultiplex(input []byte, stderr io.Writer) (*report.Report, error) {
+	sections, err := report.ParseSections(input)
+	if err != nil {
+		return nil, fmt.Errorf("parsing report sections: %w", err)
+	}
+	merged := &report.Report{Tool: "multi"}
+	for _, sec := range sections {
+		body := bytes.TrimSpace(sec.Content)
+		if len(body) == 0 {
+			continue
+		}
+		sub, perr := parseSection(sec, body, stderr)
+		if perr != nil {
+			merged.Findings = append(merged.Findings, report.Finding{
+				RuleID:   "fo/section-parse-error",
+				Severity: report.SeverityError,
+				Message:  fmt.Sprintf("tool=%s format=%s: %v", sec.Tool, sec.Format, perr),
+			})
+			continue
+		}
+		merged.Findings = append(merged.Findings, sub.Findings...)
+		merged.Tests = append(merged.Tests, sub.Tests...)
+		if sub.GeneratedAt.After(merged.GeneratedAt) {
+			merged.GeneratedAt = sub.GeneratedAt
+		}
+	}
+	return merged, nil
+}
+
+func parseSection(sec report.Section, body []byte, stderr io.Writer) (*report.Report, error) {
+	switch sec.Format {
+	case "sarif":
+		doc, err := sarif.ReadBytes(body)
+		if err != nil {
+			return nil, fmt.Errorf("parsing SARIF: %w", err)
+		}
+		return sarif.ToReportWithMeta(doc, body), nil
+	case "testjson":
+		results, malformed, err := testjson.ParseBytes(body)
+		if err != nil {
+			return nil, fmt.Errorf("parsing go test -json: %w", err)
+		}
+		if malformed > 0 {
+			fmt.Fprintf(stderr, "fo: warning: tool=%s %d malformed line(s) skipped\n", sec.Tool, malformed)
+		}
+		return testjson.ToReportWithMeta(results, body), nil
+	default:
+		return nil, fmt.Errorf("%w: %q", errUnknownSectionFormat, sec.Format)
+	}
 }
 
 func writeReportJSON(w io.Writer, r *report.Report) error {

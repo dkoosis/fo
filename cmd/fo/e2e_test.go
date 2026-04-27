@@ -252,3 +252,41 @@ func TestE2E_NoInputIsUsageError(t *testing.T) {
 		t.Fatalf("want exit 2, got %d (stderr=%s)", code, stderr.String())
 	}
 }
+
+func TestE2E_Multiplex_SARIFAndTestjson(t *testing.T) {
+	sarifBody := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"vet"}},"results":[{"ruleId":"R1","level":"error","message":{"text":"boom"}}]}]}`
+	tjBody := `{"Time":"2026-04-27T15:00:00Z","Action":"fail","Package":"foo","Test":"TestX"}`
+	input := "--- tool:vet format:sarif ---\n" + sarifBody + "\n" +
+		"--- tool:test format:testjson ---\n" + tjBody + "\n"
+
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "json", "--no-state"}, bytes.NewReader([]byte(input)), &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("want exit 1 (failures present), got %d (stderr=%s)", code, stderr.String())
+	}
+	out := stdout.Bytes()
+	if !bytes.Contains(out, []byte(`"tool": "multi"`)) {
+		t.Errorf("expected merged report tool=multi, got: %s", out)
+	}
+	if !bytes.Contains(out, []byte(`"rule_id": "R1"`)) {
+		t.Errorf("expected sarif finding in merged report, got: %s", out)
+	}
+	if !bytes.Contains(out, []byte(`"package": "foo"`)) {
+		t.Errorf("expected testjson result in merged report, got: %s", out)
+	}
+}
+
+func TestE2E_Multiplex_SectionParseFailure(t *testing.T) {
+	input := "--- tool:vet format:sarif ---\n" +
+		"this is not json at all\n" +
+		"--- tool:test format:testjson ---\n" +
+		`{"Action":"pass","Package":"bar"}` + "\n"
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "json", "--no-state"}, bytes.NewReader([]byte(input)), &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("want exit 1 (synthetic error finding), got %d (stderr=%s)", code, stderr.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte(`"rule_id": "fo/section-parse-error"`)) {
+		t.Errorf("expected synthetic parse-error finding, got: %s", stdout.String())
+	}
+}

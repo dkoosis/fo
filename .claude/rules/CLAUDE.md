@@ -27,7 +27,7 @@ Three outputs: human (TTY), llm (piped), json (--format json)
 - `pkg/mapper/` — SARIF → patterns, testjson → patterns
 - `pkg/render/` — Renderer interface + human, llm, json implementations + themes
 - `internal/detect/` — Format sniffing (SARIF vs go test -json)
-- `internal/report/` — Report delimiter protocol (multiplexer for multi-tool pipelines)
+- `pkg/report/multiplex.go` — Report delimiter protocol (multiplexer for multi-tool pipelines)
 
 ## Key Design Decisions
 
