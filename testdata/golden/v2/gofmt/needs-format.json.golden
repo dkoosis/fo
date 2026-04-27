@@ -1,0 +1,31 @@
+{
+  "Tool": "gofmt",
+  "GeneratedAt": "2026-04-27T17:48:06.519352Z",
+  "DataHash": "df42c2c64a53c14d6e01a83a6e6539fd12c44917d259ec6813af749bc181b27f",
+  "Findings": [
+    {
+      "RuleID": "needs-formatting",
+      "File": "/tmp/gofmt-sample/bad.go",
+      "Line": 0,
+      "Col": 0,
+      "Severity": "warning",
+      "Message": "needs formatting",
+      "FixCommand": "gofmt -w /tmp/gofmt-sample/bad.go",
+      "Fingerprint": "80bc70ff6793d4ca21bec3a2fe031186d4a0d0e373e182a0b8b59754da39360c",
+      "Score": 4
+    },
+    {
+      "RuleID": "needs-formatting",
+      "File": "/tmp/gofmt-sample/bad2.go",
+      "Line": 0,
+      "Col": 0,
+      "Severity": "warning",
+      "Message": "needs formatting",
+      "FixCommand": "gofmt -w /tmp/gofmt-sample/bad2.go",
+      "Fingerprint": "e44c4e5d09e906fe27706ae245a3c63ffc6529cd743285d86a7c80d28c659494",
+      "Score": 4
+    }
+  ],
+  "Tests": null,
+  "Prior": null
+}

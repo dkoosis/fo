@@ -1,0 +1,6 @@
+x  search → embedder                                                  pkg/search/search.go:0
+  fix: go-arch-lint check --arch-file .go-arch-lint.yml
+x  agentSupervisor → github.com/example/project/internal/agent/shell  internal/agent/supervisor/supervisor.go:0
+  fix: go-arch-lint check --arch-file .go-arch-lint.yml
+x  store → internal/svc                                               internal/store/store.go:0
+  fix: go-arch-lint check --arch-file .go-arch-lint.yml

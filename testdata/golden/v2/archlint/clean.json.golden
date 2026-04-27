@@ -1,0 +1,8 @@
+{
+  "Tool": "go-arch-lint",
+  "GeneratedAt": "2026-04-27T17:48:06.4443Z",
+  "DataHash": "b273fe6bfb7c8ac3dde4cf5f4c1c80edad89a76219f734240dcc362af0e07503",
+  "Findings": null,
+  "Tests": null,
+  "Prior": null
+}

@@ -115,3 +115,81 @@ Expected outcomes per format:
   `testdata/golden/v2/`.
 - **regression** → block cutover; file an issue against the responsible
   v2 substrate package.
+
+## Deltas (v2)
+
+Captured 2026-04-27 against the v2 substrate at branch tip
+(`v2-substrate-pin`). All 33 v2 renders are checked in under
+`testdata/golden/v2/`. None of the v1 renders are byte-equivalent;
+every delta below is intentional.
+
+### llm format
+
+- **No `fo:llm:vN` header.** v2 emits dense, header-free output by design
+  (Tufte-Swiss minimalism). Removed `fo:llm:v1` prefix and the
+  `data_hash` / `generated_at` lines that followed it. Tools that
+  parsed the header must now sniff content directly or rely on
+  `--format json`.
+- **No timestamp embedded.** v2 llm output is fully deterministic, which
+  is why `TestE2E_LLMGoldens` can byte-compare against the goldens. v1
+  embedded an RFC3339 `generated_at` and could not be byte-compared.
+- **Finding rendering switches to leaderboard + sparkline / per-finding
+  rows.** v1 emitted bulleted finding lists; v2 emits compact density
+  bars (`#####...   3`) for aggregate views and `x  RuleID  message
+  file:line` rows for per-finding views. This is the substrate's
+  Tufte-Swiss visual model, not a regression.
+
+### json format
+
+- **Schema reshape.** v2 emits the canonical `pkg/report.Report` struct
+  directly (`Tool`, `GeneratedAt`, `DataHash`, `Findings[]`, `Tests[]`).
+  v1 wrapped findings in a multi-section envelope. JSON consumers must
+  re-key against the new shape; see `pkg/report/report.go`.
+- **`GeneratedAt` is non-deterministic.** v2 keeps the v1 behaviour of
+  embedding render-time timestamp. JSON goldens are NOT byte-compared
+  in tests; consumers must substitute or ignore this field.
+- **State/diff field reserved.** Cutover (fo-7f5.9) will add a
+  `Diff *report.DiffSummary` field to `Report` (decision below); the
+  field is `omitempty` and absent from current v2 goldens. JSON
+  consumers should treat unknown top-level keys as forward-compatible.
+
+### human format
+
+- **Banner shape.** v1 emitted "FAIL N/M tests" with per-package detail
+  trees; v2 emits a terse band ("PANIC\n<pkg>" for failing test runs,
+  "+ no findings" for clean wrapper inputs). The v1 quirk #1
+  (silence-on-clean for SARIF wrappers) is resolved — v2 always emits
+  something.
+- **`+ no findings`** is the explicit clean-state marker across all
+  wrappers. Replaces the v1 inconsistency where some clean inputs
+  produced empty output.
+
+### Wrapper-specific notes
+
+- **gofmt:** v2 e2e tests now invoke `wrap diag --tool gofmt --rule
+  needs-formatting`. v1 `e2e_test.go` had `--tool govet` for this
+  fixture (likely a copy-paste bug); fixed in fo-uyp. The `fix:` line
+  in the gofmt llm golden comes from the `--rule needs-formatting`
+  contract, which auto-attaches `gofmt -w <path>` fix commands.
+
+## JSON shape decision for state/diff (fo-7f5.9 wire-in)
+
+**Decision: extend `pkg/report.Report` with a `Diff *DiffSummary`
+field (Option B).**
+
+Rationale:
+- Avoids breaking the JSON contract: `Diff` is `omitempty`, absent for
+  `--no-state` runs and first runs. Existing consumers ignore it.
+- Avoids an `{report, diff}` wrapper, which would be a hard breaking
+  change for everyone consuming `--format json` today.
+- Avoids signature churn through `view.RenderReport` / `RenderStream`
+  / `PickView` — the diff travels with the report.
+- `pkg/state` already imports `pkg/report` (one-way), so defining
+  `DiffSummary` in `pkg/report` keeps the dependency direction clean.
+  `state.EnvelopeOf` returns a value convertible to `*report.DiffSummary`
+  (or main.go assembles it from `state.Headline` + counts directly —
+  decide at wire-in time).
+
+Out of scope for fo-uyp; recorded here so fo-7f5.9 doesn't have to
+re-litigate the call.
+

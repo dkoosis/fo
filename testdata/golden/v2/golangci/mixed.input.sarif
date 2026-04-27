@@ -1,0 +1,58 @@
+{
+  "version": "2.1.0",
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "golangci-lint",
+          "version": "1.62.0"
+        }
+      },
+      "results": [
+        {
+          "ruleId": "errcheck",
+          "level": "error",
+          "message": { "text": "error return value of `db.Close` is not checked" },
+          "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "internal/store/store.go" }, "region": { "startLine": 42, "startColumn": 5 } } }]
+        },
+        {
+          "ruleId": "errcheck",
+          "level": "error",
+          "message": { "text": "error return value of `resp.Body.Close` is not checked" },
+          "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "internal/store/store.go" }, "region": { "startLine": 78, "startColumn": 2 } } }]
+        },
+        {
+          "ruleId": "ineffassign",
+          "level": "error",
+          "message": { "text": "ineffectual assignment to `err`" },
+          "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "pkg/api/client.go" }, "region": { "startLine": 33, "startColumn": 5 } } }]
+        },
+        {
+          "ruleId": "govet",
+          "level": "warning",
+          "message": { "text": "printf: fmt.Sprintf format %d has arg of wrong type string" },
+          "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "pkg/api/client.go" }, "region": { "startLine": 57, "startColumn": 12 } } }]
+        },
+        {
+          "ruleId": "unused",
+          "level": "error",
+          "message": { "text": "func `helperValidate` is unused" },
+          "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "internal/validate.go" }, "region": { "startLine": 15, "startColumn": 6 } } }]
+        },
+        {
+          "ruleId": "gosimple",
+          "level": "warning",
+          "message": { "text": "S1005: unnecessary assignment to the blank identifier" },
+          "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "cmd/server/main.go" }, "region": { "startLine": 88, "startColumn": 2 } } }]
+        },
+        {
+          "ruleId": "staticcheck",
+          "level": "warning",
+          "message": { "text": "SA1019: package `io/ioutil` is deprecated" },
+          "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "pkg/config/loader.go" }, "region": { "startLine": 7, "startColumn": 2 } } }]
+        }
+      ]
+    }
+  ]
+}

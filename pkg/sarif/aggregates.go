@@ -64,9 +64,9 @@ func TopFiles(doc *Document, limit int) []FileIssue {
 
 			fi.IssueCount++
 			switch result.Level {
-			case "error":
+			case LevelError:
 				fi.ErrorCount++
-			case "warning":
+			case LevelWarning:
 				fi.WarnCount++
 			}
 		}

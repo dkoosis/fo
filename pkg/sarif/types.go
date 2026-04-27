@@ -1,6 +1,14 @@
 // Package sarif provides SARIF (Static Analysis Results Interchange Format) parsing and rendering.
 package sarif
 
+// SARIF result levels per the 2.1.0 spec.
+const (
+	LevelError   = "error"
+	LevelWarning = "warning"
+	LevelNote    = "note"
+	LevelNone    = "none"
+)
+
 // Document represents a SARIF 2.1.0 document.
 // See: https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html
 type Document struct {

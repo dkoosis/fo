@@ -1,0 +1,86 @@
+{
+  "Tool": "golangci-lint",
+  "GeneratedAt": "2026-04-27T17:48:06.270504Z",
+  "DataHash": "35ded4c1b7548d287368fff58149b3495c6f3cd4da5e39d2167ff3fd7c7fef1d",
+  "Findings": [
+    {
+      "RuleID": "ineffassign",
+      "File": "pkg/api/client.go",
+      "Line": 33,
+      "Col": 5,
+      "Severity": "error",
+      "Message": "ineffectual assignment to `err`",
+      "FixCommand": "",
+      "Fingerprint": "a2015464fcad835116d91321432bfdbc5e559a8b40fbc329d602f9e6361f0662",
+      "Score": 3
+    },
+    {
+      "RuleID": "gosimple",
+      "File": "cmd/server/main.go",
+      "Line": 88,
+      "Col": 2,
+      "Severity": "warning",
+      "Message": "S1005: unnecessary assignment to the blank identifier",
+      "FixCommand": "",
+      "Fingerprint": "3262de6995ad2549074a58762fb57d98df75ae5895d0f0c75015427973dca25f",
+      "Score": 2
+    },
+    {
+      "RuleID": "govet",
+      "File": "pkg/api/client.go",
+      "Line": 57,
+      "Col": 12,
+      "Severity": "warning",
+      "Message": "printf: fmt.Sprintf format %d has arg of wrong type string",
+      "FixCommand": "",
+      "Fingerprint": "27e600da466ff85602595f25a273e49a82ae0a59075f46c3a702913bbea4d31d",
+      "Score": 2
+    },
+    {
+      "RuleID": "staticcheck",
+      "File": "pkg/config/loader.go",
+      "Line": 7,
+      "Col": 2,
+      "Severity": "warning",
+      "Message": "SA1019: package `io/ioutil` is deprecated",
+      "FixCommand": "",
+      "Fingerprint": "f9102cb77af43ca037d2e4ad029a0c6cd55dba54ecbcc4c2db0973c980c99693",
+      "Score": 2
+    },
+    {
+      "RuleID": "errcheck",
+      "File": "internal/store/store.go",
+      "Line": 42,
+      "Col": 5,
+      "Severity": "error",
+      "Message": "error return value of `db.Close` is not checked",
+      "FixCommand": "",
+      "Fingerprint": "8e0b376cda9ffd41c2fd03710a3be14398e2053f2e92d353a8150debe3dd38da",
+      "Score": 1.5
+    },
+    {
+      "RuleID": "errcheck",
+      "File": "internal/store/store.go",
+      "Line": 78,
+      "Col": 2,
+      "Severity": "error",
+      "Message": "error return value of `resp.Body.Close` is not checked",
+      "FixCommand": "",
+      "Fingerprint": "c31387c28daf614aae386919f8b8e77cefc87fb0d19bf85d9a23a84b410e119f",
+      "Score": 1.5
+    },
+    {
+      "RuleID": "unused",
+      "File": "internal/validate.go",
+      "Line": 15,
+      "Col": 6,
+      "Severity": "error",
+      "Message": "func `helperValidate` is unused",
+      "FixCommand": "",
+      "Fingerprint": "e40cab920730fd9a5eab883e668393d4747e6d7d7c451022aef54f968d9626ff",
+      "Score": 1.5
+    }
+  ],
+  "Tests": null,
+  "Prior": null
+}

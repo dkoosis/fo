@@ -1,7 +1,6 @@
-// E2E tests against the v1 golden fixture suite — fixture-driven smoke,
-// determinism, and wrap subcommand checks. Goldens are NOT compared
-// byte-for-byte (v2 renderer output is intentionally different); these
-// are contract tests that exercise run() end-to-end.
+// E2E tests against the v2 golden fixture suite — fixture-driven smoke,
+// determinism, wrap subcommand checks, and llm byte-equivalence regression
+// guard.
 package main
 
 import (
@@ -13,7 +12,7 @@ import (
 	"testing"
 )
 
-const fixturesRoot = "../../testdata/golden/v1"
+const fixturesRoot = "../../testdata/golden/v2"
 
 // scenario describes one fixture run, fully discovered from the filesystem.
 type scenario struct {
@@ -79,7 +78,7 @@ func pipelineInput(t *testing.T, sc scenario) []byte {
 	case "jscpd":
 		return wrapToSARIF(t, []string{"wrap", "jscpd"}, raw)
 	case "gofmt":
-		return wrapToSARIF(t, []string{"wrap", "diag", "--tool", "govet"}, raw)
+		return wrapToSARIF(t, []string{"wrap", "diag", "--tool", "gofmt", "--rule", "needs-formatting"}, raw)
 	}
 	t.Fatalf("unknown fixture dir %q", sc.dir)
 	return nil
@@ -180,7 +179,7 @@ func TestE2E_WrapSubcommands(t *testing.T) {
 	}{
 		{"archlint", []string{"wrap", "archlint"}, "archlint", ".input.json"},
 		{"jscpd", []string{"wrap", "jscpd"}, "jscpd", ".input.json"},
-		{"diag-govet", []string{"wrap", "diag", "--tool", "govet"}, "gofmt", ".input.txt"},
+		{"diag-gofmt", []string{"wrap", "diag", "--tool", "gofmt", "--rule", "needs-formatting"}, "gofmt", ".input.txt"},
 	}
 	for _, tc := range cases {
 		tc := tc
@@ -222,6 +221,30 @@ func TestE2E_WrapSubcommands(t *testing.T) {
 						t.Fatalf("wrap output missing runs")
 					}
 				})
+			}
+		})
+	}
+}
+
+// TestE2E_LLMGoldens asserts byte-equivalence between live llm output and
+// checked-in v2 goldens. llm is deterministic (no timestamp); regressions
+// here mean the format drifted unintentionally.
+func TestE2E_LLMGoldens(t *testing.T) {
+	scenarios := discoverScenarios(t)
+	for _, sc := range scenarios {
+		sc := sc
+		t.Run(sc.dir+"/"+sc.name, func(t *testing.T) {
+			input := pipelineInput(t, sc)
+			var stdout, stderr bytes.Buffer
+			_ = run([]string{"--format", "llm"}, bytes.NewReader(input), &stdout, &stderr)
+			goldenPath := filepath.Join(filepath.Dir(sc.inputAbs), sc.name+".llm.golden")
+			want, err := os.ReadFile(goldenPath)
+			if err != nil {
+				t.Fatalf("read golden %s: %v", goldenPath, err)
+			}
+			if !bytes.Equal(stdout.Bytes(), want) {
+				t.Errorf("llm output drift for %s/%s\n--- want (%d bytes)\n%s\n--- got (%d bytes)\n%s",
+					sc.dir, sc.name, len(want), string(want), stdout.Len(), stdout.String())
 			}
 		})
 	}

@@ -1,0 +1,4 @@
+!  needs formatting  /tmp/gofmt-sample/bad.go:0
+  fix: gofmt -w /tmp/gofmt-sample/bad.go
+!  needs formatting  /tmp/gofmt-sample/bad2.go:0
+  fix: gofmt -w /tmp/gofmt-sample/bad2.go

@@ -1,0 +1,97 @@
+{
+  "statistics": {
+    "detectionDate": "2026-04-26T21:17:25.752Z",
+    "formats": {
+      "go": {
+        "sources": {
+          "/tmp/jscpd-sample/b.go": {
+            "lines": 5,
+            "tokens": 75,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 4,
+            "duplicatedTokens": 68,
+            "percentage": 80,
+            "percentageTokens": 90.67,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "/tmp/jscpd-sample/a.go": {
+            "lines": 5,
+            "tokens": 75,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 4,
+            "duplicatedTokens": 68,
+            "percentage": 80,
+            "percentageTokens": 90.67,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          }
+        },
+        "total": {
+          "lines": 10,
+          "tokens": 150,
+          "sources": 2,
+          "clones": 1,
+          "duplicatedLines": 4,
+          "duplicatedTokens": 68,
+          "percentage": 40,
+          "percentageTokens": 45.33,
+          "newDuplicatedLines": 0,
+          "newClones": 0
+        }
+      }
+    },
+    "total": {
+      "lines": 10,
+      "tokens": 150,
+      "sources": 2,
+      "clones": 1,
+      "duplicatedLines": 4,
+      "duplicatedTokens": 68,
+      "percentage": 40,
+      "percentageTokens": 45.33,
+      "newDuplicatedLines": 0,
+      "newClones": 0
+    }
+  },
+  "duplicates": [
+    {
+      "format": "go",
+      "lines": 5,
+      "fragment": "(name string, age int) string {\n    if age < 0 { return \"invalid\" }\n    if name == \"\" { return \"anonymous\" }\n    return name + \" is \" + string(rune(age))\n}",
+      "tokens": 0,
+      "firstFile": {
+        "name": "../../../../tmp/jscpd-sample/a.go",
+        "start": 2,
+        "end": 6,
+        "startLoc": {
+          "line": 2,
+          "column": 13,
+          "position": 7
+        },
+        "endLoc": {
+          "line": 6,
+          "column": 2,
+          "position": 75
+        }
+      },
+      "secondFile": {
+        "name": "../../../../tmp/jscpd-sample/b.go",
+        "start": 2,
+        "end": 6,
+        "startLoc": {
+          "line": 2,
+          "column": 13,
+          "position": 7
+        },
+        "endLoc": {
+          "line": 6,
+          "column": 2,
+          "position": 75
+        }
+      }
+    }
+  ]
+}

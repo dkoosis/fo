@@ -1,0 +1,5 @@
+{"Type":"models.Check","Payload":{"ArchHasWarnings":true,"ArchWarningsDeps":[
+  {"ComponentName":"search","FileRelativePath":"pkg/search/search.go","ResolvedImportName":"embedder"},
+  {"ComponentName":"store","FileRelativePath":"internal/store/store.go","ResolvedImportName":"internal/svc"},
+  {"ComponentName":"agentSupervisor","FileRelativePath":"internal/agent/supervisor/supervisor.go","ResolvedImportName":"github.com/example/project/internal/agent/shell"}
+],"ArchWarningsNotMatched":[],"ArchWarningsDeepScan":[],"OmittedCount":0,"Qualities":[{"ID":"component_imports","Used":true}]}}

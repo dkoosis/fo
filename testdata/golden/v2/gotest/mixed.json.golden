@@ -1,0 +1,49 @@
+{
+  "Tool": "go test",
+  "GeneratedAt": "2026-04-27T17:48:06.306632Z",
+  "DataHash": "d97c2c1a72a982553945afcbc4b09731708b256a0a7c8b4af1fd1f4fb4037b46",
+  "Findings": null,
+  "Tests": [
+    {
+      "Package": "example.com/app/pkg/store",
+      "Test": "",
+      "Outcome": "panic",
+      "Duration": 800000000,
+      "Output": "panic: runtime error: nil pointer dereference\ngoroutine 1 [running]:",
+      "FixCommand": "go test example.com/app/pkg/store -v",
+      "Fingerprint": "dd5dc2a3a0d8e2cee3a9e3e045dec3b45c776193355865feb788bcec3cc1ba3a",
+      "Score": 300
+    },
+    {
+      "Package": "example.com/app/pkg/handler",
+      "Test": "TestCreateUser_DuplicateEmail",
+      "Outcome": "fail",
+      "Duration": 0,
+      "Output": "    handler_test.go:45: expected error \"email already exists\", got nil",
+      "FixCommand": "go test -run ^TestCreateUser_DuplicateEmail$ example.com/app/pkg/handler -v",
+      "Fingerprint": "6be19be71b4615266b139ea3f8199c8baf3e5c9cd7b4a425eff5f391714b3caa",
+      "Score": 3
+    },
+    {
+      "Package": "example.com/app/pkg/handler",
+      "Test": "TestDeleteUser_NotFound",
+      "Outcome": "fail",
+      "Duration": 0,
+      "Output": "    handler_test.go:78: expected 404, got 500",
+      "FixCommand": "go test -run ^TestDeleteUser_NotFound$ example.com/app/pkg/handler -v",
+      "Fingerprint": "0e49263087fd83a6602f314fee69d7747c8bfa70d6dcc2cf52150bf53aed5774",
+      "Score": 3
+    },
+    {
+      "Package": "example.com/app/pkg/config",
+      "Test": "",
+      "Outcome": "pass",
+      "Duration": 100000000,
+      "Output": "",
+      "FixCommand": "",
+      "Fingerprint": "",
+      "Score": 0
+    }
+  ],
+  "Prior": null
+}

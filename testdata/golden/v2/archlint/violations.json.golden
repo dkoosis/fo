@@ -1,0 +1,42 @@
+{
+  "Tool": "go-arch-lint",
+  "GeneratedAt": "2026-04-27T17:48:06.489808Z",
+  "DataHash": "d1a567cdf9a1598c0112db7c3119950a10dc7c264f79618281676b7656183f87",
+  "Findings": [
+    {
+      "RuleID": "dependency-violation",
+      "File": "pkg/search/search.go",
+      "Line": 0,
+      "Col": 0,
+      "Severity": "error",
+      "Message": "search → embedder",
+      "FixCommand": "go-arch-lint check --arch-file .go-arch-lint.yml",
+      "Fingerprint": "cff2e3d436017d594724cd624cda33eb7d03d04d83b95695cb37d238d6b0c2ef",
+      "Score": 3
+    },
+    {
+      "RuleID": "dependency-violation",
+      "File": "internal/agent/supervisor/supervisor.go",
+      "Line": 0,
+      "Col": 0,
+      "Severity": "error",
+      "Message": "agentSupervisor → github.com/example/project/internal/agent/shell",
+      "FixCommand": "go-arch-lint check --arch-file .go-arch-lint.yml",
+      "Fingerprint": "068036b071f3b03b08a13d17568f254934267b1b71ff3b6ea363c73dfafcc82d",
+      "Score": 1.5
+    },
+    {
+      "RuleID": "dependency-violation",
+      "File": "internal/store/store.go",
+      "Line": 0,
+      "Col": 0,
+      "Severity": "error",
+      "Message": "store → internal/svc",
+      "FixCommand": "go-arch-lint check --arch-file .go-arch-lint.yml",
+      "Fingerprint": "322d53b6742e4c238b64c7033c668b89902f68a6f507a0914fc536dfb84c6e78",
+      "Score": 1.5
+    }
+  ],
+  "Tests": null,
+  "Prior": null
+}

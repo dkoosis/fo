@@ -1,0 +1,20 @@
+{
+  "Tool": "jscpd",
+  "GeneratedAt": "2026-04-27T17:48:06.411661Z",
+  "DataHash": "4d294a38e61d6f464b76036569640e309132e50bc4be0c3106c44113461cdfad",
+  "Findings": [
+    {
+      "RuleID": "code-clone",
+      "File": "../../../../tmp/jscpd-sample/a.go",
+      "Line": 2,
+      "Col": 0,
+      "Severity": "warning",
+      "Message": "5 lines duplicated with ../../../../tmp/jscpd-sample/b.go:2-6",
+      "FixCommand": "# duplicate: ../../../../tmp/jscpd-sample/a.go:2-6 ↔ ../../../../tmp/jscpd-sample/b.go:2-6",
+      "Fingerprint": "0453587dfdbc85c3f43c07dc0e567a07bec3f6ec3528d31379506b82d76d82e9",
+      "Score": 2
+    }
+  ],
+  "Tests": null,
+  "Prior": null
+}

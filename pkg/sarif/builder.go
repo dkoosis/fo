@@ -31,13 +31,14 @@ func NewBuilder(toolName, toolVersion string) *Builder {
 	}
 }
 
-// validLevel reports whether level is a valid SARIF result level.
-func validLevel(level string) bool {
+// checkLevel returns nil if level is a valid SARIF result level,
+// or a descriptive error otherwise.
+func checkLevel(level string) error {
 	switch level {
 	case "error", "warning", "note", "none":
-		return true
+		return nil
 	}
-	return false
+	return fmt.Errorf("sarif: invalid level %q; must be error, warning, note, or none", level)
 }
 
 // AddResult adds a diagnostic result to the current run.
@@ -45,8 +46,8 @@ func (b *Builder) AddResult(ruleID, level, message, file string, line, col int) 
 	if b.err != nil {
 		return b
 	}
-	if !validLevel(level) {
-		b.err = fmt.Errorf("sarif: invalid level %q; must be error, warning, note, or none", level)
+	if err := checkLevel(level); err != nil {
+		b.err = err
 		return b
 	}
 	r := Result{
@@ -76,8 +77,8 @@ func (b *Builder) AddResultWithFix(ruleID, level, message, file string, line, co
 	if b.err != nil {
 		return b
 	}
-	if !validLevel(level) {
-		b.err = fmt.Errorf("sarif: invalid level %q; must be error, warning, note, or none", level)
+	if err := checkLevel(level); err != nil {
+		b.err = err
 		return b
 	}
 	r := Result{

@@ -1,0 +1,2 @@
+/tmp/gofmt-sample/bad.go
+/tmp/gofmt-sample/bad2.go

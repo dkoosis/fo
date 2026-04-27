@@ -1,0 +1,99 @@
+{
+  "Tool": "go test",
+  "GeneratedAt": "2026-04-27T17:48:06.332139Z",
+  "DataHash": "91c747da70c164a8590e3af9e254d82b96775b7f654a31f0cd74210719eea0b2",
+  "Findings": null,
+  "Tests": [
+    {
+      "Package": "github.com/dkoosis/trixi/cmd/trixi",
+      "Test": "",
+      "Outcome": "pass",
+      "Duration": 5922000000,
+      "Output": "",
+      "FixCommand": "",
+      "Fingerprint": "",
+      "Score": 0
+    },
+    {
+      "Package": "github.com/dkoosis/trixi/internal/embedder",
+      "Test": "",
+      "Outcome": "pass",
+      "Duration": 2626000000,
+      "Output": "",
+      "FixCommand": "",
+      "Fingerprint": "",
+      "Score": 0
+    },
+    {
+      "Package": "github.com/dkoosis/trixi/internal/eval",
+      "Test": "",
+      "Outcome": "pass",
+      "Duration": 8350999999,
+      "Output": "",
+      "FixCommand": "",
+      "Fingerprint": "",
+      "Score": 0
+    },
+    {
+      "Package": "github.com/dkoosis/trixi/internal/graph",
+      "Test": "",
+      "Outcome": "pass",
+      "Duration": 2611000000,
+      "Output": "",
+      "FixCommand": "",
+      "Fingerprint": "",
+      "Score": 0
+    },
+    {
+      "Package": "github.com/dkoosis/trixi/internal/index",
+      "Test": "",
+      "Outcome": "pass",
+      "Duration": 12286000000,
+      "Output": "",
+      "FixCommand": "",
+      "Fingerprint": "",
+      "Score": 0
+    },
+    {
+      "Package": "github.com/dkoosis/trixi/internal/mcp",
+      "Test": "",
+      "Outcome": "pass",
+      "Duration": 4989000000,
+      "Output": "",
+      "FixCommand": "",
+      "Fingerprint": "",
+      "Score": 0
+    },
+    {
+      "Package": "github.com/dkoosis/trixi/internal/registry",
+      "Test": "",
+      "Outcome": "pass",
+      "Duration": 2471000000,
+      "Output": "",
+      "FixCommand": "",
+      "Fingerprint": "",
+      "Score": 0
+    },
+    {
+      "Package": "github.com/dkoosis/trixi/internal/search",
+      "Test": "",
+      "Outcome": "pass",
+      "Duration": 4505000000,
+      "Output": "",
+      "FixCommand": "",
+      "Fingerprint": "",
+      "Score": 0
+    },
+    {
+      "Package": "github.com/dkoosis/trixi/internal/store",
+      "Test": "",
+      "Outcome": "pass",
+      "Duration": 4560000000,
+      "Output": "",
+      "FixCommand": "",
+      "Fingerprint": "",
+      "Score": 0
+    }
+  ],
+  "Prior": null
+}

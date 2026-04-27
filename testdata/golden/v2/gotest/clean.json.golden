@@ -1,0 +1,39 @@
+{
+  "Tool": "go test",
+  "GeneratedAt": "2026-04-27T17:48:06.285384Z",
+  "DataHash": "fee2f541d8aefbcf39255b87a2867626ba572419f1491f02298109608929d671",
+  "Findings": null,
+  "Tests": [
+    {
+      "Package": "example.com/app/pkg/config",
+      "Test": "",
+      "Outcome": "pass",
+      "Duration": 100000000,
+      "Output": "",
+      "FixCommand": "",
+      "Fingerprint": "",
+      "Score": 0
+    },
+    {
+      "Package": "example.com/app/pkg/handler",
+      "Test": "",
+      "Outcome": "pass",
+      "Duration": 400000000,
+      "Output": "",
+      "FixCommand": "",
+      "Fingerprint": "",
+      "Score": 0
+    },
+    {
+      "Package": "example.com/app/pkg/store",
+      "Test": "",
+      "Outcome": "pass",
+      "Duration": 1000000000,
+      "Output": "",
+      "FixCommand": "",
+      "Fingerprint": "",
+      "Score": 0
+    }
+  ],
+  "Prior": null
+}
