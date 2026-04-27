@@ -100,4 +100,3 @@ func TestBuilder_ValidLevels(t *testing.T) {
 		}
 	}
 }
-

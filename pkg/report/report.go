@@ -32,29 +32,29 @@ const (
 // the canonical input to the Bullet, Grouped, Leaderboard, and Headline
 // views.
 type Finding struct {
-	RuleID      string
-	File        string
-	Line        int
-	Col         int
-	Severity    Severity
-	Message     string
-	FixCommand  string
-	Fingerprint string
-	Score       float64
+	RuleID      string   `json:"rule_id,omitempty"`
+	File        string   `json:"file,omitempty"`
+	Line        int      `json:"line,omitempty"`
+	Col         int      `json:"col,omitempty"`
+	Severity    Severity `json:"severity"`
+	Message     string   `json:"message"`
+	FixCommand  string   `json:"fix_command,omitempty"`
+	Fingerprint string   `json:"fingerprint,omitempty"`
+	Score       float64  `json:"score,omitempty"`
 }
 
 // TestResult is a single test or package outcome from go test -json.
 // Test == "" means a package-level result (build error, panic, or whole-pkg
 // pass/fail rollup).
 type TestResult struct {
-	Package     string
-	Test        string
-	Outcome     TestOutcome
-	Duration    time.Duration
-	Output      string
-	FixCommand  string
-	Fingerprint string
-	Score       float64
+	Package     string        `json:"package"`
+	Test        string        `json:"test,omitempty"`
+	Outcome     TestOutcome   `json:"outcome"`
+	Duration    time.Duration `json:"duration_ns,omitempty"`
+	Output      string        `json:"output,omitempty"`
+	FixCommand  string        `json:"fix_command,omitempty"`
+	Fingerprint string        `json:"fingerprint,omitempty"`
+	Score       float64       `json:"score,omitempty"`
 }
 
 // Report is the canonical shape from parser to pickView to renderer.
@@ -65,14 +65,12 @@ type TestResult struct {
 // Diff, when non-nil, drives both the JSON contract and the Delta view
 // wrapper in pickView.
 type Report struct {
-	Tool        string
-	GeneratedAt time.Time
-	DataHash    string
-
-	Findings []Finding
-	Tests    []TestResult
-
-	Diff *DiffSummary `json:"diff,omitempty"`
+	Tool        string       `json:"tool,omitempty"`
+	GeneratedAt time.Time    `json:"generated_at"`
+	DataHash    string       `json:"data_hash,omitempty"`
+	Findings    []Finding    `json:"findings,omitempty"`
+	Tests       []TestResult `json:"tests,omitempty"`
+	Diff        *DiffSummary `json:"diff,omitempty"`
 }
 
 // DiffItem mirrors the shape of state.Item without importing pkg/state

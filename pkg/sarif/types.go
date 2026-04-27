@@ -64,7 +64,7 @@ type Location struct {
 // PhysicalLocation pinpoints the file and region.
 type PhysicalLocation struct {
 	ArtifactLocation ArtifactLocation `json:"artifactLocation"`
-	Region           Region           `json:"region,omitempty"`
+	Region           Region           `json:"region,omitzero"`
 }
 
 // ArtifactLocation identifies the file.
@@ -104,4 +104,3 @@ func (r *Result) FixCommand() string {
 	}
 	return r.Fixes[0].Description.Text
 }
-

@@ -68,15 +68,15 @@ func TestClassify_TableDriven(t *testing.T) {
 		{
 			name: "flaky — present at t-2, absent at t-1, present at t",
 			prev: &File{Version: SchemaVersion, Runs: []Run{
-				mkRun(),            // t-1: gone
+				mkRun(),             // t-1: gone
 				mkRun("a", "error"), // t-2: present
 			}},
 			current:   mkReport(report.Finding{Fingerprint: "a", Severity: report.SeverityError}),
 			wantFlaky: 1,
 		},
 		{
-			name: "with only one prior run, reappearance counts as new not flaky",
-			prev: &File{Version: SchemaVersion, Runs: []Run{mkRun()}},
+			name:    "with only one prior run, reappearance counts as new not flaky",
+			prev:    &File{Version: SchemaVersion, Runs: []Run{mkRun()}},
 			current: mkReport(report.Finding{Fingerprint: "a", Severity: report.SeverityError}),
 			wantNew: 1,
 		},
@@ -106,7 +106,6 @@ func TestClassify_TableDriven(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			d := Classify(tc.prev, tc.current)

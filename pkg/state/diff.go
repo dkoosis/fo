@@ -23,13 +23,13 @@ const (
 // (since a flaky finding is, by definition, present in the current run
 // after having been resolved).
 type Item struct {
-	Fingerprint  string          `json:"fingerprint"`
-	RuleID       string          `json:"rule_id,omitempty"`
-	File         string          `json:"file,omitempty"`
-	Severity     Severity        `json:"severity"`
-	PriorSeverity Severity       `json:"prior_severity,omitempty"`
-	Class        Class           `json:"class"`
-	report       *report.Finding // unexported back-pointer; not serialized
+	Fingerprint   string          `json:"fingerprint"`
+	RuleID        string          `json:"rule_id,omitempty"`
+	File          string          `json:"file,omitempty"`
+	Severity      Severity        `json:"severity"`
+	PriorSeverity Severity        `json:"prior_severity,omitempty"`
+	Class         Class           `json:"class"`
+	report        *report.Finding // unexported back-pointer; not serialized
 }
 
 // Diff is the classifier output, both the headline summary inputs and
@@ -56,57 +56,66 @@ type Diff struct {
 // degrades gracefully to new/persistent/resolved/regressed only.
 func Classify(prev *File, current *report.Report) Diff {
 	cur := RunFromReport(current)
-	var prior Run
-	var older []Run
-	if prev != nil && len(prev.Runs) > 0 {
-		prior = prev.Runs[0]
-		if len(prev.Runs) > 1 {
-			older = prev.Runs[1:]
-		}
-	}
-
-	byFP := make(map[string]*report.Finding, len(current.Findings))
-	for i := range current.Findings {
-		f := &current.Findings[i]
-		if f.Fingerprint != "" {
-			byFP[f.Fingerprint] = f
-		}
-	}
+	prior, older := priorRuns(prev)
+	byFP := indexFindings(current.Findings)
 
 	var d Diff
-
 	for fp, sev := range cur.Findings {
-		f := byFP[fp]
-		priorSev, hadPrior := prior.Findings[fp]
-		switch {
-		case !hadPrior:
-			if isFlaky(fp, older) {
-				d.Flaky = append(d.Flaky, makeItem(fp, sev, "", ClassFlaky, f))
-				continue
-			}
-			d.New = append(d.New, makeItem(fp, sev, "", ClassNew, f))
-		case severityRank(sev) > severityRank(priorSev):
-			d.Regressed = append(d.Regressed, makeItem(fp, sev, priorSev, ClassRegressed, f))
-		default:
-			d.Persistent = append(d.Persistent, makeItem(fp, sev, priorSev, ClassPersistent, f))
-		}
+		classifyFinding(&d, fp, sev, byFP[fp], prior, older)
 	}
-
 	for fp, sev := range prior.Findings {
-		if _, stillThere := cur.Findings[fp]; stillThere {
-			continue
+		if _, stillThere := cur.Findings[fp]; !stillThere {
+			d.Resolved = append(d.Resolved, makeItem(fp, "", sev, ClassResolved, nil))
 		}
-		d.Resolved = append(d.Resolved, makeItem(fp, "", sev, ClassResolved, nil))
 	}
 
 	d.PersistentCount = len(d.Persistent)
-
 	sortItems(d.New)
 	sortItems(d.Resolved)
 	sortItems(d.Regressed)
 	sortItems(d.Flaky)
 	sortItems(d.Persistent)
 	return d
+}
+
+// priorRuns extracts the immediate prior run and older history from prev.
+func priorRuns(prev *File) (prior Run, older []Run) {
+	if prev != nil && len(prev.Runs) > 0 {
+		prior = prev.Runs[0]
+		if len(prev.Runs) > 1 {
+			older = prev.Runs[1:]
+		}
+	}
+	return prior, older
+}
+
+// indexFindings builds a fingerprint→Finding map for O(1) lookup.
+func indexFindings(findings []report.Finding) map[string]*report.Finding {
+	m := make(map[string]*report.Finding, len(findings))
+	for i := range findings {
+		f := &findings[i]
+		if f.Fingerprint != "" {
+			m[f.Fingerprint] = f
+		}
+	}
+	return m
+}
+
+// classifyFinding places a single current finding into the appropriate Diff bucket.
+func classifyFinding(d *Diff, fp string, sev Severity, f *report.Finding, prior Run, older []Run) {
+	priorSev, hadPrior := prior.Findings[fp]
+	switch {
+	case !hadPrior:
+		if isFlaky(fp, older) {
+			d.Flaky = append(d.Flaky, makeItem(fp, sev, "", ClassFlaky, f))
+		} else {
+			d.New = append(d.New, makeItem(fp, sev, "", ClassNew, f))
+		}
+	case severityRank(sev) > severityRank(priorSev):
+		d.Regressed = append(d.Regressed, makeItem(fp, sev, priorSev, ClassRegressed, f))
+	default:
+		d.Persistent = append(d.Persistent, makeItem(fp, sev, priorSev, ClassPersistent, f))
+	}
 }
 
 // isFlaky reports whether a fingerprint absent from the immediate prior

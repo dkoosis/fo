@@ -3,9 +3,13 @@ package sarif
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 )
+
+// ErrMissingSARIFVersion is returned when a decoded document has no version field.
+var ErrMissingSARIFVersion = errors.New("missing sarif version")
 
 // Read parses SARIF from an io.Reader.
 func Read(r io.Reader) (*Document, error) {
@@ -18,7 +22,7 @@ func Read(r io.Reader) (*Document, error) {
 	// after the SARIF JSON document, and the decoder already consumed the
 	// complete first JSON value successfully.
 	if doc.Version == "" {
-		return nil, fmt.Errorf("missing sarif version")
+		return nil, ErrMissingSARIFVersion
 	}
 	return &doc, nil
 }

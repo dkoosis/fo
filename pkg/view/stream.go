@@ -43,19 +43,26 @@ func RenderStream(ctx context.Context, w io.Writer, ch <-chan report.Report, t t
 			if !ok {
 				return nil
 			}
-			out := Render(PickView(r), t, width)
-			if out == "" {
-				continue
-			}
-			if !first {
-				if _, err := fmt.Fprintln(w); err != nil {
-					return err
-				}
-			}
-			first = false
-			if _, err := fmt.Fprintln(w, out); err != nil {
+			if err := writeSnapshot(w, r, t, width, &first); err != nil {
 				return err
 			}
 		}
 	}
+}
+
+// writeSnapshot renders one report snapshot and writes it to w, prepending a
+// blank separator line for all but the first snapshot.
+func writeSnapshot(w io.Writer, r report.Report, t theme.Theme, width int, first *bool) error {
+	out := Render(PickView(r), t, width)
+	if out == "" {
+		return nil
+	}
+	if !*first {
+		if _, err := fmt.Fprintln(w); err != nil {
+			return err
+		}
+	}
+	*first = false
+	_, err := fmt.Fprintln(w, out)
+	return err
 }

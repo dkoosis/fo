@@ -56,13 +56,7 @@ func renderSmallMultiples(v SmallMultiples, t theme.Theme, width int) string {
 		return ""
 	}
 	// pick columns: aim for ~24 cols per cell minimum
-	cols := width / 24
-	if cols < 1 {
-		cols = 1
-	}
-	if cols > len(v.Cells) {
-		cols = len(v.Cells)
-	}
+	cols := min(max(width/24, 1), len(v.Cells))
 
 	rendered := make([]string, len(v.Cells))
 	for i, c := range v.Cells {
@@ -72,36 +66,35 @@ func renderSmallMultiples(v SmallMultiples, t theme.Theme, width int) string {
 	// chunk into rows of `cols` cells; each cell is 1-2 lines
 	var out strings.Builder
 	for start := 0; start < len(rendered); start += cols {
-		end := start + cols
-		if end > len(rendered) {
-			end = len(rendered)
-		}
-		// split each cell into its lines, build a row of [][]string
-		// where row[lineIdx][colIdx] = cell line at that position
-		cellLines := make([][]string, end-start)
-		maxLines := 0
-		for i := 0; i < end-start; i++ {
-			cellLines[i] = strings.Split(rendered[start+i], "\n")
-			if len(cellLines[i]) > maxLines {
-				maxLines = len(cellLines[i])
-			}
-		}
-		gridRows := make([][]string, maxLines)
-		for li := 0; li < maxLines; li++ {
-			row := make([]string, end-start)
-			for ci := 0; ci < end-start; ci++ {
-				if li < len(cellLines[ci]) {
-					row[ci] = cellLines[ci][li]
-				} else {
-					row[ci] = ""
-				}
-			}
-			gridRows[li] = row
-		}
-		out.WriteString(paint.Columnize(gridRows, 3))
+		end := min(start+cols, len(rendered))
+		out.WriteString(paint.Columnize(buildGridRows(rendered[start:end]), 3))
 		if end < len(rendered) {
 			out.WriteString("\n\n")
 		}
 	}
 	return out.String()
+}
+
+// buildGridRows converts a slice of multi-line cell strings into a
+// [][]string grid suitable for Columnize: gridRows[lineIdx][colIdx].
+func buildGridRows(cells []string) [][]string {
+	cellLines := make([][]string, len(cells))
+	maxLines := 0
+	for i, c := range cells {
+		cellLines[i] = strings.Split(c, "\n")
+		if len(cellLines[i]) > maxLines {
+			maxLines = len(cellLines[i])
+		}
+	}
+	gridRows := make([][]string, maxLines)
+	for li := range maxLines {
+		row := make([]string, len(cells))
+		for ci := range cells {
+			if li < len(cellLines[ci]) {
+				row[ci] = cellLines[ci][li]
+			}
+		}
+		gridRows[li] = row
+	}
+	return gridRows
 }

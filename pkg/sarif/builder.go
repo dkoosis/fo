@@ -2,8 +2,14 @@ package sarif
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+)
+
+var (
+	errEmptyDriverName = errors.New("sarif: driver name must not be empty")
+	errInvalidLevel    = errors.New("sarif: invalid level; must be error, warning, note, or none")
 )
 
 // Builder constructs valid SARIF 2.1.0 documents.
@@ -38,7 +44,7 @@ func checkLevel(level string) error {
 	case "error", "warning", "note", "none":
 		return nil
 	}
-	return fmt.Errorf("sarif: invalid level %q; must be error, warning, note, or none", level)
+	return fmt.Errorf("%w: %q", errInvalidLevel, level)
 }
 
 // AddResult adds a diagnostic result to the current run.
@@ -115,7 +121,7 @@ func (b *Builder) Document() *Document {
 // Returns an error if the driver name is empty or any result has an invalid level.
 func (b *Builder) WriteTo(w io.Writer) (int64, error) {
 	if b.doc.Runs[0].Tool.Driver.Name == "" {
-		return 0, fmt.Errorf("sarif: driver name must not be empty")
+		return 0, errEmptyDriverName
 	}
 	if b.err != nil {
 		return 0, b.err

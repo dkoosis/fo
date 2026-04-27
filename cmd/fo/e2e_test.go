@@ -42,8 +42,7 @@ func discoverScenarios(t *testing.T) []scenario {
 		}
 		dir := filepath.Base(filepath.Dir(path))
 		// scenario name = part before ".input."
-		idx := strings.Index(base, ".input.")
-		name := base[:idx]
+		name, _, _ := strings.Cut(base, ".input.")
 		out = append(out, scenario{
 			dir:      dir,
 			name:     name,
@@ -103,7 +102,6 @@ func TestE2E_Pipeline_ContractSurface(t *testing.T) {
 	for _, sc := range scenarios {
 		input := pipelineInput(t, sc)
 		for _, fmtName := range formats {
-			sc, fmtName, input := sc, fmtName, input
 			t.Run(sc.dir+"/"+sc.name+"/"+fmtName, func(t *testing.T) {
 				var stdout, stderr bytes.Buffer
 				code := run([]string{"--format", fmtName, "--no-state"}, bytes.NewReader(input), &stdout, &stderr)
@@ -128,7 +126,7 @@ func TestE2E_Pipeline_ContractSurface(t *testing.T) {
 					if bytes.Contains(out, []byte("\x1b[")) {
 						t.Errorf("json output contains ANSI escapes")
 					}
-					var v interface{}
+					var v any
 					if err := json.Unmarshal(out, &v); err != nil {
 						t.Errorf("json output not valid JSON: %v", err)
 					}
@@ -148,7 +146,6 @@ func TestE2E_Pipeline_Determinism(t *testing.T) {
 	for _, sc := range scenarios {
 		input := pipelineInput(t, sc)
 		for _, fmtName := range formats {
-			sc, fmtName, input := sc, fmtName, input
 			t.Run(sc.dir+"/"+sc.name+"/"+fmtName, func(t *testing.T) {
 				a := runOnce(t, fmtName, input)
 				b := runOnce(t, fmtName, input)
@@ -182,7 +179,6 @@ func TestE2E_WrapSubcommands(t *testing.T) {
 		{"diag-gofmt", []string{"wrap", "diag", "--tool", "gofmt", "--rule", "needs-formatting"}, "gofmt", ".input.txt"},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			fixtureDir, err := filepath.Abs(filepath.Join(fixturesRoot, tc.dir))
 			if err != nil {
@@ -196,7 +192,6 @@ func TestE2E_WrapSubcommands(t *testing.T) {
 				t.Fatalf("no fixtures in %s matching *%s", fixtureDir, tc.ext)
 			}
 			for _, in := range matches {
-				in := in
 				t.Run(filepath.Base(in), func(t *testing.T) {
 					raw, err := os.ReadFile(in)
 					if err != nil {
@@ -232,7 +227,6 @@ func TestE2E_WrapSubcommands(t *testing.T) {
 func TestE2E_LLMGoldens(t *testing.T) {
 	scenarios := discoverScenarios(t)
 	for _, sc := range scenarios {
-		sc := sc
 		t.Run(sc.dir+"/"+sc.name, func(t *testing.T) {
 			input := pipelineInput(t, sc)
 			var stdout, stderr bytes.Buffer
@@ -258,4 +252,3 @@ func TestE2E_NoInputIsUsageError(t *testing.T) {
 		t.Fatalf("want exit 2, got %d (stderr=%s)", code, stderr.String())
 	}
 }
-

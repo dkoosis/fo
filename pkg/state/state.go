@@ -72,10 +72,10 @@ var ErrVersionSkew = errors.New("state: schema version skew")
 // returns a non-nil error so the caller can decide whether to overwrite
 // or refuse; the CLI treats both as "start fresh".
 func Load(path string) (*File, error) {
-	b, err := os.ReadFile(path) //nolint:gosec // path is user-supplied via --state-file by design
+	b, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, nil
+			return nil, nil //nolint:nilnil // missing file is not an error; callers treat (nil, nil) as "no prior state"
 		}
 		return nil, fmt.Errorf("state: read %s: %w", path, err)
 	}

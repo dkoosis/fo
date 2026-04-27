@@ -116,8 +116,8 @@ func TestToReport_DeterministicFingerprint(t *testing.T) {
 	t.Parallel()
 
 	results := []testjson.TestPackageResult{{
-		Name:   "pkg/x",
-		Failed: 1,
+		Name:        "pkg/x",
+		Failed:      1,
 		FailedTests: []testjson.FailedTest{{Name: "TestFoo", Output: []string{"oops"}}},
 	}}
 

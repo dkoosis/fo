@@ -153,27 +153,27 @@ func TestProcessEvent_FreesOutputOnPassAndSkip(t *testing.T) {
 	for i := range passingTests {
 		name := fmt.Sprintf("TestPass%d", i)
 		lines = append(lines,
-			fmt.Sprintf(`{"Action":"run","Package":"%s","Test":"%s"}`, pkg, name),
-			fmt.Sprintf(`{"Action":"output","Package":"%s","Test":"%s","Output":"log line %d\n"}`, pkg, name, i),
-			fmt.Sprintf(`{"Action":"output","Package":"%s","Test":"%s","Output":"more output %d\n"}`, pkg, name, i),
-			fmt.Sprintf(`{"Action":"pass","Package":"%s","Test":"%s","Elapsed":0.01}`, pkg, name),
+			fmt.Sprintf(`{"Action":"run","Package":"%s","Test":"%s"}`, pkg, name),                                   //nolint:gocritic // sprintfQuotedString: building raw JSON, %s correct for string fields
+			fmt.Sprintf(`{"Action":"output","Package":"%s","Test":"%s","Output":"log line %d\n"}`, pkg, name, i),    //nolint:gocritic // sprintfQuotedString: building raw JSON
+			fmt.Sprintf(`{"Action":"output","Package":"%s","Test":"%s","Output":"more output %d\n"}`, pkg, name, i), //nolint:gocritic // sprintfQuotedString: building raw JSON
+			fmt.Sprintf(`{"Action":"pass","Package":"%s","Test":"%s","Elapsed":0.01}`, pkg, name),                   //nolint:gocritic // sprintfQuotedString: building raw JSON
 		)
 	}
 	// One skipped test with output
 	lines = append(lines,
-		fmt.Sprintf(`{"Action":"run","Package":"%s","Test":"TestSkipped"}`, pkg),
-		fmt.Sprintf(`{"Action":"output","Package":"%s","Test":"TestSkipped","Output":"skip reason\n"}`, pkg),
-		fmt.Sprintf(`{"Action":"skip","Package":"%s","Test":"TestSkipped","Elapsed":0.0}`, pkg),
+		fmt.Sprintf(`{"Action":"run","Package":"%s","Test":"TestSkipped"}`, pkg),                             //nolint:gocritic // sprintfQuotedString: building raw JSON
+		fmt.Sprintf(`{"Action":"output","Package":"%s","Test":"TestSkipped","Output":"skip reason\n"}`, pkg), //nolint:gocritic // sprintfQuotedString: building raw JSON
+		fmt.Sprintf(`{"Action":"skip","Package":"%s","Test":"TestSkipped","Elapsed":0.0}`, pkg),              //nolint:gocritic // sprintfQuotedString: building raw JSON
 	)
 	// One failing test with output (output must survive)
 	lines = append(lines,
-		fmt.Sprintf(`{"Action":"run","Package":"%s","Test":"TestFail"}`, pkg),
-		fmt.Sprintf(`{"Action":"output","Package":"%s","Test":"TestFail","Output":"expected X got Y\n"}`, pkg),
-		fmt.Sprintf(`{"Action":"fail","Package":"%s","Test":"TestFail","Elapsed":0.1}`, pkg),
+		fmt.Sprintf(`{"Action":"run","Package":"%s","Test":"TestFail"}`, pkg),                                  //nolint:gocritic // sprintfQuotedString: building raw JSON
+		fmt.Sprintf(`{"Action":"output","Package":"%s","Test":"TestFail","Output":"expected X got Y\n"}`, pkg), //nolint:gocritic // sprintfQuotedString: building raw JSON
+		fmt.Sprintf(`{"Action":"fail","Package":"%s","Test":"TestFail","Elapsed":0.1}`, pkg),                   //nolint:gocritic // sprintfQuotedString: building raw JSON
 	)
 	// Package-level fail (package contains a failing test)
 	lines = append(lines,
-		fmt.Sprintf(`{"Action":"fail","Package":"%s","Elapsed":1.0}`, pkg),
+		fmt.Sprintf(`{"Action":"fail","Package":"%s","Elapsed":1.0}`, pkg), //nolint:gocritic // sprintfQuotedString: building raw JSON
 	)
 
 	input := strings.Join(lines, "\n") + "\n"
@@ -211,7 +211,7 @@ func TestProcessEvent_FreesOutputOnPassAndSkip(t *testing.T) {
 	// Verify the aggregator freed pass/skip buffers by checking internal state.
 	// We re-parse and inspect the aggregator directly.
 	agg := newAggregator()
-	for _, line := range strings.Split(strings.TrimSpace(input), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(input), "\n") {
 		var event TestEvent
 		if err := json.Unmarshal([]byte(line), &event); err != nil {
 			continue

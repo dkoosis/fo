@@ -113,7 +113,7 @@ func TestReset(t *testing.T) {
 func TestAppend_TrimsToMaxHistory(t *testing.T) {
 	t.Parallel()
 	prev := &File{Version: SchemaVersion}
-	for i := 0; i < MaxHistory+5; i++ {
+	for range MaxHistory + 5 {
 		prev = Append(prev, Run{Findings: map[string]Severity{}})
 	}
 	if len(prev.Runs) != MaxHistory {

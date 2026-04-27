@@ -9,7 +9,7 @@ import (
 
 func mkFindings(n int, sev report.Severity, pkg string) []report.Finding {
 	out := make([]report.Finding, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		out[i] = report.Finding{
 			RuleID:   "R",
 			File:     pkg + "/f.go",

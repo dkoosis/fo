@@ -21,26 +21,22 @@ import (
 //   - value <= 0 returns all-empty
 //   - value >= max returns all-filled
 //   - NaN or Inf in value or max clamps to all-empty
-func Bar(value, max float64, width int, filled, empty string) string {
+func Bar(value, limit float64, width int, filled, empty string) string {
 	if width <= 0 {
 		return ""
 	}
-	if math.IsNaN(value) || math.IsNaN(max) || math.IsInf(value, 0) || math.IsInf(max, 0) {
+	if math.IsNaN(value) || math.IsNaN(limit) || math.IsInf(value, 0) || math.IsInf(limit, 0) {
 		return strings.Repeat(empty, width)
 	}
-	if max <= 0 || value <= 0 {
+	if limit <= 0 || value <= 0 {
 		return strings.Repeat(empty, width)
 	}
-	if value >= max {
+	if value >= limit {
 		return strings.Repeat(filled, width)
 	}
-	cells := int(math.Round(value / max * float64(width)))
-	if cells < 0 {
-		cells = 0
-	}
-	if cells > width {
-		cells = width
-	}
+	cells := int(math.Round(value / limit * float64(width)))
+	cells = max(cells, 0)
+	cells = min(cells, width)
 	return strings.Repeat(filled, cells) + strings.Repeat(empty, width-cells)
 }
 
@@ -55,7 +51,19 @@ func Sparkline(values []float64) string {
 	if len(values) == 0 {
 		return ""
 	}
-	minV, maxV := values[0], values[0]
+	minV, maxV := sliceMinMax(values)
+	span := maxV - minV
+	var b strings.Builder
+	b.Grow(len(values) * 3)
+	for _, v := range values {
+		b.WriteRune(sparkBlocks[sparkIndex(v, minV, span)])
+	}
+	return b.String()
+}
+
+// sliceMinMax returns the minimum and maximum values of a non-empty slice.
+func sliceMinMax(values []float64) (minV, maxV float64) {
+	minV, maxV = values[0], values[0]
 	for _, v := range values[1:] {
 		if v < minV {
 			minV = v
@@ -64,29 +72,19 @@ func Sparkline(values []float64) string {
 			maxV = v
 		}
 	}
-	span := maxV - minV
-	var b strings.Builder
-	b.Grow(len(values) * 3)
-	for _, v := range values {
-		if v == 0 {
-			b.WriteRune(sparkBlocks[0])
-			continue
-		}
-		var idx int
-		if span == 0 {
-			idx = 4
-		} else {
-			idx = int(math.Round((v-minV)/span*7)) + 1
-		}
-		if idx < 1 {
-			idx = 1
-		}
-		if idx > 8 {
-			idx = 8
-		}
-		b.WriteRune(sparkBlocks[idx])
+	return minV, maxV
+}
+
+// sparkIndex maps a single value to a sparkBlocks index [0..8].
+// Index 0 is the zero sentinel; indices 1–8 are the block levels.
+func sparkIndex(v, minV, span float64) int {
+	if v == 0 {
+		return 0
 	}
-	return b.String()
+	if span == 0 {
+		return 4
+	}
+	return max(1, min(8, int(math.Round((v-minV)/span*7))+1))
 }
 
 // PadLeft right-aligns s within a column of `width` runes, padding with
@@ -122,13 +120,26 @@ func Columnize(rows [][]string, gap int) string {
 	if gap < 0 {
 		gap = 0
 	}
-	cols := 0
+	cols, widths := columnWidths(rows)
+	sep := strings.Repeat(" ", gap)
+	var out strings.Builder
+	for ri, r := range rows {
+		writeRow(&out, r, cols, widths, sep)
+		if ri < len(rows)-1 {
+			out.WriteByte('\n')
+		}
+	}
+	return out.String()
+}
+
+// columnWidths returns the column count and per-column max rune widths for rows.
+func columnWidths(rows [][]string) (cols int, widths []int) {
 	for _, r := range rows {
 		if len(r) > cols {
 			cols = len(r)
 		}
 	}
-	widths := make([]int, cols)
+	widths = make([]int, cols)
 	for _, r := range rows {
 		for i, c := range r {
 			if w := utf8.RuneCountInString(c); w > widths[i] {
@@ -136,24 +147,21 @@ func Columnize(rows [][]string, gap int) string {
 			}
 		}
 	}
-	sep := strings.Repeat(" ", gap)
-	var out strings.Builder
-	for ri, r := range rows {
-		for i := 0; i < cols; i++ {
-			cell := ""
-			if i < len(r) {
-				cell = r[i]
-			}
-			if i == cols-1 {
-				out.WriteString(cell)
-			} else {
-				out.WriteString(PadRight(cell, widths[i]))
-				out.WriteString(sep)
-			}
+	return cols, widths
+}
+
+// writeRow writes one Columnize row to out, padding each cell to its column width.
+func writeRow(out *strings.Builder, r []string, cols int, widths []int, sep string) {
+	for i := range cols {
+		cell := ""
+		if i < len(r) {
+			cell = r[i]
 		}
-		if ri < len(rows)-1 {
-			out.WriteByte('\n')
+		if i == cols-1 {
+			out.WriteString(cell)
+		} else {
+			out.WriteString(PadRight(cell, widths[i]))
+			out.WriteString(sep)
 		}
 	}
-	return out.String()
 }

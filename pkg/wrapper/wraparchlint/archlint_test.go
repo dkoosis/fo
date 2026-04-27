@@ -116,4 +116,3 @@ func TestArchlint_FullImportPath(t *testing.T) {
 		t.Errorf("expected full import path in message, got %q", r.Message.Text)
 	}
 }
-

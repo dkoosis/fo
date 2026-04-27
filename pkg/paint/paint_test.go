@@ -12,10 +12,10 @@ func TestBar_ProportionalFill(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name           string
-		value, max     float64
-		width          int
-		want           string
+		name       string
+		value, max float64
+		width      int
+		want       string
 	}{
 		{"half", 5, 10, 4, "##--"},
 		{"empty", 0, 10, 4, "----"},

@@ -4,15 +4,15 @@ import "time"
 
 // Stats holds aggregate statistics across all packages.
 type Stats struct {
-	TotalTests   int
-	Passed       int
-	Failed       int
-	Skipped      int
-	Packages     int
-	FailedPkgs   int
-	Duration     time.Duration
-	BuildErrors  int
-	Panics       int
+	TotalTests  int
+	Passed      int
+	Failed      int
+	Skipped     int
+	Packages    int
+	FailedPkgs  int
+	Duration    time.Duration
+	BuildErrors int
+	Panics      int
 }
 
 // ComputeStats aggregates statistics from package results.

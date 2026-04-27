@@ -8,12 +8,19 @@ package wrapdiag
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
 	"strings"
 
 	"github.com/dkoosis/fo/pkg/sarif"
+)
+
+var (
+	errDiagNotInitialized = errors.New("diag: options not initialized")
+	errToolRequired       = errors.New("--tool is required")
+	errInvalidLevel       = errors.New("--level: must be error, warning, note, or none")
 )
 
 // diag converts line-based diagnostics to SARIF.
@@ -27,15 +34,15 @@ type diag struct {
 // Convert reads line diagnostics from r and writes SARIF to w.
 func (d *diag) Convert(r io.Reader, w io.Writer) error {
 	if d.toolName == nil {
-		return fmt.Errorf("diag: options not initialized")
+		return errDiagNotInitialized
 	}
 	if *d.toolName == "" {
-		return fmt.Errorf("--tool is required")
+		return errToolRequired
 	}
 	switch *d.level {
 	case "error", "warning", "note", "none":
 	default:
-		return fmt.Errorf("--level %q: must be error, warning, note, or none", *d.level)
+		return fmt.Errorf("%w: %q", errInvalidLevel, *d.level)
 	}
 
 	b := sarif.NewBuilder(*d.toolName, *d.version)
@@ -73,13 +80,13 @@ func fixCommandFor(tool, ruleID, file string) string {
 		// Always emit: we're not gating on whether the rule is autofixable.
 		// If the rule isn't supported, golangci-lint will print a no-op.
 		if ruleID == "" || ruleID == "finding" {
-			return fmt.Sprintf("golangci-lint run --fix %s", file)
+			return "golangci-lint run --fix " + file
 		}
 		return fmt.Sprintf("golangci-lint run --fix --enable-only=%s %s", ruleID, file)
 	case "gofmt":
-		return fmt.Sprintf("gofmt -w %s", file)
+		return "gofmt -w " + file
 	case "goimports":
-		return fmt.Sprintf("goimports -w %s", file)
+		return "goimports -w " + file
 	default:
 		// govulncheck needs a fixed-version we don't have here; generic tools
 		// get no hint. Renderer treats "" as "omit".

@@ -12,12 +12,8 @@ import (
 func leaderboardBarWidth(width, labelMax, valueMax int) int {
 	// rough budget: width - labelMax - valueMax - 2 gaps of 2
 	bar := width - labelMax - valueMax - 4
-	if bar < 8 {
-		bar = 8
-	}
-	if bar > 40 {
-		bar = 40
-	}
+	bar = max(bar, 8)
+	bar = min(bar, 40)
 	return bar
 }
 

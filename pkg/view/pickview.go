@@ -98,6 +98,8 @@ func buildErrorOnly(r report.Report) bool {
 			sawBuild = true
 		case report.OutcomeFail, report.OutcomePanic:
 			return false
+		case report.OutcomePass, report.OutcomeSkip:
+			// not a build-error-only condition
 		}
 	}
 	return sawBuild
@@ -124,6 +126,8 @@ func alertPrefix(s report.Severity) string {
 		return "ERROR"
 	case report.SeverityWarning:
 		return "WARNING"
+	case report.SeverityNote:
+		return "NOTE"
 	default:
 		return "NOTE"
 	}
@@ -145,12 +149,9 @@ func pickLeaderboard(r report.Report) (Leaderboard, bool) {
 	}
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Value > rows[j].Value })
 
-	head := 3
-	if head > len(rows) {
-		head = len(rows)
-	}
+	head := min(3, len(rows))
 	var headSum float64
-	for i := 0; i < head; i++ {
+	for i := range head {
 		headSum += rows[i].Value
 	}
 	if total == 0 || headSum/total < leaderboardHeadShare {

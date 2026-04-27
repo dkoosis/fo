@@ -54,16 +54,24 @@ func (j *jscpd) Convert(r io.Reader, w io.Writer) error {
 func parseClones(data []byte) ([]clone, error) {
 	var raw struct {
 		Duplicates []struct {
-			Lines int `json:"lines"`
+			Lines     int `json:"lines"`
 			FirstFile struct {
 				Name     string `json:"name"`
-				StartLoc struct{ Line int } `json:"startLoc"`
-				EndLoc   struct{ Line int } `json:"endLoc"`
+				StartLoc struct {
+					Line int `json:"line"`
+				} `json:"startLoc"`
+				EndLoc struct {
+					Line int `json:"line"`
+				} `json:"endLoc"`
 			} `json:"firstFile"`
 			SecondFile struct {
 				Name     string `json:"name"`
-				StartLoc struct{ Line int } `json:"startLoc"`
-				EndLoc   struct{ Line int } `json:"endLoc"`
+				StartLoc struct {
+					Line int `json:"line"`
+				} `json:"startLoc"`
+				EndLoc struct {
+					Line int `json:"line"`
+				} `json:"endLoc"`
 			} `json:"secondFile"`
 		} `json:"duplicates"`
 	}
@@ -74,9 +82,9 @@ func parseClones(data []byte) ([]clone, error) {
 	clones := make([]clone, 0, len(raw.Duplicates))
 	for _, d := range raw.Duplicates {
 		clones = append(clones, clone{
-			Lines:  d.Lines,
-			FileA:  d.FirstFile.Name, StartA: d.FirstFile.StartLoc.Line,
-			FileB:  d.SecondFile.Name, StartB: d.SecondFile.StartLoc.Line, EndB: d.SecondFile.EndLoc.Line,
+			Lines: d.Lines,
+			FileA: d.FirstFile.Name, StartA: d.FirstFile.StartLoc.Line,
+			FileB: d.SecondFile.Name, StartB: d.SecondFile.StartLoc.Line, EndB: d.SecondFile.EndLoc.Line,
 		})
 	}
 	return clones, nil

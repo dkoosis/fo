@@ -1,10 +1,10 @@
-# golangci-lint configuration for fo (strict mode)
+# golangci-lint configuration for fo (strict — modeled on trixi)
 version: "2"
 
 run:
   timeout: 5m
-  tests: true
   modules-download-mode: readonly
+  tests: true
 
 output:
   formats:
@@ -17,80 +17,77 @@ output:
 
 linters:
   enable:
-    # --- Must Haves ---
-    - staticcheck   # The gold standard
-    - errcheck      # Unchecked errors
-    - gosec         # Security
-    - testifylint   # Correct testify usage
+    # Error handling
+    - err113
+    - errchkjson
+    - errorlint
+    - nilerr
+    - nilnesserr
 
-    # --- Architecture & Style ---
-    - revive        # Replaces golint
-    - gocyclo       # Cyclomatic complexity
-    - unconvert     # Remove unnecessary type conversions
-    - prealloc      # Slice pre-allocation
-    - goconst       # Magic strings
+    # Safety
+    - bodyclose
+    - containedctx
+    - forcetypeassert
+    - gosec
+    - noctx
+    - predeclared
 
-    # --- Correctness ---
-    - bodyclose     # HTTP body leaks
-    - errorlint     # Go 1.13+ error wrapping
+    # Complexity
+    - cyclop
+    - funlen
+    - gocognit
+    - gocyclo
+    - nestif
+
+    # Enum & type safety
+    - exhaustive
+    - makezero
+    - musttag
+    - reassign
+
+    # Style & correctness
+    - asciicheck
+    - copyloopvar
+    - dupword
+    - durationcheck
+    - errname
+    - exptostd
+    - fatcontext
+    - gocheckcompilerdirectives
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - grouper
+    - inamedparam
+    - intrange
+    - iotamixing
+    - misspell
+    - modernize
+    - nakedret
+    - nilnil
+    - nolintlint
+    - prealloc
+    - recvcheck
+    - revive
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - wastedassign
+
+    # Performance
+    - mirror
+    - perfsprint
+
+    # Testing
+    - testifylint
+    - thelper
+    - usetesting
 
   disable:
-    - depguard      # Not needed
-    - funlen        # Relying on gocyclo instead
-    - godox         # TODOs are acceptable
-    - wsl           # Too aggressive on whitespace
-    - exhaustruct   # Too strict for config structs
-    - varnamelen    # Short names are fine in Go
-    - ireturn       # Returning interfaces is fine
-    - wrapcheck     # Not all errors need wrapping
-    - nlreturn      # Whitespace before return is optional
-    - gochecknoglobals  # Globals are sometimes needed
-    - mnd           # Magic number detection too noisy
-    - tagalign      # Tag alignment is optional
-    - paralleltest  # Requires careful analysis of each test
-    - tagliatelle   # snake_case is standard for yaml configs
+    - godox
+    - wsl
 
   settings:
-    # Complexity: strict but realistic
-    gocyclo:
-      min-complexity: 20
-
-    # Architecture & Idioms
-    revive:
-      ignore-generated-header: true
-      severity: warning
-      rules:
-        - name: exported
-          disabled: true
-        - name: package-comments
-          disabled: true
-        - name: var-naming
-          disabled: false
-        - name: context-as-argument
-          disabled: false
-        - name: error-return
-          disabled: false
-        - name: dot-imports
-          disabled: false
-        - name: bare-return
-          disabled: false
-        - name: waitgroup-by-value
-          disabled: false
-        - name: unused-parameter
-          disabled: false
-
-    # Security
-    gosec:
-      excludes:
-        - G104  # errcheck handles this
-        - G304  # File inclusion (CLI tool)
-        - G306  # Loose file perms ok for build outputs
-
-    # Testify
-    testifylint:
-      enable-all: true
-
-    # Errcheck - exclude common false positives
     errcheck:
       exclude-functions:
         - (io.Closer).Close
@@ -101,64 +98,116 @@ linters:
         - fmt.Println
         - fmt.Fprint
         - fmt.Fprintln
-
-    # Staticcheck
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - performance
+      disabled-checks:
+        - appendCombine
+        - commentFormatting
+        - deprecatedComment
+        - hugeParam
+        - ifElseChain
+        - rangeValCopy
+        - unlambda
+    cyclop:
+      max-complexity: 15
+    funlen:
+      lines: 80
+      statements: 40
+    gocognit:
+      min-complexity: 15
+    gocyclo:
+      min-complexity: 15
+    nestif:
+      min-complexity: 5
+    nakedret:
+      max-func-lines: 20
+    revive:
+      severity: warning
+      rules:
+        - name: exported
+          disabled: true
+        - name: package-comments
+          disabled: true
+        - name: bare-return
+          disabled: true
+        - name: var-naming
+          disabled: false
+        - name: context-as-argument
+          disabled: false
+        - name: error-return
+          disabled: false
+        - name: dot-imports
+          disabled: false
+        - name: waitgroup-by-value
+          disabled: false
+    gosec:
+      excludes:
+        - G104  # errcheck handles this
+        - G304  # File inclusion (CLI tool reads stdin/paths)
+        - G306  # Loose file perms ok for build/state outputs
     staticcheck:
       checks:
         - all
-        - -SA1019  # Deprecated warnings (too noisy during transitions)
-        - -ST1000  # Package comments - too noisy
-        - -ST1020  # Comment format on exported funcs
-        - -ST1022  # Comment format on exported consts
-
-    # Magic strings
+        - -SA1019  # deprecated warnings (transitions)
+        - -ST1000
+        - -ST1020
+        - -ST1022
+    testifylint:
+      enable-all: true
+    nolintlint:
+      require-explanation: true
+      require-specific: true
     goconst:
       min-occurrences: 4
 
-    # Keep some complexity thresholds for edge cases
-    lll:
-      line-length: 140
-    nestif:
-      min-complexity: 20
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      # Tests: relax security, complexity, ctx, unparam
+      - linters: [gosec]
+        path: _test\.go
+      - linters: [cyclop, funlen, gocognit, gocyclo, nestif]
+        path: _test\.go
+      - linters: [noctx]
+        path: _test\.go
+      - linters: [unparam]
+        path: _test\.go
+      - linters: [errcheck]
+        path: _test\.go
+        text: Close
+      - linters: [usetesting]
+        path: _test\.go
+      - linters: [revive]
+        path: _test\.go
+        text: unused-parameter
+      # CLI main.go: relax complexity, allow gosec process exec
+      - linters: [cyclop, funlen, gocognit, gocyclo, nestif]
+        path: cmd/.*/main\.go
+      - linters: [gocritic]
+        path: cmd/.*/main\.go
+        text: exitAfterDefer
+      - linters: [gosec]
+        path: cmd/.*
+        text: G204|G301|G302|G306
+      # Comment dupword (e.g. "the the" inside doc lines from prose)
+      - linters: [dupword]
+        source: "^\\s*//"
+    paths:
+      - third_party$
+      - examples$
 
-issues:
-  exclude-rules:
-    # Allow loose security in tests
-    - path: '(_test\.go)'
-      linters: [gosec]
-      text: "G101|G204|G404|G301|G302"
-
-    # Allow loose security in CLI/build tools
-    - path: '(cmd/.*|internal/magetasks/.*)'
-      linters: [gosec]
-      text: "G204|G301|G302|G306"
-
-    # Allow higher complexity in main.go files
-    - path: 'cmd/.*/main\.go'
-      linters: [gocyclo]
-
-    # Allow print statements in magetasks (build output)
-    - path: 'internal/magetasks/'
-      linters: [forbidigo]
-
-    # Exclude errcheck from test defer cleanup
-    - path: '(_test\.go)'
-      linters: [errcheck]
-      text: "Close"
-
-    # Allow os.Chdir in tests
-    - path: _test\.go
-      linters: [usetesting]
-
-    # Allow test packages to use same package name
-    - path: _test\.go
-      linters: [testpackage]
-
-    # Exclude dupword for comments
-    - linters: [dupword]
-      source: "^\\s*//"
-
-    # Allow unused test parameters (convention to keep t *testing.T)
-    - path: '(_test\.go)'
-      linters: [revive]
-      text: "unused-parameter"
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - examples$

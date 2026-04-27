@@ -62,6 +62,13 @@ type scanResult struct {
 // does not implement io.Closer (e.g. *bufio.Reader), the caller must close the
 // underlying reader externally to prevent a goroutine leak.
 func Stream(ctx context.Context, r io.Reader, fn func(TestEvent)) (int, error) {
+	lines := scanAsync(ctx, r)
+	return drainLines(ctx, r, lines, fn)
+}
+
+// scanAsync runs a scanner in a background goroutine and sends each line (or
+// terminal error) on the returned channel. The channel is closed on EOF.
+func scanAsync(ctx context.Context, r io.Reader) <-chan scanResult {
 	scanner := bufio.NewScanner(r)
 	// Same 1 MiB limit as ParseStream — see BUG note there.
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -70,7 +77,6 @@ func Stream(ctx context.Context, r io.Reader, fn func(TestEvent)) (int, error) {
 	go func() {
 		defer close(lines)
 		for scanner.Scan() {
-			// Copy bytes — scanner reuses the buffer.
 			cp := append([]byte(nil), scanner.Bytes()...)
 			select {
 			case lines <- scanResult{line: cp}:
@@ -85,15 +91,17 @@ func Stream(ctx context.Context, r io.Reader, fn func(TestEvent)) (int, error) {
 			}
 		}
 	}()
+	return lines
+}
 
+// drainLines reads from lines, dispatching parsed events to fn. Returns when
+// the channel closes, the context is cancelled, or a scan error occurs.
+func drainLines(ctx context.Context, r io.Reader, lines <-chan scanResult, fn func(TestEvent)) (int, error) {
 	var malformed int
 	for {
 		select {
 		case <-ctx.Done():
-			// Attempt to unblock the scanner goroutine.
-			if c, ok := r.(io.Closer); ok {
-				_ = c.Close()
-			}
+			cancelScan(r)
 			return malformed, ctx.Err()
 		case res, ok := <-lines:
 			if !ok {
@@ -102,17 +110,31 @@ func Stream(ctx context.Context, r io.Reader, fn func(TestEvent)) (int, error) {
 			if res.err != nil {
 				return malformed, res.err
 			}
-			if len(res.line) == 0 {
-				continue
-			}
-			var event TestEvent
-			if err := json.Unmarshal(res.line, &event); err != nil {
-				malformed++
-				continue
-			}
-			fn(event)
+			malformed += processLine(res.line, fn)
 		}
 	}
+}
+
+// cancelScan attempts to unblock a scanner goroutine by closing r if it
+// implements io.Closer.
+func cancelScan(r io.Reader) {
+	if c, ok := r.(io.Closer); ok {
+		_ = c.Close()
+	}
+}
+
+// processLine parses one raw line and dispatches to fn.
+// Returns 1 if the line is malformed (non-empty but invalid JSON), 0 otherwise.
+func processLine(line []byte, fn func(TestEvent)) int {
+	if len(line) == 0 {
+		return 0
+	}
+	var event TestEvent
+	if err := json.Unmarshal(line, &event); err != nil {
+		return 1
+	}
+	fn(event)
+	return 0
 }
 
 type aggregator struct {
@@ -160,52 +182,58 @@ func (a *aggregator) processEvent(e TestEvent) {
 
 	switch e.Action {
 	case "pass":
-		if e.Test != "" {
-			pkg.passed++
-			delete(pkg.outputBuf, e.Test)
-		} else {
-			pkg.duration = time.Duration(e.Elapsed * float64(time.Second))
-		}
-
+		a.handlePass(pkg, e)
 	case "fail":
-		if e.Test != "" {
-			pkg.failed++
-			pkg.failedOrder = append(pkg.failedOrder, e.Test)
-		} else {
-			pkg.duration = time.Duration(e.Elapsed * float64(time.Second))
-			// Check if this is a build error (failed with no tests run)
-			if pkg.passed == 0 && pkg.failed == 0 && pkg.skipped == 0 {
-				pkg.buildError = strings.Join(pkg.outputBuf[""], "\n")
-			}
-		}
-
+		a.handleFail(pkg, e)
 	case "skip":
 		if e.Test != "" {
 			pkg.skipped++
 			delete(pkg.outputBuf, e.Test)
 		}
-
 	case "output":
-		output := strings.TrimRight(e.Output, "\n")
-		if output == "" {
-			return
-		}
-		// Track output per test (empty test name = package-level output)
-		pkg.outputBuf[e.Test] = append(pkg.outputBuf[e.Test], output)
+		a.handleOutput(pkg, e)
+	}
+}
 
-		// Detect panics
-		if strings.Contains(output, "panic:") || strings.HasPrefix(output, "goroutine ") {
-			pkg.panicked = true
-			pkg.panicOutput = append(pkg.panicOutput, output)
-		}
+func (*aggregator) handlePass(pkg *pkgState, e TestEvent) {
+	if e.Test != "" {
+		pkg.passed++
+		delete(pkg.outputBuf, e.Test)
+	} else {
+		pkg.duration = time.Duration(e.Elapsed * float64(time.Second))
+	}
+}
 
-		// Parse coverage
-		if strings.Contains(output, "coverage:") && strings.Contains(output, "% of statements") {
-			var cov float64
-			_, _ = fmt.Sscanf(output, "coverage: %f%% of statements", &cov)
-			if cov > 0 {
-				pkg.coverage = cov
-			}
+func (*aggregator) handleFail(pkg *pkgState, e TestEvent) {
+	if e.Test != "" {
+		pkg.failed++
+		pkg.failedOrder = append(pkg.failedOrder, e.Test)
+	} else {
+		pkg.duration = time.Duration(e.Elapsed * float64(time.Second))
+		// Check if this is a build error (failed with no tests run)
+		if pkg.passed == 0 && pkg.failed == 0 && pkg.skipped == 0 {
+			pkg.buildError = strings.Join(pkg.outputBuf[""], "\n")
+		}
+	}
+}
+
+func (*aggregator) handleOutput(pkg *pkgState, e TestEvent) {
+	output := strings.TrimRight(e.Output, "\n")
+	if output == "" {
+		return
+	}
+	pkg.outputBuf[e.Test] = append(pkg.outputBuf[e.Test], output)
+
+	if strings.Contains(output, "panic:") || strings.HasPrefix(output, "goroutine ") {
+		pkg.panicked = true
+		pkg.panicOutput = append(pkg.panicOutput, output)
+	}
+
+	if strings.Contains(output, "coverage:") && strings.Contains(output, "% of statements") {
+		var cov float64
+		_, _ = fmt.Sscanf(output, "coverage: %f%% of statements", &cov)
+		if cov > 0 {
+			pkg.coverage = cov
 		}
 	}
 }

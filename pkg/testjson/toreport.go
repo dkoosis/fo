@@ -44,7 +44,7 @@ func ToReport(results []TestPackageResult) *report.Report {
 				Outcome:     report.OutcomeBuildError,
 				Duration:    pkg.Duration,
 				Output:      pkg.BuildError,
-				FixCommand:  fmt.Sprintf("go build %s", pkg.Name),
+				FixCommand:  "go build " + pkg.Name,
 				Fingerprint: fingerprint.Fingerprint("BUILD_ERROR", pkg.Name, pkg.BuildError),
 				Score:       score.Score(score.SeverityWeightError, 1, pkg.Name) * buildErrorBoost,
 			})

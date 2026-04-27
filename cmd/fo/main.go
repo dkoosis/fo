@@ -50,6 +50,11 @@ const (
 	formatJSON  = "json"
 )
 
+var (
+	errUnrecognizedInput = errors.New("unrecognized input (expected SARIF or go test -json)")
+	errUnknownFormat     = errors.New("unknown format (expected auto, human, llm, json)")
+)
+
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
@@ -165,7 +170,7 @@ func renderMode(mode string, r *report.Report, stdout io.Writer, themeName strin
 	if mode == formatLLM {
 		t = theme.Mono()
 	}
-	width, _ := termSize(stdout)
+	width := termSize(stdout)
 	return view.RenderReport(stdout, *r, t, width)
 }
 
@@ -180,7 +185,9 @@ func sniffGoTestJSON(data []byte) bool {
 	if i := bytes.IndexAny(data, "\n\r"); i >= 0 {
 		first = data[:i]
 	}
-	var ev struct{ Action string }
+	var ev struct {
+		Action string `json:"Action"`
+	}
 	if err := json.Unmarshal(first, &ev); err != nil {
 		return false
 	}
@@ -209,7 +216,7 @@ func sniffSARIF(data []byte) bool {
 func parseToReport(input []byte, stderr io.Writer) (*report.Report, error) {
 	trimmed := bytes.TrimLeft(input, " \t\n\r")
 	if len(trimmed) == 0 || trimmed[0] != '{' {
-		return nil, fmt.Errorf("unrecognized input (expected SARIF or go test -json)")
+		return nil, errUnrecognizedInput
 	}
 	if sniffSARIF(input) {
 		doc, err := sarif.ReadBytes(input)
@@ -228,7 +235,7 @@ func parseToReport(input []byte, stderr io.Writer) (*report.Report, error) {
 		}
 		return testjson.ToReportWithMeta(results, input), nil
 	}
-	return nil, fmt.Errorf("unrecognized input (expected SARIF or go test -json)")
+	return nil, errUnrecognizedInput
 }
 
 func writeReportJSON(w io.Writer, r *report.Report) error {
@@ -247,7 +254,7 @@ func resolveFormat(format string, w io.Writer) (string, error) {
 	case formatHuman, formatLLM, formatJSON:
 		return format, nil
 	default:
-		return "", fmt.Errorf("unknown format %q (expected auto, human, llm, json)", format)
+		return "", fmt.Errorf("%w: %q", errUnknownFormat, format)
 	}
 }
 
@@ -272,19 +279,16 @@ func isTTYWriter(w io.Writer) bool {
 	return ok && term.IsTerminal(int(f.Fd())) //nolint:gosec // file descriptor fits in int
 }
 
-func termSize(w io.Writer) (width, height int) {
-	width, height = 80, 24
+func termSize(w io.Writer) int {
+	width := 80
 	if f, ok := w.(*os.File); ok {
-		if tw, th, err := term.GetSize(int(f.Fd())); err == nil { //nolint:gosec
+		if tw, _, err := term.GetSize(int(f.Fd())); err == nil { //nolint:gosec // G115: term.GetSize takes fd from validated *os.File
 			if tw > 0 {
 				width = tw
 			}
-			if th > 0 {
-				height = th
-			}
 		}
 	}
-	return width, height
+	return width
 }
 
 // runStream pumps go test -json events into per-package Report snapshots and
@@ -297,7 +301,7 @@ func runStream(stdin io.Reader, br *bufio.Reader, stdout io.Writer, t theme.Them
 		stopClose := context.AfterFunc(ctx, func() { _ = c.Close() })
 		defer stopClose()
 	}
-	width, _ := termSize(stdout)
+	width := termSize(stdout)
 
 	// Buffer all events, parse, then stream snapshots — keeps the streaming
 	// path simple for v2. fo-7f5.9 will swap in true incremental streaming.
@@ -338,6 +342,8 @@ func exitCodeReport(r *report.Report) int {
 		switch t.Outcome {
 		case report.OutcomeFail, report.OutcomePanic, report.OutcomeBuildError:
 			return 1
+		case report.OutcomePass, report.OutcomeSkip:
+			// not a failure
 		}
 	}
 	return 0

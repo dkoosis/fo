@@ -52,11 +52,11 @@ func TestFileCentrality_PrecedenceRules(t *testing.T) {
 func TestScore_SeverityOccurrenceCentralityMatrix(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name   string
-		sev    int
-		occ    int
-		path   string
-		want   float64
+		name string
+		sev  int
+		occ  int
+		path string
+		want float64
 	}{
 		{"error_x1_pkg_root", SeverityWeightError, 1, "pkg/x/x.go", 3.0},
 		{"error_x3_pkg_root", SeverityWeightError, 3, "pkg/x/x.go", 9.0},
