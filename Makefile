@@ -16,7 +16,7 @@
         demo demo-llm demo-live
 
 # ── Sandbox prebuilt versions ──
-# Keep in sync with what .codex/setup.sh expects.
+# Keep in sync with what .sandbox/codex/setup.sh expects.
 GOLANGCI_LINT_VER ?= v2.11.3
 GOFUMPT_VER       ?= v0.9.2
 GOIMPORTS_VER     ?= v0.39.0
@@ -85,7 +85,7 @@ doctor: ## Validate required toolchain
 	echo "  go: $$(go version 2>/dev/null | cut -d' ' -f3)"; \
 	if [ "$$MISSING" -gt 0 ]; then \
 		echo ""; \
-		echo "$$MISSING required tool(s) missing — install manually or run .codex/setup.sh"; \
+		echo "$$MISSING required tool(s) missing — install manually or run .sandbox/codex/setup.sh"; \
 		exit 1; \
 	fi; \
 	echo "=== doctor pass ==="
@@ -141,8 +141,8 @@ scan: ## Vet + lint + test changed packages only (fast inner loop)
 	fi
 
 baseline: snipe-index ## Save QA report as baseline for sandbox diff
-	@( $(REPORT_CMD) ) > .codex/baseline.txt 2>&1
-	@echo "=== baseline saved to .codex/baseline.txt ($$(wc -l < .codex/baseline.txt) lines) ==="
+	@( $(REPORT_CMD) ) > .sandbox/baseline.txt 2>&1
+	@echo "=== baseline saved to .sandbox/baseline.txt ($$(wc -l < .sandbox/baseline.txt) lines) ==="
 
 snipe-index: ## Rebuild snipe index if stale
 	@state=$$(snipe status 2>/dev/null | jq -r '.results[0].state // "unknown"'); \
@@ -189,7 +189,7 @@ demo-live: install ## Run real go test + vet through fo
 
 clean: ## Remove build artifacts
 	rm -f fo
-	rm -rf build/ .bin/
+	rm -rf build/ .sandbox/bin/
 
 install:
 	go install ./cmd/fo/
@@ -216,28 +216,28 @@ _cross-build:
 		exit 1; \
 	fi; \
 	echo "  local go$$LOCAL_GO >= go.mod go$(GOMOD_VER) — ok"
-	@mkdir -p .bin/linux-$(CROSS_ARCH)
+	@mkdir -p .sandbox/bin/linux-$(CROSS_ARCH)
 	$(eval XBIN := $(shell go env GOPATH)/bin/linux_$(CROSS_ARCH))
 	@echo "-- golangci-lint $(GOLANGCI_LINT_VER)"
 	@CGO_ENABLED=0 GOOS=linux GOARCH=$(CROSS_ARCH) go install -trimpath -ldflags='-s -w' github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VER)
-	@cp $(XBIN)/golangci-lint .bin/linux-$(CROSS_ARCH)/
+	@cp $(XBIN)/golangci-lint .sandbox/bin/linux-$(CROSS_ARCH)/
 	@echo "-- gofumpt $(GOFUMPT_VER)"
 	@CGO_ENABLED=0 GOOS=linux GOARCH=$(CROSS_ARCH) go install -trimpath -ldflags='-s -w' mvdan.cc/gofumpt@$(GOFUMPT_VER)
-	@cp $(XBIN)/gofumpt .bin/linux-$(CROSS_ARCH)/
+	@cp $(XBIN)/gofumpt .sandbox/bin/linux-$(CROSS_ARCH)/
 	@echo "-- goimports $(GOIMPORTS_VER)"
 	@CGO_ENABLED=0 GOOS=linux GOARCH=$(CROSS_ARCH) go install -trimpath -ldflags='-s -w' golang.org/x/tools/cmd/goimports@$(GOIMPORTS_VER)
-	@cp $(XBIN)/goimports .bin/linux-$(CROSS_ARCH)/
+	@cp $(XBIN)/goimports .sandbox/bin/linux-$(CROSS_ARCH)/
 	@echo "-- snipe"
 	@if [ -d "$(SNIPE_SRC)" ]; then \
 		echo "  (from $(SNIPE_SRC))"; \
 		cd "$(SNIPE_SRC)" && CGO_ENABLED=0 GOOS=linux GOARCH=$(CROSS_ARCH) \
-			go build -trimpath -ldflags='-s -w' -o "$(CURDIR)/.bin/linux-$(CROSS_ARCH)/snipe" .; \
+			go build -trimpath -ldflags='-s -w' -o "$(CURDIR)/.sandbox/bin/linux-$(CROSS_ARCH)/snipe" .; \
 	else \
 		CGO_ENABLED=0 GOOS=linux GOARCH=$(CROSS_ARCH) go install -trimpath -ldflags='-s -w' github.com/dkoosis/snipe@latest && \
-			cp $(XBIN)/snipe .bin/linux-$(CROSS_ARCH)/; \
+			cp $(XBIN)/snipe .sandbox/bin/linux-$(CROSS_ARCH)/; \
 	fi
 	@echo "-- bat $(BAT_VER)"
-	@if [ -f ".bin/linux-$(CROSS_ARCH)/bat" ]; then \
+	@if [ -f ".sandbox/bin/linux-$(CROSS_ARCH)/bat" ]; then \
 		echo "  (exists, skipping download)"; \
 	else \
 		case "$(CROSS_ARCH)" in \
@@ -248,15 +248,15 @@ _cross-build:
 		echo "  downloading bat-$(BAT_VER)-$$BAT_TRIPLE"; \
 		curl -fsSL "https://github.com/sharkdp/bat/releases/download/$(BAT_VER)/bat-$(BAT_VER)-$$BAT_TRIPLE.tar.gz" \
 			| tar xz -C "$$TMP" && \
-		cp "$$TMP"/bat-*/bat .bin/linux-$(CROSS_ARCH)/bat && \
+		cp "$$TMP"/bat-*/bat .sandbox/bin/linux-$(CROSS_ARCH)/bat && \
 		rm -rf "$$TMP"; \
 	fi
 	@echo "-- dtree"
-	@cp .codex/dtree .bin/linux-$(CROSS_ARCH)/dtree
+	@cp .sandbox/codex/dtree .sandbox/bin/linux-$(CROSS_ARCH)/dtree
 	@# UPX compress all ELF binaries (skip shell scripts)
 	@if command -v upx >/dev/null 2>&1; then \
 		echo "-- upx compressing"; \
-		for f in .bin/linux-$(CROSS_ARCH)/*; do \
+		for f in .sandbox/bin/linux-$(CROSS_ARCH)/*; do \
 			case "$$(file -b "$$f")" in *ELF*) \
 				upx -q --best "$$f" 2>/dev/null || true; \
 			esac; \
@@ -266,4 +266,4 @@ _cross-build:
 	fi
 	@echo ""
 	@echo "=== prebuilts ready ==="
-	@ls -lh .bin/linux-$(CROSS_ARCH)/
+	@ls -lh .sandbox/bin/linux-$(CROSS_ARCH)/

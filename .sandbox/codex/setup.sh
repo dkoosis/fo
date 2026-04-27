@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Codex cloud environment setup for fo
-# Auto-discovered by Codex from .codex/setup.sh on first container creation.
-# Cached ~12h; .codex/maintenance.sh refreshes cached containers.
+# Auto-discovered by Codex from .sandbox/codex/setup.sh on first container creation.
+# Cached ~12h; .sandbox/codex/maintenance.sh refreshes cached containers.
 # Exports don't persist into agent phase — use ~/.bashrc or install to PATH.
 set -euo pipefail
 
-# Derive repo root from this script's location (.codex/setup.sh → parent)
-REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# Derive paths from this script's location (.sandbox/codex/setup.sh)
+SANDBOX_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_DIR="$(cd "$SANDBOX_DIR/.." && pwd)"
 ARCH=$(uname -m)
 case "$ARCH" in
   x86_64)  ARCH="amd64" ;;
@@ -16,11 +17,11 @@ case "$ARCH" in
     exit 1
     ;;
 esac
-PREBUILT_DIR="$REPO_DIR/.bin/linux-$ARCH"
+PREBUILT_DIR="$SANDBOX_DIR/bin/linux-$ARCH"
 INSTALL_DIR="/usr/local/bin"
 
-# shellcheck source=lib-doctor.sh
-source "$(dirname "$0")/lib-doctor.sh"
+# shellcheck source=../lib/lib-doctor.sh
+source "$SANDBOX_DIR/lib/lib-doctor.sh"
 
 SETUP_START=$(date +%s)
 echo "=== fo sandbox setup ==="

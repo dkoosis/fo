@@ -3,7 +3,7 @@
 # Sourced, not executed directly.
 # Requires: REPO_DIR, PREBUILT_DIR, INSTALL_DIR set before sourcing.
 
-REPORT_FILE="$REPO_DIR/.codex/setup-report.json"
+REPORT_FILE="$REPO_DIR/.sandbox/setup-report.json"
 FATALS=()
 WARNINGS=()
 REPAIRED_ISSUES=()
@@ -180,7 +180,7 @@ doctor_exit() {
     echo "=== DEGRADED: ${#WARNINGS[@]} warning(s), ${#REPAIRED_ISSUES[@]} repaired ==="
     echo "  Report: $REPORT_FILE"
   else
-    rm -f "$REPO_DIR/.codex/setup-issues.txt"
+    rm -f "$REPO_DIR/.sandbox/setup-issues.txt"
     echo ""
     echo "=== $phase complete (healthy) ==="
   fi

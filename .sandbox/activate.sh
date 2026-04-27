@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # Source this file to activate the Go development environment for Codex/Claude sandbox
-# Usage: source .codex/activate.sh
+# Usage: source .sandbox/activate.sh
 # Generic — works for any Go project with Makefile or magefile.go
+
+# Resolve paths from this script's location (works regardless of cwd)
+_SANDBOX_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_REPO_DIR="$(cd "$_SANDBOX_DIR/.." && pwd)"
 
 # Detect platform for prebuilt binaries
 _CODEX_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -11,16 +15,16 @@ case "$_CODEX_ARCH" in
   aarch64|arm64) _CODEX_ARCH="arm64" ;;
 esac
 _CODEX_PLATFORM="${_CODEX_OS}-${_CODEX_ARCH}"
-_CODEX_PROJECT=$(basename "$PWD")
+_CODEX_PROJECT=$(basename "$_REPO_DIR")
 
 export GOTOOLCHAIN=local
 export GOPROXY="https://proxy.golang.org,direct"
 export GOSUMDB="sum.golang.org"
 
 # Repo-local caches
-export GOCACHE="$PWD/.codex/cache/go-build"
-export GOMODCACHE="$PWD/.codex/cache/mod"
-export GOLANGCI_LINT_CACHE="$PWD/.codex/cache/golangci-lint"
+export GOCACHE="$_SANDBOX_DIR/cache/go-build"
+export GOMODCACHE="$_SANDBOX_DIR/cache/mod"
+export GOLANGCI_LINT_CACHE="$_SANDBOX_DIR/cache/golangci-lint"
 mkdir -p "$GOCACHE" "$GOMODCACHE" "$GOLANGCI_LINT_CACHE" 2>/dev/null || true
 
 # Performance
@@ -28,20 +32,20 @@ export GOMAXPROCS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4
 ulimit -n 4096 2>/dev/null || true
 
 # Link prebuilt binaries for current platform
-_PREBUILT_DIR="$PWD/.bin/$_CODEX_PLATFORM"
+_PREBUILT_DIR="$_SANDBOX_DIR/bin/$_CODEX_PLATFORM"
 if [ -d "$_PREBUILT_DIR" ] && [ -n "$(ls -A "$_PREBUILT_DIR" 2>/dev/null)" ]; then
-  mkdir -p "$PWD/bin" 2>/dev/null || true
+  mkdir -p "$_REPO_DIR/bin" 2>/dev/null || true
   for tool in "$_PREBUILT_DIR"/*; do
     [ -f "$tool" ] || continue
     toolname=$(basename "$tool")
-    if [ ! -e "$PWD/bin/$toolname" ]; then
-      ln -sf "$tool" "$PWD/bin/$toolname" 2>/dev/null || true
+    if [ ! -e "$_REPO_DIR/bin/$toolname" ]; then
+      ln -sf "$tool" "$_REPO_DIR/bin/$toolname" 2>/dev/null || true
     fi
   done
 fi
 
 # PATH: repo bins first
-export PATH="$PWD/bin:$PWD/.bin:$PATH"
+export PATH="$_REPO_DIR/bin:$_PREBUILT_DIR:$PATH"
 
 # Helper: available commands (auto-detects build system)
 codex-help() {
@@ -83,4 +87,4 @@ if [ "$_TOOLS_MISS" -gt 0 ]; then
 fi
 echo "  Run 'codex-help' for available commands"
 
-unset _CODEX_OS _CODEX_ARCH _CODEX_PLATFORM _PREBUILT_DIR _TOOLS_OK _TOOLS_MISS _CODEX_PROJECT _t
+unset _CODEX_OS _CODEX_ARCH _CODEX_PLATFORM _PREBUILT_DIR _TOOLS_OK _TOOLS_MISS _CODEX_PROJECT _t _SANDBOX_DIR _REPO_DIR

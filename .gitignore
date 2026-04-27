@@ -40,15 +40,16 @@ visual_test_outputs/
 
 # Built binaries (not prebuilts)
 bin/
-!.bin/
+!.sandbox/bin/
 
 # Git worktrees
 .worktrees/
 
 # Codex sandbox runtime artifacts
-.codex/cache/
-.codex/setup-report.json
-.codex/setup-issues.txt
+.sandbox/cache/
+.sandbox/setup-report.json
+.sandbox/setup-issues.txt
+.sandbox/baseline.txt
 
 # Beads / Dolt files (added by bd init)
 .dolt/

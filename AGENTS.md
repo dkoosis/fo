@@ -4,8 +4,8 @@ Focused build output renderer. Accepts SARIF and go test -json on stdin, renders
 
 ## Environment Setup
 
-Setup is handled by `.codex/setup.sh` (auto-discovered by Codex on container creation).
-Fallback: `source .codex/activate.sh` (auto-detects platform, links prebuilt binaries from `.bin/linux-{amd64,arm64}/`).
+Setup is handled by `.sandbox/codex/setup.sh` (auto-discovered by Codex on container creation).
+Fallback: `source .sandbox/activate.sh` (auto-detects platform, links prebuilt binaries from `.sandbox/bin/linux-{amd64,arm64}/`).
 
 ### Required tools
 

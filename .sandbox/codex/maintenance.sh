@@ -4,7 +4,8 @@
 # Keep lightweight — setup.sh already installed tools.
 set -euo pipefail
 
-REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+SANDBOX_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_DIR="$(cd "$SANDBOX_DIR/.." && pwd)"
 cd "$REPO_DIR"
 
 ARCH=$(uname -m)
@@ -13,11 +14,11 @@ case "$ARCH" in
   aarch64|arm64) ARCH="arm64" ;;
   *) ARCH="amd64" ;;
 esac
-PREBUILT_DIR="$REPO_DIR/.bin/linux-$ARCH"
+PREBUILT_DIR="$SANDBOX_DIR/bin/linux-$ARCH"
 INSTALL_DIR="/usr/local/bin"
 
-# shellcheck source=lib-doctor.sh
-source "$(dirname "$0")/lib-doctor.sh"
+# shellcheck source=../lib/lib-doctor.sh
+source "$SANDBOX_DIR/lib/lib-doctor.sh"
 
 echo "=== fo maintenance ==="
 
