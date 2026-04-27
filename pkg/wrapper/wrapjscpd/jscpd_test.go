@@ -7,15 +7,7 @@ import (
 	"testing"
 
 	"github.com/dkoosis/fo/pkg/sarif"
-	"github.com/dkoosis/fo/pkg/wrapper"
 )
-
-func TestJscpd_OutputFormat(t *testing.T) {
-	w := newJscpd()
-	if w.OutputFormat() != wrapper.FormatSARIF {
-		t.Errorf("expected FormatSARIF, got %q", w.OutputFormat())
-	}
-}
 
 func TestJscpd_EmptyDuplicates(t *testing.T) {
 	input := `{"duplicates":[],"statistics":{}}`

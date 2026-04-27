@@ -3,32 +3,41 @@ package wrapdiag
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
 	"strings"
 	"testing"
 
 	"github.com/dkoosis/fo/pkg/sarif"
-	"github.com/dkoosis/fo/pkg/wrapper"
 )
 
 func diagConvert(t *testing.T, args []string, input string) (bytes.Buffer, error) {
 	t.Helper()
-	d := newDiag()
-	fs := flag.NewFlagSet("test", flag.ContinueOnError)
-	d.RegisterFlags(fs)
-	if err := fs.Parse(args); err != nil {
-		t.Fatalf("flag parse: %v", err)
-	}
+	opts := parseDiagArgs(t, args)
 	var buf bytes.Buffer
-	err := d.Convert(strings.NewReader(input), &buf)
+	err := Convert(strings.NewReader(input), &buf, opts)
 	return buf, err
 }
 
-func TestDiag_OutputFormat(t *testing.T) {
-	d := newDiag()
-	if d.OutputFormat() != wrapper.FormatSARIF {
-		t.Errorf("expected FormatSARIF, got %q", d.OutputFormat())
+// parseDiagArgs walks --tool/--rule/--level/--version pairs.
+func parseDiagArgs(t *testing.T, args []string) DiagOpts {
+	t.Helper()
+	opts := DiagOpts{}
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--tool":
+			i++
+			opts.Tool = args[i]
+		case "--rule":
+			i++
+			opts.Rule = args[i]
+		case "--level":
+			i++
+			opts.Level = args[i]
+		case "--version":
+			i++
+			opts.Version = args[i]
+		}
 	}
+	return opts
 }
 
 func TestDiag_FileLineColMessage(t *testing.T) {
@@ -77,12 +86,8 @@ func TestDiag_FileOnly(t *testing.T) {
 }
 
 func TestDiag_MissingToolFlag(t *testing.T) {
-	d := newDiag()
-	fs := flag.NewFlagSet("test", flag.ContinueOnError)
-	d.RegisterFlags(fs)
-	_ = fs.Parse([]string{})
 	var buf bytes.Buffer
-	err := d.Convert(strings.NewReader("x.go:1: msg\n"), &buf)
+	err := Convert(strings.NewReader("x.go:1: msg\n"), &buf, DiagOpts{})
 	if err == nil {
 		t.Error("expected error for missing --tool flag")
 	}

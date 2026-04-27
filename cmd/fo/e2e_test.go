@@ -106,7 +106,7 @@ func TestE2E_Pipeline_ContractSurface(t *testing.T) {
 			sc, fmtName, input := sc, fmtName, input
 			t.Run(sc.dir+"/"+sc.name+"/"+fmtName, func(t *testing.T) {
 				var stdout, stderr bytes.Buffer
-				code := run([]string{"--format", fmtName}, bytes.NewReader(input), &stdout, &stderr)
+				code := run([]string{"--format", fmtName, "--no-state"}, bytes.NewReader(input), &stdout, &stderr)
 
 				// Exit code contract: 0 (clean / no errors) or 1 (errors
 				// or test failures). Anything else means dispatch failure.
@@ -163,7 +163,7 @@ func TestE2E_Pipeline_Determinism(t *testing.T) {
 func runOnce(t *testing.T, fmtName string, input []byte) []byte {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
-	_ = run([]string{"--format", fmtName}, bytes.NewReader(input), &stdout, &stderr)
+	_ = run([]string{"--format", fmtName, "--no-state"}, bytes.NewReader(input), &stdout, &stderr)
 	return stdout.Bytes()
 }
 
@@ -236,7 +236,7 @@ func TestE2E_LLMGoldens(t *testing.T) {
 		t.Run(sc.dir+"/"+sc.name, func(t *testing.T) {
 			input := pipelineInput(t, sc)
 			var stdout, stderr bytes.Buffer
-			_ = run([]string{"--format", "llm"}, bytes.NewReader(input), &stdout, &stderr)
+			_ = run([]string{"--format", "llm", "--no-state"}, bytes.NewReader(input), &stdout, &stderr)
 			goldenPath := filepath.Join(filepath.Dir(sc.inputAbs), sc.name+".llm.golden")
 			want, err := os.ReadFile(goldenPath)
 			if err != nil {

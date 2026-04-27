@@ -3,12 +3,10 @@ package wrapjscpd
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 
 	"github.com/dkoosis/fo/pkg/sarif"
-	"github.com/dkoosis/fo/pkg/wrapper"
 )
 
 // clone records a single code duplication instance.
@@ -25,15 +23,6 @@ type clone struct {
 type jscpd struct{}
 
 func newJscpd() *jscpd { return &jscpd{} }
-
-func init() {
-	wrapper.Register("jscpd", "Convert jscpd JSON duplication report to SARIF", newJscpd())
-}
-
-func (j *jscpd) OutputFormat() wrapper.Format { return wrapper.FormatSARIF }
-
-// RegisterFlags is a no-op — jscpd wrapper has no flags.
-func (j *jscpd) RegisterFlags(_ *flag.FlagSet) {}
 
 // Convert reads jscpd JSON from r and writes SARIF to w.
 // Reads entire input into memory — fine for jscpd reports (typically <1MB).

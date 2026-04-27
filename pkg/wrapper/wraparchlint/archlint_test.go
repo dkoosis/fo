@@ -7,15 +7,7 @@ import (
 	"testing"
 
 	"github.com/dkoosis/fo/pkg/sarif"
-	"github.com/dkoosis/fo/pkg/wrapper"
 )
-
-func TestArchlint_OutputFormat(t *testing.T) {
-	w := newArchlint()
-	if w.OutputFormat() != wrapper.FormatSARIF {
-		t.Errorf("expected FormatSARIF, got %q", w.OutputFormat())
-	}
-}
 
 func TestArchlint_Clean(t *testing.T) {
 	input := `{"Type":"models.Check","Payload":{"ArchHasWarnings":false,"ArchWarningsDeps":[],"ArchWarningsNotMatched":[],"ArchWarningsDeepScan":[],"OmittedCount":0,"Qualities":[{"ID":"component_imports","Used":true}]}}`

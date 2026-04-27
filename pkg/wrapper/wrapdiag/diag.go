@@ -8,14 +8,12 @@ package wrapdiag
 
 import (
 	"bufio"
-	"flag"
 	"fmt"
 	"io"
 	"strconv"
 	"strings"
 
 	"github.com/dkoosis/fo/pkg/sarif"
-	"github.com/dkoosis/fo/pkg/wrapper"
 )
 
 // diag converts line-based diagnostics to SARIF.
@@ -26,27 +24,10 @@ type diag struct {
 	version  *string
 }
 
-func newDiag() *diag { return &diag{} }
-
-func init() {
-	wrapper.Register("diag", "Convert line diagnostics (file:line:col: msg) to SARIF", newDiag())
-}
-
-func (d *diag) OutputFormat() wrapper.Format { return wrapper.FormatSARIF }
-
-// RegisterFlags adds diag-specific flags to the provided FlagSet.
-func (d *diag) RegisterFlags(fs *flag.FlagSet) {
-	d.toolName = fs.String("tool", "", "Tool name for SARIF driver.name (required)")
-	d.ruleID = fs.String("rule", "finding", "Default rule ID")
-	d.level = fs.String("level", "warning", "Default severity: error|warning|note")
-	d.version = fs.String("version", "", "Tool version string")
-}
-
 // Convert reads line diagnostics from r and writes SARIF to w.
-// Must be called after RegisterFlags + FlagSet.Parse.
 func (d *diag) Convert(r io.Reader, w io.Writer) error {
 	if d.toolName == nil {
-		return fmt.Errorf("diag: RegisterFlags must be called before Convert")
+		return fmt.Errorf("diag: options not initialized")
 	}
 	if *d.toolName == "" {
 		return fmt.Errorf("--tool is required")

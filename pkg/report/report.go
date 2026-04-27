@@ -73,4 +73,33 @@ type Report struct {
 	Tests    []TestResult
 
 	Prior *Report
+
+	// Diff is the optional state-vs-prior summary attached by the CLI when
+	// --no-state isn't set and a sidecar exists. Marshaled with omitempty
+	// so first runs and stateless invocations preserve the existing JSON
+	// contract.
+	Diff *DiffSummary `json:"diff,omitempty"`
+}
+
+// DiffItem mirrors the shape of state.Item without importing pkg/state
+// (state already depends on report; this preserves the one-way edge).
+type DiffItem struct {
+	Fingerprint   string `json:"fingerprint"`
+	RuleID        string `json:"rule_id,omitempty"`
+	File          string `json:"file,omitempty"`
+	Severity      string `json:"severity"`
+	PriorSeverity string `json:"prior_severity,omitempty"`
+	Class         string `json:"class"`
+}
+
+// DiffSummary mirrors state.Envelope. Owned by pkg/report so the JSON
+// contract for Report sits in one place; the CLI converts state.Envelope
+// → DiffSummary at the wire-in seam.
+type DiffSummary struct {
+	Headline        string     `json:"headline"`
+	New             []DiffItem `json:"new"`
+	Resolved        []DiffItem `json:"resolved"`
+	Regressed       []DiffItem `json:"regressed"`
+	Flaky           []DiffItem `json:"flaky"`
+	PersistentCount int        `json:"persistent_count"`
 }

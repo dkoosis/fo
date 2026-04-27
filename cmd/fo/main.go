@@ -39,7 +39,6 @@ import (
 	"github.com/dkoosis/fo/pkg/testjson"
 	"github.com/dkoosis/fo/pkg/theme"
 	"github.com/dkoosis/fo/pkg/view"
-	"github.com/dkoosis/fo/pkg/wrapper"
 	"github.com/dkoosis/fo/pkg/wrapper/wraparchlint"
 	"github.com/dkoosis/fo/pkg/wrapper/wrapdiag"
 	"github.com/dkoosis/fo/pkg/wrapper/wrapjscpd"
@@ -72,8 +71,10 @@ OUTPUT FORMATS (--format)
   json            Machine-parseable Report JSON
 
 FLAGS
-  --format <mode>   auto | human | llm | json (default: auto)
-  --theme <name>    color | mono (default: auto — color on TTY, mono otherwise)
+  --format <mode>     auto | human | llm | json (default: auto)
+  --theme <name>      color | mono (default: auto — color on TTY, mono otherwise)
+  --state-file <path> Sidecar state file (default: .fo/last-run.json)
+  --no-state          Skip diff classification and sidecar I/O
 
 SUBCOMMANDS
   fo wrap <name>     Convert tool output to SARIF
@@ -103,6 +104,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs.Usage = func() { fmt.Fprint(stderr, usage) }
 	formatFlag := fs.String("format", "auto", "Output format: auto, human, llm, json")
 	themeFlag := fs.String("theme", "auto", "Theme: auto, color, mono")
+	stateFile := fs.String("state-file", state.DefaultPath, "Sidecar state file path")
+	noState := fs.Bool("no-state", false, "Skip diff classification and sidecar I/O")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -130,7 +133,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	// Stream mode: go test -json + TTY + format=auto. The streaming path
 	// owns its own parser → channel → RenderStream pump.
 	if *formatFlag == "auto" && isTTYWriter(stdout) && sniffGoTestJSON(peeked) {
-		return runStream(stdin, br, stdout, resolveTheme(*themeFlag, stdout))
+		return runStream(stdin, br, stdout, resolveTheme(*themeFlag, stdout), *stateFile, *noState, stderr)
 	}
 
 	input, err := io.ReadAll(br)
@@ -144,6 +147,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "fo: %v\n", err)
 		return 2
 	}
+
+	attachDiff(r, *stateFile, *noState, stderr)
 
 	if err := renderMode(mode, r, stdout, *themeFlag); err != nil {
 		fmt.Fprintf(stderr, "fo: %v\n", err)
@@ -285,7 +290,7 @@ func termSize(w io.Writer) (width, height int) {
 // runStream pumps go test -json events into per-package Report snapshots and
 // hands them to view.RenderStream. One channel send per finished package
 // keeps PickView's total-driven thresholds meaningful.
-func runStream(stdin io.Reader, br *bufio.Reader, stdout io.Writer, t theme.Theme) int {
+func runStream(stdin io.Reader, br *bufio.Reader, stdout io.Writer, t theme.Theme, stateFile string, noState bool, stderr io.Writer) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	if c, ok := stdin.(io.Closer); ok {
@@ -307,6 +312,7 @@ func runStream(stdin io.Reader, br *bufio.Reader, stdout io.Writer, t theme.Them
 		return 2
 	}
 	r := testjson.ToReportWithMeta(results, data)
+	attachDiff(r, stateFile, noState, stderr)
 
 	ch := make(chan report.Report, 1)
 	ch <- *r
@@ -367,14 +373,19 @@ func runState(args []string, stdout, stderr io.Writer) int {
 	}
 }
 
-// runWrap dispatches `fo wrap <name>`. The three canonical wrappers
-// (archlint, diag, jscpd) hit the new Convert functions directly; any other
-// registered wrapper falls back to the plugin interface so contract tests
-// keep passing.
+// wrapNames is the canonical list of `fo wrap` subcommands.
+var wrapNames = []string{"archlint", "diag", "jscpd"}
+
+var wrapDescriptions = map[string]string{
+	"archlint": "Convert go-arch-lint JSON to SARIF",
+	"diag":     "Convert line diagnostics (file:line:col: msg) to SARIF",
+	"jscpd":    "Convert jscpd JSON duplication report to SARIF",
+}
+
 func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintf(stderr, "fo wrap: wrapper name required\n\nAvailable wrappers: %s\n",
-			strings.Join(wrapper.Names(), ", "))
+			strings.Join(wrapNames, ", "))
 		return 2
 	}
 	if args[0] == "-h" || args[0] == "--help" || args[0] == "help" {
@@ -415,28 +426,9 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runWrapDiag(args[1:], stdin, stdout, stderr)
 	}
 
-	// Fallback: any other registered wrapper (none today, but keeps the
-	// plugin layer working for fo-7f5.9 cutover).
-	w := wrapper.Get(name)
-	if w == nil {
-		fmt.Fprintf(stderr, "fo wrap: unknown wrapper %q\n\nAvailable wrappers: %s\n",
-			name, strings.Join(wrapper.Names(), ", "))
-		return 2
-	}
-	fs := flag.NewFlagSet("fo wrap "+name, flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	w.RegisterFlags(fs)
-	if err := fs.Parse(args[1:]); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			return 0
-		}
-		return 2
-	}
-	if err := w.Convert(stdin, stdout); err != nil {
-		fmt.Fprintf(stderr, "fo wrap %s: %v\n", name, err)
-		return 2
-	}
-	return 0
+	fmt.Fprintf(stderr, "fo wrap: unknown wrapper %q\n\nAvailable wrappers: %s\n",
+		name, strings.Join(wrapNames, ", "))
+	return 2
 }
 
 func runWrapDiag(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -462,19 +454,14 @@ func runWrapDiag(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 func runWrapHelp(stderr io.Writer) int {
 	fmt.Fprintf(stderr, "fo wrap: convert tool output to SARIF\n\n")
-	for _, name := range wrapper.Names() {
-		fmt.Fprintf(stderr, "  %-12s %s\n", name, wrapper.Description(name))
-		w := wrapper.Get(name)
-		fs := flag.NewFlagSet(name, flag.ContinueOnError)
-		w.RegisterFlags(fs)
-		fs.VisitAll(func(f *flag.Flag) {
-			fmt.Fprintf(stderr, "    --%-10s %s", f.Name, f.Usage)
-			if f.DefValue != "" && f.DefValue != "false" {
-				fmt.Fprintf(stderr, " (default: %s)", f.DefValue)
-			}
-			fmt.Fprintln(stderr)
-		})
-		fmt.Fprintln(stderr)
+	for _, name := range wrapNames {
+		fmt.Fprintf(stderr, "  %-12s %s\n", name, wrapDescriptions[name])
 	}
+	fmt.Fprintln(stderr)
+	fmt.Fprintln(stderr, "  diag flags:")
+	fmt.Fprintln(stderr, "    --tool <name>     Tool name for SARIF driver.name (required)")
+	fmt.Fprintln(stderr, "    --rule <id>       Default rule ID (default: finding)")
+	fmt.Fprintln(stderr, "    --level <sev>     Default severity: error|warning|note (default: warning)")
+	fmt.Fprintln(stderr, "    --version <ver>   Tool version string")
 	return 0
 }

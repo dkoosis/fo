@@ -3,27 +3,16 @@ package wraparchlint
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 
 	"github.com/dkoosis/fo/pkg/sarif"
-	"github.com/dkoosis/fo/pkg/wrapper"
 )
 
 // archlint converts go-arch-lint JSON to SARIF.
 type archlint struct{}
 
 func newArchlint() *archlint { return &archlint{} }
-
-func init() {
-	wrapper.Register("archlint", "Convert go-arch-lint JSON to SARIF", newArchlint())
-}
-
-func (a *archlint) OutputFormat() wrapper.Format { return wrapper.FormatSARIF }
-
-// RegisterFlags is a no-op — archlint wrapper has no flags.
-func (a *archlint) RegisterFlags(_ *flag.FlagSet) {}
 
 // Convert reads go-arch-lint JSON from r and writes SARIF to w.
 // Reads entire input into memory — fine for arch-lint reports (typically <100KB).
