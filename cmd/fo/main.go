@@ -40,6 +40,7 @@ import (
 	"github.com/dkoosis/fo/pkg/pattern"
 	"github.com/dkoosis/fo/pkg/render"
 	"github.com/dkoosis/fo/pkg/sarif"
+	"github.com/dkoosis/fo/pkg/state"
 	"github.com/dkoosis/fo/pkg/stream"
 	"github.com/dkoosis/fo/pkg/testjson"
 	"github.com/dkoosis/fo/pkg/wrapper"
@@ -103,6 +104,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		switch args[0] {
 		case "wrap":
 			return runWrap(args[1:], stdin, stdout, stderr)
+		case "state":
+			return runState(args[1:], stdout, stderr)
 		case "help":
 			fmt.Fprint(stderr, usage)
 			return 0
@@ -114,6 +117,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs.Usage = func() { fmt.Fprint(stderr, usage) }
 	formatFlag := fs.String("format", "auto", "Output format: auto, human, llm, json")
 	themeFlag := fs.String("theme", "default", "Theme: default, orca, mono")
+	_ = fs.String("state-file", state.DefaultPath, "Sidecar state file for diff vs prior run")
+	_ = fs.Bool("no-state", false, "Disable read+write of sidecar state")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -309,6 +314,37 @@ func parseEvents(data []byte) ([]testjson.TestEvent, int, error) {
 		events = append(events, e)
 	}
 	return events, malformed, nil
+}
+
+// runState handles `fo state <subcommand>`. Currently only `reset` is
+// supported; it deletes the sidecar so the next run starts fresh.
+func runState(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("fo state", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	stateFile := fs.String("state-file", state.DefaultPath, "Sidecar state file path")
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "fo state: subcommand required (reset)")
+		return 2
+	}
+	sub := args[0]
+	if err := fs.Parse(args[1:]); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 2
+	}
+	switch sub {
+	case "reset":
+		if err := state.Reset(*stateFile); err != nil {
+			fmt.Fprintf(stderr, "fo state reset: %v\n", err)
+			return 2
+		}
+		fmt.Fprintf(stdout, "fo: state reset (%s)\n", *stateFile)
+		return 0
+	default:
+		fmt.Fprintf(stderr, "fo state: unknown subcommand %q\n", sub)
+		return 2
+	}
 }
 
 func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
