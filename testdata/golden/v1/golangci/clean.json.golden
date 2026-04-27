@@ -1,0 +1,1499 @@
+{
+  "version": "2.0",
+  "data_hash": "bb41fb412d6b",
+  "generated_at": "2026-04-26T21:17:14Z",
+  "patterns": [
+    {
+      "type": "summary",
+      "data": {
+        "Label": "Analysis: 113 issues",
+        "Kind": "sarif",
+        "Metrics": [
+          {
+            "Label": "Errors",
+            "Value": "75",
+            "Kind": "error",
+            "Status": ""
+          },
+          {
+            "Label": "Warnings",
+            "Value": "38",
+            "Kind": "warning",
+            "Status": ""
+          }
+        ]
+      }
+    },
+    {
+      "type": "leaderboard",
+      "data": {
+        "Label": "Files with Most Issues",
+        "MetricName": "Issues",
+        "Items": [
+          {
+            "Name": "design/config.go",
+            "Metric": "22 issues",
+            "Value": 22,
+            "Rank": 1
+          },
+          {
+            "Name": "design/render.go",
+            "Metric": "12 issues",
+            "Value": 12,
+            "Rank": 2
+          },
+          {
+            "Name": "sarif/orchestrator.go",
+            "Metric": "10 issues",
+            "Value": 10,
+            "Rank": 3
+          },
+          {
+            "Name": "design/theme.go",
+            "Metric": "7 issues",
+            "Value": 7,
+            "Rank": 4
+          },
+          {
+            "Name": "fo/console.go",
+            "Metric": "6 issues",
+            "Value": 6,
+            "Rank": 5
+          },
+          {
+            "Name": "fo/testrender.go",
+            "Metric": "6 issues",
+            "Value": 6,
+            "Rank": 6
+          },
+          {
+            "Name": "design/complexity_dashboard.go",
+            "Metric": "5 issues",
+            "Value": 5,
+            "Rank": 7
+          },
+          {
+            "Name": "design/taskview.go",
+            "Metric": "4 issues",
+            "Value": 4,
+            "Rank": 8
+          },
+          {
+            "Name": "config/config_test.go",
+            "Metric": "4 issues",
+            "Value": 4,
+            "Rank": 9
+          },
+          {
+            "Name": "fo/processor_test.go",
+            "Metric": "4 issues",
+            "Value": 4,
+            "Rank": 10
+          }
+        ],
+        "TotalCount": 30,
+        "ShowRank": true
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "fo/profile_test.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "errcheck:52:18",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "Error return value of `f.Close` is not checked",
+            "FixCommand": "",
+            "Fingerprint": "efff2d7d4429c21ae2364074e90caa369d9beb7e0d1c746aa6f8942b5f332928",
+            "Score": 1.5
+          },
+          {
+            "Name": "testifylint:71:5",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "negative-positive: use assert.Positive",
+            "FixCommand": "",
+            "Fingerprint": "ce20684129a4e9a0249ad726e78beb21c656cc67d88da2ae3919ff9b4fe0ccd9",
+            "Score": 0.75
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "pkg/sarif/orchestrator.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "gosec:77:12",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "G301: Expect directory permissions to be 0750 or less",
+            "FixCommand": "",
+            "Fingerprint": "4b052499ee8109e0f824ba92fe73d6a1e879208039816c453cafe561df7340cc",
+            "Score": 9
+          },
+          {
+            "Name": "gosec:147:9",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "G204: Subprocess launched with a potential tainted input or cmd arguments",
+            "FixCommand": "",
+            "Fingerprint": "c732085327c334a3b20818856e6778788ac9305375fa8b92ca4f6253b15ea48d",
+            "Score": 9
+          },
+          {
+            "Name": "errcheck:189:15",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "Error return value of `fmt.Fprintf` is not checked",
+            "FixCommand": "",
+            "Fingerprint": "5af5d2e5f709c99161a75fb583e7689305aa7f3ef6d8fe59a932c82acb964300",
+            "Score": 9
+          },
+          {
+            "Name": "errcheck:201:15",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "Error return value of `fmt.Fprintf` is not checked",
+            "FixCommand": "",
+            "Fingerprint": "5af5d2e5f709c99161a75fb583e7689305aa7f3ef6d8fe59a932c82acb964300",
+            "Score": 9
+          },
+          {
+            "Name": "errcheck:206:14",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "Error return value of `fmt.Fprintf` is not checked",
+            "FixCommand": "",
+            "Fingerprint": "5af5d2e5f709c99161a75fb583e7689305aa7f3ef6d8fe59a932c82acb964300",
+            "Score": 9
+          },
+          {
+            "Name": "errcheck:208:13",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "Error return value of `fmt.Fprint` is not checked",
+            "FixCommand": "",
+            "Fingerprint": "b3daeb285e8440c420cb7c0af953b17776a2a2c5f571b49f149f8b3e0c21cd1a",
+            "Score": 9
+          },
+          {
+            "Name": "errcheck:321:13",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "Error return value of `fmt.Fprint` is not checked",
+            "FixCommand": "",
+            "Fingerprint": "b3daeb285e8440c420cb7c0af953b17776a2a2c5f571b49f149f8b3e0c21cd1a",
+            "Score": 9
+          },
+          {
+            "Name": "errcheck:342:13",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "Error return value of `fmt.Fprint` is not checked",
+            "FixCommand": "",
+            "Fingerprint": "b3daeb285e8440c420cb7c0af953b17776a2a2c5f571b49f149f8b3e0c21cd1a",
+            "Score": 9
+          },
+          {
+            "Name": "errorlint:157:21",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "type assertion on error will fail on wrapped errors. Use errors.As to check for specific errors",
+            "FixCommand": "",
+            "Fingerprint": "27ac2880ba79f9dd48a03737ef7bfe38552cd420541c01c809be88396cc36f3a",
+            "Score": 3
+          },
+          {
+            "Name": "unused:224:2",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "field spinners is unused",
+            "FixCommand": "",
+            "Fingerprint": "e0a587434405012659932072fbacbce278643e43b7bd0f3b2e711622deef149e",
+            "Score": 3
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "pkg/sarif/reader.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "gosec:12:12",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "G304: Potential file inclusion via variable",
+            "FixCommand": "",
+            "Fingerprint": "4847d56c34591fb50d56b59c219bed5351dcfc52110949f6bf4685da5eefaf51",
+            "Score": 9
+          },
+          {
+            "Name": "errcheck:16:15",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "Error return value of `f.Close` is not checked",
+            "FixCommand": "",
+            "Fingerprint": "ea01352eb99502fd4a9596fe9eeca025527c1bc423cf9b91fc981f6a516562ee",
+            "Score": 6
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "fo/console_test.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "goconst:14:29",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `on-fail` has 3 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "ac50b6850e984fbc05df2c705d965aadb1e4a3715c4bed7f06e041de767d5cc9",
+            "Score": 0.75
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "fo/content.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "goconst:70:8",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `↑` has 3 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "75543e0adf364874737f2ac94455bfc3dcbafb5cb77cb5dab0c3a2a87fe93358",
+            "Score": 6
+          },
+          {
+            "Name": "goconst:72:8",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `↓` has 3 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "60b9cf223a73157a61fa1c018c77f0a71d5843b467f6ccd1e6bef592b2abe0d3",
+            "Score": 6
+          },
+          {
+            "Name": "revive:1:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "package-comments: package comment should be of the form \"Package fo ...\"",
+            "FixCommand": "",
+            "Fingerprint": "734c48fbde35082ad99304040a7da9957bcf8db4c6f39abe6b32993a2478fc79",
+            "Score": 6
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "fo/testrender.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "gosec:444:20",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "G304: Potential file inclusion via variable",
+            "FixCommand": "",
+            "Fingerprint": "59df7f8cfe26ebe3744f6f35cd20d9631a2415decc1dec5de6ffa40261e7917d",
+            "Score": 9
+          },
+          {
+            "Name": "prealloc:328:2",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "Consider pre-allocating `lines`",
+            "FixCommand": "",
+            "Fingerprint": "5fc7dbd6b4dd2abadf60cec2129178b2ee548fb809976edef56fdad8bdc854aa",
+            "Score": 6
+          },
+          {
+            "Name": "goconst:345:17",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `Error` has 3 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "416b07450628a1d1ee124556a5de7dbef2662e0236d6508083dafeae8008acab",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:349:17",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `Success` has 3 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "29dfe823daf91fe375358973d0977c0a17c61414928dd8cd84836b720a81ba14",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:361:20",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `Muted` has 5 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "2c8776e9a8068b468795d8b6a2d461eec1e34b521ef86eb703f8e430eb926638",
+            "Score": 3
+          },
+          {
+            "Name": "gocyclo:523:1",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "cyclomatic complexity 32 of func `humanizePart` is high (\u003e 30)",
+            "FixCommand": "",
+            "Fingerprint": "e0824195b7b28439cd420c67ea246df64fbcd2e4acd589639f96e862d8ef07cc",
+            "Score": 3
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "pkg/design/complexity_dashboard.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "goconst:192:15",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `↓` has 3 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "bcfbc2c6fe91c018f9e159441e9df9a0a7f3a1a124994dea1e01ca7c10e5775a",
+            "Score": 6
+          },
+          {
+            "Name": "goconst:194:16",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `↑` has 3 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "1f33b0b3f8013e0604ed94a8366270dfa8257457a60b36fe6a36921fa4cdff46",
+            "Score": 6
+          },
+          {
+            "Name": "goconst:191:7",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `improving` has 3 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "87f72135992e2133c10e0e84602b5d46a1b1e015a6f04f797f3ab06e49c53be8",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:197:7",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `degrading` has 3 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "7a77fc467b9d7555e7a62ce3390a59be2008ee90123afb29c3d0a5c0eea316e3",
+            "Score": 3
+          },
+          {
+            "Name": "revive:222:39",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "unused-parameter: parameter 'unit' seems to be unused, consider removing or renaming it as _",
+            "FixCommand": "",
+            "Fingerprint": "7bb5099de13acc3b522bf0e9f15271ad52a82270e7234f5ba306a5a9168ec963",
+            "Score": 2
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "pkg/design/config.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "revive:1:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "package-comments: package comment should be of the form \"Package design ...\"",
+            "FixCommand": "",
+            "Fingerprint": "6f982e7607665c7afe58c475426d442e9973563f72a43eb1e171c8a754f3fcbf",
+            "Score": 4
+          },
+          {
+            "Name": "goconst:428:29",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `▮` has 3 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "b8e5f763809ada24caf6b5ec61015e47156e4cd9fb5e3ba27c4aa9c0f8e9197c",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:429:28",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `▯` has 3 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "467ee29a861cdbed8cd164997b920907b839039b9c9aedd037eeea6454862e3a",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:432:25",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `○` has 3 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "50765ff26d8803a35d8950f43cc51a2f9d9cf6f5bfecd24335aa8cc75e6fd756",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:448:22",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `balanced` has 3 occurrences, but such constant `DensityBalanced` already exists",
+            "FixCommand": "",
+            "Fingerprint": "c8c7f4a1de433c6b0265d558f007575dfd278792cdbc555a9283a368ecfdbe79",
+            "Score": 3
+          },
+          {
+            "Name": "revive:25:2",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: exported const BorderLeftOnly should have comment (or a comment on this block) or be unexported",
+            "FixCommand": "",
+            "Fingerprint": "d082bc60136c8b4eb8fc86917313468932c4019bcece1205db2b75a9c0e71d5c",
+            "Score": 2
+          },
+          {
+            "Name": "revive:95:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: comment on exported const DefaultSpinnerChars should be of the form \"DefaultSpinnerChars ...\"",
+            "FixCommand": "",
+            "Fingerprint": "430fdb06ba39ecb24b049d462412d08eff0cf73eff5f146ba3730084bf09b9ee",
+            "Score": 2
+          },
+          {
+            "Name": "revive:130:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: comment on exported const MessageTypeHeader should be of the form \"MessageTypeHeader ...\"",
+            "FixCommand": "",
+            "Fingerprint": "72e91d6c29e70f3e48d083d7cc80586c44cfc9055276a31e60ff60aca3983c9c",
+            "Score": 2
+          },
+          {
+            "Name": "revive:133:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: comment on exported const ANSIBrightWhite should be of the form \"ANSIBrightWhite ...\"",
+            "FixCommand": "",
+            "Fingerprint": "1bfef96c2fe9eccfb180fbf5ba13fb4e00e6e188b9560fb60e2344747429cd55",
+            "Score": 2
+          },
+          {
+            "Name": "revive:167:6",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: type name will be used as design.DesignTokens by other packages, and that stutters; consider calling this Tokens",
+            "FixCommand": "",
+            "Fingerprint": "ae9982634ab105f924bb440b1bb4c8eed71c5406763932cfc643bbf6fc6f1dc8",
+            "Score": 2
+          },
+          {
+            "Name": "revive:343:6",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: exported type PatternsRepo should have comment or be unexported",
+            "FixCommand": "",
+            "Fingerprint": "1dcf1d5ee8af9b74b5260c8273e7690a8958f1b8ac5167148bbed6df64098c3a",
+            "Score": 2
+          },
+          {
+            "Name": "revive:348:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: exported function DefaultConfig should have comment or be unexported",
+            "FixCommand": "",
+            "Fingerprint": "00262804eab29a87b35642d7748ca1bf969c1568199934c199a38b6d2b3b4e02",
+            "Score": 2
+          },
+          {
+            "Name": "revive:352:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: exported function NoColorConfig should have comment or be unexported",
+            "FixCommand": "",
+            "Fingerprint": "6fc9a93af5568a701910308e76c187eabc18d97356f8fdba13590bb2e75ddd6f",
+            "Score": 2
+          },
+          {
+            "Name": "revive:359:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: exported function ASCIIMinimalTheme should have comment or be unexported",
+            "FixCommand": "",
+            "Fingerprint": "5c0602a5007d91c14bbf39e2f4148181e2501f0706bb64df491ad71593445c8a",
+            "Score": 2
+          },
+          {
+            "Name": "revive:440:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: exported function UnicodeVibrantTheme should have comment or be unexported",
+            "FixCommand": "",
+            "Fingerprint": "3a3505a42d030127156cc95578992702c41ff395a8219f87496030881b710430",
+            "Score": 2
+          },
+          {
+            "Name": "revive:539:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: exported function OrcaTheme should have comment or be unexported",
+            "FixCommand": "",
+            "Fingerprint": "b04b1d68672dc1d6e1332792bc28c7c6f7ce09f4ccd39d4ff07e9ee2a72d47e3",
+            "Score": 2
+          },
+          {
+            "Name": "revive:703:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: exported method Config.GetElementStyle should have comment or be unexported",
+            "FixCommand": "",
+            "Fingerprint": "4750c630867ddc8c191094ef8f429994a1fba17045a4ceeaa220b0924bd5fd11",
+            "Score": 2
+          },
+          {
+            "Name": "revive:710:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: exported method Config.GetIndentation should have comment or be unexported",
+            "FixCommand": "",
+            "Fingerprint": "1e4a81f25fed7891b62b135e0f3dca16a37a1356066f8a5cf6150a4014511144",
+            "Score": 2
+          },
+          {
+            "Name": "revive:721:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: exported method Config.GetIcon should have comment or be unexported",
+            "FixCommand": "",
+            "Fingerprint": "d8472963b476f95c17d9a33481f4401cf87e47d49f4b5667d38bedd9c904fcd8",
+            "Score": 2
+          },
+          {
+            "Name": "revive:758:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: exported method Config.GetColor should have comment or be unexported",
+            "FixCommand": "",
+            "Fingerprint": "52225a1eef00369d2a77396c09a27ce02fdc9a302e276c147e7079f21823c500",
+            "Score": 2
+          },
+          {
+            "Name": "revive:958:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: exported method Config.ResetColor should have comment or be unexported",
+            "FixCommand": "",
+            "Fingerprint": "0c2d88303c7243a7ab89fead490b5578dbf28f50371416e6e9ddd0be1ce775b2",
+            "Score": 2
+          },
+          {
+            "Name": "revive:1172:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: exported function ApplyMonochromeDefaults should have comment or be unexported",
+            "FixCommand": "",
+            "Fingerprint": "563b6978756c0a0065b4275d64a1950d987d2a1b9a83e48bbe233c9a219d6462",
+            "Score": 2
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "pkg/design/housekeeping.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "goconst:41:18",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `pass` has 8 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "d77577b67bf65d42cb1f5f53175a4b57e64649aeb7137d2c6482dbc1dfe09057",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:52:18",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `warn` has 4 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "60e1351fba2e755daab67e7a0cda649609cff78499621caa843058dc969018d4",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:63:18",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `fail` has 6 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "a27ba450392cda70abdb9dc41b2556cbdf9a1d73d254f78f2f51eb608c03218b",
+            "Score": 3
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "pkg/design/quality_report.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "goconst:153:21",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `error` has 6 occurrences, but such constant `TypeError` already exists",
+            "FixCommand": "",
+            "Fingerprint": "4f6b9c4af4bfbbd562e898a6acf4e3393fa7d535519e0b33bf81d86bc9b2ddfc",
+            "Score": 3
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "pkg/design/render.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "revive:1:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "package-comments: package comment should be of the form \"Package design ...\"",
+            "FixCommand": "",
+            "Fingerprint": "208704d459514347dc70e7ed69118e168c4591de61db0600252f1b432c9d28e4",
+            "Score": 4
+          },
+          {
+            "Name": "goconst:169:7",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `╭` has 3 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "7f4ad214725e077f44e96ccefb31b9b1dd929d64ef85eb2479c20c46c6d1c15a",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:170:14",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `╮` has 3 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "c3f88b77650d446c910fa50e56e70c5ebae4dfc78da3af657bb13afb6ee04fa1",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:179:7",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `╰` has 3 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "ed26b65168a5920f2c3a7b6ecefc32bfc35eac30772a2dd08b36689db31fe060",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:180:17",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `╯` has 3 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "32b5793c59781c300b93e01278089648fcce10fc37446f03f157a12819713e7c",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:200:20",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `orca` has 3 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "7712e360c4cc185be173372f18cb69d85f522446e969869e2b125d0e238bd6d3",
+            "Score": 3
+          },
+          {
+            "Name": "gocyclo:586:1",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "cyclomatic complexity 33 of func `(*Task).RenderOutputLine` is high (\u003e 30)",
+            "FixCommand": "",
+            "Fingerprint": "3cfbb4b9607344209b3a95087f7af4140344b26b144420293b417c921b359433",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:664:23",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `Detail` has 3 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "7f19e6102bf426ff2b74f4fac231cac0d9afa6f502752936def42db9f7d9f884",
+            "Score": 3
+          },
+          {
+            "Name": "gocyclo:885:1",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "cyclomatic complexity 35 of func `RenderDirectMessage` is high (\u003e 30)",
+            "FixCommand": "",
+            "Fingerprint": "1cff4fe18e326c9573e9fa22e5680cecf3ff6ac42a889ee0d68e340854639881",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:946:17",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `Process` has 3 occurrences, but such constant `ColorKeyProcess` already exists",
+            "FixCommand": "",
+            "Fingerprint": "ac0728b5d617fe208d256e2db76c8431c1d3475914909f0e9a69e823dcf7c971",
+            "Score": 3
+          },
+          {
+            "Name": "revive:359:10",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "indent-error-flow: if block ends with a return statement, so drop this else and outdent its block",
+            "FixCommand": "",
+            "Fingerprint": "6cf4e4cfb3cf8ebfb2817a8e9cc8ddefc61a09cb099177c3a6358f272c94d745",
+            "Score": 2
+          },
+          {
+            "Name": "revive:709:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: exported method Task.RenderSummary should have comment or be unexported",
+            "FixCommand": "",
+            "Fingerprint": "021742709c8d2112de4e66615391219d88a1cae647c6dad6d3bffe1bdd52efe3",
+            "Score": 2
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "pkg/design/taskview.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "prealloc:135:2",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "Consider pre-allocating `lines`",
+            "FixCommand": "",
+            "Fingerprint": "f16606e30cd7553452ee5ec684d5b3122f760e9f67a0284e288385512600845a",
+            "Score": 6
+          },
+          {
+            "Name": "goconst:150:7",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `success` has 5 occurrences, but such constant `TypeSuccess` already exists",
+            "FixCommand": "",
+            "Fingerprint": "c4e67fa5847c41ba8eedc20c8edbef0bd9e4a76f7cc8370bbdd3833fc95dbb7f",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:154:7",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `warning` has 5 occurrences, but such constant `TypeWarning` already exists",
+            "FixCommand": "",
+            "Fingerprint": "92d0f16e161ab034ba347ad9d522541047946a05ab67846a77d5fb9296473083",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:197:7",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `info` has 3 occurrences, but such constant `TypeInfo` already exists",
+            "FixCommand": "",
+            "Fingerprint": "d1bef14af8213a3a270687700f223c267481bf4ed7fdac5d47ec0f743718c4ff",
+            "Score": 3
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "pkg/design/theme.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "goconst:97:14",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `│` has 3 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "a6138dd1740e487fae1069993349b8cd00ae3bee041635808b62c0f20711419f",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:301:19",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `✓` has 4 occurrences, but such constant `testSuccessIcon` already exists",
+            "FixCommand": "",
+            "Fingerprint": "0e2e2da2143320437c6fc584e748d73a35e71eae46114e75c05625ff11d631b1",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:304:19",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `⚠` has 6 occurrences, but such constant `IconCharWarning` already exists",
+            "FixCommand": "",
+            "Fingerprint": "2148b99cb612f9ae3a4909de56cc3facd5c613e1598f21a3fac999de9ea62696",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:307:17",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `✗` has 6 occurrences, but such constant `IconCharError` already exists",
+            "FixCommand": "",
+            "Fingerprint": "7add5e488d9166f5db45d5a0b715f2a24706f97da9891f66feb8ff459cc5951b",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:310:16",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `ℹ` has 3 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "10af2a39b9c8cd308006e9e0a621ff5315a3c4a1cbe74345fe8937e42a721d2e",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:313:18",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `•` has 5 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "560aa87ae7fba15c789e415ee0eea2b7f266629aea3ddf9677b698e9c571068f",
+            "Score": 3
+          },
+          {
+            "Name": "revive:204:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: comment on exported function OrcaTheme2 should be of the form \"OrcaTheme2 ...\"",
+            "FixCommand": "",
+            "Fingerprint": "fdbd3a870af0041a7713c0b1b8600a0618cb75f9883b518707787ac67578f474",
+            "Score": 2
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "pkg/sarif/mapper.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "staticcheck:225:2",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "QF1003: could use tagged switch on pc.Detail",
+            "FixCommand": "",
+            "Fingerprint": "2b4bb5768371c216c02cd558c8e03e6df84098a2d0b1514804d4f52d009752d7",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:249:9",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `error` has 4 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "b12579b1384ec18dfd45fd43e884a3bc888137c3f252558c261ce679a2336327",
+            "Score": 3
+          },
+          {
+            "Name": "goconst:251:9",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "string `warning` has 3 occurrences, make it a constant",
+            "FixCommand": "",
+            "Fingerprint": "b979935eb92662f3543ce5366ebbed22a65866babd5062f58f8898a26f750d08",
+            "Score": 3
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "fo/console.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "gocyclo:1171:1",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "cyclomatic complexity 46 of func `(*Console).runContext` is high (\u003e 30)",
+            "FixCommand": "",
+            "Fingerprint": "ecd2cb238ab0396db56beeedf96df48aae309f5498e44bc43ba7b4f182f08661",
+            "Score": 3
+          },
+          {
+            "Name": "revive:47:6",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: exported type ConsoleConfig should have comment or be unexported",
+            "FixCommand": "",
+            "Fingerprint": "7aa2136debbc857cd24d8b34fdfdce1c5160b4a7b3c0ea6cdda0a26587178a84",
+            "Score": 2
+          },
+          {
+            "Name": "revive:76:6",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: exported type TaskResult should have comment or be unexported",
+            "FixCommand": "",
+            "Fingerprint": "73d857c6729fe7c14d4b879977eede856a78da8f3d8037fa9483208c6ceea15e",
+            "Score": 2
+          },
+          {
+            "Name": "revive:129:6",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: exported type Console should have comment or be unexported",
+            "FixCommand": "",
+            "Fingerprint": "29c4c0f145dab756c1d372db99128d03a7a0e8fb3920498e92c150afc696199d",
+            "Score": 2
+          },
+          {
+            "Name": "revive:140:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: exported function DefaultConsole should have comment or be unexported",
+            "FixCommand": "",
+            "Fingerprint": "e0033ac09a057468c94840669dd9d9fa76be378d528c74b0b9842dfba1fb88a0",
+            "Score": 2
+          },
+          {
+            "Name": "revive:144:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: exported function NewConsole should have comment or be unexported",
+            "FixCommand": "",
+            "Fingerprint": "1f83df071b1ee30aa077f52401e655dae6c2444b98d31e5cdd505634b29b12b4",
+            "Score": 2
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "cmd/main.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "gosec:393:15",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "G304: Potential file inclusion via variable",
+            "FixCommand": "",
+            "Fingerprint": "336700f6d7f5373528b0b7d3c8c42dfec89d0c489e742a5747abc06d6a0c36d4",
+            "Score": 9
+          },
+          {
+            "Name": "revive:1:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "package-comments: should have a package comment",
+            "FixCommand": "",
+            "Fingerprint": "3988190f00a3eef31ea9b793d8eddeab8388da8dc90c3af0223f2f6994d89ef4",
+            "Score": 4
+          },
+          {
+            "Name": "revive:228:46",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "unused-parameter: parameter 'fileAppConfig' seems to be unused, consider removing or renaming it as _",
+            "FixCommand": "",
+            "Fingerprint": "44f2b43a509ef077f58862f6a407847748f1700615dccfa1d677d0827f68cca8",
+            "Score": 2
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "cmd/main_test.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "gosec:170:9",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "G204: Subprocess launched with a potential tainted input or cmd arguments",
+            "FixCommand": "",
+            "Fingerprint": "9d7016c3651fc409f2d005be3831e42a4d8045da2885b11869af7d34a9876493",
+            "Score": 2.25
+          },
+          {
+            "Name": "gosec:282:9",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "G204: Subprocess launched with a potential tainted input or cmd arguments",
+            "FixCommand": "",
+            "Fingerprint": "9d7016c3651fc409f2d005be3831e42a4d8045da2885b11869af7d34a9876493",
+            "Score": 2.25
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "internal/config/config_test.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "gosec:67:8",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "G306: Expect WriteFile permissions to be 0600 or less",
+            "FixCommand": "",
+            "Fingerprint": "9618f05535407089ba46c9ce1644790e322e142054df5620c12a4b8945347044",
+            "Score": 2.25
+          },
+          {
+            "Name": "gosec:101:8",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "G306: Expect WriteFile permissions to be 0600 or less",
+            "FixCommand": "",
+            "Fingerprint": "9618f05535407089ba46c9ce1644790e322e142054df5620c12a4b8945347044",
+            "Score": 2.25
+          },
+          {
+            "Name": "gosec:124:8",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "G301: Expect directory permissions to be 0750 or less",
+            "FixCommand": "",
+            "Fingerprint": "2fff3e5311191d21a9a01695d9d0de53cd4533b2546d38e73ac2553e408a3389",
+            "Score": 2.25
+          },
+          {
+            "Name": "gosec:148:8",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "G306: Expect WriteFile permissions to be 0600 or less",
+            "FixCommand": "",
+            "Fingerprint": "9618f05535407089ba46c9ce1644790e322e142054df5620c12a4b8945347044",
+            "Score": 2.25
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "internal/magetasks/lint.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "gosec:75:12",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "G301: Expect directory permissions to be 0750 or less",
+            "FixCommand": "",
+            "Fingerprint": "ea526074f9b991d9f2164dbe6025f5b5b1fadf7c52f77389b369c35544443367",
+            "Score": 4.5
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "fo/spinner.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "prealloc:42:2",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "Consider pre-allocating `frames`",
+            "FixCommand": "",
+            "Fingerprint": "d4c3177f803a80d67ee32733ecc9308a960076dedea986037cb241a6593b5d47",
+            "Score": 3
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "fo/magetasks.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "revive:1:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "package-comments: package comment should be of the form \"Package fo ...\"",
+            "FixCommand": "",
+            "Fingerprint": "7e7c9dba153d7052125a324c8aa98167791c07714f2002cb72176fd90e3db9f0",
+            "Score": 6
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "fo/projectconfig.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "revive:1:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "package-comments: package comment should be of the form \"Package fo ...\"",
+            "FixCommand": "",
+            "Fingerprint": "33667f157876f0f4c0bcc2b1e26af3c97e55dc016cc0bd7f0d6bdf3d338f80f1",
+            "Score": 6
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "internal/config/config.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "revive:1:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "package-comments: package comment should be of the form \"Package config ...\"",
+            "FixCommand": "",
+            "Fingerprint": "6e2b18b281ea78c6d72a3ccc3eea964a58ccf077ae923a88259169df7185520a",
+            "Score": 1
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "internal/magetasks/console.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "revive:91:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: comment on exported type SectionStatus should be of the form \"SectionStatus ...\" (with optional leading article)",
+            "FixCommand": "",
+            "Fingerprint": "951bc4ab16f5aba9dd436b94fd959bbebd27d26c7b6a39e1e8171758e0f3d6fe",
+            "Score": 1
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "internal/version/version.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "revive:1:1",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "package-comments: should have a package comment",
+            "FixCommand": "",
+            "Fingerprint": "d136034590da2b03b36a99b46322e65a6ff0d305c29d363e7a18d459050ed3cd",
+            "Score": 2
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "pkg/design/system.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "revive:91:2",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "exported: exported const LoadLow should have comment (or a comment on this block) or be unexported",
+            "FixCommand": "",
+            "Fingerprint": "e3ce8115e63020eb0dfbd97b7c13b7aeadd6e15bf82f83561d6455bc126b3e50",
+            "Score": 2
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "pkg/design/theme_test.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "revive:60:32",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "unused-parameter: parameter 't' seems to be unused, consider removing or renaming it as _",
+            "FixCommand": "",
+            "Fingerprint": "e17c2e60fbf26c242e8b73319ca8994a6bdd08d525396e81e3863052ec78d703",
+            "Score": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "fo/processor_test.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "testifylint:40:2",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "len: use assert.Len",
+            "FixCommand": "",
+            "Fingerprint": "dd42b0e4047d24dd28d4d22f84cc1403f150ab20a31bd52fb83621c084c076c2",
+            "Score": 2.25
+          },
+          {
+            "Name": "testifylint:57:2",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "empty: use assert.Empty",
+            "FixCommand": "",
+            "Fingerprint": "815f534be09bd2768388612e94d2489c54f570f5cfbfb64fcde488dc564d19ee",
+            "Score": 2.25
+          },
+          {
+            "Name": "testifylint:74:2",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "len: use assert.Len",
+            "FixCommand": "",
+            "Fingerprint": "dd42b0e4047d24dd28d4d22f84cc1403f150ab20a31bd52fb83621c084c076c2",
+            "Score": 2.25
+          },
+          {
+            "Name": "testifylint:94:2",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "len: use assert.Len",
+            "FixCommand": "",
+            "Fingerprint": "dd42b0e4047d24dd28d4d22f84cc1403f150ab20a31bd52fb83621c084c076c2",
+            "Score": 2.25
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "fo/section_render_test.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "testifylint:275:2",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "error-nil: use assert.NoError",
+            "FixCommand": "",
+            "Fingerprint": "21ce9adb4dd138b7b60ee81f12b3f31c16324e3a9a7b5d4d3cb007066fc1e40b",
+            "Score": 0.75
+          },
+          {
+            "Name": "testifylint:317:2",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "error-nil: use assert.Error",
+            "FixCommand": "",
+            "Fingerprint": "ec265983d7893e29097d53bd27a770110453f5d1f83c58e32062ef57eeb2bb85",
+            "Score": 0.75
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "pkg/design/config_behavior_test.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "testifylint:54:2",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "empty: use assert.Empty",
+            "FixCommand": "",
+            "Fingerprint": "97b6e1c08d91ad6d0f130f4286d950465b336ca183f6d1637e2b0bb6135c112e",
+            "Score": 2.25
+          },
+          {
+            "Name": "testifylint:57:2",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "empty: use assert.Empty",
+            "FixCommand": "",
+            "Fingerprint": "97b6e1c08d91ad6d0f130f4286d950465b336ca183f6d1637e2b0bb6135c112e",
+            "Score": 2.25
+          }
+        ]
+      }
+    }
+  ]
+}

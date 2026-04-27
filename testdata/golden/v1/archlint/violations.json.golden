@@ -1,0 +1,108 @@
+{
+  "version": "2.0",
+  "data_hash": "d1a567cdf9a1",
+  "generated_at": "2026-04-26T21:17:15Z",
+  "patterns": [
+    {
+      "type": "summary",
+      "data": {
+        "Label": "Analysis: 3 issues",
+        "Kind": "sarif",
+        "Metrics": [
+          {
+            "Label": "Errors",
+            "Value": "3",
+            "Kind": "error",
+            "Status": ""
+          }
+        ]
+      }
+    },
+    {
+      "type": "leaderboard",
+      "data": {
+        "Label": "Files with Most Issues",
+        "MetricName": "Issues",
+        "Items": [
+          {
+            "Name": "search/search.go",
+            "Metric": "1 issues",
+            "Value": 1,
+            "Rank": 1
+          },
+          {
+            "Name": "store/store.go",
+            "Metric": "1 issues",
+            "Value": 1,
+            "Rank": 2
+          },
+          {
+            "Name": "supervisor/supervisor.go",
+            "Metric": "1 issues",
+            "Value": 1,
+            "Rank": 3
+          }
+        ],
+        "TotalCount": 3,
+        "ShowRank": true
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "pkg/search/search.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "dependency-violation",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "search → embedder",
+            "FixCommand": "go-arch-lint check --arch-file .go-arch-lint.yml",
+            "Fingerprint": "cff2e3d436017d594724cd624cda33eb7d03d04d83b95695cb37d238d6b0c2ef",
+            "Score": 3
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "internal/store/store.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "dependency-violation",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "store → internal/svc",
+            "FixCommand": "go-arch-lint check --arch-file .go-arch-lint.yml",
+            "Fingerprint": "322d53b6742e4c238b64c7033c668b89902f68a6f507a0914fc536dfb84c6e78",
+            "Score": 1.5
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "internal/agent/supervisor/supervisor.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "dependency-violation",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "agentSupervisor → github.com/example/project/internal/agent/shell",
+            "FixCommand": "go-arch-lint check --arch-file .go-arch-lint.yml",
+            "Fingerprint": "068036b071f3b03b08a13d17568f254934267b1b71ff3b6ea363c73dfafcc82d",
+            "Score": 1.5
+          }
+        ]
+      }
+    }
+  ]
+}

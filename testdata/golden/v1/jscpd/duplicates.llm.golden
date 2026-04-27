@@ -1,0 +1,10 @@
+fo:llm:v1
+data_hash: 4d294a38e61d
+generated_at: 2026-04-26T21:17:43Z
+
+0 ✗ 1 ⚠
+
+  ⚠ ../../../../tmp/jscpd-sample/a.go:2:0 code-clone — 5 lines duplicated with ../../../../tmp/jscpd-sample/b.go:2-6
+    ```bash
+    # duplicate: ../../../../tmp/jscpd-sample/a.go:2-6 ↔ ../../../../tmp/jscpd-sample/b.go:2-6
+    ```

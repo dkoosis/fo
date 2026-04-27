@@ -1,0 +1,14 @@
+Analysis: 2 issues
+  ! Warnings: 2
+
+Files with Most Issues
+   1. gofmt-sample/bad2.go  1 issues
+   2. gofmt-sample/bad.go   1 issues
+
+/tmp/gofmt-sample/bad.go
+  ! needs-formatting
+    needs formatting
+
+/tmp/gofmt-sample/bad2.go
+  ! needs-formatting
+    needs formatting

@@ -1,0 +1,41 @@
+{
+  "version": "2.0",
+  "data_hash": "4d294a38e61d",
+  "generated_at": "2026-04-26T21:17:43Z",
+  "patterns": [
+    {
+      "type": "summary",
+      "data": {
+        "Label": "Analysis: 1 issues",
+        "Kind": "sarif",
+        "Metrics": [
+          {
+            "Label": "Warnings",
+            "Value": "1",
+            "Kind": "warning",
+            "Status": ""
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "../../../../tmp/jscpd-sample/a.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "code-clone:2:0",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "5 lines duplicated with ../../../../tmp/jscpd-sample/b.go:2-6",
+            "FixCommand": "# duplicate: ../../../../tmp/jscpd-sample/a.go:2-6 ↔ ../../../../tmp/jscpd-sample/b.go:2-6",
+            "Fingerprint": "0453587dfdbc85c3f43c07dc0e567a07bec3f6ec3528d31379506b82d76d82e9",
+            "Score": 2
+          }
+        ]
+      }
+    }
+  ]
+}

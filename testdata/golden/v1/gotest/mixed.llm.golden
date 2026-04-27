@@ -1,0 +1,22 @@
+fo:llm:v1
+data_hash: d97c2c1a72a9
+generated_at: 2026-04-26T21:17:15Z
+
+3 ✗ / 10 tests 3 pkg (1.8s)
+
+  ✗ pkg/store PANIC
+    panic: runtime error: nil pointer dereference
+    goroutine 1 [running]:
+    ```bash
+    go test example.com/app/pkg/store -v
+    ```
+  ✗ pkg/handler TestCreateUser_DuplicateEmail
+        handler_test.go:45: expected error "email already exists", got nil
+    ```bash
+    go test -run ^TestCreateUser_DuplicateEmail$ example.com/app/pkg/handler -v
+    ```
+  ✗ pkg/handler TestDeleteUser_NotFound
+        handler_test.go:78: expected 404, got 500
+    ```bash
+    go test -run ^TestDeleteUser_NotFound$ example.com/app/pkg/handler -v
+    ```

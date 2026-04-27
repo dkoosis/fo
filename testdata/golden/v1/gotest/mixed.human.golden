@@ -1,0 +1,20 @@
+FAIL 3/10 tests, 2 packages affected (1.8s)
+  x Panics: 1
+  x Failed: 3/10 tests
+  * Passed: 6/10 tests
+  ! Skipped: 1
+  * Packages: 3
+
+PANIC pkg/store
+  x PANIC
+    panic: runtime error: nil pointer dereference
+    goroutine 1 [running]:
+
+FAIL pkg/handler (2/5 failed)
+  x TestCreateUser_DuplicateEmail
+        handler_test.go:45: expected error "email already exists", got nil
+  x TestDeleteUser_NotFound      
+        handler_test.go:78: expected 404, got 500
+
+Passing Packages (1)
+  + pkg/config  3 tests  100ms

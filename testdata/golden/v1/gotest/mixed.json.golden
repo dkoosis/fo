@@ -1,0 +1,113 @@
+{
+  "version": "2.0",
+  "data_hash": "d97c2c1a72a9",
+  "generated_at": "2026-04-26T21:17:15Z",
+  "patterns": [
+    {
+      "type": "summary",
+      "data": {
+        "Label": "FAIL 3/10 tests, 2 packages affected (1.8s)",
+        "Kind": "test",
+        "Metrics": [
+          {
+            "Label": "Panics",
+            "Value": "1",
+            "Kind": "error",
+            "Status": ""
+          },
+          {
+            "Label": "Failed",
+            "Value": "3/10 tests",
+            "Kind": "error",
+            "Status": ""
+          },
+          {
+            "Label": "Passed",
+            "Value": "6/10 tests",
+            "Kind": "info",
+            "Status": ""
+          },
+          {
+            "Label": "Skipped",
+            "Value": "1",
+            "Kind": "warning",
+            "Status": ""
+          },
+          {
+            "Label": "Packages",
+            "Value": "3",
+            "Kind": "info",
+            "Status": ""
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "PANIC pkg/store",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "PANIC",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "panic: runtime error: nil pointer dereference\ngoroutine 1 [running]:",
+            "FixCommand": "go test example.com/app/pkg/store -v",
+            "Fingerprint": "dd5dc2a3a0d8e2cee3a9e3e045dec3b45c776193355865feb788bcec3cc1ba3a",
+            "Score": 3
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "FAIL pkg/handler (2/5 failed)",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "TestCreateUser_DuplicateEmail",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "    handler_test.go:45: expected error \"email already exists\", got nil",
+            "FixCommand": "go test -run ^TestCreateUser_DuplicateEmail$ example.com/app/pkg/handler -v",
+            "Fingerprint": "6be19be71b4615266b139ea3f8199c8baf3e5c9cd7b4a425eff5f391714b3caa",
+            "Score": 3
+          },
+          {
+            "Name": "TestDeleteUser_NotFound",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "    handler_test.go:78: expected 404, got 500",
+            "FixCommand": "go test -run ^TestDeleteUser_NotFound$ example.com/app/pkg/handler -v",
+            "Fingerprint": "0e49263087fd83a6602f314fee69d7747c8bfa70d6dcc2cf52150bf53aed5774",
+            "Score": 3
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "Passing Packages (1)",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "pkg/config",
+            "Status": "pass",
+            "Duration": "100ms",
+            "Count": 3,
+            "Details": "",
+            "FixCommand": "",
+            "Fingerprint": "",
+            "Score": 0
+          }
+        ]
+      }
+    }
+  ]
+}

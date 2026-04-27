@@ -1,0 +1,184 @@
+{
+  "version": "2.0",
+  "data_hash": "35ded4c1b754",
+  "generated_at": "2026-04-26T21:17:14Z",
+  "patterns": [
+    {
+      "type": "summary",
+      "data": {
+        "Label": "Analysis: 7 issues",
+        "Kind": "sarif",
+        "Metrics": [
+          {
+            "Label": "Errors",
+            "Value": "4",
+            "Kind": "error",
+            "Status": ""
+          },
+          {
+            "Label": "Warnings",
+            "Value": "3",
+            "Kind": "warning",
+            "Status": ""
+          }
+        ]
+      }
+    },
+    {
+      "type": "leaderboard",
+      "data": {
+        "Label": "Files with Most Issues",
+        "MetricName": "Issues",
+        "Items": [
+          {
+            "Name": "store/store.go",
+            "Metric": "2 issues",
+            "Value": 2,
+            "Rank": 1
+          },
+          {
+            "Name": "api/client.go",
+            "Metric": "2 issues",
+            "Value": 2,
+            "Rank": 2
+          },
+          {
+            "Name": "internal/validate.go",
+            "Metric": "1 issues",
+            "Value": 1,
+            "Rank": 3
+          },
+          {
+            "Name": "server/main.go",
+            "Metric": "1 issues",
+            "Value": 1,
+            "Rank": 4
+          },
+          {
+            "Name": "config/loader.go",
+            "Metric": "1 issues",
+            "Value": 1,
+            "Rank": 5
+          }
+        ],
+        "TotalCount": 5,
+        "ShowRank": true
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "internal/store/store.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "errcheck:42:5",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "error return value of `db.Close` is not checked",
+            "FixCommand": "",
+            "Fingerprint": "8e0b376cda9ffd41c2fd03710a3be14398e2053f2e92d353a8150debe3dd38da",
+            "Score": 1.5
+          },
+          {
+            "Name": "errcheck:78:2",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "error return value of `resp.Body.Close` is not checked",
+            "FixCommand": "",
+            "Fingerprint": "c31387c28daf614aae386919f8b8e77cefc87fb0d19bf85d9a23a84b410e119f",
+            "Score": 1.5
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "pkg/api/client.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "ineffassign:33:5",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "ineffectual assignment to `err`",
+            "FixCommand": "",
+            "Fingerprint": "a2015464fcad835116d91321432bfdbc5e559a8b40fbc329d602f9e6361f0662",
+            "Score": 3
+          },
+          {
+            "Name": "govet:57:12",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "printf: fmt.Sprintf format %d has arg of wrong type string",
+            "FixCommand": "",
+            "Fingerprint": "27e600da466ff85602595f25a273e49a82ae0a59075f46c3a702913bbea4d31d",
+            "Score": 2
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "internal/validate.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "unused:15:6",
+            "Status": "fail",
+            "Duration": "",
+            "Count": 0,
+            "Details": "func `helperValidate` is unused",
+            "FixCommand": "",
+            "Fingerprint": "e40cab920730fd9a5eab883e668393d4747e6d7d7c451022aef54f968d9626ff",
+            "Score": 1.5
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "cmd/server/main.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "gosimple:88:2",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "S1005: unnecessary assignment to the blank identifier",
+            "FixCommand": "",
+            "Fingerprint": "3262de6995ad2549074a58762fb57d98df75ae5895d0f0c75015427973dca25f",
+            "Score": 2
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "pkg/config/loader.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "staticcheck:7:2",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "SA1019: package `io/ioutil` is deprecated",
+            "FixCommand": "",
+            "Fingerprint": "f9102cb77af43ca037d2e4ad029a0c6cd55dba54ecbcc4c2db0973c980c99693",
+            "Score": 2
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "version": "2.0",
+  "data_hash": "fee2f541d8ae",
+  "generated_at": "2026-04-26T21:17:14Z",
+  "patterns": [
+    {
+      "type": "summary",
+      "data": {
+        "Label": "PASS (1.0s)",
+        "Kind": "test",
+        "Metrics": [
+          {
+            "Label": "Passed",
+            "Value": "7/7 tests",
+            "Kind": "success",
+            "Status": ""
+          },
+          {
+            "Label": "Packages",
+            "Value": "3",
+            "Kind": "info",
+            "Status": ""
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "Passing Packages (3)",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "pkg/config",
+            "Status": "pass",
+            "Duration": "100ms",
+            "Count": 2,
+            "Details": "",
+            "FixCommand": "",
+            "Fingerprint": "",
+            "Score": 0
+          },
+          {
+            "Name": "pkg/handler",
+            "Status": "pass",
+            "Duration": "400ms",
+            "Count": 3,
+            "Details": "",
+            "FixCommand": "",
+            "Fingerprint": "",
+            "Score": 0
+          },
+          {
+            "Name": "pkg/store",
+            "Status": "pass",
+            "Duration": "1.0s",
+            "Count": 2,
+            "Details": "",
+            "FixCommand": "",
+            "Fingerprint": "",
+            "Score": 0
+          }
+        ]
+      }
+    }
+  ]
+}

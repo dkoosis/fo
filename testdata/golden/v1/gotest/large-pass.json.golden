@@ -1,0 +1,133 @@
+{
+  "version": "2.0",
+  "data_hash": "91c747da70c1",
+  "generated_at": "2026-04-26T21:17:14Z",
+  "patterns": [
+    {
+      "type": "summary",
+      "data": {
+        "Label": "PASS (12.3s)",
+        "Kind": "test",
+        "Metrics": [
+          {
+            "Label": "Passed",
+            "Value": "467/468 tests",
+            "Kind": "success",
+            "Status": ""
+          },
+          {
+            "Label": "Skipped",
+            "Value": "1",
+            "Kind": "warning",
+            "Status": ""
+          },
+          {
+            "Label": "Packages",
+            "Value": "9",
+            "Kind": "info",
+            "Status": ""
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "Passing Packages (9)",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "cmd/trixi",
+            "Status": "pass",
+            "Duration": "5.9s",
+            "Count": 68,
+            "Details": "",
+            "FixCommand": "",
+            "Fingerprint": "",
+            "Score": 0
+          },
+          {
+            "Name": "internal/embedder",
+            "Status": "pass",
+            "Duration": "2.6s",
+            "Count": 26,
+            "Details": "",
+            "FixCommand": "",
+            "Fingerprint": "",
+            "Score": 0
+          },
+          {
+            "Name": "internal/eval",
+            "Status": "pass",
+            "Duration": "8.4s",
+            "Count": 57,
+            "Details": "",
+            "FixCommand": "",
+            "Fingerprint": "",
+            "Score": 0
+          },
+          {
+            "Name": "internal/graph",
+            "Status": "pass",
+            "Duration": "2.6s",
+            "Count": 58,
+            "Details": "",
+            "FixCommand": "",
+            "Fingerprint": "",
+            "Score": 0
+          },
+          {
+            "Name": "internal/index",
+            "Status": "pass",
+            "Duration": "12.3s",
+            "Count": 29,
+            "Details": "",
+            "FixCommand": "",
+            "Fingerprint": "",
+            "Score": 0
+          },
+          {
+            "Name": "internal/mcp",
+            "Status": "pass",
+            "Duration": "5.0s",
+            "Count": 34,
+            "Details": "",
+            "FixCommand": "",
+            "Fingerprint": "",
+            "Score": 0
+          },
+          {
+            "Name": "internal/registry",
+            "Status": "pass",
+            "Duration": "2.5s",
+            "Count": 30,
+            "Details": "",
+            "FixCommand": "",
+            "Fingerprint": "",
+            "Score": 0
+          },
+          {
+            "Name": "internal/search",
+            "Status": "pass",
+            "Duration": "4.5s",
+            "Count": 71,
+            "Details": "",
+            "FixCommand": "",
+            "Fingerprint": "",
+            "Score": 0
+          },
+          {
+            "Name": "internal/store",
+            "Status": "pass",
+            "Duration": "4.6s",
+            "Count": 95,
+            "Details": "",
+            "FixCommand": "",
+            "Fingerprint": "",
+            "Score": 0
+          }
+        ]
+      }
+    }
+  ]
+}

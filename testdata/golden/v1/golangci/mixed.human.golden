@@ -1,0 +1,34 @@
+Analysis: 7 issues
+  x Errors: 4
+  ! Warnings: 3
+
+Files with Most Issues
+   1. store/store.go        2 issues
+   2. api/client.go         2 issues
+   3. server/main.go        1 issues
+   4. config/loader.go      1 issues
+   5. internal/validate.go  1 issues
+
+internal/store/store.go
+  x errcheck:42:5
+    error return value of `db.Close` is not checked
+  x errcheck:78:2
+    error return value of `resp.Body.Close` is not checked
+
+pkg/api/client.go
+  x ineffassign:33:5
+    ineffectual assignment to `err`
+  ! govet:57:12     
+    printf: fmt.Sprintf format %d has arg of wrong type string
+
+internal/validate.go
+  x unused:15:6
+    func `helperValidate` is unused
+
+cmd/server/main.go
+  ! gosimple:88:2
+    S1005: unnecessary assignment to the blank identifier
+
+pkg/config/loader.go
+  ! staticcheck:7:2
+    SA1019: package `io/ioutil` is deprecated

@@ -1,0 +1,13 @@
+fo:llm:v1
+data_hash: 35ded4c1b754
+generated_at: 2026-04-26T21:17:14Z
+
+4 ✗ 3 ⚠
+
+  ✗ pkg/api/client.go:33:5 ineffassign — ineffectual assignment to `err`
+  ⚠ cmd/server/main.go:88:2 gosimple — S1005: unnecessary assignment to the blank identifier
+  ⚠ pkg/api/client.go:57:12 govet — printf: fmt.Sprintf format %d has arg of wrong type string
+  ⚠ pkg/config/loader.go:7:2 staticcheck — SA1019: package `io/ioutil` is deprecated
+  ✗ internal/store/store.go:42:5 errcheck — error return value of `db.Close` is not checked
+  ✗ internal/store/store.go:78:2 errcheck — error return value of `resp.Body.Close` is not checked
+  ✗ internal/validate.go:15:6 unused — func `helperValidate` is unused

@@ -1,0 +1,19 @@
+Analysis: 3 issues
+  x Errors: 3
+
+Files with Most Issues
+   1. search/search.go          1 issues
+   2. store/store.go            1 issues
+   3. supervisor/supervisor.go  1 issues
+
+pkg/search/search.go
+  x dependency-violation
+    search → embedder
+
+internal/store/store.go
+  x dependency-violation
+    store → internal/svc
+
+internal/agent/supervisor/supervisor.go
+  x dependency-violation
+    agentSupervisor → github.com/example/project/internal/agent/shell

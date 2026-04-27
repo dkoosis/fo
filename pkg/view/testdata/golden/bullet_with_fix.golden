@@ -1,0 +1,4 @@
+[1mx[0m  unchecked error  [2mstore.go:42[0m
+  [2mfix: errcheck ./...[0m
+!          missing godoc    [2mapi.go:8[0m
+  [2mfix: godot -w api.go[0m

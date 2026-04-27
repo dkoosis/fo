@@ -1,0 +1,5 @@
+[1mx[0m  unchecked error          [2mstore.go:42[0m
+!          shadowed variable        [2mquery.go:117[0m
+[2m.[0m  exported func lacks doc  [2mapi.go:8[0m
+
+errors [1m^[0m 12  warnings v 3  notes [2m=[0m 5

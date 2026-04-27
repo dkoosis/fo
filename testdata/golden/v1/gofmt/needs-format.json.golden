@@ -1,0 +1,83 @@
+{
+  "version": "2.0",
+  "data_hash": "df42c2c64a53",
+  "generated_at": "2026-04-26T21:17:15Z",
+  "patterns": [
+    {
+      "type": "summary",
+      "data": {
+        "Label": "Analysis: 2 issues",
+        "Kind": "sarif",
+        "Metrics": [
+          {
+            "Label": "Warnings",
+            "Value": "2",
+            "Kind": "warning",
+            "Status": ""
+          }
+        ]
+      }
+    },
+    {
+      "type": "leaderboard",
+      "data": {
+        "Label": "Files with Most Issues",
+        "MetricName": "Issues",
+        "Items": [
+          {
+            "Name": "gofmt-sample/bad.go",
+            "Metric": "1 issues",
+            "Value": 1,
+            "Rank": 1
+          },
+          {
+            "Name": "gofmt-sample/bad2.go",
+            "Metric": "1 issues",
+            "Value": 1,
+            "Rank": 2
+          }
+        ],
+        "TotalCount": 2,
+        "ShowRank": true
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "/tmp/gofmt-sample/bad.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "needs-formatting",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "needs formatting",
+            "FixCommand": "gofmt -w /tmp/gofmt-sample/bad.go",
+            "Fingerprint": "80bc70ff6793d4ca21bec3a2fe031186d4a0d0e373e182a0b8b59754da39360c",
+            "Score": 4
+          }
+        ]
+      }
+    },
+    {
+      "type": "test-table",
+      "data": {
+        "Label": "/tmp/gofmt-sample/bad2.go",
+        "Source": "",
+        "Results": [
+          {
+            "Name": "needs-formatting",
+            "Status": "skip",
+            "Duration": "",
+            "Count": 0,
+            "Details": "needs formatting",
+            "FixCommand": "gofmt -w /tmp/gofmt-sample/bad2.go",
+            "Fingerprint": "e44c4e5d09e906fe27706ae245a3c63ffc6529cd743285d86a7c80d28c659494",
+            "Score": 4
+          }
+        ]
+      }
+    }
+  ]
+}

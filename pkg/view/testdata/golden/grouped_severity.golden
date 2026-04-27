@@ -1,0 +1,7 @@
+[1merrors[0m
+[1mx[0m  unchecked error  [2mstore.go:42[0m
+[1mx[0m  nil deref        [2mquery.go:9[0m
+  [2mfix: go vet ./...[0m
+
+[1mwarnings[0m
+!  shadowed  [2mx.go:3[0m

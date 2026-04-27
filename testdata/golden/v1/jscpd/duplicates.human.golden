@@ -1,0 +1,6 @@
+Analysis: 1 issues
+  ! Warnings: 1
+
+../../../../tmp/jscpd-sample/a.go
+  ! code-clone:2:0
+    5 lines duplicated with ../../../../tmp/jscpd-sample/b.go:2-6

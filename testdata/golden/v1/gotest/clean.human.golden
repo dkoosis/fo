@@ -1,0 +1,8 @@
+PASS (1.0s)
+  + Passed: 7/7 tests
+  * Packages: 3
+
+Passing Packages (3)
+  + pkg/config   2 tests  100ms
+  + pkg/handler  3 tests  400ms
+  + pkg/store    2 tests   1.0s

@@ -1,0 +1,15 @@
+PASS (12.3s)
+  + Passed: 467/468 tests
+  ! Skipped: 1
+  * Packages: 9
+
+Passing Packages (9)
+  + cmd/trixi          68 tests   5.9s
+  + internal/embedder  26 tests   2.6s
+  + internal/eval      57 tests   8.4s
+  + internal/graph     58 tests   2.6s
+  + internal/index     29 tests  12.3s
+  + internal/mcp       34 tests   5.0s
+  + internal/registry  30 tests   2.5s
+  + internal/search    71 tests   4.5s
+  + internal/store     95 tests   4.6s
