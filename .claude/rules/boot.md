@@ -1,8 +1,8 @@
 # Boot
 updated: 2026-04-27
 
-→ `bd ready` — fo-7f5.9 (cutover) is the only P1 child. Read its NOTES: state+diff wiring folds in here (pkg/state API ready). Atomic delete commit; verify parity on testdata/golden/v1 first.
+→ epic fo-7f5 (v2 substrate) closed. v1 packages deleted, state+diff wired via r.Diff, Delta view unified. `bd ready` for next pick.
 
 ✓ done
-- fo-7f5.5/.7/.8/.10 shipped (pickView, streaming, v2 CLI, e2e tests)
-- fo-40z.2 + epic fo-40z closed (state+diff engine)
+- fo-7f5.9: atomic v2 cutover (−7722 LOC), state+diff wired, wrap dispatch rewritten
+- fo-0rh: PickView gates on r.Diff, r.Prior removed, deltaBuckets driven by classification
