@@ -2,6 +2,7 @@ package view_test
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,9 +13,9 @@ import (
 )
 
 var (
-	foBinOnce sync.Once
-	foBinPath string
-	foBinErr  error
+	foBinOnce     sync.Once
+	foBinPath     string
+	errFoBinBuild error
 )
 
 // foBinary builds cmd/fo once per test process and returns the path.
@@ -25,34 +26,34 @@ func foBinary(t *testing.T) string {
 	foBinOnce.Do(func() {
 		_, thisFile, _, ok := runtime.Caller(0)
 		if !ok {
-			foBinErr = errBuild("runtime.Caller failed")
+			errFoBinBuild = buildError("runtime.Caller failed")
 			return
 		}
 		// thisFile = .../pkg/view/pipeline_golden_test.go → repo = ../..
 		repo := filepath.Join(filepath.Dir(thisFile), "..", "..")
 		dir, err := os.MkdirTemp("", "fo-bin-*")
 		if err != nil {
-			foBinErr = err
+			errFoBinBuild = err
 			return
 		}
 		bin := filepath.Join(dir, "fo")
 		cmd := exec.Command("go", "build", "-o", bin, "./cmd/fo")
 		cmd.Dir = repo
 		if out, err := cmd.CombinedOutput(); err != nil {
-			foBinErr = errBuild("go build: " + err.Error() + "\n" + string(out))
+			errFoBinBuild = buildError("go build: " + err.Error() + "\n" + string(out))
 			return
 		}
 		foBinPath = bin
 	})
-	if foBinErr != nil {
-		t.Fatalf("build fo: %v", foBinErr)
+	if errFoBinBuild != nil {
+		t.Fatalf("build fo: %v", errFoBinBuild)
 	}
 	return foBinPath
 }
 
-type errBuild string
+type buildError string
 
-func (e errBuild) Error() string { return string(e) }
+func (e buildError) Error() string { return string(e) }
 
 // TestPipelineGoldens replays each captured stdin stream in
 // testdata/pipelines/*.in through the built `fo` binary in two
@@ -85,7 +86,8 @@ func TestPipelineGoldens(t *testing.T) {
 				// Exit 0 (clean) and 1 (findings present) are expected;
 				// any other code is a real failure.
 				if err := cmd.Run(); err != nil {
-					if ee, ok := err.(*exec.ExitError); !ok || ee.ExitCode() > 1 {
+					var ee *exec.ExitError
+					if !errors.As(err, &ee) || ee.ExitCode() > 1 {
 						t.Fatalf("fo crashed on %s: %v\n%s", in, err, out.String())
 					}
 				}
