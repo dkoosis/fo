@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/dkoosis/fo/pkg/sarif"
+	"github.com/dkoosis/fo/pkg/wrapper/internal/boundread"
 )
 
 // archlint converts go-arch-lint JSON to SARIF.
@@ -16,8 +17,9 @@ func newArchlint() *archlint { return &archlint{} }
 
 // Convert reads go-arch-lint JSON from r and writes SARIF to w.
 // Reads entire input into memory — fine for arch-lint reports (typically <100KB).
+// Bounded by boundread.DefaultMax to prevent OOM on pathological input (fo-s5x).
 func (a *archlint) Convert(r io.Reader, w io.Writer) error {
-	data, err := io.ReadAll(r)
+	data, err := boundread.All(r, 0)
 	if err != nil {
 		return fmt.Errorf("reading input: %w", err)
 	}
