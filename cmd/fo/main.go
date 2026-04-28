@@ -220,8 +220,11 @@ func parseToReport(input []byte, stderr io.Writer) (*report.Report, error) {
 		return parseMultiplex(input, stderr)
 	}
 	trimmed := bytes.TrimLeft(input, " \t\n\r")
-	if len(trimmed) == 0 || trimmed[0] != '{' {
+	if len(trimmed) == 0 {
 		return nil, errUnrecognizedInput
+	}
+	if trimmed[0] != '{' {
+		return parseTestJSONTolerant(input, stderr)
 	}
 	if sniffSARIF(input) {
 		doc, err := sarif.ReadBytes(input)
@@ -240,7 +243,22 @@ func parseToReport(input []byte, stderr io.Writer) (*report.Report, error) {
 		}
 		return testjson.ToReportWithMeta(results, input), nil
 	}
-	return nil, errUnrecognizedInput
+	return parseTestJSONTolerant(input, stderr)
+}
+
+// parseTestJSONTolerant attempts to parse input as go test -json even when
+// it doesn't start with '{' — wrapped commands sometimes prepend banners or
+// progress lines before the JSON stream. Accept iff at least one valid event
+// parsed; otherwise treat as unrecognized.
+func parseTestJSONTolerant(input []byte, stderr io.Writer) (*report.Report, error) {
+	results, malformed, err := testjson.ParseBytes(input)
+	if err != nil || len(results) == 0 {
+		return nil, errUnrecognizedInput
+	}
+	if malformed > 0 {
+		fmt.Fprintf(stderr, "fo: warning: %d malformed line(s) skipped\n", malformed)
+	}
+	return testjson.ToReportWithMeta(results, input), nil
 }
 
 // parseMultiplex parses a multi-tool delimited stream and merges every
