@@ -177,7 +177,13 @@ func renderMode(mode string, r *report.Report, stdout io.Writer, themeName strin
 		t = theme.Mono()
 	}
 	width := termSize(stdout)
-	return view.RenderReport(stdout, *r, t, width)
+	if err := view.RenderReport(stdout, *r, t, width); err != nil {
+		return err
+	}
+	if mode == formatLLM {
+		writeDiffDetail(stdout, r)
+	}
+	return nil
 }
 
 // sniffGoTestJSON returns true when peeked stdin starts with a go test -json

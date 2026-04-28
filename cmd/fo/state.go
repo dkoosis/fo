@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/dkoosis/fo/pkg/report"
 	"github.com/dkoosis/fo/pkg/state"
@@ -55,4 +56,53 @@ func convertItems(items []state.Item) []report.DiffItem {
 		}
 	}
 	return out
+}
+
+// writeDiffDetail emits a plain-text block listing new and regressed
+// findings with file:line rule message, for LLM consumers who need to
+// act on the delta rather than just count it.
+func writeDiffDetail(w io.Writer, r *report.Report) {
+	if r == nil || r.Diff == nil {
+		return
+	}
+	newItems := r.Diff.New
+	regressed := r.Diff.Regressed
+	if len(newItems) == 0 && len(regressed) == 0 {
+		return
+	}
+
+	// Build fingerprint → finding index for O(1) lookup.
+	byFP := make(map[string]report.Finding, len(r.Findings))
+	for _, f := range r.Findings {
+		if f.Fingerprint != "" {
+			byFP[f.Fingerprint] = f
+		}
+	}
+
+	var sb strings.Builder
+	if len(newItems) > 0 {
+		fmt.Fprintf(&sb, "\nNEW (%d)\n", len(newItems))
+		for _, item := range newItems {
+			writeDiffLine(&sb, item, byFP)
+		}
+	}
+	if len(regressed) > 0 {
+		fmt.Fprintf(&sb, "\nREGRESSED (%d)\n", len(regressed))
+		for _, item := range regressed {
+			writeDiffLine(&sb, item, byFP)
+		}
+	}
+	_, _ = io.WriteString(w, sb.String())
+}
+
+func writeDiffLine(sb *strings.Builder, item report.DiffItem, byFP map[string]report.Finding) {
+	if f, ok := byFP[item.Fingerprint]; ok {
+		loc := f.File
+		if f.Line > 0 {
+			loc = fmt.Sprintf("%s:%d", f.File, f.Line)
+		}
+		fmt.Fprintf(sb, "  %s  %s  %s\n", loc, f.RuleID, f.Message)
+	} else {
+		fmt.Fprintf(sb, "  %s  %s\n", item.File, item.RuleID)
+	}
 }
