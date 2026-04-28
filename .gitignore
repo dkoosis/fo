@@ -16,9 +16,20 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
-/fo$
+/fo
 fo_test_binary_generated_by_TestMain
 termtest
+
+# Local scratch / scratchpads
+/try
+/orient.txt
+/context.json
+
+# Tool caches / runtime artifacts
+.fo/
+.snipe/
+.claude/tmp/
+.playwright-mcp/
 
 # Go workspace file
 go.work
