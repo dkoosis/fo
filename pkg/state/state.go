@@ -142,7 +142,7 @@ func Save(path string, f *File) error {
 // package var so tests can assert it's invoked with the right path
 // without requiring real fault injection.
 var syncDir = func(dir string) error {
-	d, err := os.Open(dir) //nolint:gosec // dir is the parent of a caller-provided sidecar path
+	d, err := os.Open(dir) // dir is the parent of a caller-provided sidecar path
 	if err != nil {
 		return err
 	}

@@ -102,6 +102,52 @@ func TestStream_RespectsContextCancellation(t *testing.T) {
 	}
 }
 
+func TestStream_PreCancelledContext(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	var count int
+	_, err := Stream(ctx, io.NopCloser(strings.NewReader(`{"Action":"run","Package":"x","Test":"T"}`+"\n")), func(_ TestEvent) {
+		count++
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+}
+
+type errReader struct{ err error }
+
+func (r *errReader) Read([]byte) (int, error) { return 0, r.err }
+func (r *errReader) Close() error             { return nil }
+
+var errStreamReaderBoom = errors.New("stream reader boom")
+
+func TestStream_PropagatesReaderError(t *testing.T) {
+	t.Parallel()
+
+	_, err := Stream(context.Background(), &errReader{err: errStreamReaderBoom}, func(_ TestEvent) {})
+	if !errors.Is(err, errStreamReaderBoom) {
+		t.Fatalf("err = %v, want errors.Is(errStreamReaderBoom)", err)
+	}
+}
+
+func TestStream_EmptyInputIsNoop(t *testing.T) {
+	t.Parallel()
+
+	var count int
+	malformed, err := Stream(context.Background(), io.NopCloser(strings.NewReader("")), func(_ TestEvent) {
+		count++
+	})
+	if err != nil {
+		t.Fatalf("err = %v, want nil", err)
+	}
+	if malformed != 0 || count != 0 {
+		t.Fatalf("malformed=%d count=%d, want 0/0", malformed, count)
+	}
+}
+
 // blockingReader never returns from Read, simulating a stalled stdin.
 type blockingReader struct {
 	done chan struct{}
