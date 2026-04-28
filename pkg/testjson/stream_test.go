@@ -66,7 +66,7 @@ also not json
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var events []TestEvent
-			malformed, err := Stream(context.Background(), strings.NewReader(tt.input), func(e TestEvent) {
+			malformed, err := Stream(context.Background(), io.NopCloser(strings.NewReader(tt.input)), func(e TestEvent) {
 				events = append(events, e)
 			})
 			if err != nil {
@@ -90,7 +90,7 @@ func TestStream_RespectsContextCancellation(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var count int
-	_, err := Stream(ctx, strings.NewReader(`{"Action":"start","Package":"example.com/pkg"}`+"\n"), func(_ TestEvent) {
+	_, err := Stream(ctx, io.NopCloser(strings.NewReader(`{"Action":"start","Package":"example.com/pkg"}`+"\n")), func(_ TestEvent) {
 		count++
 		cancel()
 	})

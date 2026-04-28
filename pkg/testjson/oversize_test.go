@@ -3,6 +3,7 @@ package testjson
 import (
 	"bytes"
 	"context"
+	"io"
 	"strings"
 	"testing"
 
@@ -37,7 +38,7 @@ func TestStream_OversizeLineDoesNotAbort(t *testing.T) {
 		`{"Action":"pass","Package":"b","Test":"TestB"}` + "\n"
 
 	var got []string
-	malformed, err := Stream(context.Background(), bytes.NewReader([]byte(input)), func(ev TestEvent) {
+	malformed, err := Stream(context.Background(), io.NopCloser(bytes.NewReader([]byte(input))), func(ev TestEvent) {
 		got = append(got, ev.Package+":"+ev.Action)
 	})
 	if err != nil {

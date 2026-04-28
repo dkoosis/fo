@@ -73,10 +73,10 @@ type scanResult struct {
 // skipped and any error.
 //
 // Cancellation: the scanner runs in a background goroutine. On context cancel,
-// Stream closes r (if it implements io.Closer) to unblock the scanner. If r
-// does not implement io.Closer (e.g. *bufio.Reader), the caller must close the
-// underlying reader externally to prevent a goroutine leak.
-func Stream(ctx context.Context, r io.Reader, fn func(TestEvent)) (int, error) {
+// Stream calls r.Close() to unblock the scanner. r MUST be an io.ReadCloser
+// whose Close actually interrupts in-flight Read calls — *bufio.Reader wrapped
+// in io.NopCloser will leak the scanner goroutine on cancel (fo-u2w).
+func Stream(ctx context.Context, r io.ReadCloser, fn func(TestEvent)) (int, error) {
 	lines := scanAsync(ctx, r)
 	return drainLines(ctx, r, lines, fn)
 }
@@ -86,7 +86,7 @@ func Stream(ctx context.Context, r io.Reader, fn func(TestEvent)) (int, error) {
 // on EOF. Oversize lines are signaled via scanResult.oversize so the
 // consumer can count them as malformed without aborting the stream
 // (fo-gn0).
-func scanAsync(ctx context.Context, r io.Reader) <-chan scanResult {
+func scanAsync(ctx context.Context, r io.ReadCloser) <-chan scanResult {
 	br := bufio.NewReaderSize(r, 64*1024)
 	lines := make(chan scanResult)
 	go scanLoop(ctx, br, lines)
@@ -128,12 +128,12 @@ func copyBytes(b []byte) []byte {
 
 // drainLines reads from lines, dispatching parsed events to fn. Returns when
 // the channel closes, the context is cancelled, or a scan error occurs.
-func drainLines(ctx context.Context, r io.Reader, lines <-chan scanResult, fn func(TestEvent)) (int, error) {
+func drainLines(ctx context.Context, r io.ReadCloser, lines <-chan scanResult, fn func(TestEvent)) (int, error) {
 	var malformed int
 	for {
 		select {
 		case <-ctx.Done():
-			cancelScan(r)
+			_ = r.Close()
 			return malformed, ctx.Err()
 		case res, ok := <-lines:
 			if !ok {
@@ -148,14 +148,6 @@ func drainLines(ctx context.Context, r io.Reader, lines <-chan scanResult, fn fu
 			}
 			malformed += processLine(res.line, fn)
 		}
-	}
-}
-
-// cancelScan attempts to unblock a scanner goroutine by closing r if it
-// implements io.Closer.
-func cancelScan(r io.Reader) {
-	if c, ok := r.(io.Closer); ok {
-		_ = c.Close()
 	}
 }
 
