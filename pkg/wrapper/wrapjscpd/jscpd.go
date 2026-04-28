@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/dkoosis/fo/internal/boundread"
 	"github.com/dkoosis/fo/pkg/sarif"
-	"github.com/dkoosis/fo/pkg/wrapper/internal/boundread"
 )
 
 // clone records a single code duplication instance.

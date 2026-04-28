@@ -17,19 +17,19 @@ const DefaultMax = 256 << 20
 // ErrInputTooLarge is returned when the reader produces more than the cap.
 var ErrInputTooLarge = errors.New("input exceeds maximum size")
 
-// All reads up to max bytes from r. If r produces more, returns
-// ErrInputTooLarge wrapped with the cap. max <= 0 falls back to DefaultMax.
-func All(r io.Reader, max int64) ([]byte, error) {
-	if max <= 0 {
-		max = DefaultMax
+// All reads up to limit bytes from r. If r produces more, returns
+// ErrInputTooLarge wrapped with the cap. limit <= 0 falls back to DefaultMax.
+func All(r io.Reader, limit int64) ([]byte, error) {
+	if limit <= 0 {
+		limit = DefaultMax
 	}
-	lr := &io.LimitedReader{R: r, N: max + 1}
+	lr := &io.LimitedReader{R: r, N: limit + 1}
 	data, err := io.ReadAll(lr)
 	if err != nil {
 		return nil, err
 	}
-	if int64(len(data)) > max {
-		return nil, fmt.Errorf("%w: %d bytes", ErrInputTooLarge, max)
+	if int64(len(data)) > limit {
+		return nil, fmt.Errorf("%w: %d bytes", ErrInputTooLarge, limit)
 	}
 	return data, nil
 }

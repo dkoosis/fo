@@ -165,6 +165,23 @@ func processLine(line []byte, fn func(TestEvent)) int {
 	return 0
 }
 
+// Aggregator accumulates TestEvents into per-package results. Exposed so
+// streaming consumers can build incremental snapshots between events.
+// Not safe for concurrent use; callers serialize event delivery.
+type Aggregator = aggregator
+
+// NewAggregator returns an empty Aggregator ready to consume events.
+func NewAggregator() *Aggregator { return newAggregator() }
+
+// ProcessEvent feeds one event into the aggregator. Mirrors the behavior
+// used internally by ParseStream.
+func (a *aggregator) ProcessEvent(e TestEvent) { a.processEvent(e) }
+
+// Results returns the current accumulated package results in arrival
+// order, skipping packages with no observed activity. Safe to call
+// repeatedly between events to produce snapshots.
+func (a *aggregator) Results() []TestPackageResult { return a.results() }
+
 type aggregator struct {
 	packages map[string]*pkgState
 	order    []string

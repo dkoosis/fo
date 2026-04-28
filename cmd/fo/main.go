@@ -33,6 +33,7 @@ import (
 
 	"golang.org/x/term"
 
+	"github.com/dkoosis/fo/internal/boundread"
 	"github.com/dkoosis/fo/pkg/report"
 	"github.com/dkoosis/fo/pkg/sarif"
 	"github.com/dkoosis/fo/pkg/state"
@@ -142,9 +143,13 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runStream(stdin, br, stdout, resolveTheme(*themeFlag, stdout), *stateFile, *noState, stderr)
 	}
 
-	input, err := io.ReadAll(br)
+	input, err := boundread.All(br, 0)
 	if err != nil {
-		fmt.Fprintf(stderr, "fo: reading stdin: %v\n", err)
+		if errors.Is(err, boundread.ErrInputTooLarge) {
+			fmt.Fprintf(stderr, "fo: %v (use stream mode for larger inputs)\n", err)
+		} else {
+			fmt.Fprintf(stderr, "fo: reading stdin: %v\n", err)
+		}
 		return 2
 	}
 
@@ -374,39 +379,96 @@ func termSize(w io.Writer) int {
 
 // runStream pumps go test -json events into per-package Report snapshots and
 // hands them to view.RenderStream. One channel send per finished package
-// keeps PickView's total-driven thresholds meaningful.
+// keeps PickView's total-driven thresholds meaningful. Cancellation (SIGINT)
+// closes the underlying reader so blocked Reads unblock promptly — fo-op6.
 func runStream(stdin io.Reader, br *bufio.Reader, stdout io.Writer, t theme.Theme, stateFile string, noState bool, stderr io.Writer) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+	return runStreamCtx(ctx, stdin, br, stdout, t, stateFile, noState, stderr)
+}
+
+// runStreamCtx is runStream's testable core: cancellation root injected.
+// Streams events incrementally — never buffers the whole stdin — so large
+// CI runs cannot OOM and Ctrl-C exits within the next event boundary.
+func runStreamCtx(ctx context.Context, stdin io.Reader, br *bufio.Reader, stdout io.Writer, t theme.Theme, stateFile string, noState bool, stderr io.Writer) int {
 	if c, ok := stdin.(io.Closer); ok {
 		stopClose := context.AfterFunc(ctx, func() { _ = c.Close() })
 		defer stopClose()
 	}
 	width := termSize(stdout)
 
-	// Buffer all events, parse, then stream snapshots — keeps the streaming
-	// path simple for v2. fo-7f5.9 will swap in true incremental streaming.
-	data, err := io.ReadAll(br)
-	if err != nil {
-		fmt.Fprintf(stderr, "fo: reading stdin: %v\n", err)
-		return 2
-	}
-	results, _, err := testjson.ParseBytes(data)
-	if err != nil {
-		fmt.Fprintf(stderr, "fo: %v\n", err)
-		return 2
-	}
-	r := testjson.ToReportWithMeta(results, data)
-	attachDiff(r, stateFile, noState, stderr)
+	// br already wraps stdin and holds the sniffed prefix. Wrap it as a
+	// ReadCloser whose Close propagates to stdin (if closable) so
+	// testjson.Stream's cancel path unblocks an in-flight Read.
+	rc := &bufioReadCloser{Reader: br, closer: closerOf(stdin)}
 
-	ch := make(chan report.Report, 1)
-	ch <- *r
-	close(ch)
-	if err := view.RenderStream(ctx, stdout, ch, t, width); err != nil && !errors.Is(err, context.Canceled) {
-		fmt.Fprintf(stderr, "fo: %v\n", err)
+	snapshots := make(chan report.Report, 8)
+	finalCh := make(chan *report.Report, 1)
+	parseErrCh := make(chan error, 1)
+
+	go func() {
+		defer close(snapshots)
+		agg := testjson.NewAggregator()
+		_, err := testjson.Stream(ctx, rc, func(e testjson.TestEvent) {
+			agg.ProcessEvent(e)
+			// Emit a snapshot only at package-finish events. Per-test
+			// events would flood RenderStream and PickView.
+			if e.Test == "" && (e.Action == "pass" || e.Action == "fail" || e.Action == "skip") {
+				r := testjson.ToReport(agg.Results())
+				select {
+				case snapshots <- *r:
+				case <-ctx.Done():
+				}
+			}
+		})
+		if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+			parseErrCh <- err
+		}
+		// Final snapshot with diff attached. Same code path as batch.
+		r := testjson.ToReport(agg.Results())
+		attachDiff(r, stateFile, noState, stderr)
+		finalCh <- r
+		select {
+		case snapshots <- *r:
+		case <-ctx.Done():
+		}
+	}()
+
+	renderErr := view.RenderStream(ctx, stdout, snapshots, t, width)
+	final := <-finalCh
+	select {
+	case perr := <-parseErrCh:
+		fmt.Fprintf(stderr, "fo: %v\n", perr)
+		return 2
+	default:
+	}
+	if renderErr != nil && !errors.Is(renderErr, context.Canceled) {
+		fmt.Fprintf(stderr, "fo: %v\n", renderErr)
 		return 2
 	}
-	return exitCodeReport(r)
+	return exitCodeReport(final)
+}
+
+// bufioReadCloser pairs a *bufio.Reader (carrying the sniffed prefix) with
+// the underlying stdin's Close so context-cancel can interrupt blocked
+// Reads. closer may be nil for non-closable stdin (tests, pipes).
+type bufioReadCloser struct {
+	*bufio.Reader
+	closer io.Closer
+}
+
+func (b *bufioReadCloser) Close() error {
+	if b.closer != nil {
+		return b.closer.Close()
+	}
+	return nil
+}
+
+func closerOf(r io.Reader) io.Closer {
+	if c, ok := r.(io.Closer); ok {
+		return c
+	}
+	return nil
 }
 
 // exitCodeReport: 1 if any error finding or non-pass/skip test outcome.
