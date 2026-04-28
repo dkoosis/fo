@@ -1,0 +1,2 @@
+!  Printf format %d has arg "not-an-int" of wrong type string  fixture/main.go:4
+!  unreachable code                                            fixture/util.go:7

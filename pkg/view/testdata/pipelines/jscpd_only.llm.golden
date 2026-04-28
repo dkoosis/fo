@@ -1,0 +1,23 @@
+warning
+!  16 lines duplicated with app/cmd/trixi/adapters.go:128-143                                            app/cmd/trixi/adapters.go:146
+  fix: # duplicate: app/cmd/trixi/adapters.go:146-161 ↔ app/cmd/trixi/adapters.go:128-143
+!  16 lines duplicated with app/cmd/trixi/adapters.go:128-143                                            app/cmd/trixi/adapters.go:175
+  fix: # duplicate: app/cmd/trixi/adapters.go:175-190 ↔ app/cmd/trixi/adapters.go:128-143
+!  16 lines duplicated with app/cmd/trixi/adapters.go:128-143                                            app/cmd/trixi/adapters.go:238
+  fix: # duplicate: app/cmd/trixi/adapters.go:238-253 ↔ app/cmd/trixi/adapters.go:128-143
+!  16 lines duplicated with app/cmd/trixi/adapters.go:128-143                                            app/cmd/trixi/adapters.go:291
+  fix: # duplicate: app/cmd/trixi/adapters.go:291-306 ↔ app/cmd/trixi/adapters.go:128-143
+!  46 lines duplicated with CLAUDE.md:6-51                                                               AGENTS.md:248
+  fix: # duplicate: AGENTS.md:248-293 ↔ CLAUDE.md:6-51
+!  43 lines duplicated with metrics/store.go:46-88                                                       cclog/store.go:32
+  fix: # duplicate: cclog/store.go:32-74 ↔ metrics/store.go:46-88
+!  16 lines duplicated with docs/superpowers/plans/2026-04-19-centralize-launchagent-secrets.md:664-677  docs/ops/launchagent-secrets.md:13
+  fix: # duplicate: docs/ops/launchagent-secrets.md:13-28 ↔ docs/superpowers/plans/2026-04-19-centralize-launchagent-secrets.md:664-677
+!  13 lines duplicated with docs/superpowers/plans/2026-04-19-guard-rails-refocus.md:41-50               docs/superpowers/plans/2026-04-19-guard-rails-refocus.md:122
+  fix: # duplicate: docs/superpowers/plans/2026-04-19-guard-rails-refocus.md:122-134 ↔ docs/superpowers/plans/2026-04-19-guard-rails-refocus.md:41-50
+!  16 lines duplicated with domain/nug/pipeline/enrich/enrich.go:72-87                                   domain/nug/pipeline/dedup/dedup.go:87
+  fix: # duplicate: domain/nug/pipeline/dedup/dedup.go:87-102 ↔ domain/nug/pipeline/enrich/enrich.go:72-87
+!  41 lines duplicated with domain/nug/pipeline/internal/synthesizer.go:3-43                             kg/memory/synthesizer.go:8
+  fix: # duplicate: kg/memory/synthesizer.go:8-48 ↔ domain/nug/pipeline/internal/synthesizer.go:3-43
+!  100 lines duplicated with domain/nug/pipeline/internal/synthesizer.go:47-146                          kg/memory/synthesizer.go:48
+  fix: # duplicate: kg/memory/synthesizer.go:48-147 ↔ domain/nug/pipeline/internal/synthesizer.go:47-146
