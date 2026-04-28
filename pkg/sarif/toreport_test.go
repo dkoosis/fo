@@ -114,3 +114,34 @@ func TestToReport_EmptyDocument(t *testing.T) {
 		t.Errorf("Tool = %q, want empty", r.Tool)
 	}
 }
+
+func TestToReport_FixCommandPassthrough(t *testing.T) {
+	t.Parallel()
+
+	const wantCmd = "gofmt -w bad.go"
+	b := sarif.NewBuilder("gofmt", "")
+	b.AddResultWithFix("needs-formatting", "warning", "needs formatting", "bad.go", 0, 0, wantCmd)
+
+	r := sarif.ToReport(b.Document())
+	if len(r.Findings) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(r.Findings))
+	}
+	if got := r.Findings[0].FixCommand; got != wantCmd {
+		t.Errorf("Finding.FixCommand = %q, want %q", got, wantCmd)
+	}
+}
+
+func TestToReport_NoFix_EmptyFixCommand(t *testing.T) {
+	t.Parallel()
+
+	b := sarif.NewBuilder("govet", "")
+	b.AddResult("printf", "warning", "wrong arg", "main.go", 5, 0)
+
+	r := sarif.ToReport(b.Document())
+	if len(r.Findings) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(r.Findings))
+	}
+	if got := r.Findings[0].FixCommand; got != "" {
+		t.Errorf("Finding.FixCommand = %q, want empty for result without fix", got)
+	}
+}

@@ -1,7 +1,11 @@
 // Multi-tool delimiter protocol — multiplexes several tool outputs into a
 // single stdin stream via lines of the form:
 //
-//	--- tool:<name> format:<sarif|testjson> ---
+//	--- tool:<name> format:<sarif|testjson> [status:<value>] ---
+//
+// The optional status attribute signals the tool's execution outcome to the
+// renderer. Valid values: ok, clean, partial, timeout, skipped, error.
+// Omitting status is equivalent to ok.
 //
 // Restored for fo-5b6 after the v2 cutover removed internal/report.
 package report
@@ -12,11 +16,21 @@ import (
 	"regexp"
 )
 
+// Section status values.
+const (
+	StatusOK      = "ok"
+	StatusClean   = "clean"
+	StatusPartial = "partial"
+	StatusTimeout = "timeout"
+	StatusSkipped = "skipped"
+	StatusError   = "error"
+)
+
 // ErrNoSections is returned when ParseSections finds no delimiter lines.
 var ErrNoSections = errors.New("no sections found in report input")
 
 var delimiterRe = regexp.MustCompile(
-	`^--- tool:(\w[\w-]*) format:(sarif|testjson) ---$`,
+	`^--- tool:(\w[\w-]*) format:(sarif|testjson)(?: status:(\w+))? ---$`,
 )
 
 // IsDelimiter reports whether line is a section delimiter.
@@ -40,9 +54,12 @@ func HasDelimiter(data []byte) bool {
 }
 
 // Section is one tool's output within a multiplexed report.
+// Status carries the optional status attribute from the delimiter line;
+// empty string means the attribute was absent (treated as ok).
 type Section struct {
 	Tool    string
 	Format  string
+	Status  string
 	Content []byte
 }
 
@@ -69,6 +86,7 @@ func ParseSections(data []byte) (sections []Section, prelude []byte, err error) 
 			current = &Section{
 				Tool:   string(m[1]),
 				Format: string(m[2]),
+				Status: string(m[3]),
 			}
 			continue
 		}

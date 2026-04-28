@@ -1,7 +1,7 @@
 # Boot
 updated: 2026-04-28
 
-→ `bd ready` and pick. Queue is thin — top-of-stack is P3 fo-4un (decision-only, needs dk input).
+→ Pick from `bd ready` and begin
 
 ✓ done
-- Closed PR #251 (didn't compile + banned deps); cherry-picked 3 stdlib subtests for testjson.Stream
+- Decomposed GH #247/244/248/245/246 into beads (closed 247, deferred 244, epic fo-n5r + children, standalones fo-0y1 + fo-sbs)

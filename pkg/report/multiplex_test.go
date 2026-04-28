@@ -133,3 +133,50 @@ func TestParseSectionsWhitespacePreludeSilent(t *testing.T) {
 		t.Errorf("prelude = %q, want nil", prelude)
 	}
 }
+
+func TestParseSections_StatusAttribute(t *testing.T) {
+	cases := []struct {
+		line       string
+		wantStatus string
+	}{
+		{"--- tool:vet format:sarif status:ok ---", "ok"},
+		{"--- tool:vet format:sarif status:clean ---", "clean"},
+		{"--- tool:vet format:sarif status:timeout ---", "timeout"},
+		{"--- tool:vet format:sarif status:error ---", "error"},
+		{"--- tool:vet format:sarif status:partial ---", "partial"},
+		{"--- tool:vet format:sarif status:skipped ---", "skipped"},
+		{"--- tool:vet format:sarif ---", ""},
+	}
+	for _, c := range cases {
+		input := c.line + "\nbody\n"
+		got, _, err := ParseSections([]byte(input))
+		if err != nil {
+			t.Errorf("%q: ParseSections err = %v", c.line, err)
+			continue
+		}
+		if len(got) != 1 {
+			t.Errorf("%q: got %d sections, want 1", c.line, len(got))
+			continue
+		}
+		if got[0].Status != c.wantStatus {
+			t.Errorf("%q: Status = %q, want %q", c.line, got[0].Status, c.wantStatus)
+		}
+	}
+}
+
+func TestIsDelimiter_WithStatus(t *testing.T) {
+	cases := []struct {
+		line string
+		want bool
+	}{
+		{"--- tool:vet format:sarif status:ok ---", true},
+		{"--- tool:vet format:sarif status:timeout ---", true},
+		{"--- tool:vet format:sarif status:error ---", true},
+		{"--- tool:vet format:sarif status: ---", false},
+	}
+	for _, c := range cases {
+		if got := IsDelimiter([]byte(c.line)); got != c.want {
+			t.Errorf("IsDelimiter(%q) = %v, want %v", c.line, got, c.want)
+		}
+	}
+}

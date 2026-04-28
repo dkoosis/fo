@@ -290,3 +290,108 @@ func TestE2E_Multiplex_SectionParseFailure(t *testing.T) {
 		t.Errorf("expected synthetic parse-error finding, got: %s", stdout.String())
 	}
 }
+
+// TestE2E_FixCommand_JSONOutput verifies that fix_command flows end-to-end
+// from a wrapper (wrapdiag gofmt) through the pipeline into JSON output.
+// This is the primary path Claude uses to get copy-pastable fix commands.
+// TestE2E_SectionStatus_Timeout verifies that status:timeout on a delimiter
+// with empty content produces a synthetic error finding rather than silently
+// passing. This closes the "tool failed silently" ambiguity.
+func TestE2E_SectionStatus_Timeout(t *testing.T) {
+	input := "--- tool:govulncheck format:sarif status:timeout ---\n"
+
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "json", "--no-state"}, bytes.NewReader([]byte(input)), &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("want exit 1 (timeout is an error), got %d stderr=%s", code, stderr.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte("fo/section-timeout")) {
+		t.Errorf("JSON output should contain fo/section-timeout finding:\n%s", stdout.String())
+	}
+}
+
+func TestE2E_SectionStatus_Error(t *testing.T) {
+	input := "--- tool:govulncheck format:sarif status:error ---\n"
+
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "json", "--no-state"}, bytes.NewReader([]byte(input)), &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("want exit 1 (error status), got %d stderr=%s", code, stderr.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte("fo/section-error")) {
+		t.Errorf("JSON output should contain fo/section-error finding:\n%s", stdout.String())
+	}
+}
+
+func TestE2E_SectionStatus_Skipped(t *testing.T) {
+	// skipped tool with no content — should produce a note-level finding, exit 0
+	input := "--- tool:govulncheck format:sarif status:skipped ---\n" +
+		"--- tool:vet format:sarif status:ok ---\n" +
+		`{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"vet"}},"results":[]}]}` + "\n"
+
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "json", "--no-state"}, bytes.NewReader([]byte(input)), &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("want exit 0 (skipped is not a failure), got %d stderr=%s", code, stderr.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte("fo/section-skipped")) {
+		t.Errorf("JSON output should contain fo/section-skipped finding:\n%s", stdout.String())
+	}
+}
+
+func TestE2E_SectionStatus_OK_NoSyntheticFinding(t *testing.T) {
+	sarif := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"vet"}},"results":[]}]}`
+	input := "--- tool:vet format:sarif status:ok ---\n" + sarif + "\n"
+
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "json", "--no-state"}, bytes.NewReader([]byte(input)), &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("want exit 0 (ok status, clean), got %d stderr=%s", code, stderr.String())
+	}
+	if bytes.Contains(stdout.Bytes(), []byte("fo/section-")) {
+		t.Errorf("OK status should produce no synthetic findings:\n%s", stdout.String())
+	}
+}
+
+func TestE2E_FixCommand_JSONOutput(t *testing.T) {
+	raw, err := os.ReadFile(fixturesRoot + "/gofmt/needs-format.input.txt")
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	sarif := wrapToSARIF(t, []string{"wrap", "diag", "--tool", "gofmt", "--rule", "needs-formatting"}, raw)
+
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "json", "--no-state"}, bytes.NewReader(sarif), &stdout, &stderr)
+	if code != 0 && code != 1 {
+		t.Fatalf("unexpected exit %d stderr=%s", code, stderr.String())
+	}
+
+	out := stdout.Bytes()
+	if !bytes.Contains(out, []byte(`"fix_command"`)) {
+		t.Errorf("JSON output missing fix_command field:\n%s", out)
+	}
+	if !bytes.Contains(out, []byte(`gofmt -w`)) {
+		t.Errorf("JSON output fix_command should contain gofmt -w:\n%s", out)
+	}
+}
+
+// TestE2E_FixCommand_LLMOutput verifies fix: hint lines appear in LLM output
+// for wrappers that emit fix commands (gofmt path).
+func TestE2E_FixCommand_LLMOutput(t *testing.T) {
+	raw, err := os.ReadFile(fixturesRoot + "/gofmt/needs-format.input.txt")
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	sarif := wrapToSARIF(t, []string{"wrap", "diag", "--tool", "gofmt", "--rule", "needs-formatting"}, raw)
+
+	var stdout, stderr bytes.Buffer
+	_ = run([]string{"--format", "llm", "--no-state"}, bytes.NewReader(sarif), &stdout, &stderr)
+
+	out := stdout.Bytes()
+	if !bytes.Contains(out, []byte("fix: gofmt -w")) {
+		t.Errorf("LLM output missing fix: hint:\n%s", out)
+	}
+	if bytes.Contains(out, []byte("\x1b[")) {
+		t.Errorf("LLM output must not contain ANSI escapes")
+	}
+}

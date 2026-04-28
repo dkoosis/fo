@@ -100,3 +100,40 @@ func TestBuilder_ValidLevels(t *testing.T) {
 		}
 	}
 }
+
+func TestBuilder_AddResultWithFix_RoundTrip(t *testing.T) {
+	const wantCmd = "gofmt -w main.go"
+	b := NewBuilder("gofmt", "")
+	b.AddResultWithFix("needs-formatting", "warning", "needs formatting", "main.go", 0, 0, wantCmd)
+
+	doc := b.Document()
+	if len(doc.Runs) != 1 || len(doc.Runs[0].Results) != 1 {
+		t.Fatal("expected 1 run with 1 result")
+	}
+	got := doc.Runs[0].Results[0].FixCommand()
+	if got != wantCmd {
+		t.Errorf("FixCommand() = %q, want %q", got, wantCmd)
+	}
+}
+
+func TestBuilder_AddResult_NoFix(t *testing.T) {
+	b := NewBuilder("govet", "")
+	b.AddResult("printf", "warning", "wrong type", "main.go", 5, 3)
+
+	doc := b.Document()
+	got := doc.Runs[0].Results[0].FixCommand()
+	if got != "" {
+		t.Errorf("AddResult should produce empty FixCommand, got %q", got)
+	}
+}
+
+func TestBuilder_AddResultWithFix_EmptyCommand_NoFixAttached(t *testing.T) {
+	b := NewBuilder("govet", "")
+	b.AddResultWithFix("r1", "warning", "msg", "f.go", 1, 0, "")
+
+	doc := b.Document()
+	res := doc.Runs[0].Results[0]
+	if len(res.Fixes) != 0 {
+		t.Errorf("empty fixCommand should produce no Fixes slice, got %d", len(res.Fixes))
+	}
+}

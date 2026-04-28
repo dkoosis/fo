@@ -280,6 +280,9 @@ func parseMultiplex(input []byte, stderr io.Writer) (*report.Report, error) {
 	}
 	merged := &report.Report{Tool: "multi"}
 	for _, sec := range sections {
+		if f, ok := sectionStatusFinding(sec); ok {
+			merged.Findings = append(merged.Findings, f)
+		}
 		body := bytes.TrimSpace(sec.Content)
 		if len(body) == 0 {
 			continue
@@ -300,6 +303,40 @@ func parseMultiplex(input []byte, stderr io.Writer) (*report.Report, error) {
 		}
 	}
 	return merged, nil
+}
+
+// sectionStatusFinding returns a synthetic finding for non-ok section statuses.
+// Returns (finding, true) when the status warrants a finding; (_, false) for
+// ok/clean/empty (normal execution).
+func sectionStatusFinding(sec report.Section) (report.Finding, bool) {
+	switch sec.Status {
+	case report.StatusTimeout:
+		return report.Finding{
+			RuleID:   "fo/section-timeout",
+			Severity: report.SeverityError,
+			Message:  fmt.Sprintf("tool=%s timed out before producing output", sec.Tool),
+		}, true
+	case report.StatusError:
+		return report.Finding{
+			RuleID:   "fo/section-error",
+			Severity: report.SeverityError,
+			Message:  fmt.Sprintf("tool=%s exited with an error", sec.Tool),
+		}, true
+	case report.StatusPartial:
+		return report.Finding{
+			RuleID:   "fo/section-partial",
+			Severity: report.SeverityWarning,
+			Message:  fmt.Sprintf("tool=%s produced partial output (may have been interrupted)", sec.Tool),
+		}, true
+	case report.StatusSkipped:
+		return report.Finding{
+			RuleID:   "fo/section-skipped",
+			Severity: report.SeverityNote,
+			Message:  fmt.Sprintf("tool=%s was skipped", sec.Tool),
+		}, true
+	default:
+		return report.Finding{}, false
+	}
 }
 
 func parseSection(sec report.Section, body []byte, stderr io.Writer) (*report.Report, error) {
