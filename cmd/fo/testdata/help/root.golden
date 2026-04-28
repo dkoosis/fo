@@ -1,0 +1,30 @@
+fo — focused build output renderer
+
+USAGE
+  <input-command> | fo [FLAGS]
+  <tool-output>   | fo wrap <name> [FLAGS]
+
+INPUT FORMATS (auto-detected from stdin)
+  SARIF 2.1.0     Static analysis results (golangci-lint, gosec, etc.)
+  go test -json   Test execution stream
+
+OUTPUT FORMATS (--format)
+  auto            TTY → human, piped → llm (default)
+  human           Tufte-Swiss styled terminal output
+  llm             Token-dense plain text, no ANSI
+  json            Machine-parseable Report JSON
+
+FLAGS
+  --format <mode>     auto | human | llm | json (default: auto)
+  --theme <name>      color | mono (default: auto — color on TTY, mono otherwise)
+  --state-file <path> Sidecar state file (default: .fo/last-run.json)
+  --no-state          Skip diff classification and sidecar I/O
+
+SUBCOMMANDS
+  fo wrap <name>     Convert tool output to SARIF
+  fo wrap --help     Show available wrappers
+
+EXIT CODES
+  0   Clean — no errors or test failures
+  1   Failures — lint errors or test failures present
+  2   Usage error — bad flags, unrecognized input, stdin problems

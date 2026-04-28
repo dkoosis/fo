@@ -1,0 +1,9 @@
+Usage of fo wrap diag:
+  -level string
+    	Default severity: error|warning|note (default "warning")
+  -rule string
+    	Default rule ID (default "finding")
+  -tool string
+    	Tool name for SARIF driver.name (required)
+  -version string
+    	Tool version string

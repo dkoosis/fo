@@ -1,0 +1,11 @@
+fo wrap: convert tool output to SARIF
+
+  archlint     Convert go-arch-lint JSON to SARIF
+  diag         Convert line diagnostics (file:line:col: msg) to SARIF
+  jscpd        Convert jscpd JSON duplication report to SARIF
+
+  diag flags:
+    --tool <name>     Tool name for SARIF driver.name (required)
+    --rule <id>       Default rule ID (default: finding)
+    --level <sev>     Default severity: error|warning|note (default: warning)
+    --version <ver>   Tool version string
