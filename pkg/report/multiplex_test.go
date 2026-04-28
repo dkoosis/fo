@@ -50,9 +50,12 @@ func TestParseSections(t *testing.T) {
 		"--- tool:test format:testjson ---\n" +
 		"{\"Action\":\"pass\"}\n"
 
-	got, err := ParseSections([]byte(input))
+	got, prelude, err := ParseSections([]byte(input))
 	if err != nil {
 		t.Fatalf("ParseSections err = %v", err)
+	}
+	if string(prelude) != "preamble line" {
+		t.Errorf("prelude = %q, want %q", prelude, "preamble line")
 	}
 	if len(got) != 2 {
 		t.Fatalf("got %d sections, want 2", len(got))
@@ -73,7 +76,7 @@ func TestParseSections(t *testing.T) {
 
 func TestParseSectionsCRLF(t *testing.T) {
 	input := "--- tool:vet format:sarif ---\r\nbody\r\n"
-	got, err := ParseSections([]byte(input))
+	got, _, err := ParseSections([]byte(input))
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}
@@ -83,14 +86,14 @@ func TestParseSectionsCRLF(t *testing.T) {
 }
 
 func TestParseSectionsEmpty(t *testing.T) {
-	if _, err := ParseSections([]byte("no delimiters here\nat all\n")); !errors.Is(err, ErrNoSections) {
+	if _, _, err := ParseSections([]byte("no delimiters here\nat all\n")); !errors.Is(err, ErrNoSections) {
 		t.Errorf("err = %v, want ErrNoSections", err)
 	}
 }
 
 func TestParseSectionsEmptyContent(t *testing.T) {
 	input := "--- tool:vet format:sarif ---\n--- tool:test format:testjson ---\nbody\n"
-	got, err := ParseSections([]byte(input))
+	got, _, err := ParseSections([]byte(input))
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}
@@ -99,5 +102,34 @@ func TestParseSectionsEmptyContent(t *testing.T) {
 	}
 	if len(got[0].Content) != 0 {
 		t.Errorf("section[0].Content = %q, want empty", got[0].Content)
+	}
+}
+
+func TestParseSectionsPreludeSurfaced(t *testing.T) {
+	input := "stray banner\nfrom wrapper\n--- tool:vet format:sarif ---\nbody\n"
+	got, prelude, err := ParseSections([]byte(input))
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("got %d sections, want 1", len(got))
+	}
+	want := "stray banner\nfrom wrapper"
+	if string(prelude) != want {
+		t.Errorf("prelude = %q, want %q", prelude, want)
+	}
+}
+
+func TestParseSectionsWhitespacePreludeSilent(t *testing.T) {
+	input := "\n  \n\t\n--- tool:vet format:sarif ---\nbody\n"
+	got, prelude, err := ParseSections([]byte(input))
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("got %d sections, want 1", len(got))
+	}
+	if prelude != nil {
+		t.Errorf("prelude = %q, want nil", prelude)
 	}
 }
