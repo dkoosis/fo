@@ -30,6 +30,7 @@ type diag struct {
 	ruleID   *string
 	level    *string
 	version  *string
+	stderr   io.Writer
 }
 
 // Convert reads line diagnostics from r and writes SARIF to w.
@@ -55,22 +56,37 @@ func (d *diag) Convert(r io.Reader, w io.Writer) error {
 }
 
 // readAndAdd reads diagnostic lines from r and appends results to b.
-// Oversize lines are silently skipped — they cannot be valid diagnostics
-// (file:line:col: msg), and aborting would lose every subsequent
-// diagnostic (fo-gn0).
+// Oversize lines are skipped (they cannot be valid file:line:col: msg
+// diagnostics) but counted so the caller learns a finding may have been
+// lost — fo-2mb. Aborting on oversize would lose every subsequent
+// diagnostic — fo-gn0.
 func (d *diag) readAndAdd(r io.Reader, b *sarif.Builder) error {
 	br := bufio.NewReaderSize(r, 64*1024)
+	var dropped int
 	for {
-		line, _, err := lineread.Read(br)
-		d.addLine(b, line)
+		line, oversize, err := lineread.Read(br)
+		if oversize {
+			dropped++
+		} else {
+			d.addLine(b, line)
+		}
 		if err == nil {
 			continue
 		}
 		if errors.Is(err, io.EOF) {
+			d.warnOversize(dropped)
 			return nil
 		}
 		return fmt.Errorf("reading input: %w", err)
 	}
+}
+
+func (d *diag) warnOversize(dropped int) {
+	if dropped == 0 || d.stderr == nil {
+		return
+	}
+	fmt.Fprintf(d.stderr, "wrapdiag: dropped %d line(s) exceeding %d bytes\n",
+		dropped, lineread.MaxLineLen)
 }
 
 func (d *diag) addLine(b *sarif.Builder, line []byte) {

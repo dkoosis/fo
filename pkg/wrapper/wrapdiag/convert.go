@@ -5,12 +5,14 @@ import "io"
 // DiagOpts carries the wrapdiag flags as plain values for the v2 CLI
 // dispatch — bypasses the *flag.FlagSet ceremony of the plugin path.
 // Tool is required; Rule, Level, Version match the plugin defaults
-// when zero ("finding", "warning", "").
+// when zero ("finding", "warning", ""). Stderr, when non-nil, receives
+// non-fatal warnings (e.g. oversize-line drops); nil silences them.
 type DiagOpts struct {
 	Tool    string
 	Rule    string
 	Level   string
 	Version string
+	Stderr  io.Writer
 }
 
 // Convert reads line diagnostics from r and writes SARIF to w using opts.
@@ -27,6 +29,7 @@ func Convert(r io.Reader, w io.Writer, opts DiagOpts) error {
 		ruleID:   &opts.Rule,
 		level:    &opts.Level,
 		version:  &opts.Version,
+		stderr:   opts.Stderr,
 	}
 	return d.Convert(r, w)
 }
