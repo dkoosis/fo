@@ -248,9 +248,12 @@ func parseToReport(input []byte, stderr io.Writer) (*report.Report, error) {
 // surface as synthetic error-severity findings so silent crashes can't
 // masquerade as a clean run.
 func parseMultiplex(input []byte, stderr io.Writer) (*report.Report, error) {
-	sections, err := report.ParseSections(input)
+	sections, prelude, err := report.ParseSections(input)
 	if err != nil {
 		return nil, fmt.Errorf("parsing report sections: %w", err)
+	}
+	if len(prelude) > 0 {
+		fmt.Fprintf(stderr, "fo: warning: %d byte(s) before first --- tool: --- delimiter discarded\n", len(prelude))
 	}
 	merged := &report.Report{Tool: "multi"}
 	for _, sec := range sections {

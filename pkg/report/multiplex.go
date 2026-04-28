@@ -46,16 +46,19 @@ type Section struct {
 	Content []byte
 }
 
-// ParseSections splits delimited input into sections. Lines before the first
-// delimiter are silently discarded. CRLF is normalized to LF.
-func ParseSections(data []byte) ([]Section, error) {
+// ParseSections splits delimited input into sections. CRLF is normalized to
+// LF. Any non-whitespace lines preceding the first delimiter are returned
+// in prelude so callers can surface them; whitespace-only preludes yield a
+// nil prelude. Dropping the prelude silently would mask wrapper bugs that
+// emit banners ahead of the first tool's output (fo-qhi).
+func ParseSections(data []byte) (sections []Section, prelude []byte, err error) {
 	nl := []byte{'\n'}
 	data = bytes.ReplaceAll(data, []byte("\r\n"), nl)
 	data = bytes.TrimSuffix(data, nl)
 	lines := bytes.Split(data, nl)
 
-	var sections []Section
 	var current *Section
+	var preludeBuf []byte
 
 	for _, line := range lines {
 		if m := delimiterRe.FindSubmatch(line); m != nil {
@@ -72,15 +75,22 @@ func ParseSections(data []byte) ([]Section, error) {
 		if current != nil {
 			current.Content = append(current.Content, line...)
 			current.Content = append(current.Content, '\n')
+			continue
 		}
+		preludeBuf = append(preludeBuf, line...)
+		preludeBuf = append(preludeBuf, '\n')
 	}
 	if current != nil {
 		current.Content = bytes.TrimSuffix(current.Content, nl)
 		sections = append(sections, *current)
 	}
 
-	if len(sections) == 0 {
-		return nil, ErrNoSections
+	if len(bytes.TrimSpace(preludeBuf)) > 0 {
+		prelude = bytes.TrimSuffix(preludeBuf, nl)
 	}
-	return sections, nil
+
+	if len(sections) == 0 {
+		return nil, prelude, ErrNoSections
+	}
+	return sections, prelude, nil
 }
