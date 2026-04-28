@@ -1,0 +1,57 @@
+--- tool:vet format:sarif ---
+{
+  "version": "2.1.0",
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "govet"
+        }
+      },
+      "results": [
+        {
+          "ruleId": "finding",
+          "level": "warning",
+          "message": {
+            "text": "Printf format %d has arg \"not-an-int\" of wrong type string"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "fixture/main.go"
+                },
+                "region": {
+                  "startLine": 4,
+                  "startColumn": 2
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "finding",
+          "level": "warning",
+          "message": {
+            "text": "unreachable code"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "fixture/util.go"
+                },
+                "region": {
+                  "startLine": 7,
+                  "startColumn": 1
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+

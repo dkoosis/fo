@@ -1,0 +1,10 @@
+--- tool:test format:testjson ---
+{"Time":"2026-04-27T21:16:31.447087-04:00","Action":"start","Package":"fixture"}
+{"Time":"2026-04-27T21:16:31.68234-04:00","Action":"run","Package":"fixture","Test":"TestOK"}
+{"Time":"2026-04-27T21:16:31.682493-04:00","Action":"output","Package":"fixture","Test":"TestOK","Output":"=== RUN   TestOK\n"}
+{"Time":"2026-04-27T21:16:31.682526-04:00","Action":"output","Package":"fixture","Test":"TestOK","Output":"--- PASS: TestOK (0.00s)\n"}
+{"Time":"2026-04-27T21:16:31.682545-04:00","Action":"pass","Package":"fixture","Test":"TestOK","Elapsed":0}
+{"Time":"2026-04-27T21:16:31.682558-04:00","Action":"output","Package":"fixture","Output":"PASS\n"}
+{"Time":"2026-04-27T21:16:31.682938-04:00","Action":"output","Package":"fixture","Output":"ok  \tfixture\t0.235s\n"}
+{"Time":"2026-04-27T21:16:31.686263-04:00","Action":"pass","Package":"fixture","Elapsed":0.239}
+

@@ -1,0 +1,8 @@
+--- tool:test format:testjson ---
+{"ImportPath":"fixture [fixture.test]","Action":"build-output","Output":"# fixture [fixture.test]\n"}
+{"ImportPath":"fixture [fixture.test]","Action":"build-output","Output":"./x_test.go:5:33: undefined: undefined\n"}
+{"ImportPath":"fixture [fixture.test]","Action":"build-fail"}
+{"Time":"2026-04-27T21:16:41.496859-04:00","Action":"start","Package":"fixture"}
+{"Time":"2026-04-27T21:16:41.496895-04:00","Action":"output","Package":"fixture","Output":"FAIL\tfixture [build failed]\n"}
+{"Time":"2026-04-27T21:16:41.496901-04:00","Action":"fail","Package":"fixture","Elapsed":0,"FailedBuild":"fixture [fixture.test]"}
+

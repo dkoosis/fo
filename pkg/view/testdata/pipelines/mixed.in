@@ -1,0 +1,370 @@
+--- tool:vet format:sarif ---
+{
+  "version": "2.1.0",
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "govet"
+        }
+      },
+      "results": [
+        {
+          "ruleId": "finding",
+          "level": "warning",
+          "message": {
+            "text": "Printf format %d has arg \"not-an-int\" of wrong type string"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "fixture/main.go"
+                },
+                "region": {
+                  "startLine": 4,
+                  "startColumn": 2
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "finding",
+          "level": "warning",
+          "message": {
+            "text": "unreachable code"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "fixture/util.go"
+                },
+                "region": {
+                  "startLine": 7,
+                  "startColumn": 1
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+--- tool:dupl format:sarif ---
+{
+  "version": "2.1.0",
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "jscpd"
+        }
+      },
+      "results": [
+        {
+          "ruleId": "code-clone",
+          "level": "warning",
+          "message": {
+            "text": "16 lines duplicated with domain/nug/pipeline/enrich/enrich.go:72-87"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "domain/nug/pipeline/dedup/dedup.go"
+                },
+                "region": {
+                  "startLine": 87
+                }
+              }
+            }
+          ],
+          "fixes": [
+            {
+              "description": {
+                "text": "# duplicate: domain/nug/pipeline/dedup/dedup.go:87-102 ↔ domain/nug/pipeline/enrich/enrich.go:72-87"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "code-clone",
+          "level": "warning",
+          "message": {
+            "text": "13 lines duplicated with docs/superpowers/plans/2026-04-19-guard-rails-refocus.md:41-50"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "docs/superpowers/plans/2026-04-19-guard-rails-refocus.md"
+                },
+                "region": {
+                  "startLine": 122
+                }
+              }
+            }
+          ],
+          "fixes": [
+            {
+              "description": {
+                "text": "# duplicate: docs/superpowers/plans/2026-04-19-guard-rails-refocus.md:122-134 ↔ docs/superpowers/plans/2026-04-19-guard-rails-refocus.md:41-50"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "code-clone",
+          "level": "warning",
+          "message": {
+            "text": "16 lines duplicated with app/cmd/trixi/adapters.go:128-143"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app/cmd/trixi/adapters.go"
+                },
+                "region": {
+                  "startLine": 146
+                }
+              }
+            }
+          ],
+          "fixes": [
+            {
+              "description": {
+                "text": "# duplicate: app/cmd/trixi/adapters.go:146-161 ↔ app/cmd/trixi/adapters.go:128-143"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "code-clone",
+          "level": "warning",
+          "message": {
+            "text": "16 lines duplicated with app/cmd/trixi/adapters.go:128-143"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app/cmd/trixi/adapters.go"
+                },
+                "region": {
+                  "startLine": 175
+                }
+              }
+            }
+          ],
+          "fixes": [
+            {
+              "description": {
+                "text": "# duplicate: app/cmd/trixi/adapters.go:175-190 ↔ app/cmd/trixi/adapters.go:128-143"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "code-clone",
+          "level": "warning",
+          "message": {
+            "text": "16 lines duplicated with app/cmd/trixi/adapters.go:128-143"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app/cmd/trixi/adapters.go"
+                },
+                "region": {
+                  "startLine": 238
+                }
+              }
+            }
+          ],
+          "fixes": [
+            {
+              "description": {
+                "text": "# duplicate: app/cmd/trixi/adapters.go:238-253 ↔ app/cmd/trixi/adapters.go:128-143"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "code-clone",
+          "level": "warning",
+          "message": {
+            "text": "16 lines duplicated with app/cmd/trixi/adapters.go:128-143"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "app/cmd/trixi/adapters.go"
+                },
+                "region": {
+                  "startLine": 291
+                }
+              }
+            }
+          ],
+          "fixes": [
+            {
+              "description": {
+                "text": "# duplicate: app/cmd/trixi/adapters.go:291-306 ↔ app/cmd/trixi/adapters.go:128-143"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "code-clone",
+          "level": "warning",
+          "message": {
+            "text": "41 lines duplicated with domain/nug/pipeline/internal/synthesizer.go:3-43"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "kg/memory/synthesizer.go"
+                },
+                "region": {
+                  "startLine": 8
+                }
+              }
+            }
+          ],
+          "fixes": [
+            {
+              "description": {
+                "text": "# duplicate: kg/memory/synthesizer.go:8-48 ↔ domain/nug/pipeline/internal/synthesizer.go:3-43"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "code-clone",
+          "level": "warning",
+          "message": {
+            "text": "100 lines duplicated with domain/nug/pipeline/internal/synthesizer.go:47-146"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "kg/memory/synthesizer.go"
+                },
+                "region": {
+                  "startLine": 48
+                }
+              }
+            }
+          ],
+          "fixes": [
+            {
+              "description": {
+                "text": "# duplicate: kg/memory/synthesizer.go:48-147 ↔ domain/nug/pipeline/internal/synthesizer.go:47-146"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "code-clone",
+          "level": "warning",
+          "message": {
+            "text": "16 lines duplicated with docs/superpowers/plans/2026-04-19-centralize-launchagent-secrets.md:664-677"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "docs/ops/launchagent-secrets.md"
+                },
+                "region": {
+                  "startLine": 13
+                }
+              }
+            }
+          ],
+          "fixes": [
+            {
+              "description": {
+                "text": "# duplicate: docs/ops/launchagent-secrets.md:13-28 ↔ docs/superpowers/plans/2026-04-19-centralize-launchagent-secrets.md:664-677"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "code-clone",
+          "level": "warning",
+          "message": {
+            "text": "43 lines duplicated with metrics/store.go:46-88"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "cclog/store.go"
+                },
+                "region": {
+                  "startLine": 32
+                }
+              }
+            }
+          ],
+          "fixes": [
+            {
+              "description": {
+                "text": "# duplicate: cclog/store.go:32-74 ↔ metrics/store.go:46-88"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "code-clone",
+          "level": "warning",
+          "message": {
+            "text": "46 lines duplicated with CLAUDE.md:6-51"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "AGENTS.md"
+                },
+                "region": {
+                  "startLine": 248
+                }
+              }
+            }
+          ],
+          "fixes": [
+            {
+              "description": {
+                "text": "# duplicate: AGENTS.md:248-293 ↔ CLAUDE.md:6-51"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+--- tool:test format:testjson ---
+{"Time":"2026-04-27T21:16:31.447087-04:00","Action":"start","Package":"fixture"}
+{"Time":"2026-04-27T21:16:31.68234-04:00","Action":"run","Package":"fixture","Test":"TestOK"}
+{"Time":"2026-04-27T21:16:31.682493-04:00","Action":"output","Package":"fixture","Test":"TestOK","Output":"=== RUN   TestOK\n"}
+{"Time":"2026-04-27T21:16:31.682526-04:00","Action":"output","Package":"fixture","Test":"TestOK","Output":"--- PASS: TestOK (0.00s)\n"}
+{"Time":"2026-04-27T21:16:31.682545-04:00","Action":"pass","Package":"fixture","Test":"TestOK","Elapsed":0}
+{"Time":"2026-04-27T21:16:31.682558-04:00","Action":"output","Package":"fixture","Output":"PASS\n"}
+{"Time":"2026-04-27T21:16:31.682938-04:00","Action":"output","Package":"fixture","Output":"ok  \tfixture\t0.235s\n"}
+{"Time":"2026-04-27T21:16:31.686263-04:00","Action":"pass","Package":"fixture","Elapsed":0.239}
+

@@ -1,0 +1,24 @@
+--- tool:test format:testjson ---
+{"Time":"2026-04-27T21:16:41.199997-04:00","Action":"start","Package":"fixture"}
+{"Time":"2026-04-27T21:16:41.395119-04:00","Action":"run","Package":"fixture","Test":"TestPanics"}
+{"Time":"2026-04-27T21:16:41.395206-04:00","Action":"output","Package":"fixture","Test":"TestPanics","Output":"=== RUN   TestPanics\n"}
+{"Time":"2026-04-27T21:16:41.395252-04:00","Action":"output","Package":"fixture","Test":"TestPanics","Output":"--- FAIL: TestPanics (0.00s)\n"}
+{"Time":"2026-04-27T21:16:41.397729-04:00","Action":"output","Package":"fixture","Test":"TestPanics","Output":"panic: boom [recovered, repanicked]\n"}
+{"Time":"2026-04-27T21:16:41.397772-04:00","Action":"output","Package":"fixture","Test":"TestPanics","Output":"\n"}
+{"Time":"2026-04-27T21:16:41.397782-04:00","Action":"output","Package":"fixture","Test":"TestPanics","Output":"goroutine 21 [running]:\n"}
+{"Time":"2026-04-27T21:16:41.39779-04:00","Action":"output","Package":"fixture","Test":"TestPanics","Output":"testing.tRunner.func1.2({0x104a45a60, 0x104a78a30})\n"}
+{"Time":"2026-04-27T21:16:41.397807-04:00","Action":"output","Package":"fixture","Test":"TestPanics","Output":"\t/opt/homebrew/Cellar/go/1.26.2/libexec/src/testing/testing.go:1974 +0x1a0\n"}
+{"Time":"2026-04-27T21:16:41.397823-04:00","Action":"output","Package":"fixture","Test":"TestPanics","Output":"testing.tRunner.func1()\n"}
+{"Time":"2026-04-27T21:16:41.397831-04:00","Action":"output","Package":"fixture","Test":"TestPanics","Output":"\t/opt/homebrew/Cellar/go/1.26.2/libexec/src/testing/testing.go:1977 +0x318\n"}
+{"Time":"2026-04-27T21:16:41.397844-04:00","Action":"output","Package":"fixture","Test":"TestPanics","Output":"panic({0x104a45a60?, 0x104a78a30?})\n"}
+{"Time":"2026-04-27T21:16:41.397851-04:00","Action":"output","Package":"fixture","Test":"TestPanics","Output":"\t/opt/homebrew/Cellar/go/1.26.2/libexec/src/runtime/panic.go:860 +0x12c\n"}
+{"Time":"2026-04-27T21:16:41.397858-04:00","Action":"output","Package":"fixture","Test":"TestPanics","Output":"fixture.TestPanics(0x4f7acb8ea248?)\n"}
+{"Time":"2026-04-27T21:16:41.397865-04:00","Action":"output","Package":"fixture","Test":"TestPanics","Output":"\t/var/folders/_5/z29k0cv53bjgn2nkk_sv0cqr0000gq/T/tmp.Ud9G17Gnut/x_test.go:5 +0x2c\n"}
+{"Time":"2026-04-27T21:16:41.397874-04:00","Action":"output","Package":"fixture","Test":"TestPanics","Output":"testing.tRunner(0x4f7acb8ea248, 0x104a77ef8)\n"}
+{"Time":"2026-04-27T21:16:41.397881-04:00","Action":"output","Package":"fixture","Test":"TestPanics","Output":"\t/opt/homebrew/Cellar/go/1.26.2/libexec/src/testing/testing.go:2036 +0xc4\n"}
+{"Time":"2026-04-27T21:16:41.397888-04:00","Action":"output","Package":"fixture","Test":"TestPanics","Output":"created by testing.(*T).Run in goroutine 1\n"}
+{"Time":"2026-04-27T21:16:41.397895-04:00","Action":"output","Package":"fixture","Test":"TestPanics","Output":"\t/opt/homebrew/Cellar/go/1.26.2/libexec/src/testing/testing.go:2101 +0x3a8\n"}
+{"Time":"2026-04-27T21:16:41.39821-04:00","Action":"fail","Package":"fixture","Test":"TestPanics","Elapsed":0}
+{"Time":"2026-04-27T21:16:41.398232-04:00","Action":"output","Package":"fixture","Output":"FAIL\tfixture\t0.198s\n"}
+{"Time":"2026-04-27T21:16:41.398243-04:00","Action":"fail","Package":"fixture","Elapsed":0.198}
+

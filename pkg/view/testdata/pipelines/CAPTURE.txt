@@ -1,0 +1,16 @@
+# Pipeline fixture capture
+
+Each `.in` file is a captured stdin stream that Layer 2 tests replay.
+Refresh by re-running the snippet for that file. Keep the captures
+small — a handful of findings each is enough.
+
+| File | Source | Notes |
+|------|--------|-------|
+| jscpd_only.in   | trixi repo (jscpd) via `fo wrap jscpd` | requires trixi checkout |
+| vet_only.in     | hand-crafted diag text via `fo wrap diag --tool govet` | offline |
+| clean.in        | synthesized passing testjson module | needs go test |
+| panic.in        | synthesized panicking testjson module | needs go test |
+| build_error.in  | synthesized syntax-error module via go test -json | needs go test |
+| mixed.in        | concat(vet_only, jscpd_only, clean) | offline |
+
+Snippets live in plan: docs/superpowers/plans/2026-04-27-view-invariants-and-goldens.md, Task 7.
