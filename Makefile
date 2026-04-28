@@ -10,6 +10,7 @@
 
 .PHONY: help scan check audit report deploy install doctor cross \
         vet lint test race fmt fmt-fix dupl vuln \
+        qa-goldens qa-goldens-update \
         snipe-index baseline \
         cross-amd64 cross-arm64 \
         lint-sarif clean issues \
@@ -104,6 +105,12 @@ lint: vet ## Run golangci-lint
 
 test: ## Run tests with coverage
 	go test -count=1 -cover ./...
+
+qa-goldens: ## Replay captured pipeline fixtures and diff against goldens
+	@go test ./pkg/view/ -run TestPipelineGoldens -v
+
+qa-goldens-update: ## Refresh pipeline goldens (review the diff before committing)
+	@go test ./pkg/view/ -run TestPipelineGoldens -update -v
 
 race: ## Run tests with race detector (slow)
 	go test -race -timeout=5m -count=1 -cover ./...
