@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,7 +23,7 @@ func executeCommand(args ...string) (stdout, stderr string, err error) {
 
 type exitError struct{ code int }
 
-func (e *exitError) Error() string { return "non-zero exit" }
+func (e *exitError) Error() string { return fmt.Sprintf("non-zero exit: %d", e.code) }
 
 type helpNode struct {
 	name     string
@@ -34,7 +35,7 @@ type helpNode struct {
 func walkVisibleHelp(nodes []helpNode, visit func(name string, args []string)) {
 	var walk func(prefixName string, n helpNode)
 	walk = func(prefixName string, n helpNode) {
-		fullName := strings.TrimSpace(strings.TrimSpace(prefixName + " " + n.name))
+		fullName := strings.TrimSpace(prefixName + " " + n.name)
 		if n.visible {
 			path := append(append([]string{}, n.args...), "--help")
 			visit(fullName, path)
@@ -83,19 +84,23 @@ func goldenName(name string) string {
 }
 
 func TestHelpGolden(t *testing.T) {
+	wrapChildren := make([]helpNode, 0, len(wrapNames))
+	for _, name := range wrapNames {
+		wrapChildren = append(wrapChildren, helpNode{
+			name:    name,
+			args:    []string{"wrap", name},
+			visible: true,
+		})
+	}
 	commands := []helpNode{{
 		name:    "root",
 		args:    nil,
 		visible: true,
 		children: []helpNode{{
-			name:    "wrap",
-			args:    []string{"wrap"},
-			visible: true,
-			children: []helpNode{
-				{name: "archlint", args: []string{"wrap", "archlint"}, visible: true},
-				{name: "diag", args: []string{"wrap", "diag"}, visible: true},
-				{name: "jscpd", args: []string{"wrap", "jscpd"}, visible: true},
-			},
+			name:     "wrap",
+			args:     []string{"wrap"},
+			visible:  true,
+			children: wrapChildren,
 		}},
 	}}
 
