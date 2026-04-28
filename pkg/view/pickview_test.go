@@ -1,6 +1,7 @@
 package view_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/dkoosis/fo/pkg/report"
@@ -12,6 +13,24 @@ func mkFindings(n int, sev report.Severity, pkg string) []report.Finding {
 	for i := range n {
 		out[i] = report.Finding{
 			RuleID:   "R",
+			File:     pkg + "/f.go",
+			Line:     i + 1,
+			Severity: sev,
+			Message:  "msg",
+			Score:    1,
+		}
+	}
+	return out
+}
+
+// mkFindingsDistinct builds n findings each with a unique RuleID
+// ("R0", "R1", ...). Use when a test must exercise the multi-row
+// leaderboard path post-aggregation.
+func mkFindingsDistinct(n int, sev report.Severity, pkg string) []report.Finding {
+	out := make([]report.Finding, n)
+	for i := range n {
+		out[i] = report.Finding{
+			RuleID:   fmt.Sprintf("R%d", i),
 			File:     pkg + "/f.go",
 			Line:     i + 1,
 			Severity: sev,
@@ -91,8 +110,9 @@ func TestPickView_Bullet_TwoFindings(t *testing.T) {
 }
 
 func TestPickView_Leaderboard_TopThreeDominant(t *testing.T) {
-	// 6 findings; first three Score=10, rest Score=1 → head = 30/33 > 50%.
-	fs := mkFindings(6, report.SeverityWarning, "a")
+	// 6 findings, distinct rule IDs; first three Score=10, rest Score=1
+	// → head = 30/33 > 50%. Distinct labels keep aggregation a no-op.
+	fs := mkFindingsDistinct(6, report.SeverityWarning, "a")
 	fs[0].Score, fs[1].Score, fs[2].Score = 10, 10, 10
 	fs[3].Score, fs[4].Score, fs[5].Score = 1, 1, 1
 	r := report.Report{Findings: fs}

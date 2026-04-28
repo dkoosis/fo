@@ -1,7 +1,7 @@
-ineffassign  #########-------------------------------    3
-gosimple     ######----------------------------------    2
-govet        ######----------------------------------    2
-staticcheck  ######----------------------------------    2
-errcheck     ####------------------------------------  1.5
-errcheck     ####------------------------------------  1.5
-unused       ####------------------------------------  1.5
+x  ineffectual assignment to `err`                             pkg/api/client.go:33
+!  S1005: unnecessary assignment to the blank identifier       cmd/server/main.go:88
+!  printf: fmt.Sprintf format %d has arg of wrong type string  pkg/api/client.go:57
+!  SA1019: package `io/ioutil` is deprecated                   pkg/config/loader.go:7
+x  error return value of `db.Close` is not checked             internal/store/store.go:42
+x  error return value of `resp.Body.Close` is not checked      internal/store/store.go:78
+x  func `helperValidate` is unused                             internal/validate.go:15

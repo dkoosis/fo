@@ -10,8 +10,10 @@ import (
 // Thresholds locked at fo-7f5 design pass; tuning happens against real
 // fixtures, not by editing renderers.
 const (
-	leaderboardMinTotal    = 6
-	leaderboardHeadShare   = 0.50
+	leaderboardMinTotal = 6
+	// leaderboardHeadShare: post-aggregation distributions concentrate;
+	// threshold tuned 2026-04-27 against fo-abv invariants.
+	leaderboardHeadShare   = 0.70
 	smallMultiplesMinGroup = 3
 	smallMultiplesMinItems = 2
 	groupedMinCount        = 10
@@ -137,15 +139,34 @@ func pickLeaderboard(r report.Report) (Leaderboard, bool) {
 	if len(r.Findings) < leaderboardMinTotal {
 		return Leaderboard{}, false
 	}
-	rows := make([]LbRow, 0, len(r.Findings))
+
+	// Aggregate by label — one row per distinct label, summing scores.
+	// Findings with the same RuleID would otherwise emit N visually
+	// identical rows (see fo-abv).
+	agg := map[string]float64{}
+	order := []string{}
 	var total float64
 	for _, f := range r.Findings {
 		v := f.Score
 		if v <= 0 {
 			v = 1
 		}
-		rows = append(rows, LbRow{Label: lbLabel(f), Value: v})
+		label := lbLabel(f)
+		if _, seen := agg[label]; !seen {
+			order = append(order, label)
+		}
+		agg[label] += v
 		total += v
+	}
+
+	// A one-row leaderboard says nothing a bullet can't say better.
+	if len(agg) < 2 {
+		return Leaderboard{}, false
+	}
+
+	rows := make([]LbRow, 0, len(agg))
+	for _, label := range order {
+		rows = append(rows, LbRow{Label: label, Value: agg[label]})
 	}
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Value > rows[j].Value })
 

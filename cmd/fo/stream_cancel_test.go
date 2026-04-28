@@ -126,4 +126,3 @@ func (c constReader) Read(p []byte) (int, error) {
 	}
 	return len(p), nil
 }
-
