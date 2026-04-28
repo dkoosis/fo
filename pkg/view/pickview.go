@@ -29,7 +29,7 @@ func PickView(r report.Report) ViewSpec {
 	if r.Diff != nil {
 		buckets := deltaBuckets(r, r.Diff)
 		if hasNonZero(buckets) {
-			return Delta{Inner: inner, Buckets: buckets}
+			return Delta{Inner: inner, Buckets: buckets, Headline: r.Diff.Headline}
 		}
 	}
 	return inner

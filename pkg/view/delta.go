@@ -33,6 +33,14 @@ func renderDelta(v Delta, t theme.Theme, width int) string {
 		parts = append(parts, seg)
 	}
 	strip := strings.Join(parts, "  ")
+	if v.Headline != "" {
+		hl := t.Muted.Render(v.Headline)
+		if strip != "" {
+			strip = strip + "  " + hl
+		} else {
+			strip = hl
+		}
+	}
 	if inner == "" {
 		return strip
 	}

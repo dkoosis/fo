@@ -106,8 +106,9 @@ func (Alert) isViewSpec() {}
 // system does not enforce this; pickView is responsible for picking a
 // sane Inner.
 type Delta struct {
-	Inner   ViewSpec
-	Buckets []DeltaBucket
+	Inner    ViewSpec
+	Buckets  []DeltaBucket
+	Headline string // "N new · N resolved · N persistent" — omitted when empty
 }
 
 func (Delta) isViewSpec() {}
