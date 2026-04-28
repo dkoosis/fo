@@ -91,6 +91,34 @@ func TestSave_NoTmpLeak(t *testing.T) {
 	}
 }
 
+func TestSave_FsyncsParentDir(t *testing.T) {
+	// Not parallel: mutates package-level syncDir.
+	dir := t.TempDir()
+	p := filepath.Join(dir, "sub", "last.json")
+	wantDir := filepath.Join(dir, "sub")
+
+	orig := syncDir
+	t.Cleanup(func() { syncDir = orig })
+
+	var gotDir string
+	var called int
+	syncDir = func(d string) error {
+		called++
+		gotDir = d
+		return nil
+	}
+
+	if err := Save(p, &File{Version: SchemaVersion}); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	if called != 1 {
+		t.Fatalf("syncDir call count: want 1, got %d", called)
+	}
+	if gotDir != wantDir {
+		t.Fatalf("syncDir path: want %q, got %q", wantDir, gotDir)
+	}
+}
+
 func TestReset(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

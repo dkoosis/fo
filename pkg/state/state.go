@@ -126,7 +126,31 @@ func Save(path string, f *File) error {
 		cleanup()
 		return fmt.Errorf("state: rename: %w", err)
 	}
+	// Best-effort fsync of the parent directory so the rename itself is
+	// durable across crash/power-loss. Without this, the data blocks are
+	// safe (we fsynced the tmp file) but the directory entry update can
+	// be lost — leaving the sidecar at its pre-rename state and causing
+	// previously-resolved findings to reappear as "new". Errors are
+	// ignored: on Windows directory sync is a no-op / EINVAL, and a
+	// failure here is a durability hint, not a correctness failure.
+	_ = syncDir(filepath.Dir(path))
 	return nil
+}
+
+// syncDir opens dir and calls Sync so the parent directory's metadata
+// (including the rename above) is flushed to disk. Indirected through a
+// package var so tests can assert it's invoked with the right path
+// without requiring real fault injection.
+var syncDir = func(dir string) error {
+	d, err := os.Open(dir) //nolint:gosec // dir is the parent of a caller-provided sidecar path
+	if err != nil {
+		return err
+	}
+	if err := d.Sync(); err != nil {
+		_ = d.Close()
+		return err
+	}
+	return d.Close()
 }
 
 // Reset removes the sidecar file. Missing file is not an error —
