@@ -1,7 +1,13 @@
 # Boot
 updated: 2026-04-28
 
-→ Pick from `bd ready` and begin
+→ Clean slate. `bd ready` shows only fo-4un (decision, skip unless dk wants to decide it).
 
-✓ done
-- Decomposed GH #247/244/248/245/246 into beads (closed 247, deferred 244, epic fo-n5r + children, standalones fo-0y1 + fo-sbs)
+Next highest-value: snapshot tests for the LLM diff detail block (writeDiffDetail).
+Or: look at what else Claude-as-consumer needs from `--format llm` output.
+
+✓ done this session
+- fo-4hr: LLM diff detail — NEW/REGRESSED block with file:line rule message after leaderboard
+- fo-n5r (epic): full temporal diff — fingerprinter + state I/O + classifier + CLI flags + headline + envelope
+- fo-0y1: fix_command tests (builder + toreport + E2E JSON/LLM)
+- fo-sbs: multiplex status:X attribute + synthetic findings for timeout/error/partial/skipped
