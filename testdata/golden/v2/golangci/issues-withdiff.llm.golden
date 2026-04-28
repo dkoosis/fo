@@ -1,0 +1,126 @@
+goconst      #############---------------------------  125.25
+revive       #########-------------------------------    91.5
+gosec        #######---------------------------------    67.5
+errcheck     ######----------------------------------    61.5
+testifylint  ##--------------------------------------   18.75
+prealloc     #---------------------------------------      15
+gocyclo      #---------------------------------------      12
+staticcheck  ----------------------------------------       3
+errorlint    ----------------------------------------       3
+unused       ----------------------------------------       3
+
+err ^ 81  warn ^ 40  note = 0  fail = 0  112 new · 1 resolved
+
+NEW (112)
+  fo/profile_test.go:52  errcheck  Error return value of `f.Close` is not checked
+  fo/spinner.go:183  errcheck  Error return value of `fmt.Fprint` is not checked
+  fo/spinner.go:178  errcheck  Error return value of `fmt.Fprintf` is not checked
+  pkg/sarif/orchestrator.go:189  errcheck  Error return value of `fmt.Fprintf` is not checked
+  pkg/sarif/orchestrator.go:208  errcheck  Error return value of `fmt.Fprint` is not checked
+  pkg/sarif/reader.go:16  errcheck  Error return value of `f.Close` is not checked
+  pkg/sarif/orchestrator.go:157  errorlint  type assertion on error will fail on wrapped errors. Use errors.As to check for specific errors
+  fo/console_test.go:14  goconst  string `on-fail` has 3 occurrences, make it a constant
+  fo/content.go:72  goconst  string `↓` has 3 occurrences, make it a constant
+  fo/content.go:70  goconst  string `↑` has 3 occurrences, make it a constant
+  fo/testrender.go:349  goconst  string `Success` has 3 occurrences, make it a constant
+  fo/testrender.go:361  goconst  string `Muted` has 5 occurrences, make it a constant
+  fo/testrender.go:345  goconst  string `Error` has 3 occurrences, make it a constant
+  pkg/adapter/housekeeping_test.go:133  goconst  string `HOUSEKEEPING` has 3 occurrences, make it a constant
+  pkg/adapter/housekeeping_test.go:173  goconst  string `pass` has 6 occurrences, make it a constant
+  pkg/adapter/stream.go:159  goconst  string `fail` has 3 occurrences, make it a constant
+  pkg/adapter/stream.go:169  goconst  string `skip` has 3 occurrences, make it a constant
+  pkg/design/complexity_dashboard.go:194  goconst  string `↑` has 3 occurrences, make it a constant
+  pkg/design/complexity_dashboard.go:197  goconst  string `degrading` has 3 occurrences, make it a constant
+  pkg/design/complexity_dashboard.go:191  goconst  string `improving` has 3 occurrences, make it a constant
+  pkg/design/complexity_dashboard.go:192  goconst  string `↓` has 3 occurrences, make it a constant
+  pkg/design/config.go:429  goconst  string `▯` has 3 occurrences, make it a constant
+  pkg/design/config.go:432  goconst  string `○` has 3 occurrences, make it a constant
+  pkg/design/config.go:428  goconst  string `▮` has 3 occurrences, make it a constant
+  pkg/design/config.go:448  goconst  string `balanced` has 3 occurrences, but such constant `DensityBalanced` already exists
+  pkg/design/housekeeping.go:52  goconst  string `warn` has 4 occurrences, make it a constant
+  pkg/design/housekeeping.go:63  goconst  string `fail` has 6 occurrences, make it a constant
+  pkg/design/housekeeping.go:41  goconst  string `pass` has 8 occurrences, make it a constant
+  pkg/design/quality_report.go:153  goconst  string `error` has 6 occurrences, but such constant `TypeError` already exists
+  pkg/design/render.go:180  goconst  string `╯` has 3 occurrences, make it a constant
+  pkg/design/render.go:200  goconst  string `orca` has 3 occurrences, make it a constant
+  pkg/design/render.go:664  goconst  string `Detail` has 3 occurrences, make it a constant
+  pkg/design/render.go:169  goconst  string `╭` has 3 occurrences, make it a constant
+  pkg/design/render.go:946  goconst  string `Process` has 3 occurrences, but such constant `ColorKeyProcess` already exists
+  pkg/design/render.go:170  goconst  string `╮` has 3 occurrences, make it a constant
+  pkg/design/render.go:179  goconst  string `╰` has 3 occurrences, make it a constant
+  pkg/design/taskview.go:154  goconst  string `warning` has 5 occurrences, but such constant `TypeWarning` already exists
+  pkg/design/taskview.go:150  goconst  string `success` has 5 occurrences, but such constant `TypeSuccess` already exists
+  pkg/design/taskview.go:197  goconst  string `info` has 3 occurrences, but such constant `TypeInfo` already exists
+  pkg/design/theme.go:301  goconst  string `✓` has 4 occurrences, but such constant `testSuccessIcon` already exists
+  pkg/design/theme.go:310  goconst  string `ℹ` has 3 occurrences, make it a constant
+  pkg/design/theme.go:304  goconst  string `⚠` has 6 occurrences, but such constant `IconCharWarning` already exists
+  pkg/design/theme.go:313  goconst  string `•` has 5 occurrences, make it a constant
+  pkg/design/theme.go:307  goconst  string `✗` has 6 occurrences, but such constant `IconCharError` already exists
+  pkg/design/theme.go:97  goconst  string `│` has 3 occurrences, make it a constant
+  pkg/sarif/mapper.go:249  goconst  string `error` has 4 occurrences, make it a constant
+  pkg/sarif/mapper.go:251  goconst  string `warning` has 3 occurrences, make it a constant
+  fo/console.go:1178  gocyclo  cyclomatic complexity 46 of func `(*Console).runContext` is high (> 30)
+  fo/testrender.go:523  gocyclo  cyclomatic complexity 32 of func `humanizePart` is high (> 30)
+  pkg/design/render.go:885  gocyclo  cyclomatic complexity 35 of func `RenderDirectMessage` is high (> 30)
+  pkg/design/render.go:586  gocyclo  cyclomatic complexity 33 of func `(*Task).RenderOutputLine` is high (> 30)
+  cmd/main.go:393  gosec  G304: Potential file inclusion via variable
+  cmd/main_test.go:282  gosec  G204: Subprocess launched with a potential tainted input or cmd arguments
+  fo/console.go:1962  gosec  G306: Expect WriteFile permissions to be 0600 or less
+  fo/console.go:1919  gosec  G301: Expect directory permissions to be 0750 or less
+  fo/editor.go:52  gosec  G204: Subprocess launched with a potential tainted input or cmd arguments
+  fo/profile_test.go:50  gosec  G304: Potential file inclusion via variable
+  fo/testrender.go:444  gosec  G304: Potential file inclusion via variable
+  internal/config/config_test.go:124  gosec  G301: Expect directory permissions to be 0750 or less
+  internal/config/config_test.go:101  gosec  G306: Expect WriteFile permissions to be 0600 or less
+  pkg/sarif/orchestrator.go:77  gosec  G301: Expect directory permissions to be 0750 or less
+  fo/spinner.go:42  prealloc  Consider pre-allocating `frames`
+  fo/testrender.go:328  prealloc  Consider pre-allocating `lines`
+  pkg/design/taskview.go:135  prealloc  Consider pre-allocating `lines`
+  cmd/main.go:1  revive  package-comments: should have a package comment
+  cmd/main.go:228  revive  unused-parameter: parameter 'fileAppConfig' seems to be unused, consider removing or renaming it as _
+  fo/console.go:149  revive  exported: exported function NewConsole should have comment or be unexported
+  fo/console.go:133  revive  exported: exported type Console should have comment or be unexported
+  fo/console.go:80  revive  exported: exported type TaskResult should have comment or be unexported
+  fo/console.go:51  revive  exported: exported type ConsoleConfig should have comment or be unexported
+  fo/console.go:145  revive  exported: exported function DefaultConsole should have comment or be unexported
+  fo/content.go:1  revive  package-comments: package comment should be of the form "Package fo ..."
+  fo/magetasks.go:1  revive  package-comments: package comment should be of the form "Package fo ..."
+  fo/processor_test.go:333  revive  unused-parameter: parameter 'output' seems to be unused, consider removing or renaming it as _
+  fo/processor_test.go:345  revive  unused-parameter: parameter 'cfg' seems to be unused, consider removing or renaming it as _
+  fo/projectconfig.go:1  revive  package-comments: package comment should be of the form "Package fo ..."
+  internal/config/config.go:1  revive  package-comments: package comment should be of the form "Package config ..."
+  internal/magetasks/console.go:91  revive  exported: comment on exported type SectionStatus should be of the form "SectionStatus ..." (with optional leading article)
+  internal/version/version.go:1  revive  package-comments: should have a package comment
+  pkg/design/complexity_dashboard.go:222  revive  unused-parameter: parameter 'unit' seems to be unused, consider removing or renaming it as _
+  pkg/design/config.go:348  revive  exported: exported function DefaultConfig should have comment or be unexported
+  pkg/design/config.go:958  revive  exported: exported method Config.ResetColor should have comment or be unexported
+  pkg/design/config.go:133  revive  exported: comment on exported const ANSIBrightWhite should be of the form "ANSIBrightWhite ..."
+  pkg/design/config.go:343  revive  exported: exported type PatternsRepo should have comment or be unexported
+  pkg/design/config.go:710  revive  exported: exported method Config.GetIndentation should have comment or be unexported
+  pkg/design/config.go:440  revive  exported: exported function UnicodeVibrantTheme should have comment or be unexported
+  pkg/design/config.go:95  revive  exported: comment on exported const DefaultSpinnerChars should be of the form "DefaultSpinnerChars ..."
+  pkg/design/config.go:703  revive  exported: exported method Config.GetElementStyle should have comment or be unexported
+  pkg/design/config.go:758  revive  exported: exported method Config.GetColor should have comment or be unexported
+  pkg/design/config.go:1172  revive  exported: exported function ApplyMonochromeDefaults should have comment or be unexported
+  pkg/design/config.go:359  revive  exported: exported function ASCIIMinimalTheme should have comment or be unexported
+  pkg/design/config.go:1  revive  package-comments: package comment should be of the form "Package design ..."
+  pkg/design/config.go:352  revive  exported: exported function NoColorConfig should have comment or be unexported
+  pkg/design/config.go:130  revive  exported: comment on exported const MessageTypeHeader should be of the form "MessageTypeHeader ..."
+  pkg/design/config.go:167  revive  exported: type name will be used as design.DesignTokens by other packages, and that stutters; consider calling this Tokens
+  pkg/design/config.go:539  revive  exported: exported function OrcaTheme should have comment or be unexported
+  pkg/design/config.go:25  revive  exported: exported const BorderLeftOnly should have comment (or a comment on this block) or be unexported
+  pkg/design/config.go:721  revive  exported: exported method Config.GetIcon should have comment or be unexported
+  pkg/design/render.go:709  revive  exported: exported method Task.RenderSummary should have comment or be unexported
+  pkg/design/render.go:1  revive  package-comments: package comment should be of the form "Package design ..."
+  pkg/design/render.go:359  revive  indent-error-flow: if block ends with a return statement, so drop this else and outdent its block
+  pkg/design/system.go:91  revive  exported: exported const LoadLow should have comment (or a comment on this block) or be unexported
+  pkg/design/theme.go:204  revive  exported: comment on exported function OrcaTheme2 should be of the form "OrcaTheme2 ..."
+  pkg/design/theme_test.go:60  revive  unused-parameter: parameter 't' seems to be unused, consider removing or renaming it as _
+  pkg/sarif/mapper.go:225  staticcheck  QF1003: could use tagged switch on pc.Detail
+  fo/processor_test.go:97  testifylint  empty: use assert.NotEmpty
+  fo/processor_test.go:256  testifylint  empty: use assert.Empty
+  fo/processor_test.go:173  testifylint  len: use assert.Len
+  fo/profile_test.go:71  testifylint  negative-positive: use assert.Positive
+  fo/section_render_test.go:275  testifylint  error-nil: use assert.NoError
+  fo/section_render_test.go:317  testifylint  error-nil: use assert.Error
+  pkg/sarif/orchestrator.go:224  unused  field spinners is unused

@@ -375,6 +375,60 @@ func TestE2E_FixCommand_JSONOutput(t *testing.T) {
 	}
 }
 
+// TestE2E_LLMDiffGolden verifies that the full LLM output — leaderboard then
+// NEW block — matches a checked-in golden when a prior state is present.
+// Prior state contains one dummy fingerprint not in the current run (so it
+// shows as RESOLVED) and no current fingerprints (so all current findings are
+// NEW). Run with UPDATE_LLM_DIFF_GOLDEN=1 to regenerate the golden.
+func TestE2E_LLMDiffGolden(t *testing.T) {
+	priorState := `{"version":1,"runs":[{"generated_at":"2026-01-01T00:00:00Z","findings":{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa":"error"}}]}`
+
+	raw, err := os.ReadFile(fixturesRoot + "/golangci/issues.input.sarif")
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+
+	dir := t.TempDir()
+	stateFile := filepath.Join(dir, "fo-state.json")
+	if err := os.WriteFile(stateFile, []byte(priorState), 0o600); err != nil {
+		t.Fatalf("write state: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "llm", "--state-file", stateFile}, bytes.NewReader(raw), &stdout, &stderr)
+	if code != 0 && code != 1 {
+		t.Fatalf("unexpected exit=%d stderr=%s", code, stderr.String())
+	}
+
+	out := stdout.Bytes()
+
+	// Structure assertions — independent of golden content.
+	if bytes.Contains(out, []byte("\x1b[")) {
+		t.Errorf("llm output contains ANSI escapes")
+	}
+	if !bytes.Contains(out, []byte("\nNEW (")) {
+		t.Errorf("expected NEW block in diff output; got:\n%s", out)
+	}
+
+	// Golden comparison.
+	goldenPath := fixturesRoot + "/golangci/issues-withdiff.llm.golden"
+	if os.Getenv("UPDATE_LLM_DIFF_GOLDEN") == "1" {
+		if err := os.WriteFile(goldenPath, out, 0o644); err != nil {
+			t.Fatalf("write golden: %v", err)
+		}
+		t.Logf("golden written: %s (%d bytes)", goldenPath, len(out))
+		return
+	}
+	want, err := os.ReadFile(goldenPath)
+	if err != nil {
+		t.Fatalf("read golden %s (run with UPDATE_LLM_DIFF_GOLDEN=1 to create): %v", goldenPath, err)
+	}
+	if !bytes.Equal(out, want) {
+		t.Errorf("llm+diff output drift\n--- want (%d bytes)\n%s\n--- got (%d bytes)\n%s",
+			len(want), string(want), len(out), string(out))
+	}
+}
+
 // TestE2E_FixCommand_LLMOutput verifies fix: hint lines appear in LLM output
 // for wrappers that emit fix commands (gofmt path).
 func TestE2E_FixCommand_LLMOutput(t *testing.T) {
