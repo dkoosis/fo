@@ -49,31 +49,7 @@ func checkLevel(level string) error {
 
 // AddResult adds a diagnostic result to the current run.
 func (b *Builder) AddResult(ruleID, level, message, file string, line, col int) *Builder {
-	if b.err != nil {
-		return b
-	}
-	if err := checkLevel(level); err != nil {
-		b.err = err
-		return b
-	}
-	r := Result{
-		RuleID:  ruleID,
-		Level:   level,
-		Message: Message{Text: message},
-	}
-	if file != "" {
-		r.Locations = []Location{{
-			PhysicalLocation: PhysicalLocation{
-				ArtifactLocation: ArtifactLocation{URI: file},
-				Region: Region{
-					StartLine:   line,
-					StartColumn: col,
-				},
-			},
-		}}
-	}
-	b.doc.Runs[0].Results = append(b.doc.Runs[0].Results, r)
-	return b
+	return b.AddResultWithFix(ruleID, level, message, file, line, col, "")
 }
 
 // AddResultWithFix is like AddResult but attaches a fix whose description
