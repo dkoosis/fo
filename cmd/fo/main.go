@@ -29,6 +29,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"regexp"
 	"strings"
 
 	"golang.org/x/term"
@@ -250,7 +251,7 @@ func parseToReport(input []byte, stderr io.Writer) (*report.Report, error) {
 	}
 	trimmed := bytes.TrimLeft(input, " \t\n\r")
 	if len(trimmed) == 0 {
-		return nil, errUnrecognizedInput
+		return nil, unrecognizedInputErr(input)
 	}
 	if trimmed[0] != '{' {
 		return parseTestJSONTolerant(input, stderr)
@@ -273,6 +274,56 @@ func parseToReport(input []byte, stderr io.Writer) (*report.Report, error) {
 		return testjson.ToReportWithMeta(results, input), nil
 	}
 	return parseTestJSONTolerant(input, stderr)
+}
+
+// lineDiagPattern matches a typical compiler/linter line diagnostic:
+//
+//	path/to/file.ext:LINE[:COL]: message
+//
+// Path component must contain at least one non-colon, non-space char and
+// commonly includes / or .; line/col are decimal; the trailing message
+// must be non-empty. Conservative on purpose so URLs and timestamps don't
+// false-positive.
+var lineDiagPattern = regexp.MustCompile(`^[^:\s]*[./][^:\s]*:\d+(:\d+)?:\s+\S`)
+
+// looksLikeLineDiagnostics returns true when input contains at least
+// minHits lines matching lineDiagPattern. Used to suggest 'fo wrap diag'
+// when stdin is raw compiler output rather than SARIF or go test -json
+// (fo-tl4).
+func looksLikeLineDiagnostics(input []byte) bool {
+	const minHits = 2
+	hits := 0
+	for len(input) > 0 {
+		nl := bytes.IndexByte(input, '\n')
+		var line []byte
+		if nl < 0 {
+			line = input
+			input = nil
+		} else {
+			line = input[:nl]
+			input = input[nl+1:]
+		}
+		if lineDiagPattern.Match(bytes.TrimRight(line, "\r")) {
+			hits++
+			if hits >= minHits {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// unrecognizedInputErr returns errUnrecognizedInput, optionally wrapped
+// with a hint to pipe through 'fo wrap diag' when the input looks like
+// raw line-diagnostic output (fo-tl4).
+func unrecognizedInputErr(input []byte) error {
+	if looksLikeLineDiagnostics(input) {
+		return fmt.Errorf(
+			"%w\nhint: input looks like line diagnostics — try piping through: fo wrap diag --tool <name>",
+			errUnrecognizedInput,
+		)
+	}
+	return errUnrecognizedInput
 }
 
 // hasJSONShapedLine reports whether any non-empty line in input begins with
@@ -319,7 +370,7 @@ func parseTestJSONTolerant(input []byte, stderr io.Writer) (*report.Report, erro
 		if malformed > 0 && hasJSONShapedLine(input) {
 			return nil, fmt.Errorf("parsing go test -json: %d line(s) failed to parse: %w", malformed, errTruncatedTestJSON)
 		}
-		return nil, errUnrecognizedInput
+		return nil, unrecognizedInputErr(input)
 	}
 	if malformed > 0 {
 		fmt.Fprintf(stderr, "fo: warning: %d malformed line(s) skipped\n", malformed)

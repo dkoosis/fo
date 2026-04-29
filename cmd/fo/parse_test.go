@@ -68,6 +68,43 @@ func TestParseToReport_TruncatedTestJSONDiagnosed(t *testing.T) {
 	}
 }
 
+// TestParseToReport_LineDiagnosticsHint verifies that raw compiler-style
+// line-diagnostic input (path:line:col: msg) gets a hint pointing at
+// 'fo wrap diag' rather than the bare 'unrecognized input' error.
+// Regression test for fo-tl4.
+func TestParseToReport_LineDiagnosticsHint(t *testing.T) {
+	input := []byte(
+		"main.go:42:13: undefined: foo\n" +
+			"pkg/x.go:7:2: missing return\n",
+	)
+	var stderr bytes.Buffer
+	_, err := parseToReport(input, &stderr)
+	if err == nil {
+		t.Fatal("expected error for raw line-diag input, got nil")
+	}
+	msg := err.Error()
+	for _, want := range []string{"unrecognized input", "fo wrap diag", "line diagnostics"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("error %q should contain %q", msg, want)
+		}
+	}
+}
+
+// TestParseToReport_NoHintForPureProse ensures the line-diag hint does
+// not fire on input that lacks the file:line:col: shape — the heuristic
+// should be conservative.
+func TestParseToReport_NoHintForPureProse(t *testing.T) {
+	input := []byte("just some random text\nwith no diagnostics shape\n")
+	var stderr bytes.Buffer
+	_, err := parseToReport(input, &stderr)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if strings.Contains(err.Error(), "fo wrap diag") {
+		t.Errorf("hint should not fire on pure prose; got: %q", err.Error())
+	}
+}
+
 // TestParseToReport_UnknownMultiplexFormat verifies that a delimiter with the
 // expected shape but an unsupported format value yields a precise error
 // (section index, offending line, supported formats, and a hint pointing at
