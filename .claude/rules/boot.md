@@ -1,8 +1,7 @@
 # Boot
 updated: 2026-04-29
 
-→ `bd ready` — fo-y2o ready (split multiplex regex; precise error w/ supported formats + wrap-diag hint)
+→ `bd ready` — pick next true-bug audit finding (fo-frl P1, fo-y2o P2, fo-4qh P2 all open)
 
 ✓ done
-- fo-y2o + fo-tl4 filed; loto Makefile fixed (text → wrap diag / native sarif)
-- 5 loto bd bugs filed from cherry-picked 3-pass audit; 4 stale codex branches deleted
+- fo-9js shipped: state.Save errors → Report.Notices + --state-strict; LLM/JSON visible

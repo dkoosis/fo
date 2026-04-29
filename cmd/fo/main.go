@@ -83,6 +83,8 @@ FLAGS
   --state-file <path> Sidecar state file (default: .fo/last-run.json)
   --no-state          Skip diff classification and sidecar I/O
   --state-strict      Exit non-zero (2) if sidecar Save fails
+  --stream            Stream go test -json incrementally (avoids 256 MiB
+                      input cap; enabled automatically on TTY+auto)
 
 SUBCOMMANDS
   fo wrap <name>     Convert tool output to SARIF
@@ -115,6 +117,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	stateFile := fs.String("state-file", state.DefaultPath, "Sidecar state file path")
 	noState := fs.Bool("no-state", false, "Skip diff classification and sidecar I/O")
 	stateStrict := fs.Bool("state-strict", false, "Exit non-zero if sidecar Save fails")
+	streamFlag := fs.Bool("stream", false, "Stream go test -json incrementally (avoids 256 MiB cap)")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -139,16 +142,25 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	// Stream mode: go test -json + TTY + format=auto. The streaming path
-	// owns its own parser → channel → RenderStream pump.
-	if *formatFlag == "auto" && isTTYWriter(stdout) && sniffGoTestJSON(peeked) {
-		return runStream(stdin, br, stdout, resolveTheme(*themeFlag, stdout), *stateFile, *noState, *stateStrict, stderr)
+	// Streaming dispatch: go test -json input only.
+	//   - TTY + format=auto → incremental render (existing path).
+	//   - --stream (any format) → incremental parse, single batch render.
+	// Non-go-test input (SARIF, multiplex) ignores --stream and falls
+	// through to the batch path.
+	if sniffGoTestJSON(peeked) {
+		ttyAuto := *formatFlag == "auto" && isTTYWriter(stdout)
+		switch {
+		case ttyAuto:
+			return runStream(stdin, br, stdout, resolveTheme(*themeFlag, stdout), *stateFile, *noState, *stateStrict, stderr)
+		case *streamFlag:
+			return runStreamBatch(stdin, br, stdout, mode, *themeFlag, *stateFile, *noState, *stateStrict, stderr)
+		}
 	}
 
 	input, err := boundread.All(br, 0)
 	if err != nil {
 		if errors.Is(err, boundread.ErrInputTooLarge) {
-			fmt.Fprintf(stderr, "fo: %v (use stream mode for larger inputs)\n", err)
+			fmt.Fprintf(stderr, "fo: %v (pass --stream for go test -json to bypass this cap)\n", err)
 		} else {
 			fmt.Fprintf(stderr, "fo: reading stdin: %v\n", err)
 		}
@@ -506,6 +518,40 @@ func runStreamCtx(ctx context.Context, stdin io.Reader, br *bufio.Reader, stdout
 		return 2
 	}
 	return exitCodeReport(final)
+}
+
+// runStreamBatch parses go test -json incrementally (so memory never grows
+// with input size) but renders a single batch report in the requested mode.
+// Used when --stream is set with format=human|llm|json and stdout is not a
+// TTY-driving incremental render. Closes fo-frl: piped CI callers can opt
+// into streaming and bypass the 256 MiB boundread cap.
+func runStreamBatch(stdin io.Reader, br *bufio.Reader, stdout io.Writer, mode, themeName, stateFile string, noState, stateStrict bool, stderr io.Writer) int {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	if c, ok := stdin.(io.Closer); ok {
+		stopClose := context.AfterFunc(ctx, func() { _ = c.Close() })
+		defer stopClose()
+	}
+	rc := &bufioReadCloser{Reader: br, closer: closerOf(stdin)}
+
+	agg := testjson.NewAggregator()
+	_, err := testjson.Stream(ctx, rc, func(e testjson.TestEvent) {
+		agg.ProcessEvent(e)
+	})
+	if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+		fmt.Fprintf(stderr, "fo: %v\n", err)
+		return 2
+	}
+	r := testjson.ToReport(agg.Results())
+	saveErr := attachDiff(r, stateFile, noState, stderr)
+	if err := renderMode(mode, r, stdout, themeName); err != nil {
+		fmt.Fprintf(stderr, "fo: %v\n", err)
+		return 2
+	}
+	if saveErr != nil && stateStrict {
+		return 2
+	}
+	return exitCodeReport(r)
 }
 
 // bufioReadCloser pairs a *bufio.Reader (carrying the sniffed prefix) with
