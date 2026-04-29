@@ -71,6 +71,10 @@ type Report struct {
 	Findings    []Finding    `json:"findings,omitempty"`
 	Tests       []TestResult `json:"tests,omitempty"`
 	Diff        *DiffSummary `json:"diff,omitempty"`
+	// Notices carries operational warnings about the run itself (e.g.
+	// sidecar state Save failure → diff classification will be stale on
+	// the next run). Empty in the happy path; never used for findings.
+	Notices []string `json:"notices,omitempty"`
 }
 
 // DiffItem mirrors the shape of state.Item without importing pkg/state

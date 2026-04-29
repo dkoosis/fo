@@ -170,6 +170,88 @@ func TestWriteDiffDetail_FingerprintMiss_Fallback(t *testing.T) {
 	}
 }
 
+func TestAttachDiff_SaveFailureRecordsNoticeAndReturnsErr(t *testing.T) {
+	// Point state-file at a path whose parent cannot be created
+	// (mkdir under a regular file → ENOTDIR). attachDiff must
+	// classify, surface a Notice on the report, AND return the err
+	// so --state-strict can escalate it.
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "not-a-dir")
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	statePath := filepath.Join(blocker, "sub", "last-run.json")
+
+	r := &report.Report{
+		Findings: []report.Finding{
+			{Fingerprint: "fp1", RuleID: "errcheck", File: "a.go", Line: 1, Severity: report.SeverityError, Message: "m"},
+		},
+	}
+	var stderr bytes.Buffer
+	err := attachDiff(r, statePath, false, &stderr)
+	if err == nil {
+		t.Fatalf("expected save error, got nil")
+	}
+	if r.Diff == nil {
+		t.Fatalf("expected diff still classified despite save failure")
+	}
+	if len(r.Notices) == 0 {
+		t.Fatalf("expected at least one notice on report, got none")
+	}
+	if !strings.Contains(r.Notices[0], "stale") {
+		t.Errorf("notice should warn about staleness, got %q", r.Notices[0])
+	}
+	if !strings.Contains(stderr.String(), "fo: state: save:") {
+		t.Errorf("expected stderr warning, got %q", stderr.String())
+	}
+}
+
+func TestWriteDiffDetail_EmitsNoticesEvenWithoutDiffItems(t *testing.T) {
+	r := &report.Report{
+		Diff:    &report.DiffSummary{},
+		Notices: []string{"state: save failed (perm denied) — next run's diff classification may be stale"},
+	}
+	var buf bytes.Buffer
+	writeDiffDetail(&buf, r)
+	out := buf.String()
+	if !strings.Contains(out, "NOTICES (1)") {
+		t.Errorf("expected NOTICES header, got %q", out)
+	}
+	if !strings.Contains(out, "stale") {
+		t.Errorf("expected notice text, got %q", out)
+	}
+}
+
+func TestWriteDiffDetail_NilDiffStillEmitsNotices(t *testing.T) {
+	r := &report.Report{Notices: []string{"state: save failed (x) — next run's diff classification may be stale"}}
+	var buf bytes.Buffer
+	writeDiffDetail(&buf, r)
+	if !strings.Contains(buf.String(), "NOTICES (1)") {
+		t.Errorf("expected NOTICES even when Diff nil, got %q", buf.String())
+	}
+}
+
+func TestRun_StateStrictExitsTwoOnSaveFailure(t *testing.T) {
+	// SARIF input + unwriteable state path → exit 2 under --state-strict.
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "not-a-dir")
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	statePath := filepath.Join(blocker, "sub", "last-run.json")
+
+	sarif := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"t"}},"results":[]}]}`
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--format", "json", "--state-file", statePath, "--state-strict"},
+		strings.NewReader(sarif), &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("want exit 2, got %d (stderr=%q)", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "notices") {
+		t.Errorf("expected JSON notices field in stdout, got %q", stdout.String())
+	}
+}
+
 func TestWriteDiffDetail_LineZero_NoColon(t *testing.T) {
 	// Line=0 means no line info — loc should be just the file path, no ":0" suffix.
 	r := &report.Report{

@@ -19,6 +19,7 @@ FLAGS
   --theme <name>      color | mono (default: auto — color on TTY, mono otherwise)
   --state-file <path> Sidecar state file (default: .fo/last-run.json)
   --no-state          Skip diff classification and sidecar I/O
+  --state-strict      Exit non-zero (2) if sidecar Save fails
 
 SUBCOMMANDS
   fo wrap <name>     Convert tool output to SARIF

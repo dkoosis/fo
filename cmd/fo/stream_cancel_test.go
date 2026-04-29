@@ -74,7 +74,7 @@ func TestRunStream_PromptCancel(t *testing.T) {
 
 	done := make(chan int, 1)
 	go func() {
-		done <- runStreamCtx(ctx, prod, br, &stdout, theme.Mono(), "", true, &stderr)
+		done <- runStreamCtx(ctx, prod, br, &stdout, theme.Mono(), "", true, false, &stderr)
 	}()
 
 	// Give the streamer a moment to consume the initial events.

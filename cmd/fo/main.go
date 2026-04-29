@@ -82,6 +82,7 @@ FLAGS
   --theme <name>      color | mono (default: auto — color on TTY, mono otherwise)
   --state-file <path> Sidecar state file (default: .fo/last-run.json)
   --no-state          Skip diff classification and sidecar I/O
+  --state-strict      Exit non-zero (2) if sidecar Save fails
 
 SUBCOMMANDS
   fo wrap <name>     Convert tool output to SARIF
@@ -113,6 +114,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	themeFlag := fs.String("theme", "auto", "Theme: auto, color, mono")
 	stateFile := fs.String("state-file", state.DefaultPath, "Sidecar state file path")
 	noState := fs.Bool("no-state", false, "Skip diff classification and sidecar I/O")
+	stateStrict := fs.Bool("state-strict", false, "Exit non-zero if sidecar Save fails")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -140,7 +142,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	// Stream mode: go test -json + TTY + format=auto. The streaming path
 	// owns its own parser → channel → RenderStream pump.
 	if *formatFlag == "auto" && isTTYWriter(stdout) && sniffGoTestJSON(peeked) {
-		return runStream(stdin, br, stdout, resolveTheme(*themeFlag, stdout), *stateFile, *noState, stderr)
+		return runStream(stdin, br, stdout, resolveTheme(*themeFlag, stdout), *stateFile, *noState, *stateStrict, stderr)
 	}
 
 	input, err := boundread.All(br, 0)
@@ -159,10 +161,13 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	attachDiff(r, *stateFile, *noState, stderr)
+	saveErr := attachDiff(r, *stateFile, *noState, stderr)
 
 	if err := renderMode(mode, r, stdout, *themeFlag); err != nil {
 		fmt.Fprintf(stderr, "fo: %v\n", err)
+		return 2
+	}
+	if saveErr != nil && *stateStrict {
 		return 2
 	}
 	return exitCodeReport(r)
@@ -424,16 +429,16 @@ func termSize(w io.Writer) int {
 // hands them to view.RenderStream. One channel send per finished package
 // keeps PickView's total-driven thresholds meaningful. Cancellation (SIGINT)
 // closes the underlying reader so blocked Reads unblock promptly — fo-op6.
-func runStream(stdin io.Reader, br *bufio.Reader, stdout io.Writer, t theme.Theme, stateFile string, noState bool, stderr io.Writer) int {
+func runStream(stdin io.Reader, br *bufio.Reader, stdout io.Writer, t theme.Theme, stateFile string, noState, stateStrict bool, stderr io.Writer) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	return runStreamCtx(ctx, stdin, br, stdout, t, stateFile, noState, stderr)
+	return runStreamCtx(ctx, stdin, br, stdout, t, stateFile, noState, stateStrict, stderr)
 }
 
 // runStreamCtx is runStream's testable core: cancellation root injected.
 // Streams events incrementally — never buffers the whole stdin — so large
 // CI runs cannot OOM and Ctrl-C exits within the next event boundary.
-func runStreamCtx(ctx context.Context, stdin io.Reader, br *bufio.Reader, stdout io.Writer, t theme.Theme, stateFile string, noState bool, stderr io.Writer) int {
+func runStreamCtx(ctx context.Context, stdin io.Reader, br *bufio.Reader, stdout io.Writer, t theme.Theme, stateFile string, noState, stateStrict bool, stderr io.Writer) int {
 	if c, ok := stdin.(io.Closer); ok {
 		stopClose := context.AfterFunc(ctx, func() { _ = c.Close() })
 		defer stopClose()
@@ -448,6 +453,7 @@ func runStreamCtx(ctx context.Context, stdin io.Reader, br *bufio.Reader, stdout
 	snapshots := make(chan report.Report, 8)
 	finalCh := make(chan *report.Report, 1)
 	parseErrCh := make(chan error, 1)
+	saveErrCh := make(chan error, 1)
 
 	go func() {
 		defer close(snapshots)
@@ -469,7 +475,7 @@ func runStreamCtx(ctx context.Context, stdin io.Reader, br *bufio.Reader, stdout
 		}
 		// Final snapshot with diff attached. Same code path as batch.
 		r := testjson.ToReport(agg.Results())
-		attachDiff(r, stateFile, noState, stderr)
+		saveErrCh <- attachDiff(r, stateFile, noState, stderr)
 		finalCh <- r
 		select {
 		case snapshots <- *r:
@@ -487,6 +493,9 @@ func runStreamCtx(ctx context.Context, stdin io.Reader, br *bufio.Reader, stdout
 	}
 	if renderErr != nil && !errors.Is(renderErr, context.Canceled) {
 		fmt.Fprintf(stderr, "fo: %v\n", renderErr)
+		return 2
+	}
+	if saveErr := <-saveErrCh; saveErr != nil && stateStrict {
 		return 2
 	}
 	return exitCodeReport(final)

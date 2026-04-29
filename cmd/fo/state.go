@@ -10,12 +10,13 @@ import (
 )
 
 // attachDiff loads prior state, classifies the current report, sets
-// r.Diff, then appends and saves. Tolerant: any I/O or parse error
-// leaves r.Diff unset and emits a single warning to stderr — the run
-// itself must not fail because of sidecar trouble.
-func attachDiff(r *report.Report, statePath string, noState bool, stderr io.Writer) {
+// r.Diff, then appends and saves. Save failure is reported back to the
+// caller (so --state-strict can escalate) and recorded on r.Notices so
+// every renderer — including JSON consumers and LLMs — sees that the
+// next run's NEW/REGRESSED classification will be stale.
+func attachDiff(r *report.Report, statePath string, noState bool, stderr io.Writer) error {
 	if noState || r == nil || statePath == "" {
-		return
+		return nil
 	}
 	prev, err := state.Load(statePath)
 	if err != nil {
@@ -29,7 +30,11 @@ func attachDiff(r *report.Report, statePath string, noState bool, stderr io.Writ
 	updated := state.Append(prev, state.RunFromReport(r))
 	if err := state.Save(statePath, updated); err != nil {
 		fmt.Fprintf(stderr, "fo: state: save: %v\n", err)
+		r.Notices = append(r.Notices,
+			fmt.Sprintf("state: save failed (%v) — next run's diff classification may be stale", err))
+		return err
 	}
+	return nil
 }
 
 func envelopeToDiffSummary(e state.Envelope) *report.DiffSummary {
@@ -62,12 +67,17 @@ func convertItems(items []state.Item) []report.DiffItem {
 // findings with file:line rule message, for LLM consumers who need to
 // act on the delta rather than just count it.
 func writeDiffDetail(w io.Writer, r *report.Report) {
-	if r == nil || r.Diff == nil {
+	if r == nil {
+		return
+	}
+	if r.Diff == nil {
+		writeNotices(w, r)
 		return
 	}
 	newItems := r.Diff.New
 	regressed := r.Diff.Regressed
 	if len(newItems) == 0 && len(regressed) == 0 {
+		writeNotices(w, r)
 		return
 	}
 
@@ -91,6 +101,22 @@ func writeDiffDetail(w io.Writer, r *report.Report) {
 		for _, item := range regressed {
 			writeDiffLine(&sb, item, byFP)
 		}
+	}
+	_, _ = io.WriteString(w, sb.String())
+	writeNotices(w, r)
+}
+
+// writeNotices emits a NOTICES block for LLM consumers so operational
+// degradation (e.g. failed state.Save) is visible alongside findings,
+// not just on stderr where Claude-as-consumer never sees it.
+func writeNotices(w io.Writer, r *report.Report) {
+	if r == nil || len(r.Notices) == 0 {
+		return
+	}
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "\nNOTICES (%d)\n", len(r.Notices))
+	for _, n := range r.Notices {
+		fmt.Fprintf(&sb, "  %s\n", n)
 	}
 	_, _ = io.WriteString(w, sb.String())
 }
