@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -29,6 +30,18 @@ func attachDiff(r *report.Report, statePath string, noState bool, stderr io.Writ
 
 	updated := state.Append(prev, state.RunFromReport(r))
 	if err := state.Save(statePath, updated); err != nil {
+		// Durability degraded (rename succeeded, parent-dir fsync
+		// failed): the new state IS on disk, but on NFS/virtualized FS
+		// a subsequent crash could revert the rename and re-surface
+		// resolved findings as new. Surface as a Notice so LLM/JSON
+		// consumers see it; do not fail the run, and do not treat as a
+		// strict-save failure (fo-1x0).
+		if errors.Is(err, state.ErrDurabilityDegraded) {
+			fmt.Fprintf(stderr, "fo: state: warning: %v\n", err)
+			r.Notices = append(r.Notices,
+				fmt.Sprintf("state: durability degraded (%v) — sidecar may revert under crash; next run's diff may be stale", err))
+			return nil
+		}
 		fmt.Fprintf(stderr, "fo: state: save: %v\n", err)
 		r.Notices = append(r.Notices,
 			fmt.Sprintf("state: save failed (%v) — next run's diff classification may be stale", err))

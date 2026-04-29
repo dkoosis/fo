@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+var errSimulatedSyncFail = errors.New("simulated NFS dir-sync failure")
+
 func TestLoad_MissingFile(t *testing.T) {
 	t.Parallel()
 	f, err := Load(filepath.Join(t.TempDir(), "nope.json"))
@@ -116,6 +118,33 @@ func TestSave_FsyncsParentDir(t *testing.T) {
 	}
 	if gotDir != wantDir {
 		t.Fatalf("syncDir path: want %q, got %q", wantDir, gotDir)
+	}
+}
+
+// TestSave_SyncDirFailure_SurfacesDurabilityWarning verifies that a
+// failing parent-directory fsync surfaces ErrDurabilityDegraded so
+// callers can distinguish "data on disk but durability reduced" from
+// a true save failure. Regression for fo-1x0.
+func TestSave_SyncDirFailure_SurfacesDurabilityWarning(t *testing.T) {
+	// Not parallel: mutates package-level syncDir.
+	dir := t.TempDir()
+	p := filepath.Join(dir, "last.json")
+
+	orig := syncDir
+	t.Cleanup(func() { syncDir = orig })
+
+	syncDir = func(string) error { return errSimulatedSyncFail }
+
+	err := Save(p, &File{Version: SchemaVersion})
+	if err == nil {
+		t.Fatal("expected ErrDurabilityDegraded, got nil")
+	}
+	if !errors.Is(err, ErrDurabilityDegraded) {
+		t.Fatalf("err should wrap ErrDurabilityDegraded; got: %v", err)
+	}
+	// Data must still be on disk — the rename happened before syncDir.
+	if _, statErr := os.Stat(p); statErr != nil {
+		t.Fatalf("sidecar should exist on disk despite dir-sync failure: %v", statErr)
 	}
 }
 

@@ -89,11 +89,24 @@ func Load(path string) (*File, error) {
 	return &f, nil
 }
 
+// ErrDurabilityDegraded is returned (wrapped) by Save when the atomic
+// rename succeeded but the parent-directory fsync did not. The new
+// state IS on disk, but a crash before the next directory flush could
+// revert the rename and resurrect previously-resolved findings as new.
+// Callers detect via errors.Is to distinguish from a true save failure
+// (fo-1x0).
+var ErrDurabilityDegraded = errors.New("state: durability degraded (parent dir not fsynced)")
+
 // Save writes a File atomically: write to a tmp file in the same
 // directory, fsync, then rename. The same-directory tmp keeps the
 // rename on the same filesystem (POSIX atomic). fsync before rename
 // guards against a power loss between write and rename leaving an
 // empty/partial file in place.
+//
+// On parent-directory fsync failure (e.g. NFS, virtualized FS), Save
+// returns an error wrapping ErrDurabilityDegraded — the data IS on
+// disk, but durability is reduced. Callers should treat this as a
+// warning rather than a hard failure (fo-1x0).
 func Save(path string, f *File) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o750); err != nil {
@@ -126,14 +139,9 @@ func Save(path string, f *File) error {
 		cleanup()
 		return fmt.Errorf("state: rename: %w", err)
 	}
-	// Best-effort fsync of the parent directory so the rename itself is
-	// durable across crash/power-loss. Without this, the data blocks are
-	// safe (we fsynced the tmp file) but the directory entry update can
-	// be lost — leaving the sidecar at its pre-rename state and causing
-	// previously-resolved findings to reappear as "new". Errors are
-	// ignored: on Windows directory sync is a no-op / EINVAL, and a
-	// failure here is a durability hint, not a correctness failure.
-	_ = syncDir(filepath.Dir(path))
+	if err := syncDir(filepath.Dir(path)); err != nil {
+		return fmt.Errorf("%w: %w", ErrDurabilityDegraded, err)
+	}
 	return nil
 }
 
