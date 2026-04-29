@@ -41,6 +41,33 @@ func TestParseToReport_GarbageStillRejected(t *testing.T) {
 	}
 }
 
+// TestParseToReport_TruncatedTestJSONDiagnosed verifies that input which
+// looks like go test -json but has only malformed/truncated JSON lines (so
+// no events parse) returns a precise diagnostic mentioning the malformed
+// count, rather than the generic 'unrecognized input'. Regression test for
+// fo-6w5.
+func TestParseToReport_TruncatedTestJSONDiagnosed(t *testing.T) {
+	// Two truncated JSON lines — both fail to unmarshal, zero results aggregate.
+	input := []byte(
+		`{"Time":"2026-04-29T12:00:00Z","Action":"run","Package":"foo"` + "\n" +
+			`{"Time":"2026-04-29T12:00:01Z","Action":"output` + "\n",
+	)
+	var stderr bytes.Buffer
+	_, err := parseToReport(input, &stderr)
+	if err == nil {
+		t.Fatal("expected error for truncated JSON, got nil")
+	}
+	msg := err.Error()
+	for _, want := range []string{"go test -json", "failed to parse", "truncated"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("error %q should contain %q", msg, want)
+		}
+	}
+	if strings.Contains(msg, "unrecognized input") {
+		t.Errorf("truncated-stream input should not collapse to 'unrecognized input'; got: %q", msg)
+	}
+}
+
 // TestParseToReport_UnknownMultiplexFormat verifies that a delimiter with the
 // expected shape but an unsupported format value yields a precise error
 // (section index, offending line, supported formats, and a hint pointing at

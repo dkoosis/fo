@@ -53,6 +53,7 @@ const (
 
 var (
 	errUnrecognizedInput    = errors.New("unrecognized input (expected SARIF or go test -json)")
+	errTruncatedTestJSON    = errors.New("no complete events recovered (truncated stream?)")
 	errUnknownFormat        = errors.New("unknown format (expected auto, human, llm, json)")
 	errUnknownSectionFormat = errors.New("unknown section format")
 )
@@ -274,13 +275,50 @@ func parseToReport(input []byte, stderr io.Writer) (*report.Report, error) {
 	return parseTestJSONTolerant(input, stderr)
 }
 
+// hasJSONShapedLine reports whether any non-empty line in input begins with
+// '{' after leading whitespace — a cheap heuristic that the caller intended
+// to pipe NDJSON.
+func hasJSONShapedLine(input []byte) bool {
+	for len(input) > 0 {
+		nl := bytes.IndexByte(input, '\n')
+		var line []byte
+		if nl < 0 {
+			line = input
+			input = nil
+		} else {
+			line = input[:nl]
+			input = input[nl+1:]
+		}
+		trimmed := bytes.TrimLeft(line, " \t\r")
+		if len(trimmed) > 0 && trimmed[0] == '{' {
+			return true
+		}
+	}
+	return false
+}
+
 // parseTestJSONTolerant attempts to parse input as go test -json even when
 // it doesn't start with '{' — wrapped commands sometimes prepend banners or
 // progress lines before the JSON stream. Accept iff at least one valid event
-// parsed; otherwise treat as unrecognized.
+// parsed; otherwise distinguish three failure modes:
+//   - parser IO error → wrap and return so operators see the real cause
+//   - input had JSON-shaped lines but none parsed (malformed > 0, no results)
+//     → return a precise truncated-stream diagnostic instead of the generic
+//     'unrecognized input' (fo-6w5)
+//   - no signal at all (no results, no malformed) → errUnrecognizedInput
 func parseTestJSONTolerant(input []byte, stderr io.Writer) (*report.Report, error) {
 	results, malformed, err := testjson.ParseBytes(input)
-	if err != nil || len(results) == 0 {
+	if err != nil {
+		return nil, fmt.Errorf("parsing go test -json: %w", err)
+	}
+	if len(results) == 0 {
+		// Distinguish JSON-shaped-but-broken input (truncated stream) from
+		// pure-prose input (wrong tool). If any line begins with '{', the
+		// caller meant to feed go test -json — surface a parse diagnostic
+		// instead of collapsing to errUnrecognizedInput (fo-6w5).
+		if malformed > 0 && hasJSONShapedLine(input) {
+			return nil, fmt.Errorf("parsing go test -json: %d line(s) failed to parse: %w", malformed, errTruncatedTestJSON)
+		}
 		return nil, errUnrecognizedInput
 	}
 	if malformed > 0 {
