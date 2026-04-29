@@ -40,3 +40,23 @@ func TestParseToReport_GarbageStillRejected(t *testing.T) {
 		t.Fatal("expected error for unrecognized input, got nil")
 	}
 }
+
+// TestParseToReport_UnknownMultiplexFormat verifies that a delimiter with the
+// expected shape but an unsupported format value yields a precise error
+// (section index, offending line, supported formats, and a hint pointing at
+// 'fo wrap diag') rather than the generic 'unrecognized input'. Regression
+// test for fo-y2o.
+func TestParseToReport_UnknownMultiplexFormat(t *testing.T) {
+	input := []byte("--- tool:build format:text ---\nbuild failed: foo.go:1: oops\n")
+	var stderr bytes.Buffer
+	_, err := parseToReport(input, &stderr)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	msg := err.Error()
+	for _, want := range []string{"section 1", `"text"`, "sarif", "testjson", "fo wrap diag"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("error %q should contain %q", msg, want)
+		}
+	}
+}

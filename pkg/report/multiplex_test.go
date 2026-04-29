@@ -2,6 +2,7 @@ package report
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -161,6 +162,48 @@ func TestParseSections_StatusAttribute(t *testing.T) {
 		if got[0].Status != c.wantStatus {
 			t.Errorf("%q: Status = %q, want %q", c.line, got[0].Status, c.wantStatus)
 		}
+	}
+}
+
+func TestHasDelimiter_UnknownFormatRoutesToMultiplexer(t *testing.T) {
+	// Shape-only delimiters should be detected so the multiplexer can surface
+	// a precise error instead of falling through to 'unrecognized input'.
+	if !HasDelimiter([]byte("--- tool:vet format:text ---\nbody\n")) {
+		t.Errorf("HasDelimiter should match shape-only delimiter with unknown format")
+	}
+}
+
+func TestParseSections_UnknownFormat(t *testing.T) {
+	input := "--- tool:vet format:sarif ---\nok body\n" +
+		"--- tool:build format:text ---\nbuild error here\n"
+	_, _, err := ParseSections([]byte(input))
+	var ufe *UnknownFormatError
+	if !errors.As(err, &ufe) {
+		t.Fatalf("err = %v, want UnknownFormatError", err)
+	}
+	if ufe.SectionIndex != 2 {
+		t.Errorf("SectionIndex = %d, want 2", ufe.SectionIndex)
+	}
+	if ufe.Tool != "build" || ufe.Format != "text" {
+		t.Errorf("Tool=%q Format=%q, want build/text", ufe.Tool, ufe.Format)
+	}
+	msg := ufe.Error()
+	if !strings.Contains(msg, "sarif") || !strings.Contains(msg, "testjson") {
+		t.Errorf("error message %q should list supported formats", msg)
+	}
+	if !strings.Contains(msg, `"text"`) {
+		t.Errorf("error message %q should quote offending format", msg)
+	}
+}
+
+func TestParseSections_UnknownFormatFirstSection(t *testing.T) {
+	_, _, err := ParseSections([]byte("--- tool:build format:text ---\nbody\n"))
+	var ufe *UnknownFormatError
+	if !errors.As(err, &ufe) {
+		t.Fatalf("err = %v, want UnknownFormatError", err)
+	}
+	if ufe.SectionIndex != 1 {
+		t.Errorf("SectionIndex = %d, want 1", ufe.SectionIndex)
 	}
 }
 
