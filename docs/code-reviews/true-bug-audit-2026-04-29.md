@@ -20,10 +20,10 @@
 
 2) **Huge go test input can OOM in non-stream modes due to full buffering**  
 **Severity:** High  
-**Evidence:** non-stream path always calls `boundread.All(br, 0)` (unbounded mode) before parse; stream mode is gated by `--format=auto` + TTY only. Reachability: `run` branch when output is piped or explicit `--format human/llm/json`.  
-**Mechanism:** entire stdin is read into memory before parsing; large `go test -json` in CI (piped output) can exhaust memory and terminate process.  
-**Concrete scenario:** monorepo integration test emits multi-GB JSON stream to piped `fo --format llm`; process is OOM-killed, losing report and causing flaky CI infrastructure alarms.  
-**Minimal fix:** allow streaming parser for go test regardless of TTY when format is llm/json/human with snapshot throttling; or enforce bounded read size with explicit error and recommendation. Add stress test with large synthetic input.
+**Evidence:** non-stream path calls `boundread.All(br, 0)` which falls back to `DefaultMax = 256 MiB` (`internal/boundread/boundread.go:13`); `cmd/fo/main.go:148-149` already returns a stream-mode hint on `ErrInputTooLarge`. Stream mode itself is gated on `--format=auto` + TTY + go-test sniff (`cmd/fo/main.go:142`), so piped CI with explicit `--format llm/json/human` cannot use the streaming path even when input is large.  
+**Mechanism:** non-TTY/non-auto callers buffer up to 256 MiB before parsing, then hard-fail rather than degrade to streaming; large `go test -json` runs in CI hit the cap and the user has no way to opt into streaming.  
+**Concrete scenario:** monorepo integration run pipes multi-GB JSON to `fo --format llm`; fo aborts at 256 MiB with the "use stream mode" hint, but stream mode is unreachable from this invocation.  
+**Minimal fix:** allow streaming parser for go test regardless of TTY when format is llm/json/human (with snapshot throttling), or expose an explicit `--stream` opt-in. Add stress test with large synthetic input.
 **Confidence:** High.
 
 3) **Parse errors are collapsed into generic “unrecognized input”, losing operational diagnosability**  
