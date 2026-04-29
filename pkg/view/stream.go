@@ -12,7 +12,12 @@ import (
 // RenderReport picks a view from r and writes the rendered string to w.
 // Batch arrival mode: caller has the complete Report.
 func RenderReport(w io.Writer, r report.Report, t theme.Theme, width int) error {
-	out := Render(PickView(r), t, width)
+	return RenderReportMode(w, r, t, width, ModeHuman)
+}
+
+// RenderReportMode is RenderReport with an explicit audience mode.
+func RenderReportMode(w io.Writer, r report.Report, t theme.Theme, width int, mode Mode) error {
+	out := Render(PickViewMode(r, mode), t, width)
 	if out == "" {
 		return nil
 	}
@@ -34,6 +39,11 @@ func RenderReport(w io.Writer, r report.Report, t theme.Theme, width int) error 
 //
 // Returns when ch is closed or ctx is cancelled. The caller owns ch.
 func RenderStream(ctx context.Context, w io.Writer, ch <-chan report.Report, t theme.Theme, width int) error {
+	return RenderStreamMode(ctx, w, ch, t, width, ModeHuman)
+}
+
+// RenderStreamMode is RenderStream with an explicit audience mode.
+func RenderStreamMode(ctx context.Context, w io.Writer, ch <-chan report.Report, t theme.Theme, width int, mode Mode) error {
 	first := true
 	for {
 		select {
@@ -43,7 +53,7 @@ func RenderStream(ctx context.Context, w io.Writer, ch <-chan report.Report, t t
 			if !ok {
 				return nil
 			}
-			if err := writeSnapshot(w, r, t, width, &first); err != nil {
+			if err := writeSnapshot(w, r, t, width, &first, mode); err != nil {
 				return err
 			}
 		}
@@ -52,8 +62,8 @@ func RenderStream(ctx context.Context, w io.Writer, ch <-chan report.Report, t t
 
 // writeSnapshot renders one report snapshot and writes it to w, prepending a
 // blank separator line for all but the first snapshot.
-func writeSnapshot(w io.Writer, r report.Report, t theme.Theme, width int, first *bool) error {
-	out := Render(PickView(r), t, width)
+func writeSnapshot(w io.Writer, r report.Report, t theme.Theme, width int, first *bool, mode Mode) error {
+	out := Render(PickViewMode(r, mode), t, width)
 	if out == "" {
 		return nil
 	}

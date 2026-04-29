@@ -21,12 +21,29 @@ const (
 	alertErrorThreshold    = 1
 )
 
+// Mode hints the audience for the picked view. ModeHuman (default) may
+// pick visual aggregates (Leaderboard, SmallMultiples) that condense
+// many findings into a chart. ModeLLM skips those — an LLM consumer
+// needs file:line per finding, not a bar chart — and falls through to
+// Grouped or Bullet, which carry the full data.
+type Mode int
+
+const (
+	ModeHuman Mode = iota
+	ModeLLM
+)
+
 // PickView selects a ViewSpec from a Report. Pure and deterministic:
 // branches are evaluated in fixed priority order so the same Report
 // always yields the same shape. Delta wraps the inner pick when Diff
 // is present and at least one severity bucket moved.
 func PickView(r report.Report) ViewSpec {
-	inner := pickInner(r)
+	return PickViewMode(r, ModeHuman)
+}
+
+// PickViewMode is PickView with an explicit audience mode.
+func PickViewMode(r report.Report, mode Mode) ViewSpec {
+	inner := pickInner(r, mode)
 	if r.Diff != nil {
 		buckets := deltaBuckets(r, r.Diff)
 		if hasNonZero(buckets) {
@@ -36,7 +53,7 @@ func PickView(r report.Report) ViewSpec {
 	return inner
 }
 
-func pickInner(r report.Report) ViewSpec {
+func pickInner(r report.Report, mode Mode) ViewSpec {
 	if isClean(r) {
 		return Clean{Message: "no findings"}
 	}
@@ -46,11 +63,13 @@ func pickInner(r report.Report) ViewSpec {
 	if a, ok := pickAlert(r); ok {
 		return a
 	}
-	if lb, ok := pickLeaderboard(r); ok {
-		return lb
-	}
-	if sm, ok := pickSmallMultiples(r); ok {
-		return sm
+	if mode != ModeLLM {
+		if lb, ok := pickLeaderboard(r); ok {
+			return lb
+		}
+		if sm, ok := pickSmallMultiples(r); ok {
+			return sm
+		}
 	}
 	if g, ok := pickGrouped(r); ok {
 		return g

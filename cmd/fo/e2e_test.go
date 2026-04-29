@@ -232,6 +232,12 @@ func TestE2E_LLMGoldens(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 			_ = run([]string{"--format", "llm", "--no-state"}, bytes.NewReader(input), &stdout, &stderr)
 			goldenPath := filepath.Join(filepath.Dir(sc.inputAbs), sc.name+".llm.golden")
+			if os.Getenv("UPDATE_LLM_GOLDENS") == "1" {
+				if err := os.WriteFile(goldenPath, stdout.Bytes(), 0o644); err != nil {
+					t.Fatalf("write golden %s: %v", goldenPath, err)
+				}
+				return
+			}
 			want, err := os.ReadFile(goldenPath)
 			if err != nil {
 				t.Fatalf("read golden %s: %v", goldenPath, err)

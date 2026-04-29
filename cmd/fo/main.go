@@ -192,11 +192,13 @@ func renderMode(mode string, r *report.Report, stdout io.Writer, themeName strin
 		return writeReportJSON(stdout, r)
 	}
 	t := resolveTheme(themeName, stdout)
+	viewMode := view.ModeHuman
 	if mode == formatLLM {
 		t = theme.Mono()
+		viewMode = view.ModeLLM
 	}
 	width := termSize(stdout)
-	if err := view.RenderReport(stdout, *r, t, width); err != nil {
+	if err := view.RenderReportMode(stdout, *r, t, width, viewMode); err != nil {
 		return err
 	}
 	if mode == formatLLM {
