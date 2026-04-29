@@ -1,2 +1,4 @@
 PANIC
 fixture
+panic: boom [recovered, repanicked]
+at /var/folders/_5/z29k0cv53bjgn2nkk_sv0cqr0000gq/T/tmp.Ud9G17Gnut/x_test.go:5

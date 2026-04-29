@@ -10,6 +10,12 @@ func renderHeadline(v Headline, t theme.Theme) string {
 	if v.Detail != "" {
 		out += "\n" + t.Muted.Render(v.Detail)
 	}
+	for _, line := range v.Body {
+		if line == "" {
+			continue
+		}
+		out += "\n" + t.Muted.Render(line)
+	}
 	return out
 }
 

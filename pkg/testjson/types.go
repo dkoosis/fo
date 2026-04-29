@@ -15,12 +15,13 @@ const (
 
 // TestEvent represents a single event from go test -json output.
 type TestEvent struct {
-	Time    time.Time `json:"Time"`
-	Action  string    `json:"Action"` // start, run, pass, fail, skip, output, bench, pause, cont
-	Package string    `json:"Package"`
-	Test    string    `json:"Test"`
-	Elapsed float64   `json:"Elapsed"`
-	Output  string    `json:"Output"`
+	Time       time.Time `json:"Time"`
+	Action     string    `json:"Action"` // start, run, pass, fail, skip, output, build-output, build-fail, bench, pause, cont
+	Package    string    `json:"Package"`
+	Test       string    `json:"Test"`
+	Elapsed    float64   `json:"Elapsed"`
+	Output     string    `json:"Output"`
+	ImportPath string    `json:"ImportPath"` // set on build-output / build-fail events
 }
 
 // TestPackageResult represents aggregated results for one package.

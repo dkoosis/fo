@@ -81,7 +81,8 @@ type LbRow struct {
 // PANIC, build-error-only runs, or one overwhelming signal.
 type Headline struct {
 	Title  string
-	Detail string // optional sub-line, rendered muted under Title
+	Detail string   // optional sub-line, rendered muted under Title
+	Body   []string // extra lines (panic message, build error, user-code frame)
 }
 
 func (Headline) isViewSpec() {}

@@ -196,6 +196,7 @@ type pkgState struct {
 	coverage    float64
 	failedOrder []string // failed test names in run order
 	buildError  string
+	buildOutput []string
 	panicked    bool
 	panicOutput []string
 	// Track output per test (empty test name = package-level output).
@@ -223,6 +224,10 @@ func (a *aggregator) getOrCreate(name string) *pkgState {
 }
 
 func (a *aggregator) processEvent(e TestEvent) {
+	if e.Action == "build-output" || e.Action == "build-fail" {
+		a.handleBuildEvent(e)
+		return
+	}
 	pkg := a.getOrCreate(e.Package)
 
 	switch e.Action {
@@ -237,6 +242,33 @@ func (a *aggregator) processEvent(e TestEvent) {
 		}
 	case "output":
 		a.handleOutput(pkg, e)
+	}
+}
+
+// handleBuildEvent routes build-output / build-fail to the underlying
+// package. ImportPath looks like "pkg" or "pkg [pkg.test]"; we strip the
+// bracketed test-binary suffix so build output lands on the same package
+// state as later test events.
+func (a *aggregator) handleBuildEvent(e TestEvent) {
+	name := e.ImportPath
+	if i := strings.Index(name, " ["); i >= 0 {
+		name = name[:i]
+	}
+	if name == "" {
+		return
+	}
+	pkg := a.getOrCreate(name)
+	switch e.Action {
+	case "build-output":
+		out := strings.TrimRight(e.Output, "\n")
+		if out == "" || strings.HasPrefix(out, "# ") {
+			return
+		}
+		pkg.buildOutput = append(pkg.buildOutput, out)
+	case "build-fail":
+		if pkg.buildError == "" {
+			pkg.buildError = strings.Join(pkg.buildOutput, "\n")
+		}
 	}
 }
 
@@ -255,11 +287,37 @@ func (*aggregator) handleFail(pkg *pkgState, e TestEvent) {
 		pkg.failedOrder = append(pkg.failedOrder, e.Test)
 	} else {
 		pkg.duration = time.Duration(e.Elapsed * float64(time.Second))
-		// Check if this is a build error (failed with no tests run)
-		if pkg.passed == 0 && pkg.failed == 0 && pkg.skipped == 0 {
-			pkg.buildError = strings.Join(pkg.outputBuf[""], "\n")
+		// Check if this is a build error (failed with no tests run).
+		// Prefer compiler output collected from build-output events; fall
+		// back to package-level output for older streams that don't carry
+		// the build-output action.
+		if pkg.passed == 0 && pkg.failed == 0 && pkg.skipped == 0 && pkg.buildError == "" {
+			if len(pkg.buildOutput) > 0 {
+				pkg.buildError = strings.Join(pkg.buildOutput, "\n")
+			} else {
+				pkg.buildError = strings.Join(pkg.outputBuf[""], "\n")
+			}
 		}
 	}
+}
+
+// isPanicNoise returns true for test-runner noise that shouldn't be in
+// the panic block (RUN/PASS/FAIL banners, package-level FAIL summary).
+func isPanicNoise(s string) bool {
+	t := strings.TrimSpace(s)
+	switch {
+	case strings.HasPrefix(t, "=== RUN"),
+		strings.HasPrefix(t, "=== PAUSE"),
+		strings.HasPrefix(t, "=== CONT"),
+		strings.HasPrefix(t, "--- PASS"),
+		strings.HasPrefix(t, "--- FAIL"),
+		strings.HasPrefix(t, "--- SKIP"),
+		strings.HasPrefix(t, "PASS"),
+		strings.HasPrefix(t, "FAIL\t"),
+		strings.HasPrefix(t, "ok  \t"):
+		return true
+	}
+	return false
 }
 
 func (*aggregator) handleOutput(pkg *pkgState, e TestEvent) {
@@ -269,8 +327,10 @@ func (*aggregator) handleOutput(pkg *pkgState, e TestEvent) {
 	}
 	pkg.outputBuf[e.Test] = append(pkg.outputBuf[e.Test], output)
 
-	if strings.Contains(output, "panic:") || strings.HasPrefix(output, "goroutine ") {
+	if !pkg.panicked && (strings.Contains(output, "panic:") || strings.HasPrefix(output, "goroutine ")) {
 		pkg.panicked = true
+	}
+	if pkg.panicked && !isPanicNoise(output) {
 		pkg.panicOutput = append(pkg.panicOutput, output)
 	}
 

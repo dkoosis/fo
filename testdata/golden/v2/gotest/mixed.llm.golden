@@ -1,2 +1,4 @@
 PANIC
 example.com/app/pkg/store
+panic: runtime error: nil pointer dereference
+at store.go:112

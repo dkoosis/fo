@@ -3,6 +3,7 @@ package view
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/dkoosis/fo/pkg/report"
 )
@@ -72,11 +73,20 @@ func isClean(r report.Report) bool {
 func pickHeadline(r report.Report) (Headline, bool) {
 	for _, t := range r.Tests {
 		if t.Outcome == report.OutcomePanic {
-			return Headline{Title: "PANIC", Detail: panicDetail(t)}, true
+			return Headline{
+				Title:  "PANIC",
+				Detail: panicDetail(t),
+				Body:   panicBody(t.Output),
+			}, true
 		}
 	}
 	if buildErrorOnly(r) {
-		return Headline{Title: "BUILD FAILED", Detail: r.Tests[0].Package}, true
+		t := r.Tests[0]
+		return Headline{
+			Title:  "BUILD FAILED",
+			Detail: t.Package,
+			Body:   buildErrorBody(t.Output),
+		}, true
 	}
 	return Headline{}, false
 }
@@ -86,6 +96,77 @@ func panicDetail(t report.TestResult) string {
 		return fmt.Sprintf("%s.%s", t.Package, t.Test)
 	}
 	return t.Package
+}
+
+// panicBody extracts the panic message and the first user-code stack
+// frame from raw test output. Frames in /testing/, /runtime/, or
+// belonging to the testing/runtime packages are skipped so the LLM
+// reader sees the user's call site instead of harness scaffolding.
+func panicBody(output string) []string {
+	if output == "" {
+		return nil
+	}
+	lines := strings.Split(output, "\n")
+	var msg, frame string
+	for i, ln := range lines {
+		trim := strings.TrimSpace(ln)
+		if msg == "" && strings.HasPrefix(trim, "panic:") {
+			msg = trim
+			continue
+		}
+		if frame == "" && msg != "" && isUserFrame(trim) && i+1 < len(lines) {
+			loc := strings.TrimSpace(lines[i+1])
+			loc = stripFramePC(loc)
+			if loc != "" {
+				frame = loc
+			}
+		}
+	}
+	out := make([]string, 0, 2)
+	if msg != "" {
+		out = append(out, msg)
+	}
+	if frame != "" {
+		out = append(out, "at "+frame)
+	}
+	return out
+}
+
+func isUserFrame(funcLine string) bool {
+	if funcLine == "" || !strings.Contains(funcLine, "(") {
+		return false
+	}
+	switch {
+	case strings.HasPrefix(funcLine, "testing."),
+		strings.HasPrefix(funcLine, "runtime."),
+		strings.HasPrefix(funcLine, "panic("),
+		strings.HasPrefix(funcLine, "created by testing"):
+		return false
+	}
+	return true
+}
+
+// stripFramePC removes the trailing " +0x..." program counter from a
+// stack-frame source line so the LLM-facing output stays stable across
+// builds. "src/foo.go:12 +0x2c" → "src/foo.go:12".
+func stripFramePC(s string) string {
+	if i := strings.LastIndex(s, " +0x"); i > 0 {
+		return s[:i]
+	}
+	return s
+}
+
+// buildErrorBody returns the first non-empty line of build output —
+// typically "file:line:col: msg", which is what the user needs to fix.
+func buildErrorBody(output string) []string {
+	for _, ln := range strings.Split(output, "\n") {
+		trim := strings.TrimSpace(ln)
+		if trim == "" || strings.HasPrefix(trim, "# ") {
+			continue
+		}
+		return []string{trim}
+	}
+	return nil
 }
 
 // buildErrorOnly: at least one build_error and no other failure modes.
