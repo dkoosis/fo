@@ -482,11 +482,7 @@ func runStreamCtx(ctx context.Context, stdin io.Reader, br *bufio.Reader, stdout
 			// Emit a snapshot only at package-finish events. Per-test
 			// events would flood RenderStream and PickView.
 			if e.Test == "" && (e.Action == "pass" || e.Action == "fail" || e.Action == "skip") {
-				r := testjson.ToReport(agg.Results())
-				select {
-				case snapshots <- *r:
-				case <-ctx.Done():
-				}
+				sendCoalesceSnapshot(ctx, snapshots, *testjson.ToReport(agg.Results()))
 			}
 		})
 		if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
@@ -518,6 +514,34 @@ func runStreamCtx(ctx context.Context, stdin io.Reader, br *bufio.Reader, stdout
 		return 2
 	}
 	return exitCodeReport(final)
+}
+
+// sendCoalesceSnapshot delivers snap to ch without blocking the parser when
+// ch is full. If a slow renderer (or slow stdout writer) leaves stale
+// snapshots queued, the oldest one is dropped to make room for the latest.
+// Safe with a single producer goroutine. Closes fo-4qh: under rapid
+// fan-out (1k packages) with a slow renderer, the parser previously blocked
+// on a buffered channel send and delayed both progress and ctx cancellation.
+func sendCoalesceSnapshot(ctx context.Context, ch chan report.Report, snap report.Report) {
+	select {
+	case ch <- snap:
+		return
+	case <-ctx.Done():
+		return
+	default:
+	}
+	// Channel full — drop one stale snapshot (single-producer invariant
+	// means no other sender races us) and retry. Worst case the renderer
+	// drains in parallel and our send finds an empty slot; either way we
+	// never block.
+	select {
+	case <-ch:
+	default:
+	}
+	select {
+	case ch <- snap:
+	case <-ctx.Done():
+	}
 }
 
 // runStreamBatch parses go test -json incrementally (so memory never grows
