@@ -28,6 +28,7 @@ SUBCOMMANDS
   fo wrap list       List wrappers (--json for machine output)
   fo wrap --help     Show available wrappers
   fo --version       Print build version and exit
+  fo --print-schema  Print JSON Schema for Report (--format json output) and exit
 
 EXIT CODES
   0   Clean — no errors or test failures

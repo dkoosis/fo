@@ -112,6 +112,7 @@ SUBCOMMANDS
   fo wrap list       List wrappers (--json for machine output)
   fo wrap --help     Show available wrappers
   fo --version       Print build version and exit
+  fo --print-schema  Print JSON Schema for Report (--format json output) and exit
 
 EXIT CODES
   0   Clean — no errors or test failures
@@ -131,6 +132,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 0
 		case "version", "-version", "--version":
 			fmt.Fprintln(stdout, resolveVersion())
+			return 0
+		case "-print-schema", "--print-schema":
+			fmt.Fprint(stdout, report.Schema())
 			return 0
 		}
 		// Reject unknown non-flag positional args (e.g. typos like

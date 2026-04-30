@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dkoosis/fo/pkg/report/report.schema.json",
+  "title": "Report",
+  "description": "Canonical fo Report shape emitted by --format json. One Report per analysis run.",
+  "type": "object",
+  "required": ["generated_at"],
+  "properties": {
+    "tool": {
+      "type": "string",
+      "description": "Source tool identifier (e.g. 'golangci-lint', 'go test', 'multi')."
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp the Report was assembled."
+    },
+    "data_hash": {
+      "type": "string",
+      "description": "Stable hash of the input bytes; used by sidecar state for diff classification."
+    },
+    "findings": {
+      "type": "array",
+      "description": "Static-analysis results. Empty or omitted when no findings.",
+      "items": { "$ref": "#/$defs/Finding" }
+    },
+    "tests": {
+      "type": "array",
+      "description": "Test or package outcomes from go test -json. Empty or omitted when no tests.",
+      "items": { "$ref": "#/$defs/TestResult" }
+    },
+    "diff": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/DiffSummary" }
+      ],
+      "description": "Diff classification against prior sidecar state; null when --no-state or first run."
+    },
+    "notices": {
+      "type": "array",
+      "description": "Operational warnings about the run itself (e.g. sidecar save failure). Never used for findings.",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "Severity": {
+      "type": "string",
+      "enum": ["error", "warning", "note"],
+      "description": "Finding severity. SARIF 'none' maps to 'note'."
+    },
+    "TestOutcome": {
+      "type": "string",
+      "enum": ["pass", "fail", "skip", "panic", "build_error"],
+      "description": "Test or package outcome. Panic and build_error are first-class, not flavors of fail."
+    },
+    "Finding": {
+      "type": "object",
+      "required": ["severity", "message"],
+      "properties": {
+        "rule_id":     { "type": "string" },
+        "file":        { "type": "string" },
+        "line":        { "type": "integer", "minimum": 0 },
+        "col":         { "type": "integer", "minimum": 0 },
+        "severity":    { "$ref": "#/$defs/Severity" },
+        "message":     { "type": "string" },
+        "fix_command": { "type": "string", "description": "Suggested shell command to fix or learn more." },
+        "fingerprint": { "type": "string", "description": "Stable identity for diff classification." },
+        "score":       { "type": "number", "description": "Severity score; higher = more severe." }
+      }
+    },
+    "TestResult": {
+      "type": "object",
+      "required": ["package", "outcome"],
+      "properties": {
+        "package":     { "type": "string" },
+        "test":        { "type": "string", "description": "Empty for package-level results." },
+        "outcome":     { "$ref": "#/$defs/TestOutcome" },
+        "duration_ns": { "type": "integer", "description": "Duration in nanoseconds." },
+        "output":      { "type": "string" },
+        "fix_command": { "type": "string" },
+        "fingerprint": { "type": "string" },
+        "score":       { "type": "number" }
+      }
+    },
+    "DiffItem": {
+      "type": "object",
+      "required": ["fingerprint", "severity", "class"],
+      "properties": {
+        "fingerprint":    { "type": "string" },
+        "rule_id":        { "type": "string" },
+        "file":           { "type": "string" },
+        "severity":       { "type": "string" },
+        "prior_severity": { "type": "string" },
+        "class":          { "type": "string", "description": "Diff class: new, resolved, regressed, flaky, persistent." }
+      }
+    },
+    "DiffSummary": {
+      "type": "object",
+      "required": ["headline", "new", "resolved", "regressed", "flaky", "persistent_count"],
+      "properties": {
+        "headline":         { "type": "string" },
+        "new":              { "type": "array", "items": { "$ref": "#/$defs/DiffItem" } },
+        "resolved":         { "type": "array", "items": { "$ref": "#/$defs/DiffItem" } },
+        "regressed":        { "type": "array", "items": { "$ref": "#/$defs/DiffItem" } },
+        "flaky":            { "type": "array", "items": { "$ref": "#/$defs/DiffItem" } },
+        "persistent_count": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}
