@@ -18,6 +18,8 @@ import (
 // path) live in archlint_test.go; this file adds: oversized input bound,
 // writer failure, and the one-result-per-warning invariant.
 
+var errWriteFailed = errors.New("write failed")
+
 func TestConvert_OversizedInput_ReturnsBoundError(t *testing.T) {
 	t.Parallel()
 
@@ -33,12 +35,11 @@ func TestConvert_OversizedInput_ReturnsBoundError(t *testing.T) {
 func TestConvert_WriterFailure_ReturnsWriterError(t *testing.T) {
 	t.Parallel()
 
-	wantErr := errors.New("write failed")
 	const clean = `{"Type":"models.Check","Payload":{"ArchWarningsDeps":[]}}`
 
-	err := wraparchlint.Convert(strings.NewReader(clean), failingWriter{err: wantErr})
-	if !errors.Is(err, wantErr) {
-		t.Fatalf("err = %v, want errors.Is(_, %v)", err, wantErr)
+	err := wraparchlint.Convert(strings.NewReader(clean), failingWriter{err: errWriteFailed})
+	if !errors.Is(err, errWriteFailed) {
+		t.Fatalf("err = %v, want errors.Is(_, %v)", err, errWriteFailed)
 	}
 }
 
