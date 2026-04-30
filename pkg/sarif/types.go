@@ -1,4 +1,13 @@
-// Package sarif provides SARIF (Static Analysis Results Interchange Format) parsing and rendering.
+// Package sarif models SARIF 2.1.0 — the format fo treats as canonical
+// for static-analysis input. Three roles:
+//
+//   - reader.go: parses SARIF JSON into the typed Document tree.
+//   - builder.go: lets wrappers (pkg/wrapper/*) emit SARIF without
+//     hand-rolling JSON.
+//   - toreport.go: lowers a Document into the renderer-facing
+//     report.Report (Findings + tool/run aggregates).
+//
+// Spec: https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html
 package sarif
 
 // SARIF result levels per the 2.1.0 spec.

@@ -1,3 +1,10 @@
+// Package score ranks static-analysis findings so renderers can lead with
+// the ones that matter. The score is severity weight × file centrality:
+// errors outweigh warnings outweigh notes, and production code outweighs
+// internal/test code. Used by pkg/view to order Findings before rendering.
+//
+// Weights are constants (no runtime flag) — tuning means editing the
+// package, not configuring fo.
 package score
 
 import "strings"

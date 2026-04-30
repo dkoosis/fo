@@ -1,4 +1,15 @@
-// Package testjson parses go test -json NDJSON streams.
+// Package testjson parses `go test -json` NDJSON streams into the
+// renderer-facing report.Report.
+//
+// Two parse modes:
+//   - ParseBytes — buffered, for completed runs.
+//   - Stream — incremental, so fo can render under a live test run
+//     without waiting for EOF.
+//
+// Aggregation lives in funcresults.go (per-test) and stats.go (per-package);
+// toreport.go lowers the aggregated results into a report.Report whose
+// Tests slice the view layer consumes. Build failures and panics are
+// preserved as first-class outcomes, not collapsed into "fail".
 package testjson
 
 import "time"

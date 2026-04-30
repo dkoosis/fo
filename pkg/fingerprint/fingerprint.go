@@ -1,3 +1,10 @@
+// Package fingerprint computes a stable per-finding identity used by the
+// diff classifier (pkg/state) to match findings across fo runs.
+//
+// The fingerprint is sha256(rule_id + file + normalize(message)) — line
+// and column are deliberately excluded so unrelated edits above a defect
+// do not invalidate its identity. Message normalization strips numbers
+// and quoted spans so trivially varying diagnostics still hash equal.
 package fingerprint
 
 import (
