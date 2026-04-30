@@ -1,8 +1,7 @@
 # Boot
-updated: 2026-04-29
+updated: 2026-04-30
 
-→ no queued work — `bd ready` empty, no open PRs/issues. Ask dk for direction.
+→ pick from `bd ready` and ship — 5 P3 polish beads queued (uai/cg7/d1e/0bm/g3y).
 
 ✓ done
-- gh #255 (codex tests): cherry-picked net-new cases into stdlib-only black-box test at `pkg/wrapper/wraparchlint/convert_external_test.go`; PR closed, branch pruned
-- fo-4un / gh #249: declined fo→beads auto-filing — diff (#248) already covers it
+- shipped fo-cy6 (wrapper doc.go), fo-20d (--version), fo-ch3 (unknown subcmd), fo-fv6 (wrap list --json)
