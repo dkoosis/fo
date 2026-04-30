@@ -109,6 +109,7 @@ FLAGS
 
 SUBCOMMANDS
   fo wrap <name>     Convert tool output to SARIF
+  fo wrap list       List wrappers (--json for machine output)
   fo wrap --help     Show available wrappers
   fo --version       Print build version and exit
 
@@ -790,6 +791,9 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if args[0] == "-h" || args[0] == "--help" || args[0] == "help" {
 		return runWrapHelp(stderr)
 	}
+	if args[0] == "list" {
+		return runWrapList(args[1:], stdout, stderr)
+	}
 
 	name := args[0]
 	switch name {
@@ -847,6 +851,39 @@ func runWrapDiag(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if err := wrapdiag.Convert(stdin, stdout, opts); err != nil {
 		fmt.Fprintf(stderr, "fo wrap diag: %v\n", err)
 		return 2
+	}
+	return 0
+}
+
+func runWrapList(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("fo wrap list", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	asJSON := fs.Bool("json", false, "Emit JSON array of {name, description}")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 2
+	}
+	if *asJSON {
+		type entry struct {
+			Name        string `json:"name"`
+			Description string `json:"description"`
+		}
+		out := make([]entry, 0, len(wrapNames))
+		for _, name := range wrapNames {
+			out = append(out, entry{Name: name, Description: wrapDescriptions[name]})
+		}
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(out); err != nil {
+			fmt.Fprintf(stderr, "fo wrap list: %v\n", err)
+			return 2
+		}
+		return 0
+	}
+	for _, name := range wrapNames {
+		fmt.Fprintf(stdout, "%-12s %s\n", name, wrapDescriptions[name])
 	}
 	return 0
 }

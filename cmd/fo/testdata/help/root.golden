@@ -25,6 +25,7 @@ FLAGS
 
 SUBCOMMANDS
   fo wrap <name>     Convert tool output to SARIF
+  fo wrap list       List wrappers (--json for machine output)
   fo wrap --help     Show available wrappers
   fo --version       Print build version and exit
 
