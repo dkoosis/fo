@@ -1,8 +1,8 @@
 # Boot
 updated: 2026-04-29
 
-→ `bd ready` — only fo-4un (decision bead) remains; rest is dk-pick
+→ `bd ready` empty — backlog clear
 
 ✓ done
-- fo-odj: BUILD FAILED / PANIC headlines carry compile error + user-code frame
-- fo-6gt: LLM mode bypasses leaderboard/small-multiples → finding list w/ file:line
+- fo-4un / gh #249: declined fo→beads auto-filing; #248 diff already covers the underlying need, scraped findings have no intent for fixnext
+- lint: modernize ×2 + nestif, PR #254 merged, stale remote branch pruned
