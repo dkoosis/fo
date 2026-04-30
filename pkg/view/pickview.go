@@ -178,7 +178,7 @@ func stripFramePC(s string) string {
 // buildErrorBody returns the first non-empty line of build output —
 // typically "file:line:col: msg", which is what the user needs to fix.
 func buildErrorBody(output string) []string {
-	for _, ln := range strings.Split(output, "\n") {
+	for ln := range strings.SplitSeq(output, "\n") {
 		trim := strings.TrimSpace(ln)
 		if trim == "" || strings.HasPrefix(trim, "# ") {
 			continue

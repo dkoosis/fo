@@ -1,22 +1,27 @@
 package view
 
 import (
+	"strings"
+
 	"github.com/dkoosis/fo/pkg/report"
 	"github.com/dkoosis/fo/pkg/theme"
 )
 
 func renderHeadline(v Headline, t theme.Theme) string {
-	out := t.Heading.Render(v.Title)
+	var b strings.Builder
+	b.WriteString(t.Heading.Render(v.Title))
 	if v.Detail != "" {
-		out += "\n" + t.Muted.Render(v.Detail)
+		b.WriteString("\n")
+		b.WriteString(t.Muted.Render(v.Detail))
 	}
 	for _, line := range v.Body {
 		if line == "" {
 			continue
 		}
-		out += "\n" + t.Muted.Render(line)
+		b.WriteString("\n")
+		b.WriteString(t.Muted.Render(line))
 	}
-	return out
+	return b.String()
 }
 
 func renderAlert(v Alert, t theme.Theme) string {

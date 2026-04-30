@@ -285,18 +285,18 @@ func (*aggregator) handleFail(pkg *pkgState, e TestEvent) {
 	if e.Test != "" {
 		pkg.failed++
 		pkg.failedOrder = append(pkg.failedOrder, e.Test)
-	} else {
-		pkg.duration = time.Duration(e.Elapsed * float64(time.Second))
-		// Check if this is a build error (failed with no tests run).
-		// Prefer compiler output collected from build-output events; fall
-		// back to package-level output for older streams that don't carry
-		// the build-output action.
-		if pkg.passed == 0 && pkg.failed == 0 && pkg.skipped == 0 && pkg.buildError == "" {
-			if len(pkg.buildOutput) > 0 {
-				pkg.buildError = strings.Join(pkg.buildOutput, "\n")
-			} else {
-				pkg.buildError = strings.Join(pkg.outputBuf[""], "\n")
-			}
+		return
+	}
+	pkg.duration = time.Duration(e.Elapsed * float64(time.Second))
+	// Check if this is a build error (failed with no tests run).
+	// Prefer compiler output collected from build-output events; fall
+	// back to package-level output for older streams that don't carry
+	// the build-output action.
+	if pkg.passed == 0 && pkg.failed == 0 && pkg.skipped == 0 && pkg.buildError == "" {
+		if len(pkg.buildOutput) > 0 {
+			pkg.buildError = strings.Join(pkg.buildOutput, "\n")
+		} else {
+			pkg.buildError = strings.Join(pkg.outputBuf[""], "\n")
 		}
 	}
 }

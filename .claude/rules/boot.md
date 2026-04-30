@@ -1,7 +1,8 @@
 # Boot
 updated: 2026-04-29
 
-→ `bd ready` — pick next true-bug audit finding (fo-frl P1, fo-y2o P2, fo-4qh P2 all open)
+→ `bd ready` — only fo-4un (decision bead) remains; rest is dk-pick
 
 ✓ done
-- fo-9js shipped: state.Save errors → Report.Notices + --state-strict; LLM/JSON visible
+- fo-odj: BUILD FAILED / PANIC headlines carry compile error + user-code frame
+- fo-6gt: LLM mode bypasses leaderboard/small-multiples → finding list w/ file:line
