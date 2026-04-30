@@ -352,15 +352,34 @@ func looksLikeLineDiagnostics(input []byte) bool {
 
 // unrecognizedInputErr returns errUnrecognizedInput, optionally wrapped
 // with a hint to pipe through 'fo wrap diag' when the input looks like
-// raw line-diagnostic output (fo-tl4).
+// raw line-diagnostic output (fo-tl4). The first 80 bytes of input are
+// appended (Go-escaped) so callers can self-diagnose without re-running
+// the producer (fo-g3y).
 func unrecognizedInputErr(input []byte) error {
+	preview := previewBytes(input, 80)
 	if looksLikeLineDiagnostics(input) {
 		return fmt.Errorf(
-			"%w\nhint: input looks like line diagnostics — try piping through: fo wrap diag --tool <name>",
-			errUnrecognizedInput,
+			"%w; first bytes: %s\nhint: input looks like line diagnostics — try piping through: fo wrap diag --tool <name>",
+			errUnrecognizedInput, preview,
 		)
 	}
-	return errUnrecognizedInput
+	return fmt.Errorf("%w; first bytes: %s", errUnrecognizedInput, preview)
+}
+
+// previewBytes returns up to n bytes of input as a Go-quoted string with a
+// "...(truncated)" suffix when the input was longer. Empty input renders as
+// `""`.
+func previewBytes(input []byte, n int) string {
+	truncated := false
+	if len(input) > n {
+		input = input[:n]
+		truncated = true
+	}
+	q := fmt.Sprintf("%q", input)
+	if truncated {
+		q += " (truncated)"
+	}
+	return q
 }
 
 // hasJSONShapedLine reports whether any non-empty line in input begins with

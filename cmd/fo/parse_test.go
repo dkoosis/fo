@@ -41,6 +41,38 @@ func TestParseToReport_GarbageStillRejected(t *testing.T) {
 	}
 }
 
+// TestParseToReport_GarbageIncludesPreview verifies that the unrecognized
+// input error includes a Go-quoted preview of the offending bytes so callers
+// can self-diagnose without rerunning the producer (fo-g3y).
+func TestParseToReport_GarbageIncludesPreview(t *testing.T) {
+	input := []byte("just some random text\nwith no JSON at all\n")
+	var stderr bytes.Buffer
+	_, err := parseToReport(input, &stderr)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	msg := err.Error()
+	for _, want := range []string{"first bytes:", `"just some random text`} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("error %q should contain %q", msg, want)
+		}
+	}
+}
+
+// TestParseToReport_PreviewTruncated verifies that long inputs are truncated
+// to ~80 bytes in the preview and labelled as such.
+func TestParseToReport_PreviewTruncated(t *testing.T) {
+	input := []byte(strings.Repeat("x", 500))
+	var stderr bytes.Buffer
+	_, err := parseToReport(input, &stderr)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "(truncated)") {
+		t.Errorf("error should mark long input as truncated; got: %q", err.Error())
+	}
+}
+
 // TestParseToReport_TruncatedTestJSONDiagnosed verifies that input which
 // looks like go test -json but has only malformed/truncated JSON lines (so
 // no events parse) returns a precise diagnostic mentioning the malformed
