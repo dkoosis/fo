@@ -8,14 +8,35 @@ Workspace: /Users/vcto/Projects/fo
 ## Architecture
 
 ```
-stdin → sniff (cmd/fo/main.go: sniffSARIF/sniffGoTestJSON)
-      → parse  (pkg/sarif | pkg/testjson)
-      → Report (pkg/report)
-      → render (pkg/view → pkg/paint + pkg/theme)
-      → stdout
+stdin
+  │
+  ├─[1] read           internal/boundread (batch 256 MiB cap) | internal/lineread (stream)
+  │
+  ├─[2] sniff          cmd/fo/main.go: sniffSARIF, sniffGoTestJSON, report.HasDelimiter
+  │
+  ├─[3] parse          pkg/sarif (ReadBytes → ToReportWithMeta)
+  │                    pkg/testjson (ParseBytes / Stream → ToReport)
+  │                    pkg/report.ParseSections (multiplex --- tool: --- protocol)
+  │
+  ├─[4] Report (IR)    pkg/report/report.go — Findings, Tests, Diff, Notices
+  │
+  ├─[5] diff classify  pkg/state (sidecar .fo/last-run.json) + pkg/fingerprint + pkg/score
+  │                    → attaches report.DiffSummary
+  │
+  ├─[6] mode pick      cmd/fo/main.go: resolveFormat (auto = TTY?human:llm)
+  │
+  ├─[7] render         pkg/view (human | llm | json)  → pkg/paint (bars, tables, sparklines)
+  │                                                    → pkg/theme (color | mono)
+  │
+  └─[8] exit code      cmd/fo/main.go: exitCodeReport (0 clean | 1 findings/fail | 2 error)
+                                                                                       │
+                                                                                       ▼
+                                                                                     stdout
 ```
 
-Inputs: SARIF 2.1.0, go test -json. Outputs: human (TTY), llm (piped), json.
+Subcommands (cmd/fo/main.go): `fo wrap <name>` dispatches to pkg/wrapper/wrap{archlint,diag,jscpd}; `fo state reset`; `fo --version`; `fo --print-schema` (pkg/report.Schema).
+
+Inputs: SARIF 2.1.0, go test -json, multiplex-delimited combo. Outputs: human (TTY), llm (piped), json.
 
 ## Package Structure
 
