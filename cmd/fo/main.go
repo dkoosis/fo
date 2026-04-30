@@ -132,6 +132,13 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprintln(stdout, resolveVersion())
 			return 0
 		}
+		// Reject unknown non-flag positional args (e.g. typos like
+		// `fo nonsense`). Otherwise the flag parser stops at the arg,
+		// stdin is empty, and the user gets a misleading "no input" error.
+		if !strings.HasPrefix(args[0], "-") {
+			fmt.Fprintf(stderr, "fo: unknown subcommand %q\n\nRun 'fo --help' for usage.\n", args[0])
+			return 2
+		}
 	}
 
 	fs := flag.NewFlagSet("fo", flag.ContinueOnError)

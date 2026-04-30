@@ -19,6 +19,19 @@ func TestVersionFlag(t *testing.T) {
 	}
 }
 
+func TestUnknownSubcommand(t *testing.T) {
+	stdout, stderr, err := executeCommand("nonsense")
+	if err == nil {
+		t.Fatalf("expected non-zero exit, got success (stdout=%q)", stdout)
+	}
+	if !strings.Contains(stderr, `unknown subcommand "nonsense"`) {
+		t.Fatalf("stderr missing unknown-subcommand message: %q", stderr)
+	}
+	if strings.Contains(stderr, "no input on stdin") {
+		t.Fatalf("should not fall through to stdin check: %q", stderr)
+	}
+}
+
 func TestResolveVersionLdflagsWins(t *testing.T) {
 	prev := version
 	t.Cleanup(func() { version = prev })
