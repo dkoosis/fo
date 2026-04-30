@@ -30,6 +30,26 @@ SUBCOMMANDS
   fo --version       Print build version and exit
   fo --print-schema  Print JSON Schema for Report (--format json output) and exit
 
+EXAMPLES
+  # Static analysis (SARIF) — golangci-lint v2
+  golangci-lint run --output.sarif.path=stdout ./... | fo
+
+  # Test stream
+  go test -json ./... | fo
+
+  # Streaming for large CI runs (bypasses 256 MiB cap)
+  go test -json ./... | fo --stream
+
+  # Raw line diagnostics → SARIF → fo
+  go vet ./... 2>&1 | fo wrap diag --tool govet | fo
+
+  # Force a format regardless of TTY
+  go test -json ./... | fo --format llm
+  go test -json ./... | fo --format json
+
+  # Reset diff classification baseline
+  fo state reset
+
 EXIT CODES
   0   Clean — no errors or test failures
   1   Failures — lint errors or test failures present
