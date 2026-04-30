@@ -30,6 +30,7 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"runtime/debug"
 	"strings"
 
 	"golang.org/x/term"
@@ -52,6 +53,11 @@ const (
 	formatJSON  = "json"
 )
 
+// version is the build version. Override with -ldflags "-X main.version=v1.2.3".
+// When unset and the binary was installed via `go install`, falls back to the
+// module version reported by debug.ReadBuildInfo.
+var version = "dev"
+
 var (
 	errUnrecognizedInput    = errors.New("unrecognized input (expected SARIF or go test -json)")
 	errTruncatedTestJSON    = errors.New("no complete events recovered (truncated stream?)")
@@ -61,6 +67,19 @@ var (
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
+}
+
+// resolveVersion returns the build version. If main.version was set via
+// ldflags, it wins; otherwise fall back to module info from debug.ReadBuildInfo
+// (populated by `go install module@version`).
+func resolveVersion() string {
+	if version != "dev" {
+		return version
+	}
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		return info.Main.Version
+	}
+	return version
 }
 
 const usage = `fo — focused build output renderer
@@ -91,6 +110,7 @@ FLAGS
 SUBCOMMANDS
   fo wrap <name>     Convert tool output to SARIF
   fo wrap --help     Show available wrappers
+  fo --version       Print build version and exit
 
 EXIT CODES
   0   Clean — no errors or test failures
@@ -107,6 +127,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return runState(args[1:], stdout, stderr)
 		case "help", "-h", "--help":
 			fmt.Fprint(stderr, usage)
+			return 0
+		case "version", "-version", "--version":
+			fmt.Fprintln(stdout, resolveVersion())
 			return 0
 		}
 	}
