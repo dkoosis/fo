@@ -6,12 +6,14 @@
 
 **Architecture:**
 - Two new packages mirroring `pkg/tally`: `pkg/status` (PASS/FAIL contract tables) and `pkg/metrics` (key/value with optional unit and delta-vs-last-run).
-- Wrappers under `pkg/wrapper/`: `wrapbenchstat` (benchstat → metrics), `wrapcover` (go tool cover -func → metrics), `wraparchlinttext` (go-arch-lint text → diag SARIF).
+- Wrappers under `pkg/wrapper/`: `wrapgobench` (`go test -bench` text → metrics), `wrapcover` (`go tool cover -func` → metrics), `wraparchlinttext` (go-arch-lint text → diag SARIF). A real `benchstat` (golang.org/x/perf) tabular-comparison wrapper is filed as a follow-up bead.
 - `cmd/fo/main.go` sniffs the new `# fo:status` / `# fo:metrics` headers on stdin (parallel to tally) and adds `--as <kind>` hint flag.
 - Renderers extend `pkg/view`: status → tabular PASS/FAIL view; metrics → labeled value list with delta sparklines when sidecar state has prior runs.
 - Sidecar state (`pkg/state`) gets a metrics history slot keyed by metric name for delta classification.
 
 **Tech Stack:** Go 1.24, lipgloss, x/term. No new external deps.
+
+**TDD discipline (applies to every task that adds tests + code).** Even when a task collapses "write tests" and "implement" into adjacent steps to keep the plan readable, the executor must keep the red→green discipline: write the test, run it, observe the compile/run failure, *then* write the implementation. Tasks 4, 6, 9, 10, 11 list these as adjacent steps; do not skip the failing-run between them. Task 1 spells the cycle out explicitly — use it as the template.
 
 **Audit reference:** Tool census across trixi/snipe/next Makefiles in agent run from 2026-05-03. Captured tools: govet, golangci-lint, go test, go build, jscpd, govulncheck, nilaway, go-arch-lint, benchstat, jq, snipe, gh, gomarkdoc, awk-formatted status tables. Of these, only benchstat, go-arch-lint text, govulncheck text, coverage, and dk's printf-table outputs are not yet routed through fo.
 
@@ -28,7 +30,7 @@
 | `pkg/view/status.go` | Status view renderer (human + llm) | Create |
 | `pkg/view/metrics.go` | Metrics view renderer (human + llm + delta sparkline) | Create |
 | `pkg/state/metrics_history.go` | Sidecar history for metrics deltas | Create |
-| `pkg/wrapper/wrapbenchstat/wrapbenchstat.go` | benchstat → metrics | Create |
+| `pkg/wrapper/wrapgobench/wrapgobench.go` | `go test -bench` text → metrics | Create |
 | `pkg/wrapper/wrapcover/wrapcover.go` | `go tool cover -func` → metrics | Create |
 | `pkg/wrapper/wraparchlinttext/wraparchlinttext.go` | go-arch-lint text → diag SARIF | Create |
 | `cmd/fo/main.go` | Add status/metrics sniffers, `--as` flag, wrap dispatch entries | Modify |
@@ -43,12 +45,18 @@
 - Create: `pkg/status/status.go`
 - Test: `pkg/status/status_test.go`
 
-Format spec:
+Format spec (TSV after the state token — chosen so multi-word labels don't need quoting and `printf "ok\t%s\t%s\t%s\n"` is the natural producer):
 ```
 # fo:status [tool=<name>]
-<state>  <label>  [value]  [note]
+<state><TAB><label>[<TAB><value>[<TAB><note>]]
 ```
-where `<state>` is one of `ok|fail|warn|skip` (case-insensitive). Columns are whitespace-separated; the optional `note` is the trimmed remainder after the third token. Comment lines (`#`), blank lines, and the header must all be tolerated identically to `pkg/tally`.
+or, when the producer has no tabs to spare, single-token labels separated by runs of spaces:
+```
+<state>  <label>
+```
+`<state>` is one of `ok|pass|fail|error|warn|warning|skip` (case-insensitive). Comment lines (`#`), blank lines, and the header must all be tolerated identically to `pkg/tally`.
+
+Parser rule: state = first whitespace-delimited token. Remainder = rest of line. If remainder contains a tab, split remainder on `\t` into `[label, value, note]`. Else label = trimmed remainder, value/note empty. This lets shell producers always write `printf "ok\tlabel with spaces\tvalue\tnote\n"` without a label-quoting dance, and lets the simplest case `ok foo` still work.
 
 - [ ] **Step 1: Write failing tests for IsHeader**
 
@@ -154,7 +162,9 @@ Expected: PASS.
 
 ```go
 func TestParse_basic(t *testing.T) {
-	in := strings.NewReader("# fo:status tool=doctor\nok env loaded\nfail dolt missing  not-installed\n")
+	// Mix space-only and TSV rows. Space-only rows put everything after
+	// state into Label; TSV rows split into label/value/note.
+	in := strings.NewReader("# fo:status tool=doctor\nok\tenv loaded\nfail\tdolt missing\t\tnot-installed\n")
 	s, err := Parse(in)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
@@ -168,13 +178,25 @@ func TestParse_basic(t *testing.T) {
 	if s.Rows[0] != (Row{State: StateOK, Label: "env loaded"}) {
 		t.Errorf("row0 = %+v", s.Rows[0])
 	}
-	if s.Rows[1].State != StateFail || s.Rows[1].Label != "dolt missing" {
+	if s.Rows[1].State != StateFail || s.Rows[1].Label != "dolt missing" || s.Rows[1].Note != "not-installed" {
 		t.Errorf("row1 = %+v", s.Rows[1])
 	}
 }
 
+func TestParse_spaceOnly(t *testing.T) {
+	// No tabs anywhere — entire remainder of line is the label.
+	in := strings.NewReader("# fo:status\nok build green\n")
+	s, err := Parse(in)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if s.Rows[0].Label != "build green" || s.Rows[0].Value != "" || s.Rows[0].Note != "" {
+		t.Errorf("row = %+v", s.Rows[0])
+	}
+}
+
 func TestParse_valueAndNote(t *testing.T) {
-	in := strings.NewReader("# fo:status\nok build 2.3s green\n")
+	in := strings.NewReader("# fo:status\nok\tbuild\t2.3s\tgreen\n")
 	s, err := Parse(in)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
@@ -256,22 +278,36 @@ func Parse(r io.Reader) (Status, error) {
 }
 
 func parseRow(line string) (Row, error) {
-	fields := strings.Fields(line)
-	if len(fields) < 2 {
+	// State is the first whitespace-delimited token; remainder is everything after.
+	idx := strings.IndexAny(line, " \t")
+	if idx <= 0 {
 		return Row{}, fmt.Errorf("%w: expected '<state> <label> ...', got %q", ErrMalformedRow, line)
 	}
-	st, err := parseState(fields[0])
+	st, err := parseState(line[:idx])
 	if err != nil {
 		return Row{}, err
 	}
-	row := Row{State: st}
-	// Label = fields[1]; value = fields[2] if present; note = remainder.
-	row.Label = fields[1]
-	if len(fields) >= 3 {
-		row.Value = fields[2]
+	rest := strings.TrimLeft(line[idx:], " \t")
+	if rest == "" {
+		return Row{}, fmt.Errorf("%w: missing label, got %q", ErrMalformedRow, line)
 	}
-	if len(fields) >= 4 {
-		row.Note = strings.Join(fields[3:], " ")
+	row := Row{State: st}
+	if strings.ContainsRune(rest, '\t') {
+		// TSV form: split into label / value / note. Empty fields tolerated.
+		parts := strings.SplitN(rest, "\t", 3)
+		row.Label = strings.TrimSpace(parts[0])
+		if len(parts) >= 2 {
+			row.Value = strings.TrimSpace(parts[1])
+		}
+		if len(parts) >= 3 {
+			row.Note = strings.TrimSpace(parts[2])
+		}
+	} else {
+		// Space-only form: whole remainder is the label.
+		row.Label = strings.TrimSpace(rest)
+	}
+	if row.Label == "" {
+		return Row{}, fmt.Errorf("%w: missing label, got %q", ErrMalformedRow, line)
 	}
 	return row, nil
 }
@@ -284,7 +320,7 @@ func parseState(tok string) (State, error) {
 		return StateFail, nil
 	case "warn", "warning":
 		return StateWarn, nil
-	case "skip", "n/a":
+	case "skip":
 		return StateSkip, nil
 	}
 	return "", fmt.Errorf("%w: %q", ErrBadState, tok)
@@ -300,7 +336,7 @@ func parseAttr(tail, key string) string {
 }
 ```
 
-> Note: the simplest spec treats label as a single whitespace-separated token. Multi-word labels go in the `note` slot, or the producer quotes them — see migration doc in Task 13. This keeps the parser unambiguous without quoting machinery.
+> Note: TSV after the state token. Producers that want multi-field rows write tabs; producers that just want a labeled state token write spaces. No quoting machinery needed.
 
 - [ ] **Step 7: Run all status tests**
 
@@ -496,10 +532,26 @@ git commit -m "feat(view): render fo:status tables (human + llm)"
 **Files:**
 - Modify: `cmd/fo/main.go`
 
-- [ ] **Step 1: Find tally sniff site**
+**Sniffer dispatch order (canonical — preserve as new sniffers land):**
+
+1. `report.HasDelimiter` (multiplex `--- tool:`)
+2. `sniffSARIF`
+3. `sniffGoTestJSON`
+4. `tally.IsHeader`
+5. `status.IsHeader`   ← added in this task
+6. `metrics.IsHeader`  ← added in Task 7
+7. `sniffBareTally`    ← added in Task 12 (fuzzy, runs last)
+8. otherwise → unrecognized-input error
+
+`# fo:*` headers are cheap exact-prefix checks; keep them ahead of the fuzzy bare-tally sniffer so a malformed `# fo:status` never falls through into leaderboard.
+
+- [ ] **Step 1: Find tally sniff site + verify golden harness**
 
 Run: `rg -n 'tally.IsHeader' cmd/fo/main.go`
 Read 5 lines around the match.
+
+Run once: `rg -n -- "-update" cmd/fo/*_test.go cmd/fo/testdata/`
+Confirm whether the e2e/help golden harness honors `-update`. If it does not, every "regenerate golden" step in this plan becomes "hand-edit `cmd/fo/testdata/help/*.golden`". Note the result here so later tasks don't stall.
 
 - [ ] **Step 2: Write failing e2e test**
 
@@ -507,7 +559,8 @@ Append to `cmd/fo/e2e_test.go`:
 
 ```go
 func TestE2E_statusFormat(t *testing.T) {
-	in := "# fo:status tool=doctor\nok env\nfail dolt\n"
+	t.Setenv("FO_STATE_DIR", t.TempDir())
+	in := "# fo:status tool=doctor\nok\tenv\nfail\tdolt\n"
 	out, _, code := runFo(t, in, "--format", "llm")
 	if code != 0 {
 		t.Fatalf("exit = %d, out=%s", code, out)
@@ -856,8 +909,27 @@ func TestMetricsHistory_diff(t *testing.T) {
 	prev := []MetricSample{{Tool: "cover", Key: "pkg/x", Value: 80}}
 	curr := []MetricSample{{Tool: "cover", Key: "pkg/x", Value: 87.3}}
 	d := DiffMetrics(prev, curr)
-	if len(d) != 1 || d[0].Delta != 7.3 {
+	if len(d) != 1 || d[0].Delta != 7.3 || d[0].New {
 		t.Errorf("diff = %+v", d)
+	}
+}
+
+func TestMetricsHistory_newRow(t *testing.T) {
+	curr := []MetricSample{{Tool: "cover", Key: "pkg/new", Value: 42}}
+	d := DiffMetrics(nil, curr)
+	if len(d) != 1 || !d[0].New || d[0].Delta != 0 {
+		t.Errorf("expected New=true, Delta=0; got %+v", d)
+	}
+}
+
+func TestMetricsHistory_keyOnlyFallback(t *testing.T) {
+	// Prev has tool="cover"; curr has empty tool (e.g. --as metrics).
+	// Should match by key alone and emit a real Delta, not New.
+	prev := []MetricSample{{Tool: "cover", Key: "pkg/x", Value: 80}}
+	curr := []MetricSample{{Tool: "", Key: "pkg/x", Value: 90}}
+	d := DiffMetrics(prev, curr)
+	if len(d) != 1 || d[0].Delta != 10 || d[0].New {
+		t.Errorf("expected key-only match Delta=10, got %+v", d)
 	}
 }
 ```
@@ -888,6 +960,7 @@ type MetricDelta struct {
 	Sample MetricSample `json:"sample"`
 	Prior  float64      `json:"prior"`
 	Delta  float64      `json:"delta"`
+	New    bool         `json:"new,omitempty"` // no prior sample matched
 }
 
 func SaveMetrics(path string, samples []MetricSample) error {
@@ -917,19 +990,27 @@ func LoadMetrics(path string) ([]MetricSample, error) {
 }
 
 func DiffMetrics(prev, curr []MetricSample) []MetricDelta {
-	prior := make(map[string]float64, len(prev))
+	// Index prior by tool+key AND by key alone, so we can fall back when
+	// either side has an empty Tool tag (e.g. when --as metrics injects a
+	// bare header). Tool-qualified match wins when both have a tool.
+	priorTK := make(map[string]float64, len(prev))
+	priorK := make(map[string]float64, len(prev))
 	for _, s := range prev {
-		prior[s.Tool+"\x00"+s.Key] = s.Value
+		priorTK[s.Tool+"\x00"+s.Key] = s.Value
+		priorK[s.Key] = s.Value
 	}
 	out := make([]MetricDelta, 0, len(curr))
 	for _, s := range curr {
-		key := s.Tool + "\x00" + s.Key
-		p, ok := prior[key]
-		if !ok {
-			out = append(out, MetricDelta{Sample: s, Prior: 0, Delta: 0})
+		if p, ok := priorTK[s.Tool+"\x00"+s.Key]; ok {
+			out = append(out, MetricDelta{Sample: s, Prior: p, Delta: s.Value - p})
 			continue
 		}
-		out = append(out, MetricDelta{Sample: s, Prior: p, Delta: s.Value - p})
+		if p, ok := priorK[s.Key]; ok && s.Tool == "" {
+			// Current row has no tool; match by key alone.
+			out = append(out, MetricDelta{Sample: s, Prior: p, Delta: s.Value - p})
+			continue
+		}
+		out = append(out, MetricDelta{Sample: s, Prior: 0, Delta: 0, New: true})
 	}
 	return out
 }
@@ -1004,7 +1085,8 @@ type MetricRow struct {
 	Key   string
 	Value float64
 	Unit  string
-	Delta float64 // 0 if no prior sample
+	Delta float64 // 0 if New, or genuinely unchanged
+	New   bool    // true when no prior sample matched — render "(new)"
 }
 
 func RenderMetricsLLM(w io.Writer, tool string, rows []MetricRow) error {
@@ -1043,7 +1125,10 @@ func RenderMetricsHuman(w io.Writer, tool string, rows []MetricRow) error {
 	for _, r := range rows {
 		v := strconv.FormatFloat(r.Value, 'f', -1, 64)
 		delta := ""
-		if r.Delta != 0 {
+		switch {
+		case r.New:
+			delta = "  (new)"
+		case r.Delta != 0:
 			sign := "+"
 			if r.Delta < 0 {
 				sign = ""
@@ -1092,6 +1177,7 @@ Append to `cmd/fo/e2e_test.go`:
 
 ```go
 func TestE2E_metricsFormat(t *testing.T) {
+	t.Setenv("FO_STATE_DIR", t.TempDir())
 	in := "# fo:metrics tool=cover\npkg/x 87.3 %\npkg/y 100 %\n"
 	out, _, code := runFo(t, in, "--format", "llm")
 	if code != 0 {
@@ -1142,7 +1228,7 @@ func renderMetrics(input []byte, stdout, stderr io.Writer, format string) int {
 	rows := make([]view.MetricRow, len(deltas))
 	for i, d := range deltas {
 		rows[i] = view.MetricRow{
-			Key: d.Sample.Key, Value: d.Sample.Value, Unit: d.Sample.Unit, Delta: d.Delta,
+			Key: d.Sample.Key, Value: d.Sample.Value, Unit: d.Sample.Unit, Delta: d.Delta, New: d.New,
 		}
 	}
 
@@ -1183,7 +1269,7 @@ func metricsHistoryPath() string {
 }
 ```
 
-(Reuse the existing `stateDir()` helper if present; otherwise inline `.fo` resolution from the sibling `last-run.json` writer.)
+**Unify FO_STATE_DIR in `stateDir()`.** Do not bolt the env var into `metricsHistoryPath` only — that would let `last-run.json` and `metrics-history.json` resolve to different directories in tests. Edit the existing `stateDir()` helper (or, if there is no helper today, extract one) so it consults `os.Getenv("FO_STATE_DIR")` first and falls back to the current `.fo/` resolution. Then both `last-run.json` and `metrics-history.json` share the same root automatically.
 
 - [ ] **Step 5: Run; expect PASS**
 
@@ -1193,8 +1279,7 @@ Run: `go test ./cmd/fo/... -run TestE2E_metricsFormat`
 
 ```go
 func TestE2E_metricsDelta(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("FO_STATE_DIR", dir) // or chdir if state path is cwd-relative
+	t.Setenv("FO_STATE_DIR", t.TempDir())
 	in := "# fo:metrics\nx 10\n"
 	runFo(t, in, "--format", "llm")
 	in2 := "# fo:metrics\nx 12\n"
@@ -1205,7 +1290,7 @@ func TestE2E_metricsDelta(t *testing.T) {
 }
 ```
 
-If `FO_STATE_DIR` env var doesn't exist, this task adds it: in `metricsHistoryPath()`, prefer `os.Getenv("FO_STATE_DIR")` over `stateDir()` when set. Include this in the patch.
+The `FO_STATE_DIR` honoring lives in `stateDir()` per Step 4 above — every sidecar writer (last-run, metrics-history, future) inherits it for free. Set it via `t.Setenv("FO_STATE_DIR", t.TempDir())` in **every** status/metrics e2e test, not just delta tests, to keep test runs from sharing a `.fo/` directory.
 
 - [ ] **Step 7: Run; expect PASS**
 
@@ -1361,6 +1446,10 @@ total notices: 2
 - [ ] **Step 2: Implement**
 
 Pattern after `pkg/wrapper/wrapdiag` — read lines, build SARIF results, emit. Ruleset: a single `arch-lint/forbidden-import` rule. Each `[Warning]`/`[Error]` line opens a result; the indented continuation line provides location.
+
+**Reuse `pkg/sarif`'s builder rather than redeclaring SARIF struct types.** Per the architecture doc, `pkg/sarif` is the canonical home for "SARIF 2.1.0 types, reader, builder". Inspect what `pkg/wrapper/wrapdiag` does today: if it uses `pkg/sarif` types or a builder, mirror that. Only fall back to private struct copies (the inline form below) if `wrapdiag` itself does — and if so, file a follow-up bead to consolidate both wrappers onto `pkg/sarif`.
+
+The struct definitions below are a fallback for when consolidation onto `pkg/sarif` is too invasive in this task.
 
 ```go
 // Package wraparchlinttext converts go-arch-lint plain-text output into
@@ -1521,14 +1610,16 @@ git commit -m "feat(wrap): add archlint-text wrapper for go-arch-lint plain outp
 
 ---
 
-## Task 10: Wrapper — benchstat → metrics
+## Task 10: Wrapper — `go test -bench` text → metrics  (`fo wrap gobench`)
 
 **Files:**
-- Create: `pkg/wrapper/wrapbenchstat/wrapbenchstat.go`
-- Test: `pkg/wrapper/wrapbenchstat/wrapbenchstat_test.go`
+- Create: `pkg/wrapper/wrapgobench/wrapgobench.go`
+- Test: `pkg/wrapper/wrapgobench/wrapgobench_test.go`
 - Modify: `cmd/fo/main.go`
 
-benchstat's default text output looks like:
+> **Naming note.** This wrapper consumes the **raw `go test -bench`** output shape (`BenchmarkFoo-10  1234 ns/op  56 B/op  2 allocs/op`) — not benchstat's tabular comparison output (`golang.org/x/perf/cmd/benchstat`), which has columns for sec/op, geomean, confidence intervals, and a delta column. A real `benchstat` wrapper is a separate, larger task and is filed as a follow-up bead. Calling this wrapper `benchstat` would mis-advertise its input.
+
+`go test -bench` text output looks like:
 
 ```
 goos: darwin
@@ -1553,7 +1644,7 @@ BenchmarkFoo-10        1234 ns/op     56 B/op     2 allocs/op
 		t.Fatalf("Convert: %v", err)
 	}
 	got := out.String()
-	for _, want := range []string{"# fo:metrics tool=benchstat", "BenchmarkFoo/ns_op 1234 ns/op", "BenchmarkFoo/allocs_op 2 allocs/op"} {
+	for _, want := range []string{"# fo:metrics tool=gobench", "BenchmarkFoo/ns_op 1234 ns/op", "BenchmarkFoo/allocs_op 2 allocs/op"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}
@@ -1564,7 +1655,7 @@ BenchmarkFoo-10        1234 ns/op     56 B/op     2 allocs/op
 - [ ] **Step 2: Implement**
 
 ```go
-package wrapbenchstat
+package wrapgobench
 
 import (
 	"bufio"
@@ -1578,8 +1669,13 @@ import (
 // Pairs each value with the unit token that follows it.
 var benchRe = regexp.MustCompile(`^(Benchmark[\w/.-]+)\s+\d+\s+(.+)$`)
 
+// Strips the trailing GOMAXPROCS suffix that the runtime appends to bench names
+// (e.g. "BenchmarkFoo-10" → "BenchmarkFoo"). Anchored so it only fires on a
+// trailing "-<digits>" group; benchmark names with embedded hyphens are safe.
+var goMaxProcsSuffixRe = regexp.MustCompile(`-\d+$`)
+
 func Convert(r io.Reader, w io.Writer) error {
-	if _, err := fmt.Fprintln(w, "# fo:metrics tool=benchstat"); err != nil {
+	if _, err := fmt.Fprintln(w, "# fo:metrics tool=gobench"); err != nil {
 		return err
 	}
 	sc := bufio.NewScanner(r)
@@ -1590,7 +1686,7 @@ func Convert(r io.Reader, w io.Writer) error {
 		if m == nil {
 			continue
 		}
-		name := strings.TrimSuffix(m[1], "-10") // strip GOMAXPROCS suffix; harmless if absent
+		name := goMaxProcsSuffixRe.ReplaceAllString(m[1], "")
 		// Tail like: "1234 ns/op     56 B/op     2 allocs/op"
 		// Iterate value/unit pairs.
 		fields := strings.Fields(m[2])
@@ -1615,17 +1711,17 @@ func unitKey(u string) string {
 }
 ```
 
-> Caveat: benchstat output evolves. This wrapper handles the common `<count> <unit> [...]` shape; the GOMAXPROCS suffix strip is heuristic. For benchstat A/B comparison output (`old.txt new.txt`), this wrapper does not yet support the `delta` column — a follow-up bead can add it.
+> Caveat: this wrapper handles the common `<count> <unit> [...]` shape from `go test -bench`. A real benchstat-tabular wrapper (with delta column, geomean rows, confidence intervals) is a separate, larger task — file as a follow-up bead.
 
 - [ ] **Step 3: Run; expect PASS**
 
 - [ ] **Step 4: Register wrap dispatch + commit**
 
-Same pattern as Task 9; add `benchstat` to `wrapNames`, description, switch case, `runWrapBenchstat`. Update help golden.
+Same pattern as Task 9; add `gobench` to `wrapNames`, description, switch case, `runWrapGobench`. Update help golden.
 
 ```bash
-git add pkg/wrapper/wrapbenchstat/ cmd/fo/
-git commit -m "feat(wrap): add benchstat wrapper emitting fo:metrics"
+git add pkg/wrapper/wrapgobench/ cmd/fo/
+git commit -m "feat(wrap): add gobench wrapper for go test -bench → fo:metrics"
 ```
 
 ---
@@ -1817,7 +1913,15 @@ if sniffBareTally(input) {
 }
 ```
 
-(Cleaner: factor renderTally invocation to be reachable. Adapt to the existing main.go structure.)
+**Concrete refactor for the dispatch.** Read `cmd/fo/main.go` first and identify the function that currently does the sniff-then-render decision (likely `runRender` or similar around the `tally.IsHeader` site). Replace the in-place `if tally.IsHeader(input) { return renderTally(...) }` with a one-liner that calls a small helper, e.g.:
+
+```go
+func dispatchTally(input []byte, stdout, stderr io.Writer, format string) int {
+    return renderTally(input, stdout, stderr, format)
+}
+```
+
+then both the explicit `tally.IsHeader` branch and the `sniffBareTally` branch call `dispatchTally(input, stdout, stderr, format)` after the input has been normalized (i.e., after `wrapleaderboard.Convert` produces a `# fo:tally` header). This avoids the "fall through to tally.IsHeader path next" awkwardness and keeps the sniffer order block (Task 3) honest. Keep `renderTally` as-is — only add `dispatchTally` as a thin shim if the existing code shape makes the in-line `return renderTally(...)` unreachable from the new branch.
 
 - [ ] **Step 3: Run; expect both tests PASS**
 
@@ -1847,7 +1951,7 @@ Cover four sections:
    - trixi `doctor` target: replace `printf "%-30s %s\n" ... ok|MISSING` with a script that emits `# fo:status\nok foo\nfail bar  not-installed\n` and pipes to `fo`.
    - trixi `eval:trend` target: emit `# fo:metrics tool=eval` with one row per metric; `fo` shows deltas vs the prior run.
    - snipe / next sandbox build size: replace `du -h ... | sort -rh` with a script emitting `# fo:metrics tool=size\n<binary> <bytes>\n…` piped through fo.
-   - All three projects' `bench` targets: `go test -bench=. -count=5 ./... | benchstat - | fo wrap benchstat | fo`.
+   - All three projects' `bench` targets: `go test -bench=. -count=5 ./... | fo wrap gobench | fo`. (A real benchstat-tabular wrapper is on the deferred bead list; until it lands, use raw `go test -bench` text.)
 
 - [ ] **Step 2: Update README.md**
 
@@ -1881,8 +1985,12 @@ git commit -m "docs: hygiene formats guide + Makefile migration recipes"
 **Gaps deliberately not addressed (file as separate beads if/when needed):**
 - govulncheck text output — the SARIF route already works (`-format sarif`), and the text form is rarely worth a wrapper.
 - nilaway text — already handled by `wrapdiag` since it's `file:line:col` shaped.
-- benchstat A/B comparison output — Task 10 caveat.
+- Real benchstat (golang.org/x/perf) tabular-comparison wrapper — Task 10 ships `gobench` for raw `go test -bench` only.
 - pprof tabular output — out of scope; not used in any of the three Makefiles.
+- **Multiplex protocol extension for status/metrics.** `pkg/report` defines a `--- tool: --- protocol` delimiter for findings + tests in one stream. Status and metrics live in parallel rendering paths (separate sniffers, separate renderers, no Report IR). If `make ci-report` later wants findings + status + metrics in one piped stream, the delimiter protocol needs to learn the new tool kinds. File a bead when that need shows up.
+- **`fo --print-schema` only emits Report.** It dumps `pkg/report.Schema`. After this plan ships, also expose `pkg/status.Schema` and `pkg/metrics.Schema` (or document explicitly in `--help` that `--print-schema` is Report-only). File a bead for one or the other.
+- **Theme integration.** `pkg/theme` (color/mono) exists per arch doc. Status and metrics renderers in this plan print `── tool ──` headers directly without routing through theme. By design for first cut: hygiene formats render mono-only. A follow-up bead can route them through `pkg/theme` once the visual treatment is settled.
+- **Sidecar consolidation.** `pkg/state` will hold both `last-run.json` (findings/tests fingerprints) and `metrics-history.json` after Task 5. Eventually merge into a single envelope to avoid two-file atomicity windows. Not blocking.
 
 **Type consistency check:**
 - `view.StatusRow{State,Label,Value,Note}` matches `pkg/status.Row` field-for-field via `ToViewRows`.
