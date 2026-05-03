@@ -1,7 +1,13 @@
 # Boot
-updated: 2026-04-30
+updated: 2026-05-03
 
-→ pick from `bd ready` and ship — 5 P3 polish beads queued (uai/cg7/d1e/0bm/g3y).
+→ revise hygiene-formats plan per dk feedback, then file beads + start.
+
+state: φ docs/superpowers/plans/2026-05-03-hygiene-formats.md
 
 ✓ done
-- shipped fo-cy6 (wrapper doc.go), fo-20d (--version), fo-ch3 (unknown subcmd), fo-fv6 (wrap list --json)
+- wrote 13-task plan: fo:status + fo:metrics formats, --as hint, wrappers (archlint-text, benchstat, cover), bare-tally auto-detect
+
+‡ traps
+- pkg/tally + wrapleaderboard already exist — mirror that pattern for status/metrics
+- dk wants fo to define formats his tools emit, not parse arbitrary printf|awk
