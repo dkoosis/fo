@@ -251,6 +251,50 @@ func TestE2E_LLMGoldens(t *testing.T) {
 }
 
 // Sanity: a no-input invocation should fail with usage error (exit 2).
+func TestE2E_TallyPipeline(t *testing.T) {
+	// wrap leaderboard → fo, end-to-end. Mirrors the trixi `make audit`
+	// usage: `sort | uniq -c` style input flows through a single pipe
+	// and renders as a Leaderboard. Exit code is always 0 (informational).
+	tallyIn := "  14332 log.friction\n   2578 journal.day\n    701 log.session\n"
+
+	wrapOut := runWrapForTest(t, tallyIn)
+	if !bytes.HasPrefix(wrapOut.Bytes(), []byte("# fo:tally tool=dk-types\n")) {
+		t.Errorf("missing tally header: %q", wrapOut.String())
+	}
+
+	var renderOut, renderErr bytes.Buffer
+	if code := run([]string{"--format", "llm", "--no-state"}, &wrapOut, &renderOut, &renderErr); code != 0 {
+		t.Fatalf("fo render: code=%d stderr=%s", code, renderErr.String())
+	}
+	out := renderOut.String()
+	for _, want := range []string{"log.friction", "14332", "journal.day", "2578"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("rendered output missing %q:\n%s", want, out)
+		}
+	}
+
+	jsonSrc := runWrapForTest(t, tallyIn)
+	var jsonOut, jsonErr bytes.Buffer
+	if code := run([]string{"--format", "json", "--no-state"}, &jsonSrc, &jsonOut, &jsonErr); code != 0 {
+		t.Fatalf("fo json: code=%d stderr=%s", code, jsonErr.String())
+	}
+	if !bytes.Contains(jsonOut.Bytes(), []byte(`"tool": "dk-types"`)) {
+		t.Errorf("json missing tool field: %s", jsonOut.String())
+	}
+	if !bytes.Contains(jsonOut.Bytes(), []byte(`"value": 14332`)) {
+		t.Errorf("json missing value: %s", jsonOut.String())
+	}
+}
+
+func runWrapForTest(t *testing.T, tallyIn string) bytes.Buffer {
+	t.Helper()
+	var out, errBuf bytes.Buffer
+	if code := run([]string{"wrap", "leaderboard", "--tool", "dk-types"}, bytes.NewReader([]byte(tallyIn)), &out, &errBuf); code != 0 {
+		t.Fatalf("wrap leaderboard: code=%d stderr=%s", code, errBuf.String())
+	}
+	return out
+}
+
 func TestE2E_NoInputIsUsageError(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := run(nil, bytes.NewReader(nil), &stdout, &stderr)

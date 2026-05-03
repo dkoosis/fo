@@ -39,12 +39,14 @@ import (
 	"github.com/dkoosis/fo/pkg/report"
 	"github.com/dkoosis/fo/pkg/sarif"
 	"github.com/dkoosis/fo/pkg/state"
+	"github.com/dkoosis/fo/pkg/tally"
 	"github.com/dkoosis/fo/pkg/testjson"
 	"github.com/dkoosis/fo/pkg/theme"
 	"github.com/dkoosis/fo/pkg/view"
 	"github.com/dkoosis/fo/pkg/wrapper/wraparchlint"
 	"github.com/dkoosis/fo/pkg/wrapper/wrapdiag"
 	"github.com/dkoosis/fo/pkg/wrapper/wrapjscpd"
+	"github.com/dkoosis/fo/pkg/wrapper/wrapleaderboard"
 )
 
 const (
@@ -91,6 +93,7 @@ USAGE
 INPUT FORMATS (auto-detected from stdin)
   SARIF 2.1.0     Static analysis results (golangci-lint, gosec, etc.)
   go test -json   Test execution stream
+  tally           Count→label distribution (# fo:tally header) → leaderboard
 
 OUTPUT FORMATS (--format)
   auto            TTY → human, piped → llm (default)
@@ -126,6 +129,9 @@ EXAMPLES
 
   # Raw line diagnostics → SARIF → fo
   go vet ./... 2>&1 | fo wrap diag --tool govet | fo
+
+  # Count→label tally → leaderboard
+  sort | uniq -c | sort -rn | fo wrap leaderboard --tool kg-types | fo
 
   # Force a format regardless of TTY
   go test -json ./... | fo --format llm
@@ -224,6 +230,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 
+	if tally.IsHeader(input) {
+		return renderTally(input, stdout, stderr, mode, *themeFlag)
+	}
+
 	r, err := parseToReport(input, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "fo: %v\n", err)
@@ -260,6 +270,53 @@ func renderMode(mode string, r *report.Report, stdout io.Writer, themeName strin
 		writeDiffDetail(stdout, r)
 	}
 	return nil
+}
+
+// renderTally parses tally-format input and emits the Leaderboard view.
+// Bypasses parseToReport/pickview because tallies aren't findings —
+// callers explicitly asked for a count-weighted bar chart, not a
+// severity-aggregated one. Always exits 0 on success: a tally is
+// informational, not pass/fail.
+func renderTally(input []byte, stdout io.Writer, stderr io.Writer, mode, themeName string) int {
+	t, err := tally.Parse(bytes.NewReader(input))
+	if err != nil {
+		fmt.Fprintf(stderr, "fo: parsing tally: %v\n", err)
+		return 2
+	}
+
+	switch mode {
+	case formatJSON:
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		out := struct {
+			Tool  string      `json:"tool,omitempty"`
+			Total float64     `json:"total"`
+			Rows  []tally.Row `json:"rows"`
+		}{Tool: t.Tool, Rows: t.Rows}
+		for _, r := range t.Rows {
+			out.Total += r.Value
+		}
+		if err := enc.Encode(out); err != nil {
+			fmt.Fprintf(stderr, "fo: %v\n", err)
+			return 2
+		}
+		return 0
+	case formatLLM:
+		if err := t.RenderLLM(stdout); err != nil {
+			fmt.Fprintf(stderr, "fo: %v\n", err)
+			return 2
+		}
+		return 0
+	}
+	// formatHuman (or anything else resolved to human).
+	th := resolveTheme(themeName, stdout)
+	width := termSize(stdout)
+	out := view.Render(t.ToLeaderboard(), th, width)
+	if _, err := fmt.Fprintln(stdout, out); err != nil {
+		fmt.Fprintf(stderr, "fo: %v\n", err)
+		return 2
+	}
+	return 0
 }
 
 // sniffGoTestJSON returns true when peeked stdin starts with a go test -json
@@ -817,12 +874,13 @@ func runState(args []string, stdout, stderr io.Writer) int {
 }
 
 // wrapNames is the canonical list of `fo wrap` subcommands.
-var wrapNames = []string{"archlint", "diag", "jscpd"}
+var wrapNames = []string{"archlint", "diag", "jscpd", "leaderboard"}
 
 var wrapDescriptions = map[string]string{
-	"archlint": "Convert go-arch-lint JSON to SARIF",
-	"diag":     "Convert line diagnostics (file:line:col: msg) to SARIF",
-	"jscpd":    "Convert jscpd JSON duplication report to SARIF",
+	"archlint":    "Convert go-arch-lint JSON to SARIF",
+	"diag":        "Convert line diagnostics (file:line:col: msg) to SARIF",
+	"jscpd":       "Convert jscpd JSON duplication report to SARIF",
+	"leaderboard": "Convert '<count> <label>' tally to fo's tally format",
 }
 
 func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -870,6 +928,8 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 0
 	case "diag":
 		return runWrapDiag(args[1:], stdin, stdout, stderr)
+	case "leaderboard":
+		return runWrapLeaderboard(args[1:], stdin, stdout, stderr)
 	}
 
 	fmt.Fprintf(stderr, "fo wrap: unknown wrapper %q\n\nAvailable wrappers: %s\n",
@@ -893,6 +953,24 @@ func runWrapDiag(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	if err := wrapdiag.Convert(stdin, stdout, opts); err != nil {
 		fmt.Fprintf(stderr, "fo wrap diag: %v\n", err)
+		return 2
+	}
+	return 0
+}
+
+func runWrapLeaderboard(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("fo wrap leaderboard", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	var opts wrapleaderboard.Opts
+	fs.StringVar(&opts.Tool, "tool", "", "Tool name (recorded in tally header)")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 2
+	}
+	if err := wrapleaderboard.Convert(stdin, stdout, opts); err != nil {
+		fmt.Fprintf(stderr, "fo wrap leaderboard: %v\n", err)
 		return 2
 	}
 	return 0
@@ -932,7 +1010,7 @@ func runWrapList(args []string, stdout, stderr io.Writer) int {
 }
 
 func runWrapHelp(stderr io.Writer) int {
-	fmt.Fprintf(stderr, "fo wrap: convert tool output to SARIF\n\n")
+	fmt.Fprintf(stderr, "fo wrap: convert tool output to SARIF or tally\n\n")
 	for _, name := range wrapNames {
 		fmt.Fprintf(stderr, "  %-12s %s\n", name, wrapDescriptions[name])
 	}
