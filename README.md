@@ -59,6 +59,23 @@ Test coverage: 85% → 88%    ↑ 3.0%
 
 See [examples/patterns](examples/patterns/) for complete demonstrations.
 
+## Hygiene Formats
+
+Beyond SARIF and `go test -json`, `fo` auto-detects three lightweight,
+line-oriented formats for hygiene reports:
+
+- `# fo:tally` → leaderboard (count→label distribution; bare `<count> <label>`
+  rows also auto-detect)
+- `# fo:status` → PASS/FAIL/WARN/SKIP table (doctor scripts, contract checks)
+- `# fo:metrics` → keyed numeric values with deltas vs the prior run
+
+`fo wrap <name>` adapters cover go-arch-lint (JSON + text), `go tool cover`,
+`go test -bench`, jscpd, line diagnostics, and `<count> <label>` tallies. Pass
+`--as tally|status|metrics|diag` when input lacks a header.
+
+See [docs/guides/hygiene-formats.md](docs/guides/hygiene-formats.md) for the
+full list, migration recipes, and `FO_STATE_DIR` notes.
+
 ## Installation
 
 ```bash
