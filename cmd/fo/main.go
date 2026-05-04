@@ -113,6 +113,8 @@ FLAGS
   --state-strict      Exit non-zero (2) if sidecar Save fails
   --stream            Stream go test -json incrementally (avoids 256 MiB
                       input cap; enabled automatically on TTY+auto)
+  --as <kind>         Hint format when stdin lacks a fo header
+                      (tally|status|metrics|diag)
 
 SUBCOMMANDS
   fo wrap <name>     Convert tool output to SARIF
@@ -185,6 +187,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	noState := fs.Bool("no-state", false, "Skip diff classification and sidecar I/O")
 	stateStrict := fs.Bool("state-strict", false, "Exit non-zero if sidecar Save fails")
 	streamFlag := fs.Bool("stream", false, "Stream go test -json incrementally (avoids 256 MiB cap)")
+	asFlag := fs.String("as", "", "Hint format when auto-detection is ambiguous: tally|status|metrics|diag")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -232,6 +235,14 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "fo: reading stdin: %v\n", err)
 		}
 		return 2
+	}
+
+	if *asFlag != "" {
+		coerced, code := coerceAs(*asFlag, input, stderr)
+		if code != 0 {
+			return code
+		}
+		input = coerced
 	}
 
 	if tally.IsHeader(input) {
@@ -366,6 +377,35 @@ func renderStatus(input []byte, stdout io.Writer, stderr io.Writer, mode string)
 		return 2
 	}
 	return 0
+}
+
+// coerceAs converts headerless stdin into the requested format by either
+// prepending the canonical fo header (status/metrics) or running it
+// through the corresponding wrapper (tally/diag). Returns the coerced
+// input or a non-zero exit code on usage error.
+func coerceAs(kind string, input []byte, stderr io.Writer) ([]byte, int) {
+	switch kind {
+	case "tally":
+		var buf bytes.Buffer
+		if err := wrapleaderboard.Convert(bytes.NewReader(input), &buf, wrapleaderboard.Opts{}); err != nil {
+			fmt.Fprintf(stderr, "fo: --as tally: %v\n", err)
+			return nil, 2
+		}
+		return buf.Bytes(), 0
+	case "status":
+		return append([]byte("# fo:status\n"), input...), 0
+	case "metrics":
+		return append([]byte("# fo:metrics\n"), input...), 0
+	case "diag":
+		var buf bytes.Buffer
+		if err := wrapdiag.Convert(bytes.NewReader(input), &buf, wrapdiag.DiagOpts{Tool: "diag", Rule: "finding", Level: "warning"}); err != nil {
+			fmt.Fprintf(stderr, "fo: --as diag: %v\n", err)
+			return nil, 2
+		}
+		return buf.Bytes(), 0
+	}
+	fmt.Fprintf(stderr, "fo: --as: unknown kind %q (want tally|status|metrics|diag)\n", kind)
+	return nil, 2
 }
 
 // renderMetrics parses metrics-format input, computes deltas against

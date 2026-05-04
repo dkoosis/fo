@@ -25,6 +25,8 @@ FLAGS
   --state-strict      Exit non-zero (2) if sidecar Save fails
   --stream            Stream go test -json incrementally (avoids 256 MiB
                       input cap; enabled automatically on TTY+auto)
+  --as <kind>         Hint format when stdin lacks a fo header
+                      (tally|status|metrics|diag)
 
 SUBCOMMANDS
   fo wrap <name>     Convert tool output to SARIF

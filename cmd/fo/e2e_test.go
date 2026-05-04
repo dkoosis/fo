@@ -286,6 +286,28 @@ func TestE2E_TallyPipeline(t *testing.T) {
 	}
 }
 
+func TestE2E_AsHint_tally(t *testing.T) {
+	t.Setenv("FO_STATE_DIR", t.TempDir())
+	in := "  10 a\n   3 b\n"
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"--as", "tally", "--format", "llm"}, bytes.NewReader([]byte(in)), &stdout, &stderr); code != 0 {
+		t.Fatalf("exit=%d stderr=%s", code, stderr.String())
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "a") || !strings.Contains(out, "10") {
+		t.Errorf("missing rows:\n%s", out)
+	}
+}
+
+func TestE2E_AsHint_unknown(t *testing.T) {
+	t.Setenv("FO_STATE_DIR", t.TempDir())
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"--as", "bogus"}, bytes.NewReader([]byte("x\n")), &stdout, &stderr)
+	if code != 2 || !strings.Contains(stderr.String(), "--as") {
+		t.Errorf("expected usage error, got code=%d err=%s", code, stderr.String())
+	}
+}
+
 func TestE2E_MetricsFormat(t *testing.T) {
 	t.Setenv("FO_STATE_DIR", t.TempDir())
 	in := "# fo:metrics tool=cover\npkg/x 87.3 %\npkg/y 100 %\n"
