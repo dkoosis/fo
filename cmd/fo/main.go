@@ -31,6 +31,7 @@ import (
 	"os/signal"
 	"regexp"
 	"runtime/debug"
+	"strconv"
 	"strings"
 
 	"golang.org/x/term"
@@ -260,6 +261,15 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return renderMetrics(input, stdout, stderr, mode)
 	}
 
+	if sniffBareTally(input) {
+		var buf bytes.Buffer
+		if err := wrapleaderboard.Convert(bytes.NewReader(input), &buf, wrapleaderboard.Opts{}); err != nil {
+			fmt.Fprintf(stderr, "fo: tally auto-detect: %v\n", err)
+			return 2
+		}
+		return renderTally(buf.Bytes(), stdout, stderr, mode, *themeFlag)
+	}
+
 	r, err := parseToReport(input, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "fo: %v\n", err)
@@ -409,6 +419,33 @@ func coerceAs(kind string, input []byte, stderr io.Writer) ([]byte, int) {
 	}
 	fmt.Fprintf(stderr, "fo: --as: unknown kind %q (want tally|status|metrics|diag)\n", kind)
 	return nil, 2
+}
+
+// sniffBareTally returns true when every non-blank/non-comment line
+// looks like "<number> <label>". Conservative — requires ≥2 rows so a
+// single stray "404 not_found" log line never triggers leaderboard.
+func sniffBareTally(data []byte) bool {
+	sc := bufio.NewScanner(bytes.NewReader(data))
+	sc.Buffer(make([]byte, 64*1024), 1024*1024)
+	rows := 0
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		idx := strings.IndexAny(line, " \t")
+		if idx <= 0 {
+			return false
+		}
+		if _, err := strconv.ParseFloat(line[:idx], 64); err != nil {
+			return false
+		}
+		if strings.TrimSpace(line[idx:]) == "" {
+			return false
+		}
+		rows++
+	}
+	return rows >= 2
 }
 
 // renderMetrics parses metrics-format input, computes deltas against

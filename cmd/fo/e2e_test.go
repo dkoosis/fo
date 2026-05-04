@@ -286,6 +286,27 @@ func TestE2E_TallyPipeline(t *testing.T) {
 	}
 }
 
+func TestE2E_BareTallyAutoDetect(t *testing.T) {
+	t.Setenv("FO_STATE_DIR", t.TempDir())
+	in := "  10 alpha\n   3 beta\n   1 gamma\n"
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"--format", "llm"}, bytes.NewReader([]byte(in)), &stdout, &stderr); code != 0 {
+		t.Fatalf("exit=%d stderr=%s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "alpha") {
+		t.Errorf("expected leaderboard render, got:\n%s", stdout.String())
+	}
+}
+
+func TestE2E_BareTally_notRecognized(t *testing.T) {
+	t.Setenv("FO_STATE_DIR", t.TempDir())
+	in := "10 alpha\nsomething else\n"
+	var stdout, stderr bytes.Buffer
+	if code := run(nil, bytes.NewReader([]byte(in)), &stdout, &stderr); code == 0 {
+		t.Errorf("expected unrecognized error, got success stderr=%s", stderr.String())
+	}
+}
+
 func TestE2E_AsHint_tally(t *testing.T) {
 	t.Setenv("FO_STATE_DIR", t.TempDir())
 	in := "  10 a\n   3 b\n"
