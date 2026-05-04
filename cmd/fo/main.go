@@ -39,6 +39,7 @@ import (
 	"github.com/dkoosis/fo/pkg/report"
 	"github.com/dkoosis/fo/pkg/sarif"
 	"github.com/dkoosis/fo/pkg/state"
+	"github.com/dkoosis/fo/pkg/status"
 	"github.com/dkoosis/fo/pkg/tally"
 	"github.com/dkoosis/fo/pkg/testjson"
 	"github.com/dkoosis/fo/pkg/theme"
@@ -94,6 +95,7 @@ INPUT FORMATS (auto-detected from stdin)
   SARIF 2.1.0     Static analysis results (golangci-lint, gosec, etc.)
   go test -json   Test execution stream
   tally           Count→label distribution (# fo:tally header) → leaderboard
+  status          PASS/FAIL/WARN/SKIP rows (# fo:status header) → table
 
 OUTPUT FORMATS (--format)
   auto            TTY → human, piped → llm (default)
@@ -234,6 +236,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return renderTally(input, stdout, stderr, mode, *themeFlag)
 	}
 
+	if status.IsHeader(input) {
+		return renderStatus(input, stdout, stderr, mode)
+	}
+
 	r, err := parseToReport(input, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "fo: %v\n", err)
@@ -313,6 +319,43 @@ func renderTally(input []byte, stdout io.Writer, stderr io.Writer, mode, themeNa
 	width := termSize(stdout)
 	out := view.Render(t.ToLeaderboard(), th, width)
 	if _, err := fmt.Fprintln(stdout, out); err != nil {
+		fmt.Fprintf(stderr, "fo: %v\n", err)
+		return 2
+	}
+	return 0
+}
+
+// renderStatus parses status-format input and emits the PASS/FAIL table.
+// Always exits 0 on success — status streams are reports, not gates;
+// callers decide pass/fail by inspecting the rows themselves (or via the
+// parsed json).
+func renderStatus(input []byte, stdout io.Writer, stderr io.Writer, mode string) int {
+	s, err := status.Parse(bytes.NewReader(input))
+	if err != nil {
+		fmt.Fprintf(stderr, "fo: parsing status: %v\n", err)
+		return 2
+	}
+	rows := make([]view.StatusRow, len(s.Rows))
+	for i, r := range s.Rows {
+		rows[i] = view.StatusRow{State: string(r.State), Label: r.Label, Value: r.Value, Note: r.Note}
+	}
+	switch mode {
+	case formatJSON:
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(s); err != nil {
+			fmt.Fprintf(stderr, "fo: %v\n", err)
+			return 2
+		}
+		return 0
+	case formatLLM:
+		if err := view.RenderStatusLLM(stdout, s.Tool, rows); err != nil {
+			fmt.Fprintf(stderr, "fo: %v\n", err)
+			return 2
+		}
+		return 0
+	}
+	if err := view.RenderStatusHuman(stdout, s.Tool, rows); err != nil {
 		fmt.Fprintf(stderr, "fo: %v\n", err)
 		return 2
 	}

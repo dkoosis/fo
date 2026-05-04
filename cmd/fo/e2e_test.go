@@ -286,6 +286,29 @@ func TestE2E_TallyPipeline(t *testing.T) {
 	}
 }
 
+func TestE2E_StatusFormat(t *testing.T) {
+	in := "# fo:status tool=doctor\nok\tenv\nfail\tdolt\twarn-note\n"
+
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"--format", "llm", "--no-state"}, bytes.NewReader([]byte(in)), &stdout, &stderr); code != 0 {
+		t.Fatalf("fo render: code=%d stderr=%s", code, stderr.String())
+	}
+	out := stdout.String()
+	for _, want := range []string{"doctor", "ok", "env", "fail", "dolt"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in output:\n%s", want, out)
+		}
+	}
+
+	var jsonOut, jsonErr bytes.Buffer
+	if code := run([]string{"--format", "json", "--no-state"}, bytes.NewReader([]byte(in)), &jsonOut, &jsonErr); code != 0 {
+		t.Fatalf("fo json: code=%d stderr=%s", code, jsonErr.String())
+	}
+	if !bytes.Contains(jsonOut.Bytes(), []byte(`"tool": "doctor"`)) {
+		t.Errorf("json missing tool: %s", jsonOut.String())
+	}
+}
+
 func runWrapForTest(t *testing.T, tallyIn string) bytes.Buffer {
 	t.Helper()
 	var out, errBuf bytes.Buffer
