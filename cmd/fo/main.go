@@ -46,6 +46,7 @@ import (
 	"github.com/dkoosis/fo/pkg/theme"
 	"github.com/dkoosis/fo/pkg/view"
 	"github.com/dkoosis/fo/pkg/wrapper/wraparchlint"
+	"github.com/dkoosis/fo/pkg/wrapper/wraparchlinttext"
 	"github.com/dkoosis/fo/pkg/wrapper/wrapdiag"
 	"github.com/dkoosis/fo/pkg/wrapper/wrapjscpd"
 	"github.com/dkoosis/fo/pkg/wrapper/wrapleaderboard"
@@ -1020,13 +1021,14 @@ func runState(args []string, stdout, stderr io.Writer) int {
 }
 
 // wrapNames is the canonical list of `fo wrap` subcommands.
-var wrapNames = []string{"archlint", "diag", "jscpd", "leaderboard"}
+var wrapNames = []string{"archlint", "archlint-text", "diag", "jscpd", "leaderboard"}
 
 var wrapDescriptions = map[string]string{
-	"archlint":    "Convert go-arch-lint JSON to SARIF",
-	"diag":        "Convert line diagnostics (file:line:col: msg) to SARIF",
-	"jscpd":       "Convert jscpd JSON duplication report to SARIF",
-	"leaderboard": "Convert '<count> <label>' tally to fo's tally format",
+	"archlint":      "Convert go-arch-lint JSON to SARIF",
+	"archlint-text": "Convert go-arch-lint plain-text output to SARIF",
+	"diag":          "Convert line diagnostics (file:line:col: msg) to SARIF",
+	"jscpd":         "Convert jscpd JSON duplication report to SARIF",
+	"leaderboard":   "Convert '<count> <label>' tally to fo's tally format",
 }
 
 func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -1069,6 +1071,20 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 		if err := wrapjscpd.Convert(stdin, stdout); err != nil {
 			fmt.Fprintf(stderr, "fo wrap jscpd: %v\n", err)
+			return 2
+		}
+		return 0
+	case "archlint-text":
+		fs := flag.NewFlagSet("fo wrap archlint-text", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		if err := fs.Parse(args[1:]); err != nil {
+			if errors.Is(err, flag.ErrHelp) {
+				return 0
+			}
+			return 2
+		}
+		if err := wraparchlinttext.Convert(stdin, stdout); err != nil {
+			fmt.Fprintf(stderr, "fo wrap archlint-text: %v\n", err)
 			return 2
 		}
 		return 0
