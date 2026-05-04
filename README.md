@@ -1,265 +1,139 @@
 # fo
 
-A research-backed, pattern-based design system for CLI output visualization. Built on Tufte principles and cognitive load theory to create thoughtful, information-dense build dashboards.
+Focused build output renderer. Reads SARIF, `go test -json`, or lightweight hygiene formats on stdin and renders for terminals, LLMs, or automation.
 
-## Overview
-
-`fo` (Format Output) is a presentation layer for command-line build tools, transforming raw output into structured visual patterns that guide attention and reduce cognitive load. Instead of treating output as plain text, `fo` recognizes semantic meaning—test results, errors, warnings, metrics—and renders them using information-dense patterns like sparklines, leaderboards, and comparison tables.
-
-### Design Philosophy
-
-**Tufte-Informed Visualization**
-- Maximize data-ink ratio: every character conveys information
-- Sparklines for trends, small multiples for comparisons
-- Cognitive load-aware rendering adapts to complexity
-
-**Pattern-Based Architecture**
-- Semantic patterns (Sparkline, Leaderboard, TestTable, Summary, Comparison, Inventory)
-- Theme-independent content: separate what to show from how to show it
-- Composable: build dashboards by combining patterns
-
-**Research-Backed Design**
-- Cognitive load theory guides information hierarchy
-- Error recognition patterns reduce time to understanding
-- Density modes optimize for different contexts (detailed, balanced, compact)
-
-## Visual Patterns
-
-### Sparkline
-Word-sized trend graphics using Unicode blocks:
 ```
-Build time trend: ▄▃▄▂▂▃▁▁ 1.6s
-Test coverage: ▁▂▄▅▆█ 88.0%
+golangci-lint run --output.sarif.path=stdout ./... | fo
+go test -json ./...                                 | fo
+go vet ./... 2>&1                                   | fo wrap diag --tool govet | fo
 ```
 
-### Leaderboard
-Ranked metrics highlighting optimization targets:
-```
-Slowest Tests (top 3 of 247)
-  1. TestLargeDataProcessing    5.2s
-  2. TestComplexQueryExecution  3.8s
-  3. TestNetworkIntegration     2.9s
-```
+## What it does
 
-### TestTable
-Comprehensive test results with density modes:
-```
-✅ pkg/api       42 tests  2.1s
-✅ pkg/database  28 tests  1.8s
-❌ pkg/auth      15 tests  0.5s
-```
+`fo` is a stdin-driven presentation layer. It auto-detects the input format, parses it into a canonical `Report` (the IR), classifies findings against a sidecar baseline (new / persistent / fixed), and renders one of three outputs:
 
-### Comparison
-Before/after metrics with directional indicators:
-```
-Build time:    5.2s → 4.1s  ↓ 1.1s
-Binary size:   42MB → 38MB  ↓ 4.0MB
-Test coverage: 85% → 88%    ↑ 3.0%
-```
+- **human** — Tufte-Swiss styled terminal output (default on TTY)
+- **llm** — token-dense plain text, no ANSI (default when piped)
+- **json** — machine-parseable Report
 
-See [examples/patterns](examples/patterns/) for complete demonstrations.
+Everything funnels through the same Report struct, so wrappers, hygiene formats, and native parsers all benefit from the same diff classification, scoring, and renderers.
 
-## Hygiene Formats
-
-Beyond SARIF and `go test -json`, `fo` auto-detects three lightweight,
-line-oriented formats for hygiene reports:
-
-- `# fo:tally` → leaderboard (count→label distribution; bare `<count> <label>`
-  rows also auto-detect)
-- `# fo:status` → PASS/FAIL/WARN/SKIP table (doctor scripts, contract checks)
-- `# fo:metrics` → keyed numeric values with deltas vs the prior run
-
-`fo wrap <name>` adapters cover go-arch-lint (JSON + text), `go tool cover`,
-`go test -bench`, jscpd, line diagnostics, and `<count> <label>` tallies. Pass
-`--as tally|status|metrics|diag` when input lacks a header.
-
-See [docs/guides/hygiene-formats.md](docs/guides/hygiene-formats.md) for the
-full list, migration recipes, and `FO_STATE_DIR` notes.
-
-## Installation
+## Install
 
 ```bash
-go install github.com/dkoosis/fo@latest
+go install github.com/dkoosis/fo/cmd/fo@latest
 ```
 
-## Quick Start
+Requires Go 1.24+. Runtime deps: `lipgloss`, `golang.org/x/term`.
 
-### Basic Command Wrapping
+## Input formats
 
-```bash
-# Wrap any command for formatted output
-fo -- go build ./cmd/myapp
+Auto-detected from stdin:
 
-# Custom label
-fo -l "Building application" -- go build ./cmd/myapp
+| Format | Trigger | Source |
+|---|---|---|
+| SARIF 2.1.0 | JSON shape | golangci-lint, gosec, staticcheck, custom tools |
+| `go test -json` | JSON-line shape | `go test -json ./...` |
+| tally | `# fo:tally` header (or bare `<count> <label>` rows) | hygiene scripts, `uniq -c` pipelines |
+| status | `# fo:status` header | doctor scripts, contract checks |
+| metrics | `# fo:metrics` header | coverage, benchmarks, sizes |
 
-# Stream mode for interactive commands
-fo -s -- go test -v ./...
+If stdin lacks a header, force a kind with `--as tally|status|metrics|diag`.
+
+See [docs/guides/hygiene-formats.md](docs/guides/hygiene-formats.md) for the hygiene format reference, migration recipes, and `FO_STATE_DIR` notes.
+
+## Wrappers
+
+`fo wrap <name>` adapters convert third-party tool output into SARIF or a hygiene format, then pipe to `fo` for rendering:
+
+```
+archlint        go-arch-lint JSON → SARIF
+archlint-text   go-arch-lint plain-text → SARIF
+cover           go tool cover -func → fo:metrics
+diag            file:line:col: msg → SARIF
+gobench         go test -bench → fo:metrics
+jscpd           jscpd JSON → SARIF
+leaderboard     "<count> <label>" tally → fo:tally
 ```
 
-### In Build Scripts
+`fo wrap list` (or `fo wrap list --json`) prints the current set.
 
-`fo` excels in Makefiles and CI pipelines, creating thoughtful dashboards from build output:
+## CLI
 
-```makefile
-.PHONY: build test lint
+```
+USAGE
+  <input-command> | fo [FLAGS]
+  <tool-output>   | fo wrap <name> [FLAGS]
 
-build:
-	@fo -l "Building binary" -- go build -o myapp ./cmd/myapp
+FLAGS
+  --format <mode>      auto | human | llm | json   (default: auto)
+  --theme <name>       color | mono                (default: auto — color on TTY)
+  --state-file <path>  Sidecar state file          (default: .fo/last-run.json)
+  --no-state           Skip diff classification + sidecar I/O
+  --state-strict       Exit non-zero (2) if sidecar save fails
+  --stream             Stream go test -json incrementally (bypasses 256 MiB cap)
+  --as <kind>          Format hint when stdin lacks a fo header
 
-test:
-	@fo -l "Running tests" -- go test -json ./...
-
-lint:
-	@fo -l "Running linter" -- golangci-lint run ./...
+SUBCOMMANDS
+  fo wrap <name>       Convert tool output to SARIF / hygiene format
+  fo wrap list         List available wrappers
+  fo state reset       Clear the diff baseline
+  fo --version         Print build version
+  fo --print-schema    Emit JSON Schema for the Report struct
 ```
 
-### Programmatic Usage
+## Exit codes
 
-Build custom dashboards by composing patterns:
-
-```go
-import "github.com/dkoosis/fo/pkg/design"
-
-cfg := design.UnicodeVibrantTheme()
-
-// Sparkline for trends
-sparkline := &design.Sparkline{
-    Label:  "Build time trend",
-    Values: []float64{2.3, 2.1, 2.4, 1.9, 1.8},
-    Unit:   "s",
-}
-fmt.Println(sparkline.Render(cfg))
-
-// Leaderboard for hotspots
-leaderboard := &design.Leaderboard{
-    Label:      "Slowest Tests",
-    ShowRank:   true,
-    Items:      slowTests, // []design.LeaderboardItem
-}
-fmt.Println(leaderboard.Render(cfg))
-
-// TestTable with compact density
-testTable := &design.TestTable{
-    Results: testResults,
-    Density: design.DensityCompact, // 3 columns
-}
-fmt.Println(testTable.Render(cfg))
+```
+0   Clean — no errors or test failures
+1   Failures — lint errors or test failures present
+2   Usage error — bad flags, unrecognized input, stdin problems
 ```
 
-See [pkg/design/patterns.go](pkg/design/patterns.go) for complete pattern API.
+Use the exit code, not stdout parsing, to gate CI steps.
 
-## CLI Reference
+## Diff classification
 
-### Operation Modes
+`fo` writes a sidecar at `.fo/last-run.json` after each run (override with `--state-file` or `FO_STATE_DIR`, disable with `--no-state`). The next run classifies each finding as **new**, **persistent**, or **fixed** by stable fingerprint, and surfaces those deltas in the rendered output.
 
-- **CAPTURE mode** (default): Buffers output, shows summary on completion
-- **STREAM mode** (`-s`): Real-time output for interactive commands
-
-### Flags
-
-- `-l, --label <string>`: Task label
-- `-s, --stream`: STREAM mode
-- `--show-output <mode>`: When to show captured output (`on-fail`|`always`|`never`)
-- `--theme <name>`: Visual theme (`unicode_vibrant`|`ascii_minimal`)
-- `--no-timer`: Hide duration
-- `--no-color`: Disable color/styling
-- `--ci`: CI-friendly output (implies --no-color, --no-timer)
-
-### Themes
-
-`fo` ships with multiple themes optimized for different contexts:
-
-- **unicode_vibrant** (default): Rich icons, colors, sparklines
-- **ascii_minimal**: Plain ASCII for compatibility
-- **Custom themes**: Define your own via `.fo.yaml`
-
-## Configuration
-
-Create `.fo.yaml` in your project root:
-
-```yaml
-style:
-  use_boxes: true
-  density: balanced  # detailed|balanced|compact
-  use_inline_progress: true
-
-colors:
-  success: "\033[32m"
-  error: "\033[31m"
-  warning: "\033[33m"
-
-cognitive_load:
-  auto_detect: true  # Adapt rendering to output complexity
-```
-
-## Design Principles in Practice
-
-### Data-Ink Ratio
-Compact modes save 50-66% of lines while maintaining readability:
-```
-Detailed: ~12 lines
-Balanced: ~6 lines (saves 50%)
-Compact:  ~4 lines (saves 66%)
-```
-
-### Cognitive Load Awareness
-High-complexity output (many errors, large output) triggers simplified rendering to reduce cognitive processing overhead.
-
-### Small Multiples
-Compose patterns to create comprehensive dashboards:
-```go
-// Build dashboard
-fmt.Println(summary.Render(cfg))
-fmt.Println(sparkline.Render(cfg))
-fmt.Println(leaderboard.Render(cfg))
-fmt.Println(inventory.Render(cfg))
-```
+`fo state reset` clears the baseline.
 
 ## Architecture
 
-**Pattern-Based Rendering**
 ```
-Command Output → Pattern Recognition → Semantic Patterns → Theme Renderer → Visual Output
-```
-
-**Key Components**
-- `pkg/design/patterns.go`: Pattern types and interfaces
-- `pkg/design/config.go`: Theme system
-- `pkg/design/render.go`: Rendering engine
-- `pkg/design/recognition.go`: Pattern detection
-
-## Development
-
-### Running Examples
-
-```bash
-cd examples/patterns
-go run main.go          # All patterns
-go run compact_demo.go  # Density modes
+stdin
+  ├─[1] read       (bounded 256 MiB / streaming)
+  ├─[2] sniff      (SARIF / go test -json / hygiene / multiplex)
+  ├─[3] parse      → Report (IR)
+  ├─[4] diff       (vs sidecar baseline)
+  ├─[5] mode pick  (TTY → human, piped → llm)
+  ├─[6] render     (paint primitives + theme)
+  └─[7] exit code  (0 / 1 / 2)
 ```
 
-### Running Tests
+| Path | Role |
+|---|---|
+| `cmd/fo/` | CLI entry, flag parsing, format sniffing, wrap dispatch |
+| `pkg/report/` | Canonical Report + multiplex delimiter protocol |
+| `pkg/sarif/` | SARIF 2.1.0 reader/builder → Report |
+| `pkg/testjson/` | `go test -json` parser → Report |
+| `pkg/view/` | human / llm / json renderers |
+| `pkg/paint/` | Tufte-Swiss primitives (bars, sparklines, tables) |
+| `pkg/theme/` | Color / mono theme system |
+| `pkg/state/` | Sidecar baseline for diff classification |
+| `pkg/score/`, `pkg/fingerprint/` | Severity scoring + finding identity |
+| `pkg/status/`, `pkg/metrics/`, `pkg/tally/` | Hygiene format parsers |
+| `pkg/wrapper/wrap*/` | Tool-specific adapters |
+| `internal/boundread/`, `internal/lineread/` | Stdin readers |
 
-```bash
-go test ./...
-```
+## Adding a wrapper
 
-## Research Foundations
+1. Create a package under `pkg/wrapper/` exposing `Convert(in io.Reader, out io.Writer) error`.
+2. Add a case to the `wrap` dispatch in `cmd/fo/main.go` and import the package.
+3. Wire a one-line description into the `wrap list` table.
 
-- **Cognitive Load Theory**: Adapts complexity based on output characteristics
-- **Tufte Principles**: Data-ink ratio, sparklines, small multiples
-- **Information Visualization**: Pattern recognition for semantic meaning
-
-For detailed citations and research references, see:
-- [Research Foundations](docs/RESEARCH_FOUNDATIONS.md) - Complete citations and methodology
-- [Tufte Principles](docs/TUFTE_PRINCIPLES.md) - How Tufte's design principles are applied in fo
-
-## Related Projects
-
-- [fo](fo/README.md): Go API for programmatic use
-- [examples/patterns](examples/patterns/): Pattern demonstrations
+No interface, no registry — a deliberate `switch`.
 
 ## License
 
-MIT License
+MIT
