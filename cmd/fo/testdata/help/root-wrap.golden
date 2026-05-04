@@ -3,6 +3,7 @@ fo wrap: convert tool output to SARIF or tally
   archlint     Convert go-arch-lint JSON to SARIF
   archlint-text Convert go-arch-lint plain-text output to SARIF
   diag         Convert line diagnostics (file:line:col: msg) to SARIF
+  gobench      Convert raw `go test -bench` output to fo:metrics
   jscpd        Convert jscpd JSON duplication report to SARIF
   leaderboard  Convert '<count> <label>' tally to fo's tally format
 
