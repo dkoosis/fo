@@ -286,6 +286,35 @@ func TestE2E_TallyPipeline(t *testing.T) {
 	}
 }
 
+func TestE2E_MetricsFormat(t *testing.T) {
+	t.Setenv("FO_STATE_DIR", t.TempDir())
+	in := "# fo:metrics tool=cover\npkg/x 87.3 %\npkg/y 100 %\n"
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"--format", "llm"}, bytes.NewReader([]byte(in)), &stdout, &stderr); code != 0 {
+		t.Fatalf("fo render: code=%d stderr=%s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "pkg/x 87.3 %") {
+		t.Errorf("missing row:\n%s", stdout.String())
+	}
+}
+
+func TestE2E_MetricsDelta(t *testing.T) {
+	t.Setenv("FO_STATE_DIR", t.TempDir())
+	in1 := "# fo:metrics\nx 10\n"
+	var b1out, b1err bytes.Buffer
+	if code := run([]string{"--format", "llm"}, bytes.NewReader([]byte(in1)), &b1out, &b1err); code != 0 {
+		t.Fatalf("first run: code=%d stderr=%s", code, b1err.String())
+	}
+	in2 := "# fo:metrics\nx 12\n"
+	var b2out, b2err bytes.Buffer
+	if code := run([]string{"--format", "human"}, bytes.NewReader([]byte(in2)), &b2out, &b2err); code != 0 {
+		t.Fatalf("second run: code=%d stderr=%s", code, b2err.String())
+	}
+	if !strings.Contains(b2out.String(), "+2") {
+		t.Errorf("expected delta +2 in:\n%s", b2out.String())
+	}
+}
+
 func TestE2E_StatusFormat(t *testing.T) {
 	in := "# fo:status tool=doctor\nok\tenv\nfail\tdolt\twarn-note\n"
 

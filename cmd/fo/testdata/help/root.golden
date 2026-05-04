@@ -9,6 +9,7 @@ INPUT FORMATS (auto-detected from stdin)
   go test -json   Test execution stream
   tally           Count→label distribution (# fo:tally header) → leaderboard
   status          PASS/FAIL/WARN/SKIP rows (# fo:status header) → table
+  metrics         Keyed numeric values (# fo:metrics header) → list with deltas
 
 OUTPUT FORMATS (--format)
   auto            TTY → human, piped → llm (default)

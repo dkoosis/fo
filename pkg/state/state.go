@@ -30,8 +30,26 @@ const SchemaVersion = 1
 const MaxHistory = 3
 
 // DefaultPath is the relative sidecar location used when --state-file
-// is not supplied.
+// is not supplied. Kept for compatibility with callers that record the
+// resolved path; new code should prefer Path() so FO_STATE_DIR is honored.
 const DefaultPath = ".fo/last-run.json"
+
+// Dir returns the directory holding fo's sidecar files. Honors
+// FO_STATE_DIR so test runs (and users with non-standard layouts) can
+// redirect every sidecar — last-run.json, metrics-history.json, and
+// any future addition — through one knob.
+func Dir() string {
+	if d := os.Getenv("FO_STATE_DIR"); d != "" {
+		return d
+	}
+	return ".fo"
+}
+
+// Path returns the resolved last-run sidecar path.
+func Path() string { return filepath.Join(Dir(), "last-run.json") }
+
+// MetricsHistoryPath returns the resolved metrics-history sidecar path.
+func MetricsHistoryPath() string { return filepath.Join(Dir(), "metrics-history.json") }
 
 // File is the top-level on-disk envelope. Versioned so a future
 // breaking change can refuse to read old files cleanly rather than

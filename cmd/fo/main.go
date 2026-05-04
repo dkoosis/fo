@@ -37,6 +37,7 @@ import (
 
 	"github.com/dkoosis/fo/internal/boundread"
 	"github.com/dkoosis/fo/pkg/report"
+	"github.com/dkoosis/fo/pkg/metrics"
 	"github.com/dkoosis/fo/pkg/sarif"
 	"github.com/dkoosis/fo/pkg/state"
 	"github.com/dkoosis/fo/pkg/status"
@@ -96,6 +97,7 @@ INPUT FORMATS (auto-detected from stdin)
   go test -json   Test execution stream
   tally           Count→label distribution (# fo:tally header) → leaderboard
   status          PASS/FAIL/WARN/SKIP rows (# fo:status header) → table
+  metrics         Keyed numeric values (# fo:metrics header) → list with deltas
 
 OUTPUT FORMATS (--format)
   auto            TTY → human, piped → llm (default)
@@ -179,7 +181,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs.Usage = func() { fmt.Fprint(stderr, usage) }
 	formatFlag := fs.String("format", "auto", "Output format: auto, human, llm, json")
 	themeFlag := fs.String("theme", "auto", "Theme: auto, color, mono")
-	stateFile := fs.String("state-file", state.DefaultPath, "Sidecar state file path")
+	stateFile := fs.String("state-file", state.Path(), "Sidecar state file path")
 	noState := fs.Bool("no-state", false, "Skip diff classification and sidecar I/O")
 	stateStrict := fs.Bool("state-strict", false, "Exit non-zero if sidecar Save fails")
 	streamFlag := fs.Bool("stream", false, "Stream go test -json incrementally (avoids 256 MiB cap)")
@@ -238,6 +240,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	if status.IsHeader(input) {
 		return renderStatus(input, stdout, stderr, mode)
+	}
+
+	if metrics.IsHeader(input) {
+		return renderMetrics(input, stdout, stderr, mode)
 	}
 
 	r, err := parseToReport(input, stderr)
@@ -358,6 +364,63 @@ func renderStatus(input []byte, stdout io.Writer, stderr io.Writer, mode string)
 	if err := view.RenderStatusHuman(stdout, s.Tool, rows); err != nil {
 		fmt.Fprintf(stderr, "fo: %v\n", err)
 		return 2
+	}
+	return 0
+}
+
+// renderMetrics parses metrics-format input, computes deltas against
+// the sidecar history, renders, and saves the new sample set. Always
+// exits 0 on success — metrics streams are informational rollups.
+func renderMetrics(input []byte, stdout io.Writer, stderr io.Writer, mode string) int {
+	m, err := metrics.Parse(bytes.NewReader(input))
+	if err != nil {
+		fmt.Fprintf(stderr, "fo: parsing metrics: %v\n", err)
+		return 2
+	}
+	curr := make([]state.MetricSample, len(m.Rows))
+	for i, r := range m.Rows {
+		curr[i] = state.MetricSample{Tool: m.Tool, Key: r.Key, Value: r.Value, Unit: r.Unit}
+	}
+	histPath := state.MetricsHistoryPath()
+	prev, _ := state.LoadMetrics(histPath)
+	deltas := state.DiffMetrics(prev, curr)
+
+	rows := make([]view.MetricRow, len(deltas))
+	for i, d := range deltas {
+		rows[i] = view.MetricRow{
+			Key: d.Sample.Key, Value: d.Sample.Value, Unit: d.Sample.Unit, Delta: d.Delta, New: d.New,
+		}
+	}
+
+	switch mode {
+	case formatJSON:
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(struct {
+			Tool   string              `json:"tool,omitempty"`
+			Deltas []state.MetricDelta `json:"deltas"`
+		}{Tool: m.Tool, Deltas: deltas}); err != nil {
+			fmt.Fprintf(stderr, "fo: %v\n", err)
+			return 2
+		}
+	case formatLLM:
+		if err := view.RenderMetricsLLM(stdout, m.Tool, rows); err != nil {
+			fmt.Fprintf(stderr, "fo: %v\n", err)
+			return 2
+		}
+	default:
+		if err := view.RenderMetricsHuman(stdout, m.Tool, rows); err != nil {
+			fmt.Fprintf(stderr, "fo: %v\n", err)
+			return 2
+		}
+	}
+
+	if err := os.MkdirAll(state.Dir(), 0o755); err != nil {
+		fmt.Fprintf(stderr, "fo: save metrics history: %v\n", err)
+		return 0
+	}
+	if err := state.SaveMetrics(histPath, curr); err != nil {
+		fmt.Fprintf(stderr, "fo: save metrics history: %v\n", err)
 	}
 	return 0
 }
@@ -890,7 +953,7 @@ func exitCodeReport(r *report.Report) int {
 func runState(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("fo state", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	stateFile := fs.String("state-file", state.DefaultPath, "Sidecar state file path")
+	stateFile := fs.String("state-file", state.Path(), "Sidecar state file path")
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "fo state: subcommand required (reset)")
 		return 2
