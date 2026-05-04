@@ -147,6 +147,24 @@ func parseState(tok string) (State, error) {
 	return "", fmt.Errorf("%w: %q", ErrBadState, tok)
 }
 
+// ViewRow is the renderer-facing shape; mirrors view.StatusRow so
+// pkg/view doesn't need to import pkg/status.
+type ViewRow struct {
+	State string
+	Label string
+	Value string
+	Note  string
+}
+
+// ToViewRows converts to the renderer's row shape.
+func (s Status) ToViewRows() []ViewRow {
+	out := make([]ViewRow, len(s.Rows))
+	for i, r := range s.Rows {
+		out[i] = ViewRow{State: string(r.State), Label: r.Label, Value: r.Value, Note: r.Note}
+	}
+	return out
+}
+
 func parseAttr(tail, key string) string {
 	for tok := range strings.FieldsSeq(tail) {
 		if eq := strings.IndexByte(tok, '='); eq > 0 && tok[:eq] == key {
