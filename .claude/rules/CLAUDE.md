@@ -34,9 +34,9 @@ stdin
                                                                                      stdout
 ```
 
-Subcommands (cmd/fo/main.go): `fo wrap <name>` dispatches to pkg/wrapper/wrap{archlint,diag,jscpd}; `fo state reset`; `fo --version`; `fo --print-schema` (pkg/report.Schema).
+Subcommands (cmd/fo/main.go): `fo wrap <name>` dispatches to pkg/wrapper/wrap{archlint,archlinttext,cover,diag,gobench,jscpd,leaderboard}; `fo wrap list`; `fo state reset`; `fo --version`; `fo --print-schema` (pkg/report.Schema).
 
-Inputs: SARIF 2.1.0, go test -json, multiplex-delimited combo. Outputs: human (TTY), llm (piped), json.
+Inputs: SARIF 2.1.0, go test -json, multiplex-delimited combo, hygiene formats (`# fo:status`, `# fo:metrics`, `# fo:tally`). Outputs: human (TTY), llm (piped), json.
 
 ## Package Structure
 
@@ -52,9 +52,16 @@ Inputs: SARIF 2.1.0, go test -json, multiplex-delimited combo. Outputs: human (T
 | `pkg/state/` | Sidecar `.fo/last-run.json` for diff classification |
 | `pkg/score/` | Severity scoring |
 | `pkg/fingerprint/` | Finding identity for diff classification |
+| `pkg/status/` | Hygiene format: PASS/FAIL/WARN/SKIP labeled rows |
+| `pkg/metrics/` | Hygiene format: keyed numeric values (coverage, LOC, bench) |
+| `pkg/tally/` | Hygiene format: count→label distributions (Leaderboard view) |
 | `pkg/wrapper/wraparchlint/` | go-arch-lint JSON → SARIF |
+| `pkg/wrapper/wraparchlinttext/` | go-arch-lint plain-text → SARIF |
+| `pkg/wrapper/wrapcover/` | `go tool cover -func` → fo:metrics |
 | `pkg/wrapper/wrapdiag/` | Line diagnostics (`file:line:col: msg`) → SARIF |
+| `pkg/wrapper/wrapgobench/` | `go test -bench` → fo:metrics |
 | `pkg/wrapper/wrapjscpd/` | jscpd JSON → SARIF |
+| `pkg/wrapper/wrapleaderboard/` | plain `count label` → fo:tally |
 | `internal/boundread/` | Bounded stdin reader (256 MiB cap) |
 | `internal/lineread/` | Line-by-line reader for streaming mode |
 
