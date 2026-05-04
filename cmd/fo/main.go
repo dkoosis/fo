@@ -47,6 +47,7 @@ import (
 	"github.com/dkoosis/fo/pkg/view"
 	"github.com/dkoosis/fo/pkg/wrapper/wraparchlint"
 	"github.com/dkoosis/fo/pkg/wrapper/wraparchlinttext"
+	"github.com/dkoosis/fo/pkg/wrapper/wrapcover"
 	"github.com/dkoosis/fo/pkg/wrapper/wrapdiag"
 	"github.com/dkoosis/fo/pkg/wrapper/wrapgobench"
 	"github.com/dkoosis/fo/pkg/wrapper/wrapjscpd"
@@ -1022,11 +1023,12 @@ func runState(args []string, stdout, stderr io.Writer) int {
 }
 
 // wrapNames is the canonical list of `fo wrap` subcommands.
-var wrapNames = []string{"archlint", "archlint-text", "diag", "gobench", "jscpd", "leaderboard"}
+var wrapNames = []string{"archlint", "archlint-text", "cover", "diag", "gobench", "jscpd", "leaderboard"}
 
 var wrapDescriptions = map[string]string{
 	"archlint":      "Convert go-arch-lint JSON to SARIF",
 	"archlint-text": "Convert go-arch-lint plain-text output to SARIF",
+	"cover":         "Convert `go tool cover -func` output to fo:metrics",
 	"diag":          "Convert line diagnostics (file:line:col: msg) to SARIF",
 	"gobench":       "Convert raw `go test -bench` output to fo:metrics",
 	"jscpd":         "Convert jscpd JSON duplication report to SARIF",
@@ -1087,6 +1089,20 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 		if err := wraparchlinttext.Convert(stdin, stdout); err != nil {
 			fmt.Fprintf(stderr, "fo wrap archlint-text: %v\n", err)
+			return 2
+		}
+		return 0
+	case "cover":
+		fs := flag.NewFlagSet("fo wrap cover", flag.ContinueOnError)
+		fs.SetOutput(stderr)
+		if err := fs.Parse(args[1:]); err != nil {
+			if errors.Is(err, flag.ErrHelp) {
+				return 0
+			}
+			return 2
+		}
+		if err := wrapcover.Convert(stdin, stdout); err != nil {
+			fmt.Fprintf(stderr, "fo wrap cover: %v\n", err)
 			return 2
 		}
 		return 0
