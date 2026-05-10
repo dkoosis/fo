@@ -187,6 +187,15 @@ type aggregator struct {
 	order    []string
 }
 
+// Per-test/per-package output buffering caps. A panicking or runaway test
+// can emit hundreds of MB on a single stream; lineread bounds individual
+// lines but cumulative buffering was unbounded (#257). Cap at 1 MiB per
+// bucket and append a single sentinel when exceeded.
+const (
+	maxPerTestOutputBytes = 1 << 20 // 1 MiB
+	truncationSentinel    = "fo: output truncated (per-test cap exceeded)"
+)
+
 type pkgState struct {
 	name        string
 	passed      int
@@ -201,7 +210,26 @@ type pkgState struct {
 	panicOutput []string
 	// Track output per test (empty test name = package-level output).
 	// On failure, output is read directly from here via failedOrder keys.
-	outputBuf map[string][]string
+	outputBuf        map[string][]string
+	outputBufBytes   map[string]int // bytes accumulated per test name
+	panicOutputBytes int
+	buildOutputBytes int
+}
+
+// appendCapped appends line to buf if cumulative bytes stay under the cap.
+// Once the cap would be exceeded, appends truncationSentinel exactly once
+// and drops further lines. Returns the updated slice and bytes used; when
+// truncated, bytes used is set to the cap so subsequent calls short-circuit.
+func appendCapped(buf []string, used int, line string) ([]string, int) {
+	// Once truncated, used is bumped past cap so subsequent calls short-circuit.
+	if used > maxPerTestOutputBytes {
+		return buf, used
+	}
+	add := len(line) + 1 // account for newline separator
+	if used+add > maxPerTestOutputBytes {
+		return append(buf, truncationSentinel), maxPerTestOutputBytes + 1
+	}
+	return append(buf, line), used + add
 }
 
 func newAggregator() *aggregator {
@@ -215,8 +243,9 @@ func (a *aggregator) getOrCreate(name string) *pkgState {
 		return pkg
 	}
 	pkg := &pkgState{
-		name:      name,
-		outputBuf: make(map[string][]string),
+		name:           name,
+		outputBuf:      make(map[string][]string),
+		outputBufBytes: make(map[string]int),
 	}
 	a.packages[name] = pkg
 	a.order = append(a.order, name)
@@ -239,6 +268,7 @@ func (a *aggregator) processEvent(e TestEvent) {
 		if e.Test != "" {
 			pkg.skipped++
 			delete(pkg.outputBuf, e.Test)
+			delete(pkg.outputBufBytes, e.Test)
 		}
 	case "output":
 		a.handleOutput(pkg, e)
@@ -264,7 +294,7 @@ func (a *aggregator) handleBuildEvent(e TestEvent) {
 		if out == "" || strings.HasPrefix(out, "# ") {
 			return
 		}
-		pkg.buildOutput = append(pkg.buildOutput, out)
+		pkg.buildOutput, pkg.buildOutputBytes = appendCapped(pkg.buildOutput, pkg.buildOutputBytes, out)
 	case "build-fail":
 		if pkg.buildError == "" {
 			pkg.buildError = strings.Join(pkg.buildOutput, "\n")
@@ -276,6 +306,7 @@ func (*aggregator) handlePass(pkg *pkgState, e TestEvent) {
 	if e.Test != "" {
 		pkg.passed++
 		delete(pkg.outputBuf, e.Test)
+		delete(pkg.outputBufBytes, e.Test)
 	} else {
 		pkg.duration = time.Duration(e.Elapsed * float64(time.Second))
 	}
@@ -325,13 +356,14 @@ func (*aggregator) handleOutput(pkg *pkgState, e TestEvent) {
 	if output == "" {
 		return
 	}
-	pkg.outputBuf[e.Test] = append(pkg.outputBuf[e.Test], output)
+	pkg.outputBuf[e.Test], pkg.outputBufBytes[e.Test] = appendCapped(
+		pkg.outputBuf[e.Test], pkg.outputBufBytes[e.Test], output)
 
 	if !pkg.panicked && (strings.Contains(output, "panic:") || strings.HasPrefix(output, "goroutine ")) {
 		pkg.panicked = true
 	}
 	if pkg.panicked && !isPanicNoise(output) {
-		pkg.panicOutput = append(pkg.panicOutput, output)
+		pkg.panicOutput, pkg.panicOutputBytes = appendCapped(pkg.panicOutput, pkg.panicOutputBytes, output)
 	}
 
 	if strings.Contains(output, "coverage:") && strings.Contains(output, "% of statements") {

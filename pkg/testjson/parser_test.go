@@ -227,6 +227,92 @@ func TestProcessEvent_FreesOutputOnPassAndSkip(t *testing.T) {
 	}
 }
 
+// TestStreamMode_LargePerTestOutputBounded verifies that a single failing
+// test emitting many MB of output does not balloon outputBuf — the parser
+// caps per-test buffering and emits a truncation sentinel.
+// Regression for #257 (fo-1f4): aggregator.outputBuf was unbounded.
+func TestStreamMode_LargePerTestOutputBounded(t *testing.T) {
+	t.Parallel()
+
+	const targetBytes = 50 * 1024 * 1024 // 50 MiB
+	const lineSize = 1024                // 1 KiB per output line
+	const numLines = targetBytes / lineSize
+
+	pkg := "example.com/big"
+	payload := strings.Repeat("x", lineSize-1) // -1 leaves room for \n
+	var b strings.Builder
+	b.Grow(targetBytes + 1024)
+	fmt.Fprintf(&b, `{"Action":"run","Package":%q,"Test":"TestBig"}`+"\n", pkg)
+	for range numLines {
+		fmt.Fprintf(&b, `{"Action":"output","Package":%q,"Test":"TestBig","Output":%q}`+"\n", pkg, payload+"\n")
+	}
+	fmt.Fprintf(&b, `{"Action":"fail","Package":%q,"Test":"TestBig","Elapsed":0.1}`+"\n", pkg)
+	fmt.Fprintf(&b, `{"Action":"fail","Package":%q,"Elapsed":1.0}`+"\n", pkg)
+
+	results, _, err := ParseStream(strings.NewReader(b.String()))
+	if err != nil {
+		t.Fatalf("ParseStream() error = %v", err)
+	}
+	if len(results) != 1 || len(results[0].FailedTests) != 1 {
+		t.Fatalf("expected 1 package with 1 failed test, got %+v", results)
+	}
+
+	out := results[0].FailedTests[0].Output
+	var total int
+	for _, ln := range out {
+		total += len(ln) + 1
+	}
+	if total > 2*maxPerTestOutputBytes {
+		t.Fatalf("captured %d bytes, want ≤ %d (cap=%d)", total, 2*maxPerTestOutputBytes, maxPerTestOutputBytes)
+	}
+
+	var hasSentinel bool
+	for _, ln := range out {
+		if strings.Contains(ln, truncationSentinel) {
+			hasSentinel = true
+			break
+		}
+	}
+	if !hasSentinel {
+		t.Fatalf("expected truncation sentinel %q in output, got last line: %q",
+			truncationSentinel, out[len(out)-1])
+	}
+}
+
+// TestPanicOutput_Bounded verifies that panicOutput is also capped.
+func TestPanicOutput_Bounded(t *testing.T) {
+	t.Parallel()
+
+	const numLines = 60 * 1024 // ~60 MiB at 1KiB/line
+	const lineSize = 1024
+
+	pkg := "example.com/panicker"
+	payload := strings.Repeat("p", lineSize-1)
+	var b strings.Builder
+	fmt.Fprintf(&b, `{"Action":"run","Package":%q,"Test":"TestPanic"}`+"\n", pkg)
+	fmt.Fprintf(&b, `{"Action":"output","Package":%q,"Test":"TestPanic","Output":"panic: boom\n"}`+"\n", pkg)
+	for range numLines {
+		fmt.Fprintf(&b, `{"Action":"output","Package":%q,"Test":"TestPanic","Output":%q}`+"\n", pkg, payload+"\n")
+	}
+	fmt.Fprintf(&b, `{"Action":"fail","Package":%q,"Test":"TestPanic","Elapsed":0.1}`+"\n", pkg)
+	fmt.Fprintf(&b, `{"Action":"fail","Package":%q,"Elapsed":1.0}`+"\n", pkg)
+
+	results, _, err := ParseStream(strings.NewReader(b.String()))
+	if err != nil {
+		t.Fatalf("ParseStream() error = %v", err)
+	}
+	if len(results) != 1 || !results[0].Panicked {
+		t.Fatalf("expected panicked package, got %+v", results)
+	}
+	var total int
+	for _, ln := range results[0].PanicOutput {
+		total += len(ln) + 1
+	}
+	if total > 2*maxPerTestOutputBytes {
+		t.Fatalf("panicOutput captured %d bytes, want ≤ %d", total, 2*maxPerTestOutputBytes)
+	}
+}
+
 func TestComputeStats(t *testing.T) {
 	t.Parallel()
 
