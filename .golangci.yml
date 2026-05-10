@@ -108,7 +108,6 @@ linters:
         - deprecatedComment
         - hugeParam
         - ifElseChain
-        - rangeValCopy
         - unlambda
     cyclop:
       max-complexity: 15

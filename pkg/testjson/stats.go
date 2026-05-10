@@ -19,7 +19,8 @@ type Stats struct {
 func ComputeStats(results []TestPackageResult) Stats {
 	var s Stats
 	s.Packages = len(results)
-	for _, r := range results {
+	for i := range results {
+		r := &results[i]
 		s.Passed += r.Passed
 		s.Failed += r.Failed
 		s.Skipped += r.Skipped
