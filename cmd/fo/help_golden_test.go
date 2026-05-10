@@ -88,7 +88,7 @@ func TestHelpGolden(t *testing.T) {
 	for _, name := range wrapNames {
 		wrapChildren = append(wrapChildren, helpNode{
 			name:    name,
-			args:    []string{"wrap", name},
+			args:    []string{subWrap, name},
 			visible: true,
 		})
 	}
@@ -97,8 +97,8 @@ func TestHelpGolden(t *testing.T) {
 		args:    nil,
 		visible: true,
 		children: []helpNode{{
-			name:     "wrap",
-			args:     []string{"wrap"},
+			name:     subWrap,
+			args:     []string{subWrap},
 			visible:  true,
 			children: wrapChildren,
 		}},

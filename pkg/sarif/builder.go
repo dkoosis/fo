@@ -41,7 +41,7 @@ func NewBuilder(toolName, toolVersion string) *Builder {
 // or a descriptive error otherwise.
 func checkLevel(level string) error {
 	switch level {
-	case "error", "warning", "note", "none":
+	case LevelError, LevelWarning, LevelNote, LevelNone:
 		return nil
 	}
 	return fmt.Errorf("%w: %q", errInvalidLevel, level)

@@ -41,32 +41,45 @@ func RenderMetricsHuman(w io.Writer, tool string, rows []MetricRow) error {
 			return err
 		}
 	}
+	keyMax := maxKeyLen(rows)
+	for _, r := range rows {
+		v := strconv.FormatFloat(r.Value, 'f', -1, 64)
+		unit := formatUnit(r.Unit)
+		delta := formatDelta(r)
+		if _, err := fmt.Fprintf(w, "%-*s  %s%s%s\n", keyMax, r.Key, v, unit, delta); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func maxKeyLen(rows []MetricRow) int {
 	keyMax := 0
 	for _, r := range rows {
 		if l := len(r.Key); l > keyMax {
 			keyMax = l
 		}
 	}
-	for _, r := range rows {
-		v := strconv.FormatFloat(r.Value, 'f', -1, 64)
-		delta := ""
-		switch {
-		case r.New:
-			delta = "  (new)"
-		case r.Delta != 0:
-			sign := "+"
-			if r.Delta < 0 {
-				sign = ""
-			}
-			delta = fmt.Sprintf("  (%s%s)", sign, strconv.FormatFloat(r.Delta, 'f', -1, 64))
-		}
-		unit := ""
-		if r.Unit != "" {
-			unit = " " + r.Unit
-		}
-		if _, err := fmt.Fprintf(w, "%-*s  %s%s%s\n", keyMax, r.Key, v, unit, delta); err != nil {
-			return err
-		}
+	return keyMax
+}
+
+func formatUnit(unit string) string {
+	if unit == "" {
+		return ""
 	}
-	return nil
+	return " " + unit
+}
+
+func formatDelta(r MetricRow) string {
+	switch {
+	case r.New:
+		return "  (new)"
+	case r.Delta != 0:
+		sign := "+"
+		if r.Delta < 0 {
+			sign = ""
+		}
+		return fmt.Sprintf("  (%s%s)", sign, strconv.FormatFloat(r.Delta, 'f', -1, 64))
+	}
+	return ""
 }

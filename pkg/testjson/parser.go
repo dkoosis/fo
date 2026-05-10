@@ -231,11 +231,11 @@ func (a *aggregator) processEvent(e TestEvent) {
 	pkg := a.getOrCreate(e.Package)
 
 	switch e.Action {
-	case "pass":
+	case actionPass:
 		a.handlePass(pkg, e)
-	case "fail":
+	case actionFail:
 		a.handleFail(pkg, e)
-	case "skip":
+	case actionSkip:
 		if e.Test != "" {
 			pkg.skipped++
 			delete(pkg.outputBuf, e.Test)

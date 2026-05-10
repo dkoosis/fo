@@ -37,8 +37,8 @@ import (
 	"golang.org/x/term"
 
 	"github.com/dkoosis/fo/internal/boundread"
-	"github.com/dkoosis/fo/pkg/report"
 	"github.com/dkoosis/fo/pkg/metrics"
+	"github.com/dkoosis/fo/pkg/report"
 	"github.com/dkoosis/fo/pkg/sarif"
 	"github.com/dkoosis/fo/pkg/state"
 	"github.com/dkoosis/fo/pkg/status"
@@ -59,6 +59,24 @@ const (
 	formatHuman = "human"
 	formatLLM   = "llm"
 	formatJSON  = "json"
+)
+
+// CLI flag and subcommand names. Centralized to satisfy goconst and so
+// help/usage strings stay aligned with parsing.
+const (
+	flagFormat    = "--format"
+	flagStateFile = "--state-file"
+	flagNoState   = "--no-state"
+	flagRule      = "--rule"
+	flagTool      = "--tool"
+
+	subState       = "state"
+	subWrap        = "wrap"
+	subDiag        = "diag"
+	subLeaderboard = "leaderboard"
+	subArchlint    = "archlint"
+	subJSCPD       = "jscpd"
+	subGofmt       = "gofmt"
 )
 
 // version is the build version. Override with -ldflags "-X main.version=v1.2.3".
@@ -159,9 +177,9 @@ EXIT CODES
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 {
 		switch args[0] {
-		case "wrap":
+		case subWrap:
 			return runWrap(args[1:], stdin, stdout, stderr)
-		case "state":
+		case subState:
 			return runState(args[1:], stdout, stderr)
 		case "help", "-h", "--help":
 			fmt.Fprint(stderr, usage)
@@ -409,9 +427,9 @@ func coerceAs(kind string, input []byte, stderr io.Writer) ([]byte, int) {
 		return append([]byte("# fo:status\n"), input...), 0
 	case "metrics":
 		return append([]byte("# fo:metrics\n"), input...), 0
-	case "diag":
+	case subDiag:
 		var buf bytes.Buffer
-		if err := wrapdiag.Convert(bytes.NewReader(input), &buf, wrapdiag.DiagOpts{Tool: "diag", Rule: "finding", Level: "warning"}); err != nil {
+		if err := wrapdiag.Convert(bytes.NewReader(input), &buf, wrapdiag.DiagOpts{Tool: subDiag, Rule: "finding", Level: sarif.LevelWarning}); err != nil {
 			fmt.Fprintf(stderr, "fo: --as diag: %v\n", err)
 			return nil, 2
 		}
@@ -837,13 +855,13 @@ func resolveTheme(name string, w io.Writer) theme.Theme {
 
 func isTTYWriter(w io.Writer) bool {
 	f, ok := w.(*os.File)
-	return ok && term.IsTerminal(int(f.Fd())) //nolint:gosec // file descriptor fits in int
+	return ok && term.IsTerminal(int(f.Fd()))
 }
 
 func termSize(w io.Writer) int {
 	width := 80
 	if f, ok := w.(*os.File); ok {
-		if tw, _, err := term.GetSize(int(f.Fd())); err == nil { //nolint:gosec // G115: term.GetSize takes fd from validated *os.File
+		if tw, _, err := term.GetSize(int(f.Fd())); err == nil {
 			if tw > 0 {
 				width = tw
 			}
@@ -1087,7 +1105,7 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	name := args[0]
 	switch name {
-	case "archlint":
+	case subArchlint:
 		fs := flag.NewFlagSet("fo wrap archlint", flag.ContinueOnError)
 		fs.SetOutput(stderr)
 		if err := fs.Parse(args[1:]); err != nil {
@@ -1101,7 +1119,7 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 2
 		}
 		return 0
-	case "jscpd":
+	case subJSCPD:
 		fs := flag.NewFlagSet("fo wrap jscpd", flag.ContinueOnError)
 		fs.SetOutput(stderr)
 		if err := fs.Parse(args[1:]); err != nil {
@@ -1157,9 +1175,9 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 2
 		}
 		return 0
-	case "diag":
+	case subDiag:
 		return runWrapDiag(args[1:], stdin, stdout, stderr)
-	case "leaderboard":
+	case subLeaderboard:
 		return runWrapLeaderboard(args[1:], stdin, stdout, stderr)
 	}
 

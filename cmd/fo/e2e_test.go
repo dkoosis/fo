@@ -12,7 +12,10 @@ import (
 	"testing"
 )
 
-const fixturesRoot = "../../testdata/golden/v2"
+const (
+	fixturesRoot    = "../../testdata/golden/v2"
+	needsFormatRule = "needs-formatting"
+)
 
 // scenario describes one fixture run, fully discovered from the filesystem.
 type scenario struct {
@@ -72,12 +75,12 @@ func pipelineInput(t *testing.T, sc scenario) []byte {
 	switch sc.dir {
 	case "golangci", "gotest":
 		return raw
-	case "archlint":
-		return wrapToSARIF(t, []string{"wrap", "archlint"}, raw)
-	case "jscpd":
-		return wrapToSARIF(t, []string{"wrap", "jscpd"}, raw)
-	case "gofmt":
-		return wrapToSARIF(t, []string{"wrap", "diag", "--tool", "gofmt", "--rule", "needs-formatting"}, raw)
+	case subArchlint:
+		return wrapToSARIF(t, []string{subWrap, subArchlint}, raw)
+	case subJSCPD:
+		return wrapToSARIF(t, []string{subWrap, subJSCPD}, raw)
+	case subGofmt:
+		return wrapToSARIF(t, []string{subWrap, subDiag, flagTool, subGofmt, flagRule, needsFormatRule}, raw)
 	}
 	t.Fatalf("unknown fixture dir %q", sc.dir)
 	return nil
@@ -97,14 +100,14 @@ func wrapToSARIF(t *testing.T, args []string, in []byte) []byte {
 // the full v2 dispatch in each output format, and asserts the contract.
 func TestE2E_Pipeline_ContractSurface(t *testing.T) {
 	scenarios := discoverScenarios(t)
-	formats := []string{"human", "llm", "json"}
+	formats := []string{"human", formatLLM, formatJSON}
 
 	for _, sc := range scenarios {
 		input := pipelineInput(t, sc)
 		for _, fmtName := range formats {
 			t.Run(sc.dir+"/"+sc.name+"/"+fmtName, func(t *testing.T) {
 				var stdout, stderr bytes.Buffer
-				code := run([]string{"--format", fmtName, "--no-state"}, bytes.NewReader(input), &stdout, &stderr)
+				code := run([]string{flagFormat, fmtName, flagNoState}, bytes.NewReader(input), &stdout, &stderr)
 
 				// Exit code contract: 0 (clean / no errors) or 1 (errors
 				// or test failures). Anything else means dispatch failure.
@@ -118,11 +121,11 @@ func TestE2E_Pipeline_ContractSurface(t *testing.T) {
 				}
 
 				switch fmtName {
-				case "llm":
+				case formatLLM:
 					if bytes.Contains(out, []byte("\x1b[")) {
 						t.Errorf("llm output contains ANSI escapes")
 					}
-				case "json":
+				case formatJSON:
 					if bytes.Contains(out, []byte("\x1b[")) {
 						t.Errorf("json output contains ANSI escapes")
 					}
@@ -141,7 +144,7 @@ func TestE2E_Pipeline_ContractSurface(t *testing.T) {
 // embeds a GeneratedAt timestamp by design.
 func TestE2E_Pipeline_Determinism(t *testing.T) {
 	scenarios := discoverScenarios(t)
-	formats := []string{"llm"}
+	formats := []string{formatLLM}
 
 	for _, sc := range scenarios {
 		input := pipelineInput(t, sc)
@@ -160,7 +163,7 @@ func TestE2E_Pipeline_Determinism(t *testing.T) {
 func runOnce(t *testing.T, fmtName string, input []byte) []byte {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
-	_ = run([]string{"--format", fmtName, "--no-state"}, bytes.NewReader(input), &stdout, &stderr)
+	_ = run([]string{flagFormat, fmtName, flagNoState}, bytes.NewReader(input), &stdout, &stderr)
 	return stdout.Bytes()
 }
 
@@ -174,9 +177,9 @@ func TestE2E_WrapSubcommands(t *testing.T) {
 		dir  string
 		ext  string
 	}{
-		{"archlint", []string{"wrap", "archlint"}, "archlint", ".input.json"},
-		{"jscpd", []string{"wrap", "jscpd"}, "jscpd", ".input.json"},
-		{"diag-gofmt", []string{"wrap", "diag", "--tool", "gofmt", "--rule", "needs-formatting"}, "gofmt", ".input.txt"},
+		{subArchlint, []string{subWrap, subArchlint}, subArchlint, ".input.json"},
+		{subJSCPD, []string{subWrap, subJSCPD}, subJSCPD, ".input.json"},
+		{"diag-gofmt", []string{subWrap, subDiag, flagTool, subGofmt, flagRule, needsFormatRule}, subGofmt, ".input.txt"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -230,7 +233,7 @@ func TestE2E_LLMGoldens(t *testing.T) {
 		t.Run(sc.dir+"/"+sc.name, func(t *testing.T) {
 			input := pipelineInput(t, sc)
 			var stdout, stderr bytes.Buffer
-			_ = run([]string{"--format", "llm", "--no-state"}, bytes.NewReader(input), &stdout, &stderr)
+			_ = run([]string{flagFormat, formatLLM, flagNoState}, bytes.NewReader(input), &stdout, &stderr)
 			goldenPath := filepath.Join(filepath.Dir(sc.inputAbs), sc.name+".llm.golden")
 			if os.Getenv("UPDATE_LLM_GOLDENS") == "1" {
 				if err := os.WriteFile(goldenPath, stdout.Bytes(), 0o644); err != nil {
@@ -263,7 +266,7 @@ func TestE2E_TallyPipeline(t *testing.T) {
 	}
 
 	var renderOut, renderErr bytes.Buffer
-	if code := run([]string{"--format", "llm", "--no-state"}, &wrapOut, &renderOut, &renderErr); code != 0 {
+	if code := run([]string{flagFormat, formatLLM, flagNoState}, &wrapOut, &renderOut, &renderErr); code != 0 {
 		t.Fatalf("fo render: code=%d stderr=%s", code, renderErr.String())
 	}
 	out := renderOut.String()
@@ -275,7 +278,7 @@ func TestE2E_TallyPipeline(t *testing.T) {
 
 	jsonSrc := runWrapForTest(t, tallyIn)
 	var jsonOut, jsonErr bytes.Buffer
-	if code := run([]string{"--format", "json", "--no-state"}, &jsonSrc, &jsonOut, &jsonErr); code != 0 {
+	if code := run([]string{flagFormat, formatJSON, flagNoState}, &jsonSrc, &jsonOut, &jsonErr); code != 0 {
 		t.Fatalf("fo json: code=%d stderr=%s", code, jsonErr.String())
 	}
 	if !bytes.Contains(jsonOut.Bytes(), []byte(`"tool": "dk-types"`)) {
@@ -290,7 +293,7 @@ func TestE2E_BareTallyAutoDetect(t *testing.T) {
 	t.Setenv("FO_STATE_DIR", t.TempDir())
 	in := "  10 alpha\n   3 beta\n   1 gamma\n"
 	var stdout, stderr bytes.Buffer
-	if code := run([]string{"--format", "llm"}, bytes.NewReader([]byte(in)), &stdout, &stderr); code != 0 {
+	if code := run([]string{flagFormat, formatLLM}, bytes.NewReader([]byte(in)), &stdout, &stderr); code != 0 {
 		t.Fatalf("exit=%d stderr=%s", code, stderr.String())
 	}
 	if !strings.Contains(stdout.String(), "alpha") {
@@ -311,7 +314,7 @@ func TestE2E_AsHint_tally(t *testing.T) {
 	t.Setenv("FO_STATE_DIR", t.TempDir())
 	in := "  10 a\n   3 b\n"
 	var stdout, stderr bytes.Buffer
-	if code := run([]string{"--as", "tally", "--format", "llm"}, bytes.NewReader([]byte(in)), &stdout, &stderr); code != 0 {
+	if code := run([]string{"--as", "tally", flagFormat, formatLLM}, bytes.NewReader([]byte(in)), &stdout, &stderr); code != 0 {
 		t.Fatalf("exit=%d stderr=%s", code, stderr.String())
 	}
 	out := stdout.String()
@@ -333,7 +336,7 @@ func TestE2E_MetricsFormat(t *testing.T) {
 	t.Setenv("FO_STATE_DIR", t.TempDir())
 	in := "# fo:metrics tool=cover\npkg/x 87.3 %\npkg/y 100 %\n"
 	var stdout, stderr bytes.Buffer
-	if code := run([]string{"--format", "llm"}, bytes.NewReader([]byte(in)), &stdout, &stderr); code != 0 {
+	if code := run([]string{flagFormat, formatLLM}, bytes.NewReader([]byte(in)), &stdout, &stderr); code != 0 {
 		t.Fatalf("fo render: code=%d stderr=%s", code, stderr.String())
 	}
 	if !strings.Contains(stdout.String(), "pkg/x 87.3 %") {
@@ -345,12 +348,12 @@ func TestE2E_MetricsDelta(t *testing.T) {
 	t.Setenv("FO_STATE_DIR", t.TempDir())
 	in1 := "# fo:metrics\nx 10\n"
 	var b1out, b1err bytes.Buffer
-	if code := run([]string{"--format", "llm"}, bytes.NewReader([]byte(in1)), &b1out, &b1err); code != 0 {
+	if code := run([]string{flagFormat, formatLLM}, bytes.NewReader([]byte(in1)), &b1out, &b1err); code != 0 {
 		t.Fatalf("first run: code=%d stderr=%s", code, b1err.String())
 	}
 	in2 := "# fo:metrics\nx 12\n"
 	var b2out, b2err bytes.Buffer
-	if code := run([]string{"--format", "human"}, bytes.NewReader([]byte(in2)), &b2out, &b2err); code != 0 {
+	if code := run([]string{flagFormat, "human"}, bytes.NewReader([]byte(in2)), &b2out, &b2err); code != 0 {
 		t.Fatalf("second run: code=%d stderr=%s", code, b2err.String())
 	}
 	if !strings.Contains(b2out.String(), "+2") {
@@ -362,7 +365,7 @@ func TestE2E_StatusFormat(t *testing.T) {
 	in := "# fo:status tool=doctor\nok\tenv\nfail\tdolt\twarn-note\n"
 
 	var stdout, stderr bytes.Buffer
-	if code := run([]string{"--format", "llm", "--no-state"}, bytes.NewReader([]byte(in)), &stdout, &stderr); code != 0 {
+	if code := run([]string{flagFormat, formatLLM, flagNoState}, bytes.NewReader([]byte(in)), &stdout, &stderr); code != 0 {
 		t.Fatalf("fo render: code=%d stderr=%s", code, stderr.String())
 	}
 	out := stdout.String()
@@ -373,7 +376,7 @@ func TestE2E_StatusFormat(t *testing.T) {
 	}
 
 	var jsonOut, jsonErr bytes.Buffer
-	if code := run([]string{"--format", "json", "--no-state"}, bytes.NewReader([]byte(in)), &jsonOut, &jsonErr); code != 0 {
+	if code := run([]string{flagFormat, formatJSON, flagNoState}, bytes.NewReader([]byte(in)), &jsonOut, &jsonErr); code != 0 {
 		t.Fatalf("fo json: code=%d stderr=%s", code, jsonErr.String())
 	}
 	if !bytes.Contains(jsonOut.Bytes(), []byte(`"tool": "doctor"`)) {
@@ -384,7 +387,7 @@ func TestE2E_StatusFormat(t *testing.T) {
 func runWrapForTest(t *testing.T, tallyIn string) bytes.Buffer {
 	t.Helper()
 	var out, errBuf bytes.Buffer
-	if code := run([]string{"wrap", "leaderboard", "--tool", "dk-types"}, bytes.NewReader([]byte(tallyIn)), &out, &errBuf); code != 0 {
+	if code := run([]string{subWrap, subLeaderboard, flagTool, "dk-types"}, bytes.NewReader([]byte(tallyIn)), &out, &errBuf); code != 0 {
 		t.Fatalf("wrap leaderboard: code=%d stderr=%s", code, errBuf.String())
 	}
 	return out
@@ -405,7 +408,7 @@ func TestE2E_Multiplex_SARIFAndTestjson(t *testing.T) {
 		"--- tool:test format:testjson ---\n" + tjBody + "\n"
 
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"--format", "json", "--no-state"}, bytes.NewReader([]byte(input)), &stdout, &stderr)
+	code := run([]string{flagFormat, formatJSON, flagNoState}, bytes.NewReader([]byte(input)), &stdout, &stderr)
 	if code != 1 {
 		t.Fatalf("want exit 1 (failures present), got %d (stderr=%s)", code, stderr.String())
 	}
@@ -427,7 +430,7 @@ func TestE2E_Multiplex_SectionParseFailure(t *testing.T) {
 		"--- tool:test format:testjson ---\n" +
 		`{"Action":"pass","Package":"bar"}` + "\n"
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"--format", "json", "--no-state"}, bytes.NewReader([]byte(input)), &stdout, &stderr)
+	code := run([]string{flagFormat, formatJSON, flagNoState}, bytes.NewReader([]byte(input)), &stdout, &stderr)
 	if code != 1 {
 		t.Fatalf("want exit 1 (synthetic error finding), got %d (stderr=%s)", code, stderr.String())
 	}
@@ -446,7 +449,7 @@ func TestE2E_SectionStatus_Timeout(t *testing.T) {
 	input := "--- tool:govulncheck format:sarif status:timeout ---\n"
 
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"--format", "json", "--no-state"}, bytes.NewReader([]byte(input)), &stdout, &stderr)
+	code := run([]string{flagFormat, formatJSON, flagNoState}, bytes.NewReader([]byte(input)), &stdout, &stderr)
 	if code != 1 {
 		t.Fatalf("want exit 1 (timeout is an error), got %d stderr=%s", code, stderr.String())
 	}
@@ -459,7 +462,7 @@ func TestE2E_SectionStatus_Error(t *testing.T) {
 	input := "--- tool:govulncheck format:sarif status:error ---\n"
 
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"--format", "json", "--no-state"}, bytes.NewReader([]byte(input)), &stdout, &stderr)
+	code := run([]string{flagFormat, formatJSON, flagNoState}, bytes.NewReader([]byte(input)), &stdout, &stderr)
 	if code != 1 {
 		t.Fatalf("want exit 1 (error status), got %d stderr=%s", code, stderr.String())
 	}
@@ -475,7 +478,7 @@ func TestE2E_SectionStatus_Skipped(t *testing.T) {
 		`{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"vet"}},"results":[]}]}` + "\n"
 
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"--format", "json", "--no-state"}, bytes.NewReader([]byte(input)), &stdout, &stderr)
+	code := run([]string{flagFormat, formatJSON, flagNoState}, bytes.NewReader([]byte(input)), &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("want exit 0 (skipped is not a failure), got %d stderr=%s", code, stderr.String())
 	}
@@ -489,7 +492,7 @@ func TestE2E_SectionStatus_OK_NoSyntheticFinding(t *testing.T) {
 	input := "--- tool:vet format:sarif status:ok ---\n" + sarif + "\n"
 
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"--format", "json", "--no-state"}, bytes.NewReader([]byte(input)), &stdout, &stderr)
+	code := run([]string{flagFormat, formatJSON, flagNoState}, bytes.NewReader([]byte(input)), &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("want exit 0 (ok status, clean), got %d stderr=%s", code, stderr.String())
 	}
@@ -503,10 +506,10 @@ func TestE2E_FixCommand_JSONOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read fixture: %v", err)
 	}
-	sarif := wrapToSARIF(t, []string{"wrap", "diag", "--tool", "gofmt", "--rule", "needs-formatting"}, raw)
+	sarif := wrapToSARIF(t, []string{subWrap, subDiag, flagTool, subGofmt, flagRule, needsFormatRule}, raw)
 
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"--format", "json", "--no-state"}, bytes.NewReader(sarif), &stdout, &stderr)
+	code := run([]string{flagFormat, formatJSON, flagNoState}, bytes.NewReader(sarif), &stdout, &stderr)
 	if code != 0 && code != 1 {
 		t.Fatalf("unexpected exit %d stderr=%s", code, stderr.String())
 	}
@@ -540,7 +543,7 @@ func TestE2E_LLMDiffGolden(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"--format", "llm", "--state-file", stateFile}, bytes.NewReader(raw), &stdout, &stderr)
+	code := run([]string{flagFormat, formatLLM, flagStateFile, stateFile}, bytes.NewReader(raw), &stdout, &stderr)
 	if code != 0 && code != 1 {
 		t.Fatalf("unexpected exit=%d stderr=%s", code, stderr.String())
 	}
@@ -581,10 +584,10 @@ func TestE2E_FixCommand_LLMOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read fixture: %v", err)
 	}
-	sarif := wrapToSARIF(t, []string{"wrap", "diag", "--tool", "gofmt", "--rule", "needs-formatting"}, raw)
+	sarif := wrapToSARIF(t, []string{subWrap, subDiag, flagTool, subGofmt, flagRule, needsFormatRule}, raw)
 
 	var stdout, stderr bytes.Buffer
-	_ = run([]string{"--format", "llm", "--no-state"}, bytes.NewReader(sarif), &stdout, &stderr)
+	_ = run([]string{flagFormat, formatLLM, flagNoState}, bytes.NewReader(sarif), &stdout, &stderr)
 
 	out := stdout.Bytes()
 	if !bytes.Contains(out, []byte("fix: gofmt -w")) {

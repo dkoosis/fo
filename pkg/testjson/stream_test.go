@@ -23,8 +23,8 @@ func TestStream_EventDeliveryAndMalformedCounting(t *testing.T) {
 			name: "valid stream emits all events in order",
 			input: strings.Join([]string{
 				`{"Action":"start","Package":"example.com/pkg"}`,
-				`{"Action":"run","Package":"example.com/pkg","Test":"TestFoo"}`,
-				`{"Action":"pass","Package":"example.com/pkg","Test":"TestFoo","Elapsed":0.01}`,
+				`{"Action":"run","Package":"example.com/pkg","Test":"` + testFooName + `"}`,
+				`{"Action":"pass","Package":"example.com/pkg","Test":"` + testFooName + `","Elapsed":0.01}`,
 				`{"Action":"pass","Package":"example.com/pkg","Elapsed":0.5}`,
 			}, "\n") + "\n",
 			wantMalformed: 0,
@@ -34,7 +34,7 @@ func TestStream_EventDeliveryAndMalformedCounting(t *testing.T) {
 				if events[0].Action != "start" {
 					t.Fatalf("events[0].Action = %q, want start", events[0].Action)
 				}
-				if events[2].Test != "TestFoo" {
+				if events[2].Test != testFooName {
 					t.Fatalf("events[2].Test = %q, want TestFoo", events[2].Test)
 				}
 			},

@@ -17,6 +17,8 @@ import (
 
 var update = flag.Bool("update", false, "update golden files")
 
+const errorsLabel = "errors"
+
 // Color escapes we expect to see when theme.Color() renders a styled
 // glyph at color 196 (red), 34 (green), etc. termenv.ANSI256 emits
 // these exact byte sequences.
@@ -127,7 +129,7 @@ func TestBullet_Color_HasRed(t *testing.T) {
 func TestGrouped_Severity_Mono(t *testing.T) {
 	g := view.Grouped{
 		Sections: []view.GroupedSection{
-			{Label: "errors", Items: []view.BulletItem{
+			{Label: errorsLabel, Items: []view.BulletItem{
 				{Severity: report.SeverityError, Label: "unchecked error", Value: "store.go:42"},
 				{Severity: report.SeverityError, Label: "nil deref", Value: "query.go:9",
 					FixCommand: "go vet ./..."},
@@ -144,7 +146,7 @@ func TestGrouped_Severity_Mono(t *testing.T) {
 func TestGrouped_Color_HasRed(t *testing.T) {
 	g := view.Grouped{
 		Sections: []view.GroupedSection{
-			{Label: "errors", Items: []view.BulletItem{
+			{Label: errorsLabel, Items: []view.BulletItem{
 				{Severity: report.SeverityError, Label: "boom", Value: "x.go:1"},
 			}},
 		},
@@ -208,7 +210,7 @@ func TestDelta_OverBullet_Mono(t *testing.T) {
 	d := view.Delta{
 		Inner: inner,
 		Buckets: []view.DeltaBucket{
-			{Label: "errors", Count: 12, Direction: 1},
+			{Label: errorsLabel, Count: 12, Direction: 1},
 			{Label: "warnings", Count: 3, Direction: -1},
 			{Label: "notes", Count: 5, Direction: 0},
 		},
@@ -220,7 +222,7 @@ func TestDelta_OverBullet_Mono(t *testing.T) {
 func TestDelta_Color_HasArrowColors(t *testing.T) {
 	d := view.Delta{
 		Buckets: []view.DeltaBucket{
-			{Label: "errors", Count: 12, Direction: 1},
+			{Label: errorsLabel, Count: 12, Direction: 1},
 			{Label: "warnings", Count: 3, Direction: -1},
 		},
 	}

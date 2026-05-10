@@ -33,6 +33,14 @@ const (
 	ModeLLM
 )
 
+// Bucket labels used in summary chrome (delta buckets, severity counters).
+const (
+	labelErr  = "err"
+	labelWarn = "warn"
+	labelNote = "note"
+	labelFail = "fail"
+)
+
 // PickView selects a ViewSpec from a Report. Pure and deterministic:
 // branches are evaluated in fixed priority order so the same Report
 // always yields the same shape. Delta wraps the inner pick when Diff
@@ -352,13 +360,13 @@ func severityCounters(fs []report.Finding) []Counter {
 	}
 	out := make([]Counter, 0, 3)
 	if e > 0 {
-		out = append(out, Counter{Severity: report.SeverityError, Label: "err", Value: e})
+		out = append(out, Counter{Severity: report.SeverityError, Label: labelErr, Value: e})
 	}
 	if w > 0 {
-		out = append(out, Counter{Severity: report.SeverityWarning, Label: "warn", Value: w})
+		out = append(out, Counter{Severity: report.SeverityWarning, Label: labelWarn, Value: w})
 	}
 	if n > 0 {
-		out = append(out, Counter{Severity: report.SeverityNote, Label: "note", Value: n})
+		out = append(out, Counter{Severity: report.SeverityNote, Label: labelNote, Value: n})
 	}
 	return out
 }
@@ -425,10 +433,10 @@ func deltaBuckets(cur report.Report, d *report.DiffSummary) []DeltaBucket {
 	dW := severityDelta(d, string(report.SeverityWarning))
 	dN := severityDelta(d, string(report.SeverityNote))
 	return []DeltaBucket{
-		{Label: "err", Count: curE, Direction: sign(dE)},
-		{Label: "warn", Count: curW, Direction: sign(dW)},
-		{Label: "note", Count: curN, Direction: sign(dN)},
-		{Label: "fail", Count: curF, Direction: 0},
+		{Label: labelErr, Count: curE, Direction: sign(dE)},
+		{Label: labelWarn, Count: curW, Direction: sign(dW)},
+		{Label: labelNote, Count: curN, Direction: sign(dN)},
+		{Label: labelFail, Count: curF, Direction: 0},
 	}
 }
 

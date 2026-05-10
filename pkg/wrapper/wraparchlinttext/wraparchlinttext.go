@@ -18,17 +18,42 @@ const ruleID = "arch-lint/forbidden-import"
 
 var headerRe = regexp.MustCompile(`^\[(Warning|Error)\] Component "([^"]+)" shouldn't import component "([^"]+)"`)
 
+type pending struct {
+	level string
+	msg   string
+	file  string
+}
+
+func parseHeader(line string) *pending {
+	m := headerRe.FindStringSubmatch(line)
+	if m == nil {
+		return nil
+	}
+	level := "warning"
+	if m[1] == "Error" {
+		level = "error"
+	}
+	return &pending{level: level, msg: fmt.Sprintf("%s shouldn't import %s", m[2], m[3])}
+}
+
+func extractFile(line string) string {
+	if !strings.HasPrefix(line, "  ") {
+		return ""
+	}
+	trimmed := strings.TrimSpace(line)
+	idx := strings.IndexByte(trimmed, ':')
+	if idx <= 0 {
+		return ""
+	}
+	return trimmed[:idx]
+}
+
 func Convert(r io.Reader, w io.Writer) error {
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 64*1024), 1024*1024)
 
 	b := sarif.NewBuilder("go-arch-lint", "")
 
-	type pending struct {
-		level string
-		msg   string
-		file  string
-	}
 	var p *pending
 	flush := func() {
 		if p == nil {
@@ -40,20 +65,16 @@ func Convert(r io.Reader, w io.Writer) error {
 
 	for sc.Scan() {
 		line := sc.Text()
-		if m := headerRe.FindStringSubmatch(line); m != nil {
+		if next := parseHeader(line); next != nil {
 			flush()
-			level := "warning"
-			if m[1] == "Error" {
-				level = "error"
-			}
-			p = &pending{level: level, msg: fmt.Sprintf("%s shouldn't import %s", m[2], m[3])}
+			p = next
 			continue
 		}
-		if p != nil && strings.HasPrefix(line, "  ") {
-			trimmed := strings.TrimSpace(line)
-			if idx := strings.IndexByte(trimmed, ':'); idx > 0 {
-				p.file = trimmed[:idx]
-			}
+		if p == nil {
+			continue
+		}
+		if f := extractFile(line); f != "" {
+			p.file = f
 		}
 	}
 	flush()

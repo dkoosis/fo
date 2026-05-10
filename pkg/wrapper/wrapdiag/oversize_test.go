@@ -17,7 +17,7 @@ func TestDiagConvert_OversizeLineDoesNotAbort(t *testing.T) {
 	input := "main.go:1:1: first\n" + huge + "\nmain.go:9:1: third\n"
 
 	var buf bytes.Buffer
-	if err := Convert(strings.NewReader(input), &buf, DiagOpts{Tool: "govet", Level: "error"}); err != nil {
+	if err := Convert(strings.NewReader(input), &buf, DiagOpts{Tool: toolGovet, Level: sarif.LevelError}); err != nil {
 		t.Fatalf("Convert err = %v", err)
 	}
 	var doc sarif.Document
@@ -37,8 +37,8 @@ func TestDiagConvert_OversizeLineWarnsStderr(t *testing.T) {
 
 	var out, errBuf bytes.Buffer
 	if err := Convert(strings.NewReader(input), &out, DiagOpts{
-		Tool:   "govet",
-		Level:  "error",
+		Tool:   toolGovet,
+		Level:  sarif.LevelError,
 		Stderr: &errBuf,
 	}); err != nil {
 		t.Fatalf("Convert err = %v", err)
@@ -62,8 +62,8 @@ func TestDiagConvert_OversizeLineWarnsStderr(t *testing.T) {
 func TestDiagConvert_NoOversizeNoWarning(t *testing.T) {
 	var out, errBuf bytes.Buffer
 	if err := Convert(strings.NewReader("main.go:1:1: only\n"), &out, DiagOpts{
-		Tool:   "govet",
-		Level:  "error",
+		Tool:   toolGovet,
+		Level:  sarif.LevelError,
 		Stderr: &errBuf,
 	}); err != nil {
 		t.Fatalf("Convert err = %v", err)

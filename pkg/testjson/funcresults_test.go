@@ -4,6 +4,12 @@ import (
 	"testing"
 )
 
+const (
+	testFooName = "TestFoo"
+	pkgAName    = "pkg/a"
+	pkgBName    = "pkg/b"
+)
+
 func TestFuncResults(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -18,65 +24,65 @@ func TestFuncResults(t *testing.T) {
 		{
 			name: "pass and fail in different packages",
 			events: []TestEvent{
-				{Action: "run", Package: "pkg/a", Test: "TestFoo"},
-				{Action: "pass", Package: "pkg/a", Test: "TestFoo"},
-				{Action: "run", Package: "pkg/b", Test: "TestFoo"},
-				{Action: "fail", Package: "pkg/b", Test: "TestFoo"},
+				{Action: "run", Package: pkgAName, Test: testFooName},
+				{Action: actionPass, Package: pkgAName, Test: testFooName},
+				{Action: "run", Package: pkgBName, Test: testFooName},
+				{Action: actionFail, Package: pkgBName, Test: testFooName},
 			},
 			want: map[FuncKey]FuncResult{
-				{Package: "pkg/a", Func: "TestFoo"}: {Key: FuncKey{Package: "pkg/a", Func: "TestFoo"}, Status: FuncPass},
-				{Package: "pkg/b", Func: "TestFoo"}: {Key: FuncKey{Package: "pkg/b", Func: "TestFoo"}, Status: FuncFail},
+				{Package: pkgAName, Func: testFooName}: {Key: FuncKey{Package: pkgAName, Func: testFooName}, Status: FuncPass},
+				{Package: pkgBName, Func: testFooName}: {Key: FuncKey{Package: pkgBName, Func: testFooName}, Status: FuncFail},
 			},
 		},
 		{
 			name: "subtests filtered out",
 			events: []TestEvent{
-				{Action: "pass", Package: "pkg/a", Test: "TestFoo"},
-				{Action: "pass", Package: "pkg/a", Test: "TestFoo/subtest_one"},
-				{Action: "fail", Package: "pkg/a", Test: "TestFoo/subtest_two"},
+				{Action: actionPass, Package: pkgAName, Test: testFooName},
+				{Action: actionPass, Package: pkgAName, Test: "TestFoo/subtest_one"},
+				{Action: actionFail, Package: pkgAName, Test: "TestFoo/subtest_two"},
 			},
 			want: map[FuncKey]FuncResult{
-				{Package: "pkg/a", Func: "TestFoo"}: {Key: FuncKey{Package: "pkg/a", Func: "TestFoo"}, Status: FuncPass},
+				{Package: pkgAName, Func: testFooName}: {Key: FuncKey{Package: pkgAName, Func: testFooName}, Status: FuncPass},
 			},
 		},
 		{
 			name: "package-level events ignored",
 			events: []TestEvent{
-				{Action: "pass", Package: "pkg/a", Test: ""},
-				{Action: "pass", Package: "pkg/a", Test: "TestFoo"},
+				{Action: actionPass, Package: pkgAName, Test: ""},
+				{Action: actionPass, Package: pkgAName, Test: testFooName},
 			},
 			want: map[FuncKey]FuncResult{
-				{Package: "pkg/a", Func: "TestFoo"}: {Key: FuncKey{Package: "pkg/a", Func: "TestFoo"}, Status: FuncPass},
+				{Package: pkgAName, Func: testFooName}: {Key: FuncKey{Package: pkgAName, Func: testFooName}, Status: FuncPass},
 			},
 		},
 		{
 			name: "last action wins",
 			events: []TestEvent{
-				{Action: "pass", Package: "pkg/a", Test: "TestFoo"},
-				{Action: "fail", Package: "pkg/a", Test: "TestFoo"},
+				{Action: actionPass, Package: pkgAName, Test: testFooName},
+				{Action: actionFail, Package: pkgAName, Test: testFooName},
 			},
 			want: map[FuncKey]FuncResult{
-				{Package: "pkg/a", Func: "TestFoo"}: {Key: FuncKey{Package: "pkg/a", Func: "TestFoo"}, Status: FuncFail},
+				{Package: pkgAName, Func: testFooName}: {Key: FuncKey{Package: pkgAName, Func: testFooName}, Status: FuncFail},
 			},
 		},
 		{
 			name: "skip status",
 			events: []TestEvent{
-				{Action: "skip", Package: "pkg/a", Test: "TestSkipped"},
+				{Action: actionSkip, Package: pkgAName, Test: "TestSkipped"},
 			},
 			want: map[FuncKey]FuncResult{
-				{Package: "pkg/a", Func: "TestSkipped"}: {Key: FuncKey{Package: "pkg/a", Func: "TestSkipped"}, Status: FuncSkip},
+				{Package: pkgAName, Func: "TestSkipped"}: {Key: FuncKey{Package: pkgAName, Func: "TestSkipped"}, Status: FuncSkip},
 			},
 		},
 		{
 			name: "output and run events ignored",
 			events: []TestEvent{
-				{Action: "run", Package: "pkg/a", Test: "TestFoo"},
-				{Action: "output", Package: "pkg/a", Test: "TestFoo"},
-				{Action: "pass", Package: "pkg/a", Test: "TestFoo"},
+				{Action: "run", Package: pkgAName, Test: testFooName},
+				{Action: "output", Package: pkgAName, Test: testFooName},
+				{Action: actionPass, Package: pkgAName, Test: testFooName},
 			},
 			want: map[FuncKey]FuncResult{
-				{Package: "pkg/a", Func: "TestFoo"}: {Key: FuncKey{Package: "pkg/a", Func: "TestFoo"}, Status: FuncPass},
+				{Package: pkgAName, Func: testFooName}: {Key: FuncKey{Package: pkgAName, Func: testFooName}, Status: FuncPass},
 			},
 		},
 	}

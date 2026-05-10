@@ -8,9 +8,9 @@ import (
 
 func TestRenderStatus_human(t *testing.T) {
 	rows := []StatusRow{
-		{State: "ok", Label: "env-loaded"},
-		{State: "fail", Label: "dolt-installed", Note: "not on PATH"},
-		{State: "warn", Label: "snipe-fresh", Value: "2h-old"},
+		{State: stateOK, Label: "env-loaded"},
+		{State: stateFail, Label: "dolt-installed", Note: "not on PATH"},
+		{State: stateWarn, Label: "snipe-fresh", Value: "2h-old"},
 	}
 	var buf bytes.Buffer
 	if err := RenderStatusHuman(&buf, "doctor", rows); err != nil {
@@ -25,7 +25,7 @@ func TestRenderStatus_human(t *testing.T) {
 }
 
 func TestRenderStatus_llm(t *testing.T) {
-	rows := []StatusRow{{State: "ok", Label: "a"}, {State: "fail", Label: "b"}}
+	rows := []StatusRow{{State: stateOK, Label: "a"}, {State: stateFail, Label: "b"}}
 	var buf bytes.Buffer
 	if err := RenderStatusLLM(&buf, "tool", rows); err != nil {
 		t.Fatalf("render: %v", err)

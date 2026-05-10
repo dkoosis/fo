@@ -8,7 +8,7 @@ import (
 
 func TestBuilder_BasicOutput(t *testing.T) {
 	b := NewBuilder("govet", "1.0")
-	b.AddResult("printf", "warning", "wrong arg type", "main.go", 15, 3)
+	b.AddResult("printf", LevelWarning, "wrong arg type", "main.go", 15, 3)
 
 	var buf bytes.Buffer
 	if _, err := b.WriteTo(&buf); err != nil {
@@ -37,7 +37,7 @@ func TestBuilder_BasicOutput(t *testing.T) {
 	if r.RuleID != "printf" {
 		t.Errorf("expected ruleId printf, got %s", r.RuleID)
 	}
-	if r.Level != "warning" {
+	if r.Level != LevelWarning {
 		t.Errorf("expected level warning, got %s", r.Level)
 	}
 	if r.Locations[0].PhysicalLocation.Region.StartLine != 15 {
@@ -48,7 +48,7 @@ func TestBuilder_BasicOutput(t *testing.T) {
 func TestBuilder_MultipleResults(t *testing.T) {
 	b := NewBuilder("lint", "")
 	b.AddResult("r1", "error", "msg1", "a.go", 1, 0)
-	b.AddResult("r2", "warning", "msg2", "b.go", 2, 5)
+	b.AddResult("r2", LevelWarning, "msg2", "b.go", 2, 5)
 
 	doc := b.Document()
 	if len(doc.Runs[0].Results) != 2 {
@@ -59,7 +59,7 @@ func TestBuilder_MultipleResults(t *testing.T) {
 func TestBuilder_Chaining(t *testing.T) {
 	b := NewBuilder("tool", "1.0").
 		AddResult("r1", "error", "m1", "a.go", 1, 0).
-		AddResult("r2", "warning", "m2", "b.go", 2, 0)
+		AddResult("r2", LevelWarning, "m2", "b.go", 2, 0)
 
 	doc := b.Document()
 	if len(doc.Runs[0].Results) != 2 {
@@ -69,7 +69,7 @@ func TestBuilder_Chaining(t *testing.T) {
 
 func TestBuilder_EmptyDriverNameError(t *testing.T) {
 	b := NewBuilder("", "1.0")
-	b.AddResult("r1", "warning", "msg", "f.go", 1, 0)
+	b.AddResult("r1", LevelWarning, "msg", "f.go", 1, 0)
 
 	var buf bytes.Buffer
 	_, err := b.WriteTo(&buf)
@@ -90,7 +90,7 @@ func TestBuilder_InvalidLevelError(t *testing.T) {
 }
 
 func TestBuilder_ValidLevels(t *testing.T) {
-	for _, level := range []string{"error", "warning", "note", "none"} {
+	for _, level := range []string{"error", LevelWarning, "note", "none"} {
 		b := NewBuilder("tool", "1.0")
 		b.AddResult("r1", level, "msg", "f.go", 1, 0)
 
@@ -104,7 +104,7 @@ func TestBuilder_ValidLevels(t *testing.T) {
 func TestBuilder_AddResultWithFix_RoundTrip(t *testing.T) {
 	const wantCmd = "gofmt -w main.go"
 	b := NewBuilder("gofmt", "")
-	b.AddResultWithFix("needs-formatting", "warning", "needs formatting", "main.go", 0, 0, wantCmd)
+	b.AddResultWithFix("needs-formatting", LevelWarning, "needs formatting", "main.go", 0, 0, wantCmd)
 
 	doc := b.Document()
 	if len(doc.Runs) != 1 || len(doc.Runs[0].Results) != 1 {
@@ -118,7 +118,7 @@ func TestBuilder_AddResultWithFix_RoundTrip(t *testing.T) {
 
 func TestBuilder_AddResult_NoFix(t *testing.T) {
 	b := NewBuilder("govet", "")
-	b.AddResult("printf", "warning", "wrong type", "main.go", 5, 3)
+	b.AddResult("printf", LevelWarning, "wrong type", "main.go", 5, 3)
 
 	doc := b.Document()
 	got := doc.Runs[0].Results[0].FixCommand()
@@ -129,7 +129,7 @@ func TestBuilder_AddResult_NoFix(t *testing.T) {
 
 func TestBuilder_AddResultWithFix_EmptyCommand_NoFixAttached(t *testing.T) {
 	b := NewBuilder("govet", "")
-	b.AddResultWithFix("r1", "warning", "msg", "f.go", 1, 0, "")
+	b.AddResultWithFix("r1", LevelWarning, "msg", "f.go", 1, 0, "")
 
 	doc := b.Document()
 	res := doc.Runs[0].Results[0]

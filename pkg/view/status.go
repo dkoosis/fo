@@ -6,6 +6,13 @@ import (
 	"strings"
 )
 
+const (
+	stateOK   = "ok"
+	stateFail = "fail"
+	stateWarn = "warn"
+	stateSkip = "skip"
+)
+
 type StatusRow struct {
 	State string
 	Label string
@@ -47,13 +54,13 @@ func RenderStatusHuman(w io.Writer, tool string, rows []StatusRow) error {
 	var ok, fail, warn, skip int
 	for _, r := range rows {
 		switch r.State {
-		case "ok":
+		case stateOK:
 			ok++
-		case "fail":
+		case stateFail:
 			fail++
-		case "warn":
+		case stateWarn:
 			warn++
-		case "skip":
+		case stateSkip:
 			skip++
 		}
 	}

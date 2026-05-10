@@ -9,6 +9,14 @@ import (
 	"github.com/dkoosis/fo/pkg/sarif"
 )
 
+const (
+	flagTool   = "--tool"
+	flagRule   = "--rule"
+	toolGovet  = "govet"
+	mainGoName = "main.go"
+	aGoName    = "a.go"
+)
+
 func diagConvert(t *testing.T, args []string, input string) (bytes.Buffer, error) {
 	t.Helper()
 	opts := parseDiagArgs(t, args)
@@ -23,10 +31,10 @@ func parseDiagArgs(t *testing.T, args []string) DiagOpts {
 	opts := DiagOpts{}
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
-		case "--tool":
+		case flagTool:
 			i++
 			opts.Tool = args[i]
-		case "--rule":
+		case flagRule:
 			i++
 			opts.Rule = args[i]
 		case "--level":
@@ -42,7 +50,7 @@ func parseDiagArgs(t *testing.T, args []string) DiagOpts {
 
 func TestDiag_FileLineColMessage(t *testing.T) {
 	input := "main.go:15:3: unreachable code after return\npkg/util.go:42: unused variable x\n"
-	buf, err := diagConvert(t, []string{"--tool", "govet"}, input)
+	buf, err := diagConvert(t, []string{flagTool, toolGovet}, input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +62,7 @@ func TestDiag_FileLineColMessage(t *testing.T) {
 	if doc.Version != "2.1.0" {
 		t.Errorf("expected version 2.1.0, got %s", doc.Version)
 	}
-	if doc.Runs[0].Tool.Driver.Name != "govet" {
+	if doc.Runs[0].Tool.Driver.Name != toolGovet {
 		t.Errorf("expected tool govet, got %s", doc.Runs[0].Tool.Driver.Name)
 	}
 	if len(doc.Runs[0].Results) != 2 {
@@ -68,7 +76,7 @@ func TestDiag_FileLineColMessage(t *testing.T) {
 
 func TestDiag_FileOnly(t *testing.T) {
 	input := "pkg/handler.go\nmain.go\n"
-	buf, err := diagConvert(t, []string{"--tool", "gofmt", "--rule", "needs-formatting", "--level", "warning"}, input)
+	buf, err := diagConvert(t, []string{flagTool, toolGofmt, flagRule, "needs-formatting", "--level", "warning"}, input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +103,7 @@ func TestDiag_MissingToolFlag(t *testing.T) {
 
 func TestDiag_WindowsDriveLetter(t *testing.T) {
 	input := "C:\\Users\\dev\\main.go:15:3: unreachable code\n"
-	buf, err := diagConvert(t, []string{"--tool", "govet"}, input)
+	buf, err := diagConvert(t, []string{flagTool, toolGovet}, input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +123,7 @@ func TestDiag_WindowsDriveLetter(t *testing.T) {
 
 func TestDiag_FixCommand_GolangciLint(t *testing.T) {
 	input := "main.go:15:3: unreachable code\n"
-	buf, err := diagConvert(t, []string{"--tool", "golangci-lint", "--rule", "SA4006"}, input)
+	buf, err := diagConvert(t, []string{flagTool, toolGolangciLint, flagRule, "SA4006"}, input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +140,7 @@ func TestDiag_FixCommand_GolangciLint(t *testing.T) {
 
 func TestDiag_FixCommand_Gofmt(t *testing.T) {
 	input := "pkg/handler.go\n"
-	buf, err := diagConvert(t, []string{"--tool", "gofmt"}, input)
+	buf, err := diagConvert(t, []string{flagTool, toolGofmt}, input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +157,7 @@ func TestDiag_FixCommand_Gofmt(t *testing.T) {
 
 func TestDiag_FixCommand_UnknownToolOmitted(t *testing.T) {
 	input := "main.go:15:3: some finding\n"
-	buf, err := diagConvert(t, []string{"--tool", "govulncheck"}, input)
+	buf, err := diagConvert(t, []string{flagTool, "govulncheck"}, input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,13 +178,13 @@ func TestFixCommandFor(t *testing.T) {
 		tool, rule, file string
 		want             string
 	}{
-		{"golangci-lint", "SA4006", "main.go", "golangci-lint run --fix --enable-only=SA4006 main.go"},
-		{"golangci-lint", "finding", "main.go", "golangci-lint run --fix main.go"},
-		{"golangci-lint", "", "main.go", "golangci-lint run --fix main.go"},
-		{"gofmt", "x", "a.go", "gofmt -w a.go"},
-		{"goimports", "x", "a.go", "goimports -w a.go"},
-		{"govulncheck", "x", "a.go", ""},
-		{"unknown", "x", "a.go", ""},
+		{toolGolangciLint, "SA4006", mainGoName, "golangci-lint run --fix --enable-only=SA4006 main.go"},
+		{toolGolangciLint, "finding", mainGoName, "golangci-lint run --fix main.go"},
+		{toolGolangciLint, "", mainGoName, "golangci-lint run --fix main.go"},
+		{toolGofmt, "x", aGoName, "gofmt -w a.go"},
+		{"goimports", "x", aGoName, "goimports -w a.go"},
+		{"govulncheck", "x", aGoName, ""},
+		{"unknown", "x", aGoName, ""},
 	}
 	for _, tt := range tests {
 		got := fixCommandFor(tt.tool, tt.rule, tt.file)

@@ -90,11 +90,11 @@ func occurrenceCounts(doc *Document) map[string]int {
 
 func mapSeverity(level string) report.Severity {
 	switch level {
-	case "error":
+	case LevelError:
 		return report.SeverityError
-	case "warning":
+	case LevelWarning:
 		return report.SeverityWarning
-	case "note", "none", "":
+	case LevelNote, LevelNone, "":
 		return report.SeverityNote
 	default:
 		return report.SeverityNote

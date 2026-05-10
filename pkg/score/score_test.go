@@ -2,6 +2,8 @@ package score
 
 import "testing"
 
+const pkgXFile = "pkg/x/x.go"
+
 func TestSeverityWeight_MapsKnownLevels(t *testing.T) {
 	t.Parallel()
 	cases := map[string]int{
@@ -58,12 +60,12 @@ func TestScore_SeverityOccurrenceCentralityMatrix(t *testing.T) {
 		path string
 		want float64
 	}{
-		{"error_x1_pkg_root", SeverityWeightError, 1, "pkg/x/x.go", 3.0},
-		{"error_x3_pkg_root", SeverityWeightError, 3, "pkg/x/x.go", 9.0},
+		{"error_x1_pkg_root", SeverityWeightError, 1, pkgXFile, 3.0},
+		{"error_x3_pkg_root", SeverityWeightError, 3, pkgXFile, 9.0},
 		{"warning_x2_internal", SeverityWeightWarning, 2, "internal/x/x.go", 2.0},
-		{"note_x5_root", SeverityWeightNote, 5, "pkg/x/x.go", 5.0},
+		{"note_x5_root", SeverityWeightNote, 5, pkgXFile, 5.0},
 		{"error_x4_test_file", SeverityWeightError, 4, "pkg/x/x_test.go", 3.0},
-		{"zero_occurrence_zero_score", SeverityWeightError, 0, "pkg/x/x.go", 0.0},
+		{"zero_occurrence_zero_score", SeverityWeightError, 0, pkgXFile, 0.0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

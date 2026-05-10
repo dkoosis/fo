@@ -24,6 +24,13 @@ var (
 	errInvalidLevel       = errors.New("--level: must be error, warning, note, or none")
 )
 
+// Known --tool values with custom fix-command idioms.
+const (
+	toolGolangciLint = "golangci-lint"
+	toolGofmt        = "gofmt"
+	toolGoimports    = "goimports"
+)
+
 // diag converts line-based diagnostics to SARIF.
 type diag struct {
 	toolName *string
@@ -42,7 +49,7 @@ func (d *diag) Convert(r io.Reader, w io.Writer) error {
 		return errToolRequired
 	}
 	switch *d.level {
-	case "error", "warning", "note", "none":
+	case sarif.LevelError, sarif.LevelWarning, sarif.LevelNote, sarif.LevelNone:
 	default:
 		return fmt.Errorf("%w: %q", errInvalidLevel, *d.level)
 	}
@@ -107,17 +114,17 @@ func (d *diag) addLine(b *sarif.Builder, line []byte) {
 // "gofmt"); unknown tools return "" so renderers omit the hint.
 func fixCommandFor(tool, ruleID, file string) string {
 	switch tool {
-	case "golangci-lint":
+	case toolGolangciLint:
 		// Always emit: we're not gating on whether the rule is autofixable.
 		// If the rule isn't supported, golangci-lint will print a no-op.
 		if ruleID == "" || ruleID == "finding" {
-			return "golangci-lint run --fix " + file
+			return toolGolangciLint + " run --fix " + file
 		}
-		return fmt.Sprintf("golangci-lint run --fix --enable-only=%s %s", ruleID, file)
-	case "gofmt":
-		return "gofmt -w " + file
-	case "goimports":
-		return "goimports -w " + file
+		return fmt.Sprintf("%s run --fix --enable-only=%s %s", toolGolangciLint, ruleID, file)
+	case toolGofmt:
+		return toolGofmt + " -w " + file
+	case toolGoimports:
+		return toolGoimports + " -w " + file
 	default:
 		// govulncheck needs a fixed-version we don't have here; generic tools
 		// get no hint. Renderer treats "" as "omit".

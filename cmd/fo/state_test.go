@@ -10,6 +10,12 @@ import (
 	"github.com/dkoosis/fo/pkg/report"
 )
 
+const (
+	errcheckName = "errcheck"
+	fp1Name      = "fp1"
+	fp2Name      = "fp2"
+)
+
 func TestStateReset_RemovesFile(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "last-run.json")
@@ -18,7 +24,7 @@ func TestStateReset_RemovesFile(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"state", "reset", "--state-file", p}, bytes.NewReader(nil), &stdout, &stderr)
+	code := run([]string{"state", "reset", flagStateFile, p}, bytes.NewReader(nil), &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("exit %d, stderr=%q", code, stderr.String())
 	}
@@ -32,7 +38,7 @@ func TestStateReset_MissingFileIsOK(t *testing.T) {
 	p := filepath.Join(dir, "absent.json")
 
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"state", "reset", "--state-file", p}, bytes.NewReader(nil), &stdout, &stderr)
+	code := run([]string{"state", "reset", flagStateFile, p}, bytes.NewReader(nil), &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("exit %d, stderr=%q", code, stderr.String())
 	}
@@ -75,10 +81,10 @@ func TestWriteDiffDetail_EmptyDiff(t *testing.T) {
 func TestWriteDiffDetail_NewItems(t *testing.T) {
 	r := &report.Report{
 		Findings: []report.Finding{
-			{Fingerprint: "fp1", RuleID: "errcheck", File: "pkg/foo.go", Line: 42, Message: "error return ignored"},
+			{Fingerprint: fp1Name, RuleID: errcheckName, File: "pkg/foo.go", Line: 42, Message: "error return ignored"},
 		},
 		Diff: &report.DiffSummary{
-			New: []report.DiffItem{{Fingerprint: "fp1", RuleID: "errcheck", File: "pkg/foo.go"}},
+			New: []report.DiffItem{{Fingerprint: fp1Name, RuleID: errcheckName, File: "pkg/foo.go"}},
 		},
 	}
 	var buf bytes.Buffer
@@ -90,7 +96,7 @@ func TestWriteDiffDetail_NewItems(t *testing.T) {
 	if !strings.Contains(out, "pkg/foo.go:42") {
 		t.Errorf("missing file:line: %q", out)
 	}
-	if !strings.Contains(out, "errcheck") {
+	if !strings.Contains(out, errcheckName) {
 		t.Errorf("missing rule ID: %q", out)
 	}
 	if !strings.Contains(out, "error return ignored") {
@@ -104,10 +110,10 @@ func TestWriteDiffDetail_NewItems(t *testing.T) {
 func TestWriteDiffDetail_RegressedItems(t *testing.T) {
 	r := &report.Report{
 		Findings: []report.Finding{
-			{Fingerprint: "fp2", RuleID: "gosec", File: "cmd/main.go", Line: 7, Message: "G304: file inclusion"},
+			{Fingerprint: fp2Name, RuleID: "gosec", File: "cmd/main.go", Line: 7, Message: "G304: file inclusion"},
 		},
 		Diff: &report.DiffSummary{
-			Regressed: []report.DiffItem{{Fingerprint: "fp2", RuleID: "gosec", File: "cmd/main.go"}},
+			Regressed: []report.DiffItem{{Fingerprint: fp2Name, RuleID: "gosec", File: "cmd/main.go"}},
 		},
 	}
 	var buf bytes.Buffer
@@ -127,12 +133,12 @@ func TestWriteDiffDetail_RegressedItems(t *testing.T) {
 func TestWriteDiffDetail_BothNewAndRegressed(t *testing.T) {
 	r := &report.Report{
 		Findings: []report.Finding{
-			{Fingerprint: "fp1", RuleID: "errcheck", File: "a.go", Line: 1, Message: "msg1"},
-			{Fingerprint: "fp2", RuleID: "gosec", File: "b.go", Line: 2, Message: "msg2"},
+			{Fingerprint: fp1Name, RuleID: errcheckName, File: "a.go", Line: 1, Message: "msg1"},
+			{Fingerprint: fp2Name, RuleID: "gosec", File: "b.go", Line: 2, Message: "msg2"},
 		},
 		Diff: &report.DiffSummary{
-			New:       []report.DiffItem{{Fingerprint: "fp1"}},
-			Regressed: []report.DiffItem{{Fingerprint: "fp2"}},
+			New:       []report.DiffItem{{Fingerprint: fp1Name}},
+			Regressed: []report.DiffItem{{Fingerprint: fp2Name}},
 		},
 	}
 	var buf bytes.Buffer
@@ -184,7 +190,7 @@ func TestAttachDiff_SaveFailureRecordsNoticeAndReturnsErr(t *testing.T) {
 
 	r := &report.Report{
 		Findings: []report.Finding{
-			{Fingerprint: "fp1", RuleID: "errcheck", File: "a.go", Line: 1, Severity: report.SeverityError, Message: "m"},
+			{Fingerprint: fp1Name, RuleID: errcheckName, File: "a.go", Line: 1, Severity: report.SeverityError, Message: "m"},
 		},
 	}
 	var stderr bytes.Buffer
@@ -242,7 +248,7 @@ func TestRun_StateStrictExitsTwoOnSaveFailure(t *testing.T) {
 
 	sarif := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"t"}},"results":[]}]}`
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"--format", "json", "--state-file", statePath, "--state-strict"},
+	code := run([]string{flagFormat, "json", flagStateFile, statePath, "--state-strict"},
 		strings.NewReader(sarif), &stdout, &stderr)
 	if code != 2 {
 		t.Fatalf("want exit 2, got %d (stderr=%q)", code, stderr.String())
@@ -256,10 +262,10 @@ func TestWriteDiffDetail_LineZero_NoColon(t *testing.T) {
 	// Line=0 means no line info — loc should be just the file path, no ":0" suffix.
 	r := &report.Report{
 		Findings: []report.Finding{
-			{Fingerprint: "fp1", RuleID: "revive", File: "pkg/foo.go", Line: 0, Message: "missing comment"},
+			{Fingerprint: fp1Name, RuleID: "revive", File: "pkg/foo.go", Line: 0, Message: "missing comment"},
 		},
 		Diff: &report.DiffSummary{
-			New: []report.DiffItem{{Fingerprint: "fp1"}},
+			New: []report.DiffItem{{Fingerprint: fp1Name}},
 		},
 	}
 	var buf bytes.Buffer

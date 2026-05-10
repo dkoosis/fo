@@ -8,6 +8,8 @@ import (
 	"github.com/dkoosis/fo/pkg/paint"
 )
 
+const dashBar = "----"
+
 func TestBar_ProportionalFill(t *testing.T) {
 	t.Parallel()
 
@@ -18,16 +20,16 @@ func TestBar_ProportionalFill(t *testing.T) {
 		want       string
 	}{
 		{"half", 5, 10, 4, "##--"},
-		{"empty", 0, 10, 4, "----"},
+		{"empty", 0, 10, 4, dashBar},
 		{"full", 10, 10, 4, "####"},
 		{"over", 15, 10, 4, "####"},
-		{"negative_value", -1, 10, 4, "----"},
-		{"zero_max", 5, 0, 4, "----"},
-		{"negative_max", 5, -10, 4, "----"},
+		{"negative_value", -1, 10, 4, dashBar},
+		{"zero_max", 5, 0, 4, dashBar},
+		{"negative_max", 5, -10, 4, dashBar},
 		{"width_zero", 5, 10, 0, ""},
 		{"width_negative", 5, 10, -1, ""},
-		{"nan_value", math.NaN(), 10, 4, "----"},
-		{"inf_max", 5, math.Inf(1), 4, "----"},
+		{"nan_value", math.NaN(), 10, 4, dashBar},
+		{"inf_max", 5, math.Inf(1), 4, dashBar},
 		{"rounding_up", 7, 10, 4, "###-"},
 	}
 	for _, tc := range cases {

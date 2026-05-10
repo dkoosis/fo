@@ -24,6 +24,14 @@ const (
 	StatusSkip Status = "skip"
 )
 
+// TestEvent.Action values from `go test -json`. Same string values as the
+// Status constants, but used for comparing untyped Action strings.
+const (
+	actionPass = "pass"
+	actionFail = "fail"
+	actionSkip = "skip"
+)
+
 // TestEvent represents a single event from go test -json output.
 type TestEvent struct {
 	Time       time.Time `json:"Time"`

@@ -104,7 +104,7 @@ func TestRun_NonStreamPathBounded(t *testing.T) {
 	// Produce slightly more than cap.
 	r := io.LimitReader(constReader('a'), cap256+1024)
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"--format", "llm", "--no-state"}, r, &stdout, &stderr)
+	code := run([]string{flagFormat, formatLLM, flagNoState}, r, &stdout, &stderr)
 	if code != 2 {
 		t.Fatalf("expected exit 2 for oversize input; got %d stderr=%s", code, stderr.String())
 	}

@@ -37,11 +37,11 @@ func FuncResults(events []TestEvent) map[FuncKey]FuncResult {
 		}
 		var status FuncStatus
 		switch e.Action {
-		case "pass":
+		case actionPass:
 			status = FuncPass
-		case "fail":
+		case actionFail:
 			status = FuncFail
-		case "skip":
+		case actionSkip:
 			status = FuncSkip
 		default:
 			continue

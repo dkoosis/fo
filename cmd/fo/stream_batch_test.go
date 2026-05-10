@@ -52,7 +52,7 @@ func TestRunStreamBatch_LargeInput(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	rc := exitCodeOnly(t, []string{"--no-state", "--stream", "--format=json"}, &buf, &stdout, &stderr)
+	rc := exitCodeOnly(t, []string{flagNoState, "--stream", "--format=json"}, &buf, &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("exit=%d, stderr=%q", rc, stderr.String())
 	}
@@ -87,7 +87,7 @@ func TestRunStreamBatch_LargeInput(t *testing.T) {
 func TestRunStreamBatch_FlagOnNonTestJSONIsIgnored(t *testing.T) {
 	sarif := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"x"}},"results":[]}]}`
 	var stdout, stderr bytes.Buffer
-	rc := exitCodeOnly(t, []string{"--no-state", "--stream", "--format=json"}, strings.NewReader(sarif), &stdout, &stderr)
+	rc := exitCodeOnly(t, []string{flagNoState, "--stream", "--format=json"}, strings.NewReader(sarif), &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("exit=%d stderr=%q", rc, stderr.String())
 	}
