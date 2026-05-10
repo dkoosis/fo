@@ -71,6 +71,7 @@ const (
 	flagTool      = "--tool"
 
 	subState       = "state"
+	subWatch       = "watch"
 	subWrap        = "wrap"
 	subDiag        = "diag"
 	subLeaderboard = "leaderboard"
@@ -142,6 +143,7 @@ SUBCOMMANDS
   fo wrap <name>     Convert tool output to SARIF
   fo wrap list       List wrappers (--json for machine output)
   fo wrap --help     Show available wrappers
+  fo watch -- <cmd>  Run <cmd>, render output, rerun on stdin newline (A.1)
   fo --version       Print build version and exit
   fo --print-schema  Print JSON Schema for Report (--format json output) and exit
 
@@ -181,6 +183,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return runWrap(args[1:], stdin, stdout, stderr)
 		case subState:
 			return runState(args[1:], stdout, stderr)
+		case subWatch:
+			return runWatch(args[1:], stdin, stdout, stderr)
 		case "help", "-h", "--help":
 			fmt.Fprint(stderr, usage)
 			return 0
