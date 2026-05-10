@@ -25,7 +25,8 @@ func ToReport(results []TestPackageResult) *report.Report {
 		GeneratedAt: time.Now().UTC(),
 	}
 
-	for _, pkg := range results {
+	for i := range results {
+		pkg := &results[i]
 		switch {
 		case pkg.Panicked:
 			out := strings.Join(pkg.PanicOutput, "\n")
