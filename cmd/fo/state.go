@@ -58,6 +58,9 @@ func envelopeToDiffSummary(e state.Envelope) *report.DiffSummary {
 		Regressed:       convertItems(e.Regressed),
 		Flaky:           convertItems(e.Flaky),
 		PersistentCount: e.PersistentCount,
+		NewFailures:     convertItems(e.NewFailures),
+		FixedFailures:   convertItems(e.FixedFailures),
+		FlakyTests:      convertItems(e.FlakyTests),
 	}
 }
 

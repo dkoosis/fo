@@ -44,6 +44,13 @@ type Diff struct {
 	// Persistent is the full persistent slice, omitted from JSON to keep
 	// the envelope compact. Available for renderers that want the rows.
 	Persistent []Item `json:"-"`
+
+	// Test-outcome deltas. NewFailures are tests that transitioned from
+	// passing to failing; FixedFailures transitioned from failing to passing;
+	// FlakyTests match the resolved-then-new pattern across ≥2 prior runs.
+	NewFailures   []Item `json:"new_failures"`
+	FixedFailures []Item `json:"fixed_failures"`
+	FlakyTests    []Item `json:"flaky_tests"`
 }
 
 // Classify compares a current report against prior history. prev may be
@@ -75,7 +82,71 @@ func Classify(prev *File, current *report.Report) Diff {
 	sortItems(d.Regressed)
 	sortItems(d.Flaky)
 	sortItems(d.Persistent)
+
+	classifyTests(&d, prev, current)
+	sortItems(d.NewFailures)
+	sortItems(d.FixedFailures)
+	sortItems(d.FlakyTests)
 	return d
+}
+
+// classifyTests compares current test outcomes against prior history and
+// populates d.NewFailures, d.FixedFailures, and d.FlakyTests.
+func classifyTests(d *Diff, prev *File, current *report.Report) {
+	curRun := RunFromReport(current)
+	prior, older := priorRuns(prev)
+
+	// New and flaky failures: tests failing now.
+	for key, outcome := range curRun.Tests {
+		_, wasFailing := prior.Tests[key]
+		if wasFailing {
+			continue // persistent failure — not new
+		}
+		if isTestFlaky(key, older) {
+			d.FlakyTests = append(d.FlakyTests, makeTestItem(key, outcome, ClassFlaky))
+		} else {
+			d.NewFailures = append(d.NewFailures, makeTestItem(key, outcome, ClassNew))
+		}
+	}
+
+	// Fixed failures: tests that were failing but are no longer.
+	for key, outcome := range prior.Tests {
+		if _, stillFailing := curRun.Tests[key]; !stillFailing {
+			d.FixedFailures = append(d.FixedFailures, makeTestItem(key, outcome, ClassResolved))
+		}
+	}
+}
+
+// isTestFlaky reports whether a test key was failing in any older run,
+// mirroring the findings flake pattern: absent at t-1, present at t-2+.
+func isTestFlaky(key string, older []Run) bool {
+	for _, r := range older {
+		if _, ok := r.Tests[key]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// makeTestItem builds an Item from a test key ("pkg/TestName" or "pkg").
+func makeTestItem(key, outcome string, c Class) Item {
+	pkg, test := key, ""
+	if i := len(key) - 1; i > 0 {
+		for j := len(key) - 1; j >= 0; j-- {
+			if key[j] == '/' {
+				pkg = key[:j]
+				test = key[j+1:]
+				break
+			}
+		}
+	}
+	return Item{
+		Fingerprint: key,
+		RuleID:      test,
+		File:        pkg,
+		Severity:    Severity(outcome),
+		Class:       c,
+	}
 }
 
 // priorRuns extracts the immediate prior run and older history from prev.

@@ -5,12 +5,11 @@ import (
 	"strings"
 )
 
-// Headline returns the single-line headline band for a Diff in the
-// "3 new · 2 resolved · 1 regressed · 2 flaky · 41 persistent" form.
-// Zero-count segments are dropped to keep the band scannable; an
-// empty diff returns "no changes" so the caller never has to special-case.
+// Headline returns the single-line headline band combining finding diffs
+// and test outcome diffs. Zero-count segments are dropped; an empty diff
+// returns "no changes".
 func Headline(d Diff) string {
-	parts := make([]string, 0, 5)
+	parts := make([]string, 0, 8)
 	if n := len(d.New); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d new", n))
 	}
@@ -25,6 +24,15 @@ func Headline(d Diff) string {
 	}
 	if d.PersistentCount > 0 {
 		parts = append(parts, fmt.Sprintf("%d persistent", d.PersistentCount))
+	}
+	if n := len(d.NewFailures); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d new failure", n))
+	}
+	if n := len(d.FixedFailures); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d fixed", n))
+	}
+	if n := len(d.FlakyTests); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d flaky test", n))
 	}
 	if len(parts) == 0 {
 		return "no changes"
@@ -43,6 +51,9 @@ type Envelope struct {
 	Regressed       []Item `json:"regressed"`
 	Flaky           []Item `json:"flaky"`
 	PersistentCount int    `json:"persistent_count"`
+	NewFailures     []Item `json:"new_failures"`
+	FixedFailures   []Item `json:"fixed_failures"`
+	FlakyTests      []Item `json:"flaky_tests"`
 }
 
 // EnvelopeOf builds the Envelope from a Diff, ready for JSON marshal.
@@ -54,6 +65,9 @@ func EnvelopeOf(d Diff) Envelope {
 		Regressed:       nonNil(d.Regressed),
 		Flaky:           nonNil(d.Flaky),
 		PersistentCount: d.PersistentCount,
+		NewFailures:     nonNil(d.NewFailures),
+		FixedFailures:   nonNil(d.FixedFailures),
+		FlakyTests:      nonNil(d.FlakyTests),
 	}
 }
 

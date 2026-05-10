@@ -187,4 +187,144 @@ func TestEnvelope_NoNilSlices(t *testing.T) {
 	if e.New == nil || e.Resolved == nil || e.Regressed == nil || e.Flaky == nil {
 		t.Fatalf("envelope slices must be non-nil for stable JSON")
 	}
+	if e.NewFailures == nil || e.FixedFailures == nil || e.FlakyTests == nil {
+		t.Fatalf("test diff slices must be non-nil for stable JSON")
+	}
+}
+
+const (
+	testPkg   = "foo"
+	testNameA = "TestA"
+	testKeyA  = testPkg + "/" + testNameA
+)
+
+// mkRunWithTests builds a Run with both findings and test failures.
+func mkRunWithTests(testPairs ...string) Run {
+	if len(testPairs)%2 != 0 {
+		panic("pairs must be key,outcome")
+	}
+	m := map[string]string{}
+	for i := 0; i+1 < len(testPairs); i += 2 {
+		m[testPairs[i]] = testPairs[i+1]
+	}
+	return Run{Findings: map[string]Severity{}, Tests: m}
+}
+
+func mkTestReport(results ...report.TestResult) *report.Report {
+	return &report.Report{Tests: results}
+}
+
+func TestClassifyTests_NoPrior_AllNewFailures(t *testing.T) {
+	t.Parallel()
+	r := mkTestReport(
+		report.TestResult{Package: testPkg, Test: testNameA, Outcome: report.OutcomeFail},
+		report.TestResult{Package: testPkg, Test: "TestB", Outcome: report.OutcomePass},
+	)
+	d := Classify(nil, r)
+	if len(d.NewFailures) != 1 {
+		t.Fatalf("want 1 new failure, got %d", len(d.NewFailures))
+	}
+	if d.NewFailures[0].RuleID != testNameA {
+		t.Errorf("want TestA, got %q", d.NewFailures[0].RuleID)
+	}
+}
+
+func TestClassifyTests_FixedFailure(t *testing.T) {
+	t.Parallel()
+	prev := &File{Version: SchemaVersion, Runs: []Run{
+		mkRunWithTests(testKeyA, "fail"),
+	}}
+	r := mkTestReport(
+		report.TestResult{Package: testPkg, Test: testNameA, Outcome: report.OutcomePass},
+	)
+	d := Classify(prev, r)
+	if len(d.FixedFailures) != 1 {
+		t.Fatalf("want 1 fixed failure, got %d", len(d.FixedFailures))
+	}
+	if len(d.NewFailures) != 0 {
+		t.Errorf("want 0 new failures, got %d", len(d.NewFailures))
+	}
+}
+
+func TestClassifyTests_FlakyTest(t *testing.T) {
+	t.Parallel()
+	// t-2: failing, t-1: passing (absent from failures), t: failing again → flaky
+	prev := &File{Version: SchemaVersion, Runs: []Run{
+		mkRunWithTests(),                 // t-1: passing (absent)
+		mkRunWithTests(testKeyA, "fail"), // t-2: failing
+	}}
+	r := mkTestReport(
+		report.TestResult{Package: testPkg, Test: testNameA, Outcome: report.OutcomeFail},
+	)
+	d := Classify(prev, r)
+	if len(d.FlakyTests) != 1 {
+		t.Fatalf("want 1 flaky test, got %d", len(d.FlakyTests))
+	}
+	if len(d.NewFailures) != 0 {
+		t.Errorf("flaky should not also be new, got %d new", len(d.NewFailures))
+	}
+}
+
+func TestClassifyTests_PersistentFail_NotNewFailure(t *testing.T) {
+	t.Parallel()
+	prev := &File{Version: SchemaVersion, Runs: []Run{
+		mkRunWithTests(testKeyA, "fail"),
+	}}
+	r := mkTestReport(
+		report.TestResult{Package: testPkg, Test: testNameA, Outcome: report.OutcomeFail},
+	)
+	d := Classify(prev, r)
+	if len(d.NewFailures) != 0 {
+		t.Errorf("persistent failure should not be new, got %d", len(d.NewFailures))
+	}
+	if len(d.FixedFailures) != 0 {
+		t.Errorf("persistent failure should not be fixed, got %d", len(d.FixedFailures))
+	}
+}
+
+func TestClassifyTests_SkippedIgnored(t *testing.T) {
+	t.Parallel()
+	r := mkTestReport(
+		report.TestResult{Package: testPkg, Test: testNameA, Outcome: report.OutcomeSkip},
+	)
+	d := Classify(nil, r)
+	if len(d.NewFailures) != 0 {
+		t.Errorf("skipped test should not be a new failure")
+	}
+}
+
+func TestRunFromReport_CapturesTestFailures(t *testing.T) {
+	t.Parallel()
+	r := &report.Report{
+		Tests: []report.TestResult{
+			{Package: testPkg, Test: testNameA, Outcome: report.OutcomeFail},
+			{Package: testPkg, Test: "TestB", Outcome: report.OutcomePass},
+			{Package: "bar", Test: "", Outcome: report.OutcomeBuildError},
+		},
+	}
+	run := RunFromReport(r)
+	if run.Tests[testKeyA] != "fail" {
+		t.Errorf("want fail, got %q", run.Tests[testKeyA])
+	}
+	if _, ok := run.Tests["foo/TestB"]; ok {
+		t.Errorf("pass should not be stored")
+	}
+	if run.Tests["bar"] != "build_error" {
+		t.Errorf("want build_error for package-level, got %q", run.Tests["bar"])
+	}
+}
+
+func TestHeadline_IncludesTestDiffs(t *testing.T) {
+	t.Parallel()
+	d := Diff{
+		NewFailures:   []Item{{RuleID: testNameA}},
+		FixedFailures: []Item{{RuleID: "TestB"}, {RuleID: "TestC"}},
+	}
+	h := Headline(d)
+	if !strings.Contains(h, "1 new failure") {
+		t.Errorf("headline missing new failure: %q", h)
+	}
+	if !strings.Contains(h, "2 fixed") {
+		t.Errorf("headline missing fixed: %q", h)
+	}
 }

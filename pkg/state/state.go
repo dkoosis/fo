@@ -61,12 +61,13 @@ type File struct {
 
 // Run is one persisted prior run. Findings is a fingerprint-keyed map
 // from fingerprint to severity — the only fields the diff classifier
-// needs. Storing the full Finding would bloat the sidecar without
-// adding signal the classifier consumes.
+// needs. Tests tracks failing test outcomes (key = testKey, value =
+// "fail"|"panic"|"build_error"); passing and skipped tests are absent.
 type Run struct {
 	GeneratedAt time.Time           `json:"generated_at"`
 	DataHash    string              `json:"data_hash,omitempty"`
 	Findings    map[string]Severity `json:"findings"`
+	Tests       map[string]string   `json:"tests,omitempty"`
 }
 
 // Severity is the persisted severity, copied from report.Severity. We
@@ -204,9 +205,18 @@ func Append(prev *File, current Run) *File {
 	return out
 }
 
+// testKey returns the canonical key for a test result: "pkg/TestName"
+// when the test name is non-empty, or just "pkg" for package-level results.
+func testKey(pkg, test string) string {
+	if test == "" {
+		return pkg
+	}
+	return pkg + "/" + test
+}
+
 // RunFromReport projects a report.Report onto the persisted Run shape.
-// Only RuleID severity per fingerprint is kept; everything else lives
-// in the report itself, regenerated each invocation.
+// Only failing/panicking/build-error tests are stored in Tests; passing
+// and skipped tests are absent (absence means pass-or-skip for diff purposes).
 func RunFromReport(r *report.Report) Run {
 	findings := make(map[string]Severity, len(r.Findings))
 	for _, f := range r.Findings {
@@ -214,6 +224,18 @@ func RunFromReport(r *report.Report) Run {
 			continue
 		}
 		findings[f.Fingerprint] = severityFromReport(f.Severity)
+	}
+	var tests map[string]string
+	for _, tr := range r.Tests {
+		switch tr.Outcome {
+		case report.OutcomeFail, report.OutcomePanic, report.OutcomeBuildError:
+			if tests == nil {
+				tests = make(map[string]string)
+			}
+			tests[testKey(tr.Package, tr.Test)] = string(tr.Outcome)
+		case report.OutcomePass, report.OutcomeSkip:
+			// passing and skipped tests are not stored; absence means pass-or-skip
+		}
 	}
 	ts := r.GeneratedAt
 	if ts.IsZero() {
@@ -223,6 +245,7 @@ func RunFromReport(r *report.Report) Run {
 		GeneratedAt: ts,
 		DataHash:    r.DataHash,
 		Findings:    findings,
+		Tests:       tests,
 	}
 }
 

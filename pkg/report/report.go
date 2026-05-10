@@ -98,4 +98,7 @@ type DiffSummary struct {
 	Regressed       []DiffItem `json:"regressed"`
 	Flaky           []DiffItem `json:"flaky"`
 	PersistentCount int        `json:"persistent_count"`
+	NewFailures     []DiffItem `json:"new_failures,omitempty"`
+	FixedFailures   []DiffItem `json:"fixed_failures,omitempty"`
+	FlakyTests      []DiffItem `json:"flaky_tests,omitempty"`
 }

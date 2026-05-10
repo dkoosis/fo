@@ -103,7 +103,10 @@
         "resolved":         { "type": "array", "items": { "$ref": "#/$defs/DiffItem" } },
         "regressed":        { "type": "array", "items": { "$ref": "#/$defs/DiffItem" } },
         "flaky":            { "type": "array", "items": { "$ref": "#/$defs/DiffItem" } },
-        "persistent_count": { "type": "integer", "minimum": 0 }
+        "persistent_count": { "type": "integer", "minimum": 0 },
+        "new_failures":     { "type": "array", "items": { "$ref": "#/$defs/DiffItem" } },
+        "fixed_failures":   { "type": "array", "items": { "$ref": "#/$defs/DiffItem" } },
+        "flaky_tests":      { "type": "array", "items": { "$ref": "#/$defs/DiffItem" } }
       }
     }
   }
