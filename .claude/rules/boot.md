@@ -1,9 +1,10 @@
 # Boot
 updated: 2026-05-09
 
-→ fo-u15 still ready: 10-capability decomposition awaiting decision (flat children, labels for grouping, deps u15.2→u15.3 and u15.2→u15.8, all `hard`). `bd show fo-u15`.
+→ pick from queue — `bd ready`. Top candidates: P1 audit triage (fo-1f4 outputBuf, fo-2nj metrics-history) or fo-u15 children (Watch fo-u15.1.1, Suppress fo-u15.2.1, Cluster fo-u15.3.1 all ready).
 
-state: untracked `docs/feedback/review/diagrams/` (stale arch+lifecycle d2 from prior review) — decide keep/move/delete.
+state: untracked `docs/feedback/` — pre-existing, triage when convenient.
 
 ✓ done
-- PR #256 merged: gocritic rangeValCopy enabled + 2 sites fixed.
+- magloop clean: 55 lint issues fixed, commit d22b6c8 pushed.
+- fo-u15 decomposed: 3 sub-epics (u15.1 Watch, u15.2 Suppress, u15.3 Cluster) + 10 child tasks + deps wired. Caps #2/#4/#5/#7/#8/#9/#10 left in u15 vision for later.
