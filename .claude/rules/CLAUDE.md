@@ -70,7 +70,7 @@ Inputs: SARIF 2.1.0, go test -json, multiplex-delimited combo, hygiene formats (
 - Report is the IR. Parsers produce it; renderers consume it.
 - TTY auto-detection: `--format auto` → TTY=human, piped=llm.
 - Exit codes: 0=clean, 1=findings/failures, 2=fo error.
-- Deps: lipgloss + x/term only.
+- Deps: lipgloss + x/term + fsnotify (watch only).
 - Wrappers: each is a package exposing `Convert(in, out) error`. Dispatched by `switch` in `cmd/fo/main.go` (no interface, no registry).
 - Adding a wrapper: new package under `pkg/wrapper/`, expose `Convert`, add a case to the wrap dispatch + import in `cmd/fo/main.go`.
 
