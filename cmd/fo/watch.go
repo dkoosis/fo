@@ -5,29 +5,60 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 var errWatchUsage = errors.New("usage: fo watch [flags] -- <command> [args...]")
 
-// parseWatchArgs splits watch args at the `--` separator and returns the
-// child argv. Flags before `--` are ignored here; A.2 will own them.
+// watchOpts are flags accepted before `--` in `fo watch`.
+type watchOpts struct {
+	debounce time.Duration
+	source   string // "fs" (default) or "stdin"
+}
+
+// parseWatchArgs splits watch args at the `--` separator. Flags before `--`
+// configure the watcher; the trailing argv is the child command.
 func parseWatchArgs(args []string) ([]string, error) {
+	cmd, _, err := parseWatchArgsWithOpts(args)
+	return cmd, err
+}
+
+// parseWatchArgsWithOpts is the form used by runWatch.
+func parseWatchArgsWithOpts(args []string) ([]string, watchOpts, error) {
+	sep := -1
 	for i, a := range args {
 		if a == "--" {
-			rest := args[i+1:]
-			if len(rest) == 0 {
-				return nil, errWatchUsage
-			}
-			return rest, nil
+			sep = i
+			break
 		}
 	}
-	return nil, errWatchUsage
+	if sep < 0 {
+		return nil, watchOpts{}, errWatchUsage
+	}
+	flagArgs := args[:sep]
+	cmd := args[sep+1:]
+	if len(cmd) == 0 {
+		return nil, watchOpts{}, errWatchUsage
+	}
+	opts := watchOpts{debounce: 250 * time.Millisecond, source: "fs"}
+	fs := flag.NewFlagSet("fo watch", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	fs.DurationVar(&opts.debounce, "debounce", opts.debounce, "coalesce burst events within this window")
+	fs.StringVar(&opts.source, "source", opts.source, "trigger source: fs|stdin")
+	if err := fs.Parse(flagArgs); err != nil {
+		return nil, watchOpts{}, fmt.Errorf("watch: %w", err)
+	}
+	if opts.source != "fs" && opts.source != "stdin" {
+		return nil, watchOpts{}, fmt.Errorf("%w: -source must be fs or stdin", errWatchUsage)
+	}
+	return cmd, opts, nil
 }
 
 // watchLoop invokes runOnce immediately, then re-invokes on each value
@@ -53,14 +84,27 @@ func watchLoop(ctx context.Context, runOnce func(), triggers <-chan struct{}) {
 // A.1 scope: manual trigger via stdin newlines + SIGINT/SIGTERM cancellation.
 // A.2 will replace the trigger source with fsnotify.
 func runWatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	cmd, err := parseWatchArgs(args)
+	cmd, opts, err := parseWatchArgsWithOpts(args)
 	if err != nil {
 		fmt.Fprintf(stderr, "fo: %v\n", err)
 		return 2
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	triggers := stdinTriggers(ctx, stdin)
+
+	var triggers <-chan struct{}
+	switch opts.source {
+	case "stdin":
+		triggers = stdinTriggers(ctx, stdin)
+	default: // "fs"
+		raw, err := watchTree(ctx, ".")
+		if err != nil {
+			fmt.Fprintf(stderr, "fo: watch: %v\n", err)
+			return 2
+		}
+		triggers = debounce(ctx, raw, opts.debounce)
+	}
+
 	var lastCode int
 	watchLoop(ctx, func() {
 		lastCode = runChildAndRender(ctx, cmd, stdout, stderr)

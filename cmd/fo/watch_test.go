@@ -5,11 +5,15 @@ import (
 	"context"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
 
-const echoCmd = "echo"
+const (
+	echoCmd = "echo"
+	testArg = "test"
+)
 
 func TestParseWatchArgs(t *testing.T) {
 	tests := []struct {
@@ -22,7 +26,7 @@ func TestParseWatchArgs(t *testing.T) {
 		{"no separator", []string{echoCmd, "hi"}, nil, true},
 		{"separator only", []string{"--"}, nil, true},
 		{"basic", []string{"--", echoCmd, "hi"}, []string{echoCmd, "hi"}, false},
-		{"flag before separator", []string{"-debounce=200ms", "--", "go", "test", "./..."}, []string{"go", "test", "./..."}, false},
+		{"flag before separator", []string{"-debounce=200ms", "--", "go", testArg, "./..."}, []string{"go", testArg, "./..."}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -61,16 +65,16 @@ func TestWatchLoop_ExitsOnCtxCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	triggers := make(chan struct{})
 
-	var calls int
+	var calls atomic.Int64
 	done := make(chan struct{})
 	go func() {
-		watchLoop(ctx, func() { calls++ }, triggers)
+		watchLoop(ctx, func() { calls.Add(1) }, triggers)
 		close(done)
 	}()
 
 	// Wait for initial call to land.
 	deadline := time.After(time.Second)
-	for calls == 0 {
+	for calls.Load() == 0 {
 		select {
 		case <-deadline:
 			t.Fatal("watchLoop: initial call never observed")
@@ -85,8 +89,8 @@ func TestWatchLoop_ExitsOnCtxCancel(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("watchLoop: did not exit on ctx cancel")
 	}
-	if calls != 1 {
-		t.Fatalf("watchLoop: want exactly 1 call after cancel, got %d", calls)
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("watchLoop: want exactly 1 call after cancel, got %d", got)
 	}
 }
 
@@ -146,7 +150,7 @@ func TestRunWatch_RunsOnceAndExitsOnStdinEOF(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	// Empty stdin → triggers closes immediately after initial run.
 	// `true` produces no output → render is a no-op.
-	code := runWatch([]string{"--", "true"}, strings.NewReader(""), &stdout, &stderr)
+	code := runWatch([]string{"-source=stdin", "--", "true"}, strings.NewReader(""), &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runWatch: want exit 0, got %d (stderr=%q)", code, stderr.String())
 	}
@@ -160,7 +164,7 @@ func TestRunWatch_RerunsOnStdinNewline(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	// Two newlines on stdin → initial + 2 reruns = 3 total.
-	code := runWatch([]string{"--", cmd[0], cmd[1], cmd[2]},
+	code := runWatch([]string{"-source=stdin", "--", cmd[0], cmd[1], cmd[2]},
 		strings.NewReader("\n\n"), &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runWatch: want exit 0, got %d (stderr=%q)", code, stderr.String())
