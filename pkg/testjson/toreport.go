@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dkoosis/fo/pkg/cluster"
 	"github.com/dkoosis/fo/pkg/fingerprint"
 	"github.com/dkoosis/fo/pkg/report"
 	"github.com/dkoosis/fo/pkg/score"
@@ -85,7 +86,74 @@ func ToReport(results []TestPackageResult) *report.Report {
 		return r.Tests[i].Test < r.Tests[j].Test
 	})
 
+	attachClusters(r)
 	return r
+}
+
+// attachClusters runs the failure clusterer over failing tests in r and
+// stamps Test.ClusterID + Report.Clusters. Singletons (clusters with one
+// member) carry no ClusterID and are omitted from Report.Clusters — only
+// groups with shared root cause survive.
+func attachClusters(r *report.Report) {
+	if len(r.Tests) == 0 {
+		return
+	}
+
+	inputs := make([]cluster.Input, 0, len(r.Tests))
+	for i := range r.Tests {
+		t := &r.Tests[i]
+		if !isFailureOutcome(t.Outcome) {
+			continue
+		}
+		inputs = append(inputs, cluster.Input{
+			Key:     t.Fingerprint,
+			Package: t.Package,
+			Test:    t.Test,
+			Outcome: string(t.Outcome),
+			Output:  t.Output,
+		})
+	}
+	if len(inputs) == 0 {
+		return
+	}
+
+	groups := cluster.Run(inputs)
+	if len(groups) == 0 {
+		return
+	}
+
+	keyToID := make(map[string]string)
+	out := make([]report.Cluster, 0, len(groups))
+	for _, g := range groups {
+		if len(g.Members) < 2 {
+			continue
+		}
+		id := string(g.ID)
+		for _, m := range g.Members {
+			keyToID[m] = id
+		}
+		out = append(out, report.Cluster{
+			ID:            id,
+			Signature:     g.Signature,
+			SignatureKind: g.SignatureKind,
+			TopUserFrame:  g.TopUserFrame,
+			NormSig:       g.NormSig,
+			Members:       append([]string(nil), g.Members...),
+		})
+	}
+
+	for i := range r.Tests {
+		if id, ok := keyToID[r.Tests[i].Fingerprint]; ok {
+			r.Tests[i].ClusterID = id
+		}
+	}
+	if len(out) > 0 {
+		r.Clusters = out
+	}
+}
+
+func isFailureOutcome(o report.TestOutcome) bool {
+	return o == report.OutcomeFail || o == report.OutcomePanic || o == report.OutcomeBuildError
 }
 
 // ToReportWithMeta stamps DataHash from raw input bytes the caller already

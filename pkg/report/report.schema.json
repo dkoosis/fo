@@ -29,6 +29,11 @@
       "description": "Test or package outcomes from go test -json. Empty or omitted when no tests.",
       "items": { "$ref": "#/$defs/TestResult" }
     },
+    "clusters": {
+      "type": "array",
+      "description": "Failure clusters: groups of >=2 failing tests sharing a root cause (top user frame or normalized assertion). Singletons omitted; their members carry no cluster_id.",
+      "items": { "$ref": "#/$defs/Cluster" }
+    },
     "diff": {
       "oneOf": [
         { "type": "null" },
@@ -79,7 +84,20 @@
         "output":      { "type": "string" },
         "fix_command": { "type": "string" },
         "fingerprint": { "type": "string" },
-        "score":       { "type": "number" }
+        "score":       { "type": "number" },
+        "cluster_id":  { "type": "string", "description": "Failure cluster identifier (F-xxxxxx). Present only when this test belongs to a cluster of 2+ failures sharing a root cause." }
+      }
+    },
+    "Cluster": {
+      "type": "object",
+      "required": ["id", "signature", "signature_kind", "members"],
+      "properties": {
+        "id":              { "type": "string", "description": "Short stable run-local identifier (F-xxxxxx)." },
+        "signature":       { "type": "string", "description": "The signal that anchors the cluster (frame string, normalized assertion, or singleton key)." },
+        "signature_kind":  { "type": "string", "enum": ["frame", "norm", "singleton"], "description": "Which signal produced the signature." },
+        "top_user_frame":  { "type": "string", "description": "Topmost user-code stack frame shared by the cluster, if any." },
+        "norm_sig":        { "type": "string", "description": "Normalized assertion-text anchor shared by the cluster, if any." },
+        "members":         { "type": "array", "items": { "type": "string" }, "description": "Fingerprints of the TestResults in this cluster." }
       }
     },
     "DiffItem": {
