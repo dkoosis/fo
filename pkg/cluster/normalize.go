@@ -43,10 +43,11 @@ var (
 // output. Order: panic message, testify Error:, first line with a
 // colon, first non-empty line. Returns "" if input is empty/blank.
 func extractAnchor(output string, maxLen int) string {
-	if maxLen > 0 && len(output) > maxLen*8 {
+	if maxLen > 0 && len(output) > maxLen*128 {
 		// Pathological input: hard cap before scanning. Multiplier
-		// keeps room for many lines so the picker still has choices.
-		output = output[:maxLen*8]
+		// keeps room for many lines so the picker still has choices,
+		// since panic headers commonly trail extensive log output.
+		output = output[:maxLen*128]
 	}
 	if a := panicAnchor(output); a != "" {
 		return truncate(a, maxLen)

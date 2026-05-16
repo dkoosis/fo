@@ -49,7 +49,11 @@ func (s Suppression) Expired(now time.Time) bool {
 	if s.Until == nil {
 		return false
 	}
-	return now.After(*s.Until)
+	// Until is inclusive: suppression is valid through the end of the
+	// Until day (UTC). Compare day-to-day, not instant-to-instant.
+	y, m, d := now.UTC().Date()
+	today := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	return today.After(*s.Until)
 }
 
 // Format renders s as a canonical .fo/ignore line. Keys are emitted in
@@ -60,7 +64,7 @@ func (s Suppression) Format() string {
 	b.WriteString(s.RuleID)
 	if s.Glob != "" && s.Glob != DefaultGlob {
 		b.WriteString(" glob=")
-		b.WriteString(s.Glob)
+		writeValue(&b, s.Glob)
 	}
 	if s.Until != nil {
 		b.WriteString(" until=")
@@ -68,15 +72,23 @@ func (s Suppression) Format() string {
 	}
 	if s.Reason != "" {
 		b.WriteString(" reason=")
-		if strings.ContainsAny(s.Reason, " \t\"") {
-			b.WriteString(`"`)
-			b.WriteString(strings.ReplaceAll(s.Reason, `"`, `\"`))
-			b.WriteString(`"`)
-		} else {
-			b.WriteString(s.Reason)
-		}
+		writeValue(&b, s.Reason)
 	}
 	return b.String()
+}
+
+var valueEscaper = strings.NewReplacer(`\`, `\\`, `"`, `\"`)
+
+// writeValue emits v, quoting and escaping if it contains whitespace,
+// quotes, or backslashes that would otherwise round-trip incorrectly.
+func writeValue(b *strings.Builder, v string) {
+	if strings.ContainsAny(v, " \t\"\\") {
+		b.WriteString(`"`)
+		b.WriteString(valueEscaper.Replace(v))
+		b.WriteString(`"`)
+		return
+	}
+	b.WriteString(v)
 }
 
 // Sentinel errors. Parse failures wrap one of these so callers can
