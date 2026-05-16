@@ -1,11 +1,11 @@
 # Boot
 updated: 2026-05-16
 
-→ review/merge PRs in order: #275 (tidy) → #272 (suppress parser) → #273 (scene parser) → #274 (cluster heuristic). Run `gh pr list`.
-
 ✓ done
-- shipped 4 PRs in one drain: fo-m97, fo-u15.2.1, fo-fl0.1, fo-u15.3.1
-- decomposed fo-fl0 epic into 5 child beads with deps wired
+- shipped 10 PRs across two drains (#272-#281); main is clean, no open PRs
+- filed 6 follow-up beads from Gemini review on the last drain:
+  fo-oq9 (watch race), fo-juf (cluster Key), fo-sc7 (suppress shadow),
+  fo-2sk (stream snapshot suppress), fo-5r4 (scene_human 32-bit + NO_COLOR),
+  fo-drd (scene_llm actors escape)
 
-‡ traps
-- subagent worktrees may not persist files saved to project paths — verify with `ls` after agent reports "saved to X"
+→ next: `bd ready` to pick up. fo-oq9 + fo-juf are the load-bearing follow-ups.
