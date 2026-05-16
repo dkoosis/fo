@@ -901,16 +901,7 @@ func runStream(stdin io.Reader, br *bufio.Reader, stdout io.Writer, t theme.Them
 // Streams events incrementally — never buffers the whole stdin — so large
 // CI runs cannot OOM and Ctrl-C exits within the next event boundary.
 func runStreamCtx(ctx context.Context, stdin io.Reader, br *bufio.Reader, stdout io.Writer, t theme.Theme, stateFile string, noState, stateStrict bool, stderr io.Writer) int {
-	if c, ok := stdin.(io.Closer); ok {
-		stopClose := context.AfterFunc(ctx, func() { _ = c.Close() })
-		defer stopClose()
-	}
 	width := termSize(stdout)
-
-	// br already wraps stdin and holds the sniffed prefix. Wrap it as a
-	// ReadCloser whose Close propagates to stdin (if closable) so
-	// testjson.Stream's cancel path unblocks an in-flight Read.
-	rc := &bufioReadCloser{Reader: br, closer: closerOf(stdin)}
 
 	snapshots := make(chan report.Report, 8)
 	// resultCh carries the producer goroutine's terminal state. Using a
@@ -927,23 +918,13 @@ func runStreamCtx(ctx context.Context, stdin io.Reader, br *bufio.Reader, stdout
 
 	go func() {
 		defer close(snapshots)
-		agg := testjson.NewAggregator()
-		_, err := testjson.Stream(ctx, rc, func(e testjson.TestEvent) {
-			agg.ProcessEvent(e)
+		r, parseErr := runTestJSONPipeline(ctx, stdin, br, func(snap report.Report) {
 			// Emit a snapshot only at package-finish events. Per-test
 			// events would flood RenderStream and PickView.
-			if e.Test == "" && (e.Action == "pass" || e.Action == "fail" || e.Action == "skip") {
-				sendCoalesceSnapshot(ctx, snapshots, *testjson.ToReport(agg.Results()))
-			}
+			sendCoalesceSnapshot(ctx, snapshots, snap)
 		})
-		var parseErr error
-		if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-			parseErr = err
-		}
-		// Final snapshot with diff attached. Same code path as batch.
-		// Skip state Save on parse error so a partial Report doesn't
-		// poison the next run's diff (#262).
-		r := testjson.ToReport(agg.Results())
+		// Final snapshot with diff attached. Skip state Save on parse
+		// error so a partial Report doesn't poison the next run's diff (#262).
 		var saveErr error
 		if parseErr == nil {
 			saveErr = attachDiff(r, stateFile, noState, stderr)
@@ -1023,21 +1004,12 @@ func sendCoalesceSnapshot(ctx context.Context, ch chan report.Report, snap repor
 func runStreamBatch(stdin io.Reader, br *bufio.Reader, stdout io.Writer, mode, themeName, stateFile string, noState, stateStrict bool, stderr io.Writer) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	if c, ok := stdin.(io.Closer); ok {
-		stopClose := context.AfterFunc(ctx, func() { _ = c.Close() })
-		defer stopClose()
-	}
-	rc := &bufioReadCloser{Reader: br, closer: closerOf(stdin)}
 
-	agg := testjson.NewAggregator()
-	_, err := testjson.Stream(ctx, rc, func(e testjson.TestEvent) {
-		agg.ProcessEvent(e)
-	})
-	if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+	r, err := runTestJSONPipeline(ctx, stdin, br, nil)
+	if err != nil {
 		fmt.Fprintf(stderr, "fo: %v\n", err)
 		return 2
 	}
-	r := testjson.ToReport(agg.Results())
 	saveErr := attachDiff(r, stateFile, noState, stderr)
 	if err := renderMode(mode, r, stdout, themeName); err != nil {
 		fmt.Fprintf(stderr, "fo: %v\n", err)
@@ -1047,6 +1019,34 @@ func runStreamBatch(stdin io.Reader, br *bufio.Reader, stdout io.Writer, mode, t
 		return 2
 	}
 	return exitCodeReport(r)
+}
+
+// runTestJSONPipeline streams go test -json events from br/stdin into an
+// aggregator. onPkgFinish (if non-nil) is invoked at each package terminal
+// event with a fresh Report snapshot. Returns the final Report and any
+// non-cancel parse error. Honors ctx cancellation by closing stdin when it
+// implements io.Closer (so blocked Reads unblock promptly — fo-op6).
+func runTestJSONPipeline(ctx context.Context, stdin io.Reader, br *bufio.Reader, onPkgFinish func(report.Report)) (*report.Report, error) {
+	if c, ok := stdin.(io.Closer); ok {
+		stopClose := context.AfterFunc(ctx, func() { _ = c.Close() })
+		defer stopClose()
+	}
+	// br already wraps stdin and holds the sniffed prefix. Wrap it as a
+	// ReadCloser whose Close propagates to stdin (if closable) so
+	// testjson.Stream's cancel path unblocks an in-flight Read.
+	rc := &bufioReadCloser{Reader: br, closer: closerOf(stdin)}
+
+	agg := testjson.NewAggregator()
+	_, err := testjson.Stream(ctx, rc, func(e testjson.TestEvent) {
+		agg.ProcessEvent(e)
+		if onPkgFinish != nil && e.Test == "" && (e.Action == "pass" || e.Action == "fail" || e.Action == "skip") {
+			onPkgFinish(*testjson.ToReport(agg.Results()))
+		}
+	})
+	if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+		return testjson.ToReport(agg.Results()), err
+	}
+	return testjson.ToReport(agg.Results()), nil
 }
 
 // bufioReadCloser pairs a *bufio.Reader (carrying the sniffed prefix) with
