@@ -1,10 +1,11 @@
 # Boot
 updated: 2026-05-16
 
-→ act on `stdinTriggers` cluster — alloc-bounds:F1 + concurrency-safety:F3 + goroutine-lifecycle:F1 all cite `cmd/fo/watch.go` (~line 150). One fix closes 3 findings. Else `bd ready`.
-
-state: φ docs/feedback/review-all-2026-05-16.md (run_id f62c7fc3af14, 95 findings 79% accepted)
+→ review/merge PRs in order: #275 (tidy) → #272 (suppress parser) → #273 (scene parser) → #274 (cluster heuristic). Run `gh pr list`.
 
 ✓ done
-- /assess-feedback all: 75/95 accepted; pointer-value outlier 20%
-- 3 lintbrush beads filed in cc-plugins (8px staleness, 5z5 pointer-value, 9n2 synthesis)
+- shipped 4 PRs in one drain: fo-m97, fo-u15.2.1, fo-fl0.1, fo-u15.3.1
+- decomposed fo-fl0 epic into 5 child beads with deps wired
+
+‡ traps
+- subagent worktrees may not persist files saved to project paths — verify with `ls` after agent reports "saved to X"
