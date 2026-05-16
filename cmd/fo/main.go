@@ -300,6 +300,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 
+	applySuppress(r, suppressPath(), stderr)
+
 	saveErr := attachDiff(r, *stateFile, *noState, stderr)
 
 	if err := renderMode(mode, r, stdout, *themeFlag); err != nil {
@@ -921,6 +923,7 @@ func runStreamCtx(ctx context.Context, stdin io.Reader, br *bufio.Reader, stdout
 		// error so a partial Report doesn't poison the next run's diff (#262).
 		var saveErr error
 		if parseErr == nil {
+			applySuppress(r, suppressPath(), stderr)
 			saveErr = attachDiff(r, stateFile, noState, stderr)
 		}
 		resultCh <- streamResult{report: r, parseErr: parseErr, saveErr: saveErr}
@@ -1004,6 +1007,7 @@ func runStreamBatch(stdin io.Reader, br *bufio.Reader, stdout io.Writer, mode, t
 		fmt.Fprintf(stderr, "fo: %v\n", err)
 		return 2
 	}
+	applySuppress(r, suppressPath(), stderr)
 	saveErr := attachDiff(r, stateFile, noState, stderr)
 	if err := renderMode(mode, r, stdout, themeName); err != nil {
 		fmt.Fprintf(stderr, "fo: %v\n", err)

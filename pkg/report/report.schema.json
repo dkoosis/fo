@@ -40,6 +40,10 @@
       "type": "array",
       "description": "Operational warnings about the run itself (e.g. sidecar save failure). Never used for findings.",
       "items": { "type": "string" }
+    },
+    "suppressed": {
+      "type": "integer",
+      "description": "Count of findings removed by .fo/ignore active rules during this run."
     }
   },
   "$defs": {
