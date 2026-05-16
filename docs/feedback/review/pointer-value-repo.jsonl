@@ -1,1 +1,6 @@
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:02:05Z","linter":"pointer-value","scope":"project","target":"repo","target_slug":"repo","report_path":"docs/feedback/review/pointer-value-repo.md","n_findings":5,"status":"reviewed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:32:13Z","finding_id":"F1","outcome":"valid-not-applied","note":"wrapdiag.diag uses *string for 4 flag fields; escape analysis confirms opts moves to heap; fix is mechanical","status":"assessed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:32:13Z","finding_id":"F2","outcome":"not-worth-it","note":"state.Append returns *File but symmetry with Save/Load justifies it; author recommends no action","status":"assessed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:32:13Z","finding_id":"F3","outcome":"not-worth-it","note":"Finding ~136B exceeds small-element rule; aliasing into caller slice is intentional; out of scope","status":"assessed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:32:13Z","finding_id":"F4","outcome":"wrong","note":"receiver-mix is out of scope for pointer-value per rules.md; defer to api-surface","status":"assessed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:32:13Z","finding_id":"F5","outcome":"wrong","note":"*first is mutated to drive snapshot separator; pointer is correct, not a defect","status":"assessed"}

@@ -1,1 +1,6 @@
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:01:53Z","linter":"domain-vocab","scope":"project","target":"repo","target_slug":"repo","report_path":"docs/feedback/review/domain-vocab-repo.md","n_findings":5,"status":"reviewed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:31:58Z","finding_id":"F1","outcome":"valid-not-applied","note":"Two adjacent bool params (noState,stateStrict) at 3 sigs + 3 call sites; struct refactor sound but not applied","status":"assessed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:31:58Z","finding_id":"F2","outcome":"valid-not-applied","note":"*bool first flag at writeSnapshot is real smell; localized fix via struct receiver sound, not applied","status":"assessed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:31:59Z","finding_id":"F3","outcome":"valid-not-applied","note":"Internal lineread helpers carry oversize bool through 3 funcs; low-pressure, valid; not applied","status":"assessed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:31:59Z","finding_id":"F4","outcome":"valid-not-applied","note":"Bare 1 literal repeats 3x as occurrenceCount in testjson/toreport.go; named constant fix sound, not applied","status":"assessed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:31:59Z","finding_id":"F5","outcome":"not-worth-it","note":"Preventive note only, no current violation at pkg/view/leaderboard.go:41","status":"assessed"}

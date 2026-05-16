@@ -1,1 +1,4 @@
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:02:57Z","linter":"solid","scope":"project","target":"repo","target_slug":"repo","report_path":"docs/feedback/review/solid-repo.md","n_findings":3,"status":"reviewed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:32:28Z","finding_id":"F1","outcome":"valid-not-applied","note":"F1 verified: Tally has both Parse output role and RenderLLM method; called from cmd/fo/main.go. Real SRP smell.","status":"assessed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:32:28Z","finding_id":"F2","outcome":"valid-not-applied","note":"F2 verified: Status.ViewRow duplicates view.StatusRow; trivial codec hop. Minor as reviewer notes.","status":"assessed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:32:28Z","finding_id":"F3","outcome":"valid-not-applied","note":"F3 verified: pkg/state.Item.report field assigned in makeItem but no reader; dead state.","status":"assessed"}

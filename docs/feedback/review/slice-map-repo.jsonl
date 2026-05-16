@@ -1,1 +1,11 @@
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:01:48Z","linter":"slice-map","scope":"project","target":"repo","target_slug":"repo","report_path":"docs/feedback/review/slice-map-repo.md","n_findings":10,"status":"reviewed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:33:10Z","finding_id":"F1","outcome":"valid-not-applied","note":"real missed-prealloc; len(pkg.failedOrder) known at loop entry; trivial one-line fix","status":"assessed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:33:10Z","finding_id":"F2","outcome":"not-worth-it","note":"explicit positive-control / no-fix; nonNil empty-slice trade-off documented and intentional","status":"assessed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:33:10Z","finding_id":"F3","outcome":"valid-not-applied","note":"real cap-retention shape on TopFiles truncation; slices.Clip would defuse if FileIssue grows","status":"assessed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:33:10Z","finding_id":"F4","outcome":"valid-not-applied","note":"transient retention; marshaled and discarded today; Clip for convention uniformity","status":"assessed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:33:10Z","finding_id":"F5","outcome":"valid-not-applied","note":"boundary returns sub-slice into local hist; safe today, contract implicit; doc or clone","status":"assessed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:33:10Z","finding_id":"F6","outcome":"valid-not-applied","note":"internal priorRuns; readers only today; full-slice expr would future-proof at zero cost","status":"assessed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:33:10Z","finding_id":"F7","outcome":"not-worth-it","note":"positive control; canonical map[K][]V append idiom; explicitly approved","status":"assessed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:33:10Z","finding_id":"F8","outcome":"valid-not-applied","note":"real missed-prealloc; len(sections) known; ~3-4 reallocs avoidable with bounded approx","status":"assessed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:33:10Z","finding_id":"F9","outcome":"not-worth-it","note":"positive control; sortedKeys correctly preallocated; no action","status":"assessed"}
+{"run_id":"f62c7fc3af14","ts":"2026-05-16T20:33:10Z","finding_id":"F10","outcome":"not-worth-it","note":"positive control; bytes-cap not slot-cap; single-writer per test-name, no aliasing","status":"assessed"}
