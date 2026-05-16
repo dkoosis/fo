@@ -17,9 +17,7 @@ func orWinsInputs(t *testing.T) []Input {
 	if err != nil {
 		t.Fatalf("read fixture: %v", err)
 	}
-	var fx struct {
-		Inputs []Input `json:"inputs"`
-	}
+	var fx fixture
 	if err := json.Unmarshal(raw, &fx); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}

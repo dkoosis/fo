@@ -12,10 +12,12 @@ import (
 var updateGoldens = flag.Bool("update", false, "update golden files in testdata/golden/")
 
 type fixture struct {
-	Inputs []Input `json:"inputs"`
-	Config *struct {
-		Mode string `json:"mode"`
-	} `json:"config,omitempty"`
+	Inputs []Input        `json:"inputs"`
+	Config *fixtureConfig `json:"config,omitempty"`
+}
+
+type fixtureConfig struct {
+	Mode string `json:"mode"`
 }
 
 func TestCluster_EmptyInputs(t *testing.T) {

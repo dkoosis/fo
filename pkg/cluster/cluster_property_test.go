@@ -20,9 +20,7 @@ func loadAllFixtureInputs(t *testing.T) [][]Input {
 		if err != nil {
 			t.Fatalf("read %s: %v", p, err)
 		}
-		var fx struct {
-			Inputs []Input `json:"inputs"`
-		}
+		var fx fixture
 		if err := json.Unmarshal(raw, &fx); err != nil {
 			t.Fatalf("unmarshal %s: %v", p, err)
 		}
@@ -37,7 +35,7 @@ func TestProperty_Deterministic_OnShuffle(t *testing.T) {
 	rng := rand.New(rand.NewSource(1))
 	for _, base := range loadAllFixtureInputs(t) {
 		want := mustJSON(t, Run(base))
-		for trial := 0; trial < 8; trial++ {
+		for trial := range 8 {
 			shuffled := append([]Input(nil), base...)
 			rng.Shuffle(len(shuffled), func(i, j int) {
 				shuffled[i], shuffled[j] = shuffled[j], shuffled[i]

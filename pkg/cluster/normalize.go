@@ -48,55 +48,58 @@ func extractAnchor(output string, maxLen int) string {
 		// keeps room for many lines so the picker still has choices.
 		output = output[:maxLen*8]
 	}
-
-	if m := panicHeader.FindStringSubmatchIndex(output); m != nil {
-		msgStart := m[2]
-		// Take everything between panic: and the next goroutine
-		// header (or end-of-string).
-		tail := output[msgStart:]
-		if g := goroutineHeader.FindStringIndex(tail); g != nil {
-			tail = tail[:g[0]]
-		}
-		anchor := firstNonEmptyLine(tail)
-		if anchor != "" {
-			return truncate(anchor, maxLen)
-		}
+	if a := panicAnchor(output); a != "" {
+		return truncate(a, maxLen)
 	}
-
-	if m := testifyErrorPrefix.FindStringSubmatchIndex(output); m != nil {
-		// Take lines after Error: up to blank or Test: marker.
-		tail := output[m[2]:]
-		end := len(tail)
-		if t := testifyTestLine.FindStringIndex(tail); t != nil && t[0] < end {
-			end = t[0]
-		}
-		if blank := strings.Index(tail[:end], "\n\n"); blank >= 0 {
-			end = blank
-		}
-		anchor := strings.TrimSpace(tail[:end])
-		anchor = firstNonEmptyLine(anchor)
-		if anchor != "" {
-			return truncate(anchor, maxLen)
-		}
+	if a := testifyAnchor(output); a != "" {
+		return truncate(a, maxLen)
 	}
-
-	// First non-empty line containing a colon.
-	for _, line := range strings.Split(output, "\n") {
-		l := strings.TrimSpace(line)
-		if l == "" {
-			continue
-		}
-		if strings.Contains(l, ":") {
-			return truncate(l, maxLen)
-		}
+	if a := firstColonAnchor(output); a != "" {
+		return truncate(a, maxLen)
 	}
-
-	// Fall back to first non-empty line.
 	return truncate(firstNonEmptyLine(output), maxLen)
 }
 
+func panicAnchor(output string) string {
+	m := panicHeader.FindStringSubmatchIndex(output)
+	if m == nil {
+		return ""
+	}
+	tail := output[m[2]:]
+	if g := goroutineHeader.FindStringIndex(tail); g != nil {
+		tail = tail[:g[0]]
+	}
+	return firstNonEmptyLine(tail)
+}
+
+func testifyAnchor(output string) string {
+	m := testifyErrorPrefix.FindStringSubmatchIndex(output)
+	if m == nil {
+		return ""
+	}
+	tail := output[m[2]:]
+	end := len(tail)
+	if t := testifyTestLine.FindStringIndex(tail); len(t) > 0 && t[0] < end {
+		end = t[0]
+	}
+	if blank := strings.Index(tail[:end], "\n\n"); blank >= 0 {
+		end = blank
+	}
+	return firstNonEmptyLine(strings.TrimSpace(tail[:end]))
+}
+
+func firstColonAnchor(output string) string {
+	for line := range strings.SplitSeq(output, "\n") {
+		l := strings.TrimSpace(line)
+		if l != "" && strings.Contains(l, ":") {
+			return l
+		}
+	}
+	return ""
+}
+
 func firstNonEmptyLine(s string) string {
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		l := strings.TrimSpace(line)
 		if l != "" {
 			return l

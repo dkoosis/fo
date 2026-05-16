@@ -6,11 +6,11 @@ import "sort"
 // slice of Input from their own failure shape. Key is opaque to the
 // clusterer — it is echoed back unchanged in Cluster.Members.
 type Input struct {
-	Key     string
-	Package string
-	Test    string
-	Outcome string // "fail" | "panic" | "build_error"
-	Output  string
+	Key     string `json:"key"`
+	Package string `json:"package,omitempty"`
+	Test    string `json:"test,omitempty"`
+	Outcome string `json:"outcome,omitempty"` // "fail" | "panic" | "build_error"
+	Output  string `json:"output"`
 }
 
 // ClusterID is a short, stable, run-local identifier of the form
@@ -180,8 +180,8 @@ func extractWith(in Input, cfg Config) Signals {
 
 func unionBy(uf *unionFind, recs []record, key func(Signals) string) {
 	groups := make(map[string]int)
-	for i, r := range recs {
-		k := key(r.signals)
+	for i := range recs {
+		k := key(recs[i].signals)
 		if k == "" {
 			continue
 		}
@@ -193,16 +193,12 @@ func unionBy(uf *unionFind, recs []record, key func(Signals) string) {
 	}
 }
 
-func unionByKey(uf *unionFind, recs []record, key func(Signals) string) {
-	unionBy(uf, recs, key)
-}
-
 func buildCluster(members []int, recs []record, cfg Config, taken map[ClusterID]struct{}) Cluster {
 	// Pick signature: most common non-empty TopUserFrame; ties go to
 	// lexicographically smallest. If no frames, fall back to most
 	// common NormSig. If both empty for all members → singleton.
-	frame, frameKind := mostCommon(members, recs, func(s Signals) string { return s.TopUserFrame })
-	norm, normKind := mostCommon(members, recs, func(s Signals) string { return s.NormSig })
+	frame := mostCommon(members, recs, func(s Signals) string { return s.TopUserFrame })
+	norm := mostCommon(members, recs, func(s Signals) string { return s.NormSig })
 
 	var signature, kind string
 	switch {
@@ -213,8 +209,6 @@ func buildCluster(members []int, recs []record, cfg Config, taken map[ClusterID]
 	default:
 		signature, kind = recs[members[0]].input.Key, "singleton"
 	}
-	_ = frameKind
-	_ = normKind
 
 	id := disambiguate(makeClusterID(signature, cfg.IDPrefix, cfg.IDHexLen), taken)
 
@@ -234,7 +228,10 @@ func buildCluster(members []int, recs []record, cfg Config, taken map[ClusterID]
 	}
 }
 
-func mostCommon(members []int, recs []record, pick func(Signals) string) (string, int) {
+// mostCommon returns the most frequent non-empty value produced by
+// pick across members. Ties go to the lexicographically smallest
+// value so output is deterministic.
+func mostCommon(members []int, recs []record, pick func(Signals) string) string {
 	counts := make(map[string]int)
 	for _, m := range members {
 		v := pick(recs[m].signals)
@@ -244,7 +241,7 @@ func mostCommon(members []int, recs []record, pick func(Signals) string) (string
 		counts[v]++
 	}
 	if len(counts) == 0 {
-		return "", 0
+		return ""
 	}
 	type kv struct {
 		k string
@@ -260,7 +257,7 @@ func mostCommon(members []int, recs []record, pick func(Signals) string) (string
 		}
 		return all[i].k < all[j].k
 	})
-	return all[0].k, all[0].n
+	return all[0].k
 }
 
 type record struct {

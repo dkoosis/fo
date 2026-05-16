@@ -72,10 +72,21 @@ func isUserCodeFunc(fn string) bool {
 // omitted from the cluster key — a single line can host multiple
 // sub-calls and line is the strongest stable signal within a run.
 func extractTopUserFrame(output string, keepAbsPaths bool) string {
-	lines := strings.Split(output, "\n")
+	if f := scanPanicStack(output, keepAbsPaths); f != "" {
+		return f
+	}
+	if f := matchCite(errorTraceLine, output, keepAbsPaths); f != "" {
+		return f
+	}
+	if f := matchCite(simpleCite, output, keepAbsPaths); f != "" {
+		return f
+	}
+	return ""
+}
 
-	// First pass: panic stack pairs (function line followed by file line).
-	for i := 0; i < len(lines); i++ {
+func scanPanicStack(output string, keepAbsPaths bool) string {
+	lines := strings.Split(output, "\n")
+	for i := range lines {
 		m := panicFrameFile.FindStringSubmatch(lines[i])
 		if m == nil {
 			continue
@@ -84,36 +95,35 @@ func extractTopUserFrame(output string, keepAbsPaths bool) string {
 		if !isUserCodeFile(path) {
 			continue
 		}
-		fn := ""
-		if i > 0 {
-			fm := panicFuncLine.FindStringSubmatch(strings.TrimSpace(lines[i-1]))
-			if fm != nil {
-				fn = fm[1]
-			}
-		}
-		if !isUserCodeFunc(fn) {
+		if !isUserCodeFunc(funcNameAbove(lines, i)) {
 			continue
 		}
 		return formatFrame(path, lno, keepAbsPaths)
 	}
-
-	// Second pass: testify "Error Trace:".
-	if m := errorTraceLine.FindStringSubmatch(output); m != nil {
-		path, lno := m[1], m[2]
-		if isUserCodeFile(path) {
-			return formatFrame(path, lno, keepAbsPaths)
-		}
-	}
-
-	// Third pass: bare file.go:N: cite (t.Errorf).
-	if m := simpleCite.FindStringSubmatch(output); m != nil {
-		path, lno := m[1], m[2]
-		if isUserCodeFile(path) {
-			return formatFrame(path, lno, keepAbsPaths)
-		}
-	}
-
 	return ""
+}
+
+func funcNameAbove(lines []string, i int) string {
+	if i <= 0 {
+		return ""
+	}
+	fm := panicFuncLine.FindStringSubmatch(strings.TrimSpace(lines[i-1]))
+	if fm == nil {
+		return ""
+	}
+	return fm[1]
+}
+
+func matchCite(re *regexp.Regexp, output string, keepAbsPaths bool) string {
+	m := re.FindStringSubmatch(output)
+	if m == nil {
+		return ""
+	}
+	path, lno := m[1], m[2]
+	if !isUserCodeFile(path) {
+		return ""
+	}
+	return formatFrame(path, lno, keepAbsPaths)
 }
 
 func formatFrame(path, line string, keepAbs bool) string {
