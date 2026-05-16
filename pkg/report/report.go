@@ -55,6 +55,21 @@ type TestResult struct {
 	FixCommand  string        `json:"fix_command,omitempty"`
 	Fingerprint string        `json:"fingerprint,omitempty"`
 	Score       float64       `json:"score,omitempty"`
+	ClusterID   string        `json:"cluster_id,omitempty"`
+}
+
+// Cluster groups failing tests that share a root cause — same topmost
+// user-code stack frame or normalized assertion text. The clusterer
+// (pkg/cluster) produces these; renderers collapse N members behind one
+// expandable group. Singletons (one member) carry no ClusterID on their
+// TestResult and do not appear in Report.Clusters.
+type Cluster struct {
+	ID            string   `json:"id"`
+	Signature     string   `json:"signature"`
+	SignatureKind string   `json:"signature_kind"`
+	TopUserFrame  string   `json:"top_user_frame,omitempty"`
+	NormSig       string   `json:"norm_sig,omitempty"`
+	Members       []string `json:"members"`
 }
 
 // Report is the canonical shape from parser to pickView to renderer.
@@ -70,6 +85,7 @@ type Report struct {
 	DataHash    string       `json:"data_hash,omitempty"`
 	Findings    []Finding    `json:"findings,omitempty"`
 	Tests       []TestResult `json:"tests,omitempty"`
+	Clusters    []Cluster    `json:"clusters,omitempty"`
 	Diff        *DiffSummary `json:"diff,omitempty"`
 	// Notices carries operational warnings about the run itself (e.g.
 	// sidecar state Save failure → diff classification will be stale on
