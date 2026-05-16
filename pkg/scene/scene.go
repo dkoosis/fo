@@ -32,6 +32,7 @@ package scene
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -81,25 +82,26 @@ type Scene struct {
 // IsHeader reports whether data starts (modulo leading whitespace and
 // blank lines) with the scene header prefix.
 func IsHeader(data []byte) bool {
-	s := string(data)
+	headerPrefix := []byte(HeaderPrefix)
+	s := data
 	for {
-		nl := strings.IndexByte(s, '\n')
-		var line string
+		nl := bytes.IndexByte(s, '\n')
+		var line []byte
 		if nl < 0 {
 			line = s
-			s = ""
+			s = nil
 		} else {
 			line = s[:nl]
 			s = s[nl+1:]
 		}
-		trimmed := strings.TrimLeft(line, " \t\r")
-		if trimmed == "" {
+		trimmed := bytes.TrimLeft(line, " \t\r")
+		if len(trimmed) == 0 {
 			if nl < 0 {
 				return false
 			}
 			continue
 		}
-		return strings.HasPrefix(trimmed, HeaderPrefix)
+		return bytes.HasPrefix(trimmed, headerPrefix)
 	}
 }
 
@@ -244,7 +246,7 @@ func isOutputLine(raw string) bool {
 		return false
 	}
 	// reject 3+ leading spaces or tab indent (terminates command).
-	if len(raw) >= 3 && raw[2] == ' ' {
+	if len(raw) >= 3 && (raw[2] == ' ' || raw[2] == '\t') {
 		return false
 	}
 	return true

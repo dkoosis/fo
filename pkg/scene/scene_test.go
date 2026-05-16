@@ -167,6 +167,26 @@ func TestParse_headerAttrs(t *testing.T) {
 	}
 }
 
+func TestParse_outputTerminatesOnTabIndent(t *testing.T) {
+	// "  \tafter" is not a valid 2-space output line; it terminates the
+	// command and is reparsed as narration.
+	in := "# fo:scene\n## 01 · t\n@a $ cmd\n  out1\n  \t> after\n"
+	s, err := Parse(strings.NewReader(in))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	beats := s.Acts[0].Beats
+	if len(beats) != 2 {
+		t.Fatalf("beats = %+v", beats)
+	}
+	if got := beats[0].Command.Output; len(got) != 1 || got[0] != "out1" {
+		t.Errorf("Output = %v, want [out1]", got)
+	}
+	if beats[1].Kind != BeatNarration || beats[1].Narration != "after" {
+		t.Errorf("narr beat = %+v", beats[1])
+	}
+}
+
 func TestParse_outputTerminatesOnNonIndented(t *testing.T) {
 	in := `# fo:scene
 ## 01 · t
