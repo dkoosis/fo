@@ -33,10 +33,12 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/term"
 
 	"github.com/dkoosis/fo/internal/boundread"
+	"github.com/dkoosis/fo/internal/lineread"
 	"github.com/dkoosis/fo/pkg/metrics"
 	"github.com/dkoosis/fo/pkg/report"
 	"github.com/dkoosis/fo/pkg/sarif"
@@ -447,25 +449,33 @@ func coerceAs(kind string, input []byte, stderr io.Writer) ([]byte, int) {
 // looks like "<number> <label>". Conservative — requires ≥2 rows so a
 // single stray "404 not_found" log line never triggers leaderboard.
 func sniffBareTally(data []byte) bool {
-	sc := bufio.NewScanner(bytes.NewReader(data))
-	sc.Buffer(make([]byte, 64*1024), 1024*1024)
+	br := bufio.NewReaderSize(bytes.NewReader(data), 64*1024)
 	rows := 0
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
+	for {
+		raw, oversize, err := lineread.Read(br)
+		if !oversize {
+			line := strings.TrimSpace(string(raw))
+			if line != "" && !strings.HasPrefix(line, "#") {
+				idx := strings.IndexAny(line, " \t")
+				if idx <= 0 {
+					return false
+				}
+				if _, perr := strconv.ParseFloat(line[:idx], 64); perr != nil {
+					return false
+				}
+				if strings.TrimSpace(line[idx:]) == "" {
+					return false
+				}
+				rows++
+			}
+		}
+		if err == nil {
 			continue
 		}
-		idx := strings.IndexAny(line, " \t")
-		if idx <= 0 {
-			return false
+		if errors.Is(err, io.EOF) {
+			break
 		}
-		if _, err := strconv.ParseFloat(line[:idx], 64); err != nil {
-			return false
-		}
-		if strings.TrimSpace(line[idx:]) == "" {
-			return false
-		}
-		rows++
+		return false
 	}
 	return rows >= 2
 }
@@ -484,7 +494,10 @@ func renderMetrics(input []byte, stdout io.Writer, stderr io.Writer, mode string
 		curr[i] = state.MetricSample{Tool: m.Tool, Key: r.Key, Value: r.Value, Unit: r.Unit}
 	}
 	histPath := state.MetricsHistoryPath()
-	prev, _ := state.LoadMetrics(histPath)
+	prev, loadErr := state.LoadMetrics(histPath)
+	if loadErr != nil {
+		fmt.Fprintf(stderr, "fo: load metrics history: %v\n", loadErr)
+	}
 	deltas := state.DiffMetrics(prev, curr)
 
 	rows := make([]view.MetricRow, len(deltas))
@@ -900,9 +913,17 @@ func runStreamCtx(ctx context.Context, stdin io.Reader, br *bufio.Reader, stdout
 	rc := &bufioReadCloser{Reader: br, closer: closerOf(stdin)}
 
 	snapshots := make(chan report.Report, 8)
-	finalCh := make(chan *report.Report, 1)
-	parseErrCh := make(chan error, 1)
-	saveErrCh := make(chan error, 1)
+	// resultCh carries the producer goroutine's terminal state. Using a
+	// single struct + blocking receive (a) ensures the producer is fully
+	// finished before main inspects parseErr (#267 race), and (b) lets
+	// main bound the wait via ctx + grace timeout so a wedged
+	// attachDiff/state.Save doesn't deadlock fo (#266).
+	type streamResult struct {
+		report   *report.Report
+		parseErr error
+		saveErr  error
+	}
+	resultCh := make(chan streamResult, 1)
 
 	go func() {
 		defer close(snapshots)
@@ -915,13 +936,19 @@ func runStreamCtx(ctx context.Context, stdin io.Reader, br *bufio.Reader, stdout
 				sendCoalesceSnapshot(ctx, snapshots, *testjson.ToReport(agg.Results()))
 			}
 		})
+		var parseErr error
 		if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-			parseErrCh <- err
+			parseErr = err
 		}
 		// Final snapshot with diff attached. Same code path as batch.
+		// Skip state Save on parse error so a partial Report doesn't
+		// poison the next run's diff (#262).
 		r := testjson.ToReport(agg.Results())
-		saveErrCh <- attachDiff(r, stateFile, noState, stderr)
-		finalCh <- r
+		var saveErr error
+		if parseErr == nil {
+			saveErr = attachDiff(r, stateFile, noState, stderr)
+		}
+		resultCh <- streamResult{report: r, parseErr: parseErr, saveErr: saveErr}
 		select {
 		case snapshots <- *r:
 		case <-ctx.Done():
@@ -929,21 +956,35 @@ func runStreamCtx(ctx context.Context, stdin io.Reader, br *bufio.Reader, stdout
 	}()
 
 	renderErr := view.RenderStream(ctx, stdout, snapshots, t, width)
-	final := <-finalCh
+
+	// Wait for the producer. If ctx is already done (typical cancel/SIGINT
+	// path) give the producer a bounded grace window to finish I/O — long
+	// enough for a normal fsync, short enough that a wedged disk doesn't
+	// hang fo forever (#266).
+	var res streamResult
 	select {
-	case perr := <-parseErrCh:
-		fmt.Fprintf(stderr, "fo: %v\n", perr)
+	case res = <-resultCh:
+	case <-ctx.Done():
+		select {
+		case res = <-resultCh:
+		case <-time.After(2 * time.Second):
+			fmt.Fprintln(stderr, "fo: timed out waiting for parser after cancel")
+			return 2
+		}
+	}
+
+	if res.parseErr != nil {
+		fmt.Fprintf(stderr, "fo: %v\n", res.parseErr)
 		return 2
-	default:
 	}
 	if renderErr != nil && !errors.Is(renderErr, context.Canceled) {
 		fmt.Fprintf(stderr, "fo: %v\n", renderErr)
 		return 2
 	}
-	if saveErr := <-saveErrCh; saveErr != nil && stateStrict {
+	if res.saveErr != nil && stateStrict {
 		return 2
 	}
-	return exitCodeReport(final)
+	return exitCodeReport(res.report)
 }
 
 // sendCoalesceSnapshot delivers snap to ch without blocking the parser when

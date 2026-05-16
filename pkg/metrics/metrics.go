@@ -15,8 +15,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
+
+	"github.com/dkoosis/fo/internal/lineread"
 )
 
 const HeaderPrefix = "# fo:metrics"
@@ -44,38 +47,29 @@ var (
 )
 
 func Parse(r io.Reader) (Metrics, error) {
-	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 64*1024), 1024*1024)
+	br := bufio.NewReaderSize(r, 64*1024)
 
 	var m Metrics
 	headerSeen := false
 	lineNo := 0
-	for sc.Scan() {
-		lineNo++
-		line := strings.TrimSpace(sc.Text())
-		if line == "" {
+	var dropped int
+	for {
+		raw, oversize, err := lineread.Read(br)
+		if oversize {
+			dropped++
+		} else if perr := absorbMetricsLine(raw, &m, &headerSeen, &lineNo); perr != nil {
+			return Metrics{}, perr
+		}
+		if err == nil {
 			continue
 		}
-		if !headerSeen {
-			if !strings.HasPrefix(line, HeaderPrefix) {
-				return Metrics{}, ErrNoHeader
-			}
-			rest := strings.TrimSpace(strings.TrimPrefix(line, HeaderPrefix))
-			m.Tool = parseAttr(rest, "tool")
-			headerSeen = true
-			continue
+		if errors.Is(err, io.EOF) {
+			break
 		}
-		if strings.HasPrefix(line, "#") {
-			continue
-		}
-		row, err := parseRow(line)
-		if err != nil {
-			return Metrics{}, fmt.Errorf("metrics: line %d: %w", lineNo, err)
-		}
-		m.Rows = append(m.Rows, row)
-	}
-	if err := sc.Err(); err != nil {
 		return Metrics{}, fmt.Errorf("metrics: read: %w", err)
+	}
+	if dropped > 0 {
+		fmt.Fprintf(os.Stderr, "metrics: dropped %d line(s) exceeding %d bytes\n", dropped, lineread.MaxLineLen)
 	}
 	if !headerSeen {
 		return Metrics{}, ErrNoHeader
@@ -84,6 +78,32 @@ func Parse(r io.Reader) (Metrics, error) {
 		return Metrics{}, ErrNoRows
 	}
 	return m, nil
+}
+
+func absorbMetricsLine(raw []byte, m *Metrics, headerSeen *bool, lineNo *int) error {
+	*lineNo++
+	line := strings.TrimSpace(string(raw))
+	if line == "" {
+		return nil
+	}
+	if !*headerSeen {
+		if !strings.HasPrefix(line, HeaderPrefix) {
+			return ErrNoHeader
+		}
+		rest := strings.TrimSpace(strings.TrimPrefix(line, HeaderPrefix))
+		m.Tool = parseAttr(rest, "tool")
+		*headerSeen = true
+		return nil
+	}
+	if strings.HasPrefix(line, "#") {
+		return nil
+	}
+	row, err := parseRow(line)
+	if err != nil {
+		return fmt.Errorf("metrics: line %d: %w", *lineNo, err)
+	}
+	m.Rows = append(m.Rows, row)
+	return nil
 }
 
 func parseRow(line string) (Row, error) {

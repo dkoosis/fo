@@ -142,7 +142,7 @@ func parseDiagLine(line string) (file string, ln, col int, msg string) {
 	rest := line
 	var prefix string
 
-	if len(rest) >= 3 && rest[1] == ':' && (rest[2] == '\\' || rest[2] == '/') {
+	if len(rest) >= 3 && isAlpha(rest[0]) && rest[1] == ':' && (rest[2] == '\\' || rest[2] == '/') {
 		prefix = rest[:2]
 		rest = rest[2:]
 	}
@@ -168,4 +168,8 @@ func parseDiagLine(line string) (file string, ln, col int, msg string) {
 	}
 
 	return "", 0, 0, ""
+}
+
+func isAlpha(b byte) bool {
+	return (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z')
 }

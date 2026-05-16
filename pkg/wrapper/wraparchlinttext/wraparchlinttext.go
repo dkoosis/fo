@@ -6,11 +6,14 @@ package wraparchlinttext
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"regexp"
 	"strings"
 
+	"github.com/dkoosis/fo/internal/lineread"
 	"github.com/dkoosis/fo/pkg/sarif"
 )
 
@@ -49,8 +52,7 @@ func extractFile(line string) string {
 }
 
 func Convert(r io.Reader, w io.Writer) error {
-	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 64*1024), 1024*1024)
+	br := bufio.NewReaderSize(r, 64*1024)
 
 	b := sarif.NewBuilder("go-arch-lint", "")
 
@@ -63,23 +65,33 @@ func Convert(r io.Reader, w io.Writer) error {
 		p = nil
 	}
 
-	for sc.Scan() {
-		line := sc.Text()
-		if next := parseHeader(line); next != nil {
-			flush()
-			p = next
+	var dropped int
+	for {
+		raw, oversize, err := lineread.Read(br)
+		if oversize {
+			dropped++
+		} else {
+			line := string(raw)
+			if next := parseHeader(line); next != nil {
+				flush()
+				p = next
+			} else if p != nil {
+				if f := extractFile(line); f != "" {
+					p.file = f
+				}
+			}
+		}
+		if err == nil {
 			continue
 		}
-		if p == nil {
-			continue
+		if errors.Is(err, io.EOF) {
+			break
 		}
-		if f := extractFile(line); f != "" {
-			p.file = f
-		}
+		return fmt.Errorf("archlinttext: read: %w", err)
 	}
 	flush()
-	if err := sc.Err(); err != nil {
-		return fmt.Errorf("archlinttext: read: %w", err)
+	if dropped > 0 {
+		fmt.Fprintf(os.Stderr, "archlinttext: dropped %d line(s) exceeding %d bytes\n", dropped, lineread.MaxLineLen)
 	}
 	if _, err := b.WriteTo(w); err != nil {
 		return fmt.Errorf("archlinttext: encode: %w", err)

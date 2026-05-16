@@ -19,9 +19,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 
+	"github.com/dkoosis/fo/internal/lineread"
 	"github.com/dkoosis/fo/pkg/tally"
 )
 
@@ -49,25 +51,36 @@ func Convert(r io.Reader, w io.Writer, opts Opts) error {
 		return err
 	}
 
-	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 64*1024), 1024*1024)
+	br := bufio.NewReaderSize(r, 64*1024)
 	rows := 0
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
+	var dropped int
+	for {
+		raw, oversize, err := lineread.Read(br)
+		if oversize {
+			dropped++
+		} else {
+			line := strings.TrimSpace(string(raw))
+			if line != "" && !strings.HasPrefix(line, "#") {
+				countTok, label, perr := splitCountLabel(line)
+				if perr != nil {
+					return perr
+				}
+				if _, werr := fmt.Fprintf(bw, "%s %s\n", countTok, label); werr != nil {
+					return werr
+				}
+				rows++
+			}
+		}
+		if err == nil {
 			continue
 		}
-		countTok, label, err := splitCountLabel(line)
-		if err != nil {
-			return err
+		if errors.Is(err, io.EOF) {
+			break
 		}
-		if _, err := fmt.Fprintf(bw, "%s %s\n", countTok, label); err != nil {
-			return err
-		}
-		rows++
-	}
-	if err := sc.Err(); err != nil {
 		return fmt.Errorf("wrap leaderboard: read: %w", err)
+	}
+	if dropped > 0 {
+		fmt.Fprintf(os.Stderr, "wrap leaderboard: dropped %d line(s) exceeding %d bytes\n", dropped, lineread.MaxLineLen)
 	}
 	if rows == 0 {
 		return ErrNoRows

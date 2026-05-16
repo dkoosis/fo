@@ -23,9 +23,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 
+	"github.com/dkoosis/fo/internal/lineread"
 	"github.com/dkoosis/fo/pkg/view"
 )
 
@@ -71,39 +73,29 @@ var ErrMalformedRow = errors.New("tally: malformed row")
 // error pinned to the line number; tolerant to leading whitespace and
 // comment/blank lines.
 func Parse(r io.Reader) (Tally, error) {
-	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 64*1024), 1024*1024)
+	br := bufio.NewReaderSize(r, 64*1024)
 
 	var t Tally
 	headerSeen := false
 	lineNo := 0
-	for sc.Scan() {
-		lineNo++
-		raw := sc.Text()
-		line := strings.TrimSpace(raw)
-		if line == "" {
+	var dropped int
+	for {
+		raw, oversize, err := lineread.Read(br)
+		if oversize {
+			dropped++
+		} else if perr := absorbTallyLine(raw, &t, &headerSeen, &lineNo); perr != nil {
+			return Tally{}, perr
+		}
+		if err == nil {
 			continue
 		}
-		if !headerSeen {
-			if !strings.HasPrefix(line, HeaderPrefix) {
-				return Tally{}, ErrNoHeader
-			}
-			rest := strings.TrimSpace(strings.TrimPrefix(line, HeaderPrefix))
-			t.Tool = parseAttr(rest, "tool")
-			headerSeen = true
-			continue
+		if errors.Is(err, io.EOF) {
+			break
 		}
-		if strings.HasPrefix(line, "#") {
-			continue
-		}
-		row, err := parseRow(line)
-		if err != nil {
-			return Tally{}, fmt.Errorf("tally: line %d: %w", lineNo, err)
-		}
-		t.Rows = append(t.Rows, row)
-	}
-	if err := sc.Err(); err != nil {
 		return Tally{}, fmt.Errorf("tally: read: %w", err)
+	}
+	if dropped > 0 {
+		fmt.Fprintf(os.Stderr, "tally: dropped %d line(s) exceeding %d bytes\n", dropped, lineread.MaxLineLen)
 	}
 	if !headerSeen {
 		return Tally{}, ErrNoHeader
@@ -112,6 +104,32 @@ func Parse(r io.Reader) (Tally, error) {
 		return Tally{}, ErrNoRows
 	}
 	return t, nil
+}
+
+func absorbTallyLine(raw []byte, t *Tally, headerSeen *bool, lineNo *int) error {
+	*lineNo++
+	line := strings.TrimSpace(string(raw))
+	if line == "" {
+		return nil
+	}
+	if !*headerSeen {
+		if !strings.HasPrefix(line, HeaderPrefix) {
+			return ErrNoHeader
+		}
+		rest := strings.TrimSpace(strings.TrimPrefix(line, HeaderPrefix))
+		t.Tool = parseAttr(rest, "tool")
+		*headerSeen = true
+		return nil
+	}
+	if strings.HasPrefix(line, "#") {
+		return nil
+	}
+	row, err := parseRow(line)
+	if err != nil {
+		return fmt.Errorf("tally: line %d: %w", *lineNo, err)
+	}
+	t.Rows = append(t.Rows, row)
+	return nil
 }
 
 // parseRow splits a data line into count + label. Count is the first

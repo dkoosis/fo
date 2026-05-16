@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -104,8 +105,33 @@ func AppendMetrics(path string, samples []MetricSample) error {
 	if err != nil {
 		return fmt.Errorf("metrics: marshal: %w", err)
 	}
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		return fmt.Errorf("metrics: write %s: %w", path, err)
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return fmt.Errorf("metrics: mkdir %s: %w", dir, err)
+	}
+	tmp, err := os.CreateTemp(dir, ".metrics-history.*.tmp")
+	if err != nil {
+		return fmt.Errorf("metrics: tempfile: %w", err)
+	}
+	tmpName := tmp.Name()
+	cleanup := func() { _ = os.Remove(tmpName) }
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		cleanup()
+		return fmt.Errorf("metrics: write tmp: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		cleanup()
+		return fmt.Errorf("metrics: fsync: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		cleanup()
+		return fmt.Errorf("metrics: close tmp: %w", err)
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		cleanup()
+		return fmt.Errorf("metrics: rename: %w", err)
 	}
 	return nil
 }

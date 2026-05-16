@@ -19,7 +19,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
+
+	"github.com/dkoosis/fo/internal/lineread"
 )
 
 const HeaderPrefix = "# fo:status"
@@ -58,39 +61,29 @@ var (
 )
 
 func Parse(r io.Reader) (Status, error) {
-	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 64*1024), 1024*1024)
+	br := bufio.NewReaderSize(r, 64*1024)
 
 	var s Status
 	headerSeen := false
 	lineNo := 0
-	for sc.Scan() {
-		lineNo++
-		raw := sc.Text()
-		line := strings.TrimSpace(raw)
-		if line == "" {
+	var dropped int
+	for {
+		raw, oversize, err := lineread.Read(br)
+		if oversize {
+			dropped++
+		} else if perr := absorbStatusLine(raw, &s, &headerSeen, &lineNo); perr != nil {
+			return Status{}, perr
+		}
+		if err == nil {
 			continue
 		}
-		if !headerSeen {
-			if !strings.HasPrefix(line, HeaderPrefix) {
-				return Status{}, ErrNoHeader
-			}
-			rest := strings.TrimSpace(strings.TrimPrefix(line, HeaderPrefix))
-			s.Tool = parseAttr(rest, "tool")
-			headerSeen = true
-			continue
+		if errors.Is(err, io.EOF) {
+			break
 		}
-		if strings.HasPrefix(line, "#") {
-			continue
-		}
-		row, err := parseRow(line)
-		if err != nil {
-			return Status{}, fmt.Errorf("status: line %d: %w", lineNo, err)
-		}
-		s.Rows = append(s.Rows, row)
-	}
-	if err := sc.Err(); err != nil {
 		return Status{}, fmt.Errorf("status: read: %w", err)
+	}
+	if dropped > 0 {
+		fmt.Fprintf(os.Stderr, "status: dropped %d line(s) exceeding %d bytes\n", dropped, lineread.MaxLineLen)
 	}
 	if !headerSeen {
 		return Status{}, ErrNoHeader
@@ -99,6 +92,32 @@ func Parse(r io.Reader) (Status, error) {
 		return Status{}, ErrNoRows
 	}
 	return s, nil
+}
+
+func absorbStatusLine(raw []byte, s *Status, headerSeen *bool, lineNo *int) error {
+	*lineNo++
+	line := strings.TrimSpace(string(raw))
+	if line == "" {
+		return nil
+	}
+	if !*headerSeen {
+		if !strings.HasPrefix(line, HeaderPrefix) {
+			return ErrNoHeader
+		}
+		rest := strings.TrimSpace(strings.TrimPrefix(line, HeaderPrefix))
+		s.Tool = parseAttr(rest, "tool")
+		*headerSeen = true
+		return nil
+	}
+	if strings.HasPrefix(line, "#") {
+		return nil
+	}
+	row, err := parseRow(line)
+	if err != nil {
+		return fmt.Errorf("status: line %d: %w", *lineNo, err)
+	}
+	s.Rows = append(s.Rows, row)
+	return nil
 }
 
 func parseRow(line string) (Row, error) {

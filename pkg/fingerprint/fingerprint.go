@@ -75,14 +75,8 @@ func NormalizeMessage(msg string) string {
 		return p + trail
 	})
 
-	// Strip trailing coord suffixes — apply repeatedly so ":12:3" then ":4" both go.
-	for {
-		stripped := trailingCoordRe.ReplaceAllString(s, "")
-		if stripped == s {
-			break
-		}
-		s = strings.TrimSpace(stripped)
-	}
+	// Strip trailing coord suffixes — regex is anchored + greedy so one pass covers chains.
+	s = strings.TrimSpace(trailingCoordRe.ReplaceAllString(s, ""))
 
 	// Collapse whitespace.
 	s = strings.Join(strings.Fields(s), " ")
