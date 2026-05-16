@@ -598,16 +598,10 @@ func parseToReport(input []byte, stderr io.Writer) (*report.Report, error) {
 		}
 		return sarif.ToReportWithMeta(doc, input), nil
 	}
-	if sniffGoTestJSON(input) {
-		results, malformed, err := testjson.ParseBytes(input)
-		if err != nil {
-			return nil, fmt.Errorf("parsing go test -json: %w", err)
-		}
-		if malformed > 0 {
-			fmt.Fprintf(stderr, "fo: warning: %d malformed line(s) skipped\n", malformed)
-		}
-		return testjson.ToReportWithMeta(results, input), nil
-	}
+	// Not SARIF — try go test -json. The tolerant path is a strict superset of
+	// sniffGoTestJSON-then-ParseBytes: it accepts wrapped banners, surfaces
+	// truncated-stream diagnostics distinctly, and emits the same malformed
+	// warning. No need for a separate strict arm.
 	return parseTestJSONTolerant(input, stderr)
 }
 
