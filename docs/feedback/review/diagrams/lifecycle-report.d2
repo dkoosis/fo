@@ -1,0 +1,45 @@
+diagram lifecycle · type=Report · file=pkg/report/report.go:67 · 11 funcs across 2 roles
+  Create (3)
+  Read (32)
+
+```d2
+# snipe lifecycle · Report
+direction: right
+
+role_Create: "Create" {
+  style.fill: "#dcfce7"
+}
+role_Read: "Read" {
+  style.fill: "#dbeafe"
+}
+type_Report: "Report" {
+  shape: cylinder
+  style.bold: true
+  style.fill: "#fde68a"
+}
+role_Create.f9eaf9810414bd6d: "parseMultiplex · cmd/fo/main.go:704"
+role_Create.7d26753d6e9eead4: "ToReport · pkg/sarif/toreport.go:21"
+role_Create.bcd2194491381f58: "ToReport · pkg/testjson/toreport.go:22"
+role_Read.381bd93bfdd318ee: "renderMode · cmd/fo/main.go:291"
+role_Read.1091bba8a1a4b688: "parseToReport · cmd/fo/main.go:548"
+role_Read.db50b50b0a969156: "parseTestJSONTolerant · cmd/fo/main.go:679"
+role_Read.2d2ebb32e201de40: "parseSection · cmd/fo/main.go:780"
+role_Read.0718b167d71225cc: "writeReportJSON · cmd/fo/main.go:802"
+role_Read.146abd968142e743: "runStreamCtx · cmd/fo/main.go:880"
+role_Read.eeda4c90a939d8ab: "sendCoalesceSnapshot · cmd/fo/main.go:933"
+role_Read.3e2b6060d8868c7d: "exitCodeReport · cmd/fo/main.go:1012"
+role_Read._more: "+24 more" {
+  style.font-color: "#6b7280"
+}
+role_Create.f9eaf9810414bd6d -> type_Report: "create"
+role_Create.7d26753d6e9eead4 -> type_Report: "create"
+role_Create.bcd2194491381f58 -> type_Report: "create"
+type_Report -> role_Read.381bd93bfdd318ee: "read"
+type_Report -> role_Read.1091bba8a1a4b688: "read"
+type_Report -> role_Read.db50b50b0a969156: "read"
+type_Report -> role_Read.2d2ebb32e201de40: "read"
+type_Report -> role_Read.0718b167d71225cc: "read"
+type_Report -> role_Read.146abd968142e743: "read"
+type_Report -> role_Read.eeda4c90a939d8ab: "read"
+type_Report -> role_Read.3e2b6060d8868c7d: "read"
+```

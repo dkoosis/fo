@@ -1,11 +1,13 @@
 # Boot
 updated: 2026-05-16
 
-→ run `bd ready` and pick next epic — fo-u15.2 (suppress) or fo-u15.3 (cluster) are top of queue
+→ triage `/review all` findings — read `docs/feedback/review-all-2026-05-16.md`, decide: act on hotspots or resume `bd ready`
 
-state: untracked `docs/feedback/` — pre-existing, ignore
+state: φ docs/feedback/review-all-2026-05-16.md (run_id f62c7fc3af14, 95 findings / 22 linters)
 
 ✓ done
-- fo-u15.1 watch epic shipped (A.1–A.4): fsnotify + debounce, last-run sidecar, delta markers, status trailer
-- 2026-05-09 audit batch closed: GH #259/#260/#262/#263/#264/#266/#267/#271 (commit f264bc2)
-- fo-0l9 carved out: raw-TTY keyboard input for watch ((r)erun/(q)uit) — P3 polish
+- /review all dispatched (22 project-scope linters in parallel via lintbrush harness)
+- scorecard + per-linter reports written to docs/feedback/review/
+
+‡ traps
+- `/review all` does not synthesize across linters — convergence is signal (e.g. stdinTriggers hit by 3 linters); the scorecard's hotspots section is hand-rolled

@@ -1,0 +1,118 @@
+diagram arch · 20 packages · 36 edges · trimmed to top-20 by PageRank · module=github.com/dkoosis/fo
+  cmd/fo  (layer=cmd)
+  internal/boundread  (layer=internal/boundread)
+  internal/lineread  (layer=internal/lineread)
+  pkg/fingerprint  (layer=pkg)
+  pkg/paint  (layer=pkg)
+  pkg/paint_test  (layer=pkg)
+  pkg/report  (layer=pkg)
+  pkg/sarif  (layer=pkg)
+  pkg/sarif_test  (layer=pkg)
+  pkg/score  (layer=pkg)
+  pkg/state  (layer=pkg)
+  pkg/testjson  (layer=pkg)
+  pkg/testjson_test  (layer=pkg)
+  pkg/theme  (layer=pkg)
+  pkg/theme_test  (layer=pkg)
+  pkg/view  (layer=pkg)
+  pkg/view_test  (layer=pkg)
+  pkg/wrapper/wraparchlint  (layer=pkg)
+  pkg/wrapper/wrapdiag  (layer=pkg)
+  pkg/wrapper/wrapjscpd  (layer=pkg)
+
+```d2
+# snipe arch · imports graph
+direction: down
+
+layer_cmd: "cmd" {
+  style.fill: "#f5f5f5"
+}
+layer_internal_boundread: "internal/boundread" {
+  style.fill: "#f5f5f5"
+}
+layer_internal_lineread: "internal/lineread" {
+  style.fill: "#f5f5f5"
+}
+layer_pkg: "pkg" {
+  style.fill: "#f5f5f5"
+}
+layer_cmd.cmd_fo: "cmd/fo"
+layer_internal_boundread.internal_boundread: "internal/boundread" {
+  style.bold: true
+  style.fill: "#fde68a"
+}
+layer_internal_lineread.internal_lineread: "internal/lineread" {
+  style.fill: "#fef3c7"
+}
+layer_pkg.pkg_fingerprint: "pkg/fingerprint" {
+  style.fill: "#fef3c7"
+}
+layer_pkg.pkg_paint: "pkg/paint" {
+  style.fill: "#fef3c7"
+}
+layer_pkg.pkg_paint_test: "pkg/paint_test"
+layer_pkg.pkg_report: "pkg/report" {
+  style.bold: true
+  style.fill: "#fde68a"
+}
+layer_pkg.pkg_sarif: "pkg/sarif" {
+  style.bold: true
+  style.fill: "#fde68a"
+}
+layer_pkg.pkg_sarif_test: "pkg/sarif_test"
+layer_pkg.pkg_score: "pkg/score" {
+  style.fill: "#fef3c7"
+}
+layer_pkg.pkg_state: "pkg/state" {
+  style.fill: "#fef3c7"
+}
+layer_pkg.pkg_testjson: "pkg/testjson" {
+  style.fill: "#fef3c7"
+}
+layer_pkg.pkg_testjson_test: "pkg/testjson_test"
+layer_pkg.pkg_theme: "pkg/theme" {
+  style.fill: "#fef3c7"
+}
+layer_pkg.pkg_theme_test: "pkg/theme_test"
+layer_pkg.pkg_view: "pkg/view"
+layer_pkg.pkg_view_test: "pkg/view_test"
+layer_pkg.pkg_wrapper_wraparchlint: "pkg/wrapper/wraparchlint"
+layer_pkg.pkg_wrapper_wrapdiag: "pkg/wrapper/wrapdiag"
+layer_pkg.pkg_wrapper_wrapjscpd: "pkg/wrapper/wrapjscpd"
+layer_cmd.cmd_fo -> layer_internal_boundread.internal_boundread
+layer_cmd.cmd_fo -> layer_pkg.pkg_report
+layer_cmd.cmd_fo -> layer_pkg.pkg_sarif
+layer_cmd.cmd_fo -> layer_pkg.pkg_state
+layer_cmd.cmd_fo -> layer_pkg.pkg_testjson
+layer_cmd.cmd_fo -> layer_pkg.pkg_theme
+layer_cmd.cmd_fo -> layer_pkg.pkg_view
+layer_cmd.cmd_fo -> layer_pkg.pkg_wrapper_wraparchlint
+layer_cmd.cmd_fo -> layer_pkg.pkg_wrapper_wrapdiag
+layer_cmd.cmd_fo -> layer_pkg.pkg_wrapper_wrapjscpd
+layer_pkg.pkg_paint_test -> layer_pkg.pkg_paint
+layer_pkg.pkg_sarif -> layer_pkg.pkg_fingerprint
+layer_pkg.pkg_sarif -> layer_pkg.pkg_report
+layer_pkg.pkg_sarif -> layer_pkg.pkg_score
+layer_pkg.pkg_sarif_test -> layer_pkg.pkg_report
+layer_pkg.pkg_sarif_test -> layer_pkg.pkg_sarif
+layer_pkg.pkg_state -> layer_pkg.pkg_report
+layer_pkg.pkg_testjson -> layer_internal_lineread.internal_lineread
+layer_pkg.pkg_testjson -> layer_pkg.pkg_fingerprint
+layer_pkg.pkg_testjson -> layer_pkg.pkg_report
+layer_pkg.pkg_testjson -> layer_pkg.pkg_score
+layer_pkg.pkg_testjson_test -> layer_pkg.pkg_report
+layer_pkg.pkg_testjson_test -> layer_pkg.pkg_testjson
+layer_pkg.pkg_theme_test -> layer_pkg.pkg_theme
+layer_pkg.pkg_view -> layer_pkg.pkg_paint
+layer_pkg.pkg_view -> layer_pkg.pkg_report
+layer_pkg.pkg_view -> layer_pkg.pkg_theme
+layer_pkg.pkg_view_test -> layer_pkg.pkg_report
+layer_pkg.pkg_view_test -> layer_pkg.pkg_theme
+layer_pkg.pkg_view_test -> layer_pkg.pkg_view
+layer_pkg.pkg_wrapper_wraparchlint -> layer_internal_boundread.internal_boundread
+layer_pkg.pkg_wrapper_wraparchlint -> layer_pkg.pkg_sarif
+layer_pkg.pkg_wrapper_wrapdiag -> layer_internal_lineread.internal_lineread
+layer_pkg.pkg_wrapper_wrapdiag -> layer_pkg.pkg_sarif
+layer_pkg.pkg_wrapper_wrapjscpd -> layer_internal_boundread.internal_boundread
+layer_pkg.pkg_wrapper_wrapjscpd -> layer_pkg.pkg_sarif
+```
