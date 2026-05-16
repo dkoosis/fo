@@ -147,11 +147,35 @@ func writeWatchStatus(w io.Writer, isTTY bool, runN int, started time.Time, dur 
 
 // stdinTriggers emits one struct{} per newline received on r. The returned
 // channel is closed when r reaches EOF or ctx is canceled.
+//
+// Scanner buffer is explicitly bounded (1 MiB max line) so a hostile or
+// malformed input can't drive unbounded allocation via the default growth path.
+//
+// A blocked Read can't be interrupted by ctx alone. If r is an io.Closer
+// (e.g. *os.File for os.Stdin), we close it on ctx cancel to unblock the
+// scanner; for non-closable readers (strings.Reader in tests, pipes we don't
+// own) the reader goroutine remains parked until the next byte or EOF — by
+// then the process is usually exiting anyway.
 func stdinTriggers(ctx context.Context, r io.Reader) <-chan struct{} {
+	const maxLine = 1 << 20 // 1 MiB
 	ch := make(chan struct{})
+	done := make(chan struct{})
+
+	if c, ok := r.(io.Closer); ok {
+		go func() {
+			select {
+			case <-ctx.Done():
+				_ = c.Close()
+			case <-done:
+			}
+		}()
+	}
+
 	go func() {
 		defer close(ch)
+		defer close(done)
 		sc := bufio.NewScanner(r)
+		sc.Buffer(make([]byte, 0, 64*1024), maxLine)
 		for sc.Scan() {
 			select {
 			case ch <- struct{}{}:

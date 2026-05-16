@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"io"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -208,6 +209,65 @@ func TestRunWatch_RerunsOnStdinNewline(t *testing.T) {
 	}
 	if string(data) != "xxx" {
 		t.Fatalf("watch should have run 3 times, got %d run(s) (tally=%q)", len(data), data)
+	}
+}
+
+// blockingCloser blocks Read until Close, then returns EOF. Models os.Stdin's
+// behavior where closing the fd from another goroutine unblocks the read.
+type blockingCloser struct {
+	wake   chan struct{}
+	closed atomic.Bool
+}
+
+func newBlockingCloser() *blockingCloser { return &blockingCloser{wake: make(chan struct{})} }
+
+func (b *blockingCloser) Read(p []byte) (int, error) {
+	<-b.wake
+	return 0, io.EOF
+}
+
+func (b *blockingCloser) Close() error {
+	if b.closed.CompareAndSwap(false, true) {
+		close(b.wake)
+	}
+	return nil
+}
+
+func TestStdinTriggers_CancelClosesCloser(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	r := newBlockingCloser()
+	ch := stdinTriggers(ctx, r)
+
+	cancel()
+
+	select {
+	case _, ok := <-ch:
+		if ok {
+			t.Fatal("stdinTriggers: expected closed channel, got value")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("stdinTriggers: channel not closed after ctx cancel")
+	}
+	if !r.closed.Load() {
+		t.Fatal("stdinTriggers: reader was not closed on ctx cancel")
+	}
+}
+
+func TestStdinTriggers_BoundedBufferRejectsHugeLine(t *testing.T) {
+	// 2 MiB line with no newline → exceeds 1 MiB max; scanner should stop
+	// (returning false from Scan) without panicking or growing unboundedly.
+	big := strings.Repeat("x", 2<<20)
+	ctx := context.Background()
+	ch := stdinTriggers(ctx, strings.NewReader(big))
+
+	// Channel should close (no trigger emitted, no panic).
+	select {
+	case _, ok := <-ch:
+		if ok {
+			t.Fatal("stdinTriggers: unexpected trigger from oversize unterminated line")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("stdinTriggers: channel not closed after oversize input")
 	}
 }
 
