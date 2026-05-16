@@ -97,6 +97,16 @@ func runWatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// Keyboard control is offered only for the fs trigger source. The stdin
+	// source consumes newlines as triggers and is mutually exclusive with
+	// raw-mode keypress reads on the same descriptor.
+	var keyTriggers <-chan struct{}
+	restoreTTY := func() {}
+	if opts.source != "stdin" {
+		keyTriggers, restoreTTY = keyControl(ctx, stdin, stop)
+	}
+	defer restoreTTY()
+
 	var triggers <-chan struct{}
 	switch opts.source {
 	case "stdin":
@@ -108,6 +118,9 @@ func runWatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 2
 		}
 		triggers = debounce(ctx, raw, opts.debounce)
+	}
+	if keyTriggers != nil {
+		triggers = fanIn(ctx, triggers, keyTriggers)
 	}
 
 	isTTY := isTTYWriter(stdout)
