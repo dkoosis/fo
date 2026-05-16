@@ -228,7 +228,6 @@ func TestFormat_roundTrip(t *testing.T) {
 				t.Fatalf("got %d", len(got))
 			}
 			g := got[0]
-			g.Line = 0
 			if g.RuleID != want.RuleID {
 				t.Errorf("RuleID: got %q want %q (line=%q)", g.RuleID, want.RuleID, line)
 			}
