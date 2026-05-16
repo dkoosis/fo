@@ -1,0 +1,22 @@
+# fo:scene title="loto demo" actors=FrugalLapwing,OddPlover
+
+## 01 · whoami — every session has a handle
+
+> a fresh session lands in the repo.
+
+> first question: what am I called here?
+
+@FrugalLapwing $ loto whoami
+  handle: FrugalLapwing
+  uuid:   818772ce
+
+> that handle is what peers will see.
+
+## 02 · lock + status
+
+@OddPlover $ loto lock a.go --intent "rename Type"
+  ✓ locked count=1
+
+@OddPlover $ loto fail
+  boom
+  (exit 2)
