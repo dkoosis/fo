@@ -1,0 +1,14 @@
+[
+  {
+    "id": "F-badaff",
+    "signature": "pkg/a/a_test.go:10",
+    "signature_kind": "frame",
+    "top_user_frame": "pkg/a/a_test.go:10",
+    "norm_sig": "helper exploded: bad input",
+    "members": [
+      "pkg/a|TestA",
+      "pkg/b|TestB",
+      "pkg/c|TestC"
+    ]
+  }
+]

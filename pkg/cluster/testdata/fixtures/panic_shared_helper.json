@@ -1,0 +1,19 @@
+{
+  "inputs": [
+    {
+      "key": "pkg/foo|TestA",
+      "outcome": "panic",
+      "output": "panic: runtime error: index out of range [3] with length 2\n\ngoroutine 7 [running]:\ngithub.com/dkoosis/fo/pkg/foo.Compute(...)\n        /Users/x/proj/pkg/foo/compute.go:42 +0x5c\ngithub.com/dkoosis/fo/pkg/foo.TestA(0x1)\n        /Users/x/proj/pkg/foo/foo_test.go:10 +0x40\n"
+    },
+    {
+      "key": "pkg/foo|TestB",
+      "outcome": "panic",
+      "output": "panic: runtime error: index out of range [5] with length 4\n\ngoroutine 9 [running]:\ngithub.com/dkoosis/fo/pkg/foo.Compute(...)\n        /Users/x/proj/pkg/foo/compute.go:42 +0x5c\ngithub.com/dkoosis/fo/pkg/foo.TestB(0x1)\n        /Users/x/proj/pkg/foo/foo_test.go:20 +0x40\n"
+    },
+    {
+      "key": "pkg/foo|TestC",
+      "outcome": "panic",
+      "output": "panic: runtime error: index out of range [7] with length 6\n\ngoroutine 11 [running]:\ngithub.com/dkoosis/fo/pkg/foo.Compute(...)\n        /Users/x/proj/pkg/foo/compute.go:42 +0x5c\ngithub.com/dkoosis/fo/pkg/foo.TestC(0x1)\n        /Users/x/proj/pkg/foo/foo_test.go:30 +0x40\n"
+    }
+  ]
+}

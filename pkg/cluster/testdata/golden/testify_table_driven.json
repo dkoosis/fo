@@ -1,0 +1,14 @@
+[
+  {
+    "id": "F-07daa6",
+    "signature": "pkg/foo/foo_test.go:42",
+    "signature_kind": "frame",
+    "top_user_frame": "pkg/foo/foo_test.go:42",
+    "norm_sig": "Not equal: expected \u003cN\u003e got \u003cN\u003e",
+    "members": [
+      "pkg/foo|TestTable/case_1",
+      "pkg/foo|TestTable/case_2",
+      "pkg/foo|TestTable/case_3"
+    ]
+  }
+]

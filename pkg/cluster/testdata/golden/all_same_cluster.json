@@ -1,0 +1,16 @@
+[
+  {
+    "id": "F-fd38df",
+    "signature": "x_test.go:5",
+    "signature_kind": "frame",
+    "top_user_frame": "x_test.go:5",
+    "norm_sig": "x_test.go:\u003cN\u003e: oops",
+    "members": [
+      "pkg/x|T1",
+      "pkg/x|T2",
+      "pkg/x|T3",
+      "pkg/x|T4",
+      "pkg/x|T5"
+    ]
+  }
+]

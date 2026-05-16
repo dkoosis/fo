@@ -1,0 +1,14 @@
+[
+  {
+    "id": "F-359635",
+    "signature": "pkg/foo/compute.go:42",
+    "signature_kind": "frame",
+    "top_user_frame": "pkg/foo/compute.go:42",
+    "norm_sig": "runtime error: index out of range [\u003cN\u003e] with length \u003cN\u003e",
+    "members": [
+      "pkg/foo|TestA",
+      "pkg/foo|TestB",
+      "pkg/foo|TestC"
+    ]
+  }
+]

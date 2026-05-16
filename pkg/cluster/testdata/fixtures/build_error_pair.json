@@ -1,0 +1,6 @@
+{
+  "inputs": [
+    {"key": "pkg/a", "outcome": "build_error", "output": "./foo.go:42:6: undefined: Bar\n"},
+    {"key": "pkg/b", "outcome": "build_error", "output": "./quux.go:88:3: undefined: Bar\n"}
+  ]
+}

@@ -1,0 +1,12 @@
+[
+  {
+    "id": "F-9c0536",
+    "signature": "send on closed channel",
+    "signature_kind": "norm",
+    "norm_sig": "send on closed channel",
+    "members": [
+      "pkg/foo|TestA",
+      "pkg/foo|TestB"
+    ]
+  }
+]

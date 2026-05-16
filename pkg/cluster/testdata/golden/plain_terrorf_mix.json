@@ -1,0 +1,32 @@
+[
+  {
+    "id": "F-3b4a9b",
+    "signature": "foo_test.go:10",
+    "signature_kind": "frame",
+    "top_user_frame": "foo_test.go:10",
+    "norm_sig": "foo_test.go:\u003cN\u003e: got \u003cN\u003e, want \u003cN\u003e",
+    "members": [
+      "pkg/foo|TestX"
+    ]
+  },
+  {
+    "id": "F-92625f",
+    "signature": "foo_test.go:30",
+    "signature_kind": "frame",
+    "top_user_frame": "foo_test.go:30",
+    "norm_sig": "foo_test.go:\u003cN\u003e: timeout exceeded after \u003cDUR\u003e",
+    "members": [
+      "pkg/foo|TestZ"
+    ]
+  },
+  {
+    "id": "F-ee87f4",
+    "signature": "foo_test.go:20",
+    "signature_kind": "frame",
+    "top_user_frame": "foo_test.go:20",
+    "norm_sig": "foo_test.go:\u003cN\u003e: read failed: io/EOF",
+    "members": [
+      "pkg/foo|TestY"
+    ]
+  }
+]

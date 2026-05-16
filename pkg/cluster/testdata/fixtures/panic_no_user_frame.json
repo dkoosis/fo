@@ -1,0 +1,14 @@
+{
+  "inputs": [
+    {
+      "key": "pkg/foo|TestA",
+      "outcome": "panic",
+      "output": "panic: send on closed channel\n\ngoroutine 7 [running]:\nruntime.gopanic(0x100abc, 0x14000123180)\n        /usr/local/go/src/runtime/panic.go:838 +0x208\nruntime.closechan(0x100def)\n        /usr/local/go/src/runtime/chan.go:355 +0x100\n"
+    },
+    {
+      "key": "pkg/foo|TestB",
+      "outcome": "panic",
+      "output": "panic: send on closed channel\n\ngoroutine 9 [running]:\nruntime.gopanic(0x100abc, 0x14000123180)\n        /usr/local/go/src/runtime/panic.go:838 +0x208\n"
+    }
+  ]
+}
