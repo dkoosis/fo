@@ -32,6 +32,86 @@ var normRules = []struct {
 
 var wsRun = regexp.MustCompile(`[ \t]+`)
 
+var (
+	panicHeader        = regexp.MustCompile(`(?m)^panic:\s*(.*)$`)
+	goroutineHeader    = regexp.MustCompile(`(?m)^goroutine\s+\d+\s+\[`)
+	testifyErrorPrefix = regexp.MustCompile(`(?m)^\s*Error:\s*(.*)$`)
+	testifyTestLine    = regexp.MustCompile(`(?m)^\s*Test:\s`)
+)
+
+// extractAnchor picks the most identifying single line of failure
+// output. Order: panic message, testify Error:, first line with a
+// colon, first non-empty line. Returns "" if input is empty/blank.
+func extractAnchor(output string, maxLen int) string {
+	if maxLen > 0 && len(output) > maxLen*8 {
+		// Pathological input: hard cap before scanning. Multiplier
+		// keeps room for many lines so the picker still has choices.
+		output = output[:maxLen*8]
+	}
+
+	if m := panicHeader.FindStringSubmatchIndex(output); m != nil {
+		msgStart := m[2]
+		// Take everything between panic: and the next goroutine
+		// header (or end-of-string).
+		tail := output[msgStart:]
+		if g := goroutineHeader.FindStringIndex(tail); g != nil {
+			tail = tail[:g[0]]
+		}
+		anchor := firstNonEmptyLine(tail)
+		if anchor != "" {
+			return truncate(anchor, maxLen)
+		}
+	}
+
+	if m := testifyErrorPrefix.FindStringSubmatchIndex(output); m != nil {
+		// Take lines after Error: up to blank or Test: marker.
+		tail := output[m[2]:]
+		end := len(tail)
+		if t := testifyTestLine.FindStringIndex(tail); t != nil && t[0] < end {
+			end = t[0]
+		}
+		if blank := strings.Index(tail[:end], "\n\n"); blank >= 0 {
+			end = blank
+		}
+		anchor := strings.TrimSpace(tail[:end])
+		anchor = firstNonEmptyLine(anchor)
+		if anchor != "" {
+			return truncate(anchor, maxLen)
+		}
+	}
+
+	// First non-empty line containing a colon.
+	for _, line := range strings.Split(output, "\n") {
+		l := strings.TrimSpace(line)
+		if l == "" {
+			continue
+		}
+		if strings.Contains(l, ":") {
+			return truncate(l, maxLen)
+		}
+	}
+
+	// Fall back to first non-empty line.
+	return truncate(firstNonEmptyLine(output), maxLen)
+}
+
+func firstNonEmptyLine(s string) string {
+	for _, line := range strings.Split(s, "\n") {
+		l := strings.TrimSpace(line)
+		if l != "" {
+			return l
+		}
+	}
+	return ""
+}
+
+func truncate(s string, maxLen int) string {
+	if maxLen <= 0 || len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen]
+}
+
 // Normalize collapses dynamic content in assertion text so two
 // failures that differ only in line numbers, addresses, durations,
 // etc. share a signature. Idempotent: Normalize(Normalize(s)) ==
