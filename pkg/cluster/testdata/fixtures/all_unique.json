@@ -1,0 +1,9 @@
+{
+  "inputs": [
+    {"key": "pkg/a|TestA", "output": "    a_test.go:1: alpha failure\n"},
+    {"key": "pkg/b|TestB", "output": "    b_test.go:2: beta failure\n"},
+    {"key": "pkg/c|TestC", "output": "    c_test.go:3: gamma failure\n"},
+    {"key": "pkg/d|TestD", "output": "    d_test.go:4: delta failure\n"},
+    {"key": "pkg/e|TestE", "output": "    e_test.go:5: epsilon failure\n"}
+  ]
+}

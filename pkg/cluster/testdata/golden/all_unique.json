@@ -1,0 +1,52 @@
+[
+  {
+    "id": "F-5b8152",
+    "signature": "e_test.go:5",
+    "signature_kind": "frame",
+    "top_user_frame": "e_test.go:5",
+    "norm_sig": "e_test.go:\u003cN\u003e: epsilon failure",
+    "members": [
+      "pkg/e|TestE"
+    ]
+  },
+  {
+    "id": "F-a23f65",
+    "signature": "a_test.go:1",
+    "signature_kind": "frame",
+    "top_user_frame": "a_test.go:1",
+    "norm_sig": "a_test.go:\u003cN\u003e: alpha failure",
+    "members": [
+      "pkg/a|TestA"
+    ]
+  },
+  {
+    "id": "F-da45af",
+    "signature": "d_test.go:4",
+    "signature_kind": "frame",
+    "top_user_frame": "d_test.go:4",
+    "norm_sig": "d_test.go:\u003cN\u003e: delta failure",
+    "members": [
+      "pkg/d|TestD"
+    ]
+  },
+  {
+    "id": "F-daad09",
+    "signature": "c_test.go:3",
+    "signature_kind": "frame",
+    "top_user_frame": "c_test.go:3",
+    "norm_sig": "c_test.go:\u003cN\u003e: gamma failure",
+    "members": [
+      "pkg/c|TestC"
+    ]
+  },
+  {
+    "id": "F-dc2c4a",
+    "signature": "b_test.go:2",
+    "signature_kind": "frame",
+    "top_user_frame": "b_test.go:2",
+    "norm_sig": "b_test.go:\u003cN\u003e: beta failure",
+    "members": [
+      "pkg/b|TestB"
+    ]
+  }
+]

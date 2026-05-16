@@ -1,0 +1,11 @@
+{
+  "inputs": [
+    {
+      "key": "pkg/foo|TestA",
+      "package": "github.com/dkoosis/fo/pkg/foo",
+      "test": "TestA",
+      "outcome": "fail",
+      "output": "    foo_test.go:10: got 1, want 2\n"
+    }
+  ]
+}

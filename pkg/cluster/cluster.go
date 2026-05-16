@@ -1,5 +1,7 @@
 package cluster
 
+import "sort"
+
 // Input is the per-failure data the clusterer needs. Callers build a
 // slice of Input from their own failure shape. Key is opaque to the
 // clusterer — it is echoed back unchanged in Cluster.Members.
@@ -93,13 +95,215 @@ func Run(inputs []Input) []Cluster {
 
 // RunWith is the configurable form of Run.
 func RunWith(inputs []Input, cfg Config) []Cluster {
-	_ = cfg.withDefaults()
+	cfg = cfg.withDefaults()
 	out := []Cluster{}
-	_ = inputs
-	return out
+	if len(inputs) == 0 {
+		return out
+	}
+
+	// Dedupe by Key, last-write-wins, then sort to remove map-order
+	// dependence on the rest of the pipeline.
+	byKey := make(map[string]Input, len(inputs))
+	for _, in := range inputs {
+		byKey[in.Key] = in
+	}
+	keys := make([]string, 0, len(byKey))
+	for k := range byKey {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	recs := make([]record, len(keys))
+	for i, k := range keys {
+		in := byKey[k]
+		recs[i] = record{input: in, signals: extractWith(in, cfg)}
+	}
+
+	uf := newUnionFind(len(recs))
+	switch cfg.Mode {
+	case ModeOr:
+		unionBy(uf, recs, func(s Signals) string { return s.TopUserFrame })
+		unionBy(uf, recs, func(s Signals) string { return s.NormSig })
+	case ModeAnd:
+		// Cluster only when both signals match. Implemented by
+		// keying on the (frame, norm) tuple; empty signals never
+		// merge.
+		unionBy(uf, recs, func(s Signals) string {
+			if s.TopUserFrame == "" || s.NormSig == "" {
+				return ""
+			}
+			return s.TopUserFrame + "\x00" + s.NormSig
+		})
+	case ModeFrameOnly:
+		unionBy(uf, recs, func(s Signals) string { return s.TopUserFrame })
+	case ModeNormOnly:
+		unionBy(uf, recs, func(s Signals) string { return s.NormSig })
+	}
+
+	// Build groups: root → member indices.
+	groups := make(map[int][]int)
+	for i := range recs {
+		r := uf.find(i)
+		groups[r] = append(groups[r], i)
+	}
+
+	taken := make(map[ClusterID]struct{}, len(groups))
+	clusters := make([]Cluster, 0, len(groups))
+	for _, members := range groups {
+		c := buildCluster(members, recs, cfg, taken)
+		clusters = append(clusters, c)
+	}
+
+	// Stable final order: member count desc, ID asc.
+	sort.SliceStable(clusters, func(i, j int) bool {
+		if len(clusters[i].Members) != len(clusters[j].Members) {
+			return len(clusters[i].Members) > len(clusters[j].Members)
+		}
+		return clusters[i].ID < clusters[j].ID
+	})
+	return clusters
 }
 
-// Extract returns the signals for one Input.
+// Extract returns the signals for one Input using default Config.
 func Extract(in Input) Signals {
-	return Signals{}
+	return extractWith(in, Config{}.withDefaults())
+}
+
+func extractWith(in Input, cfg Config) Signals {
+	anchor := extractAnchor(in.Output, cfg.MaxAnchorLen)
+	return Signals{
+		TopUserFrame: extractTopUserFrame(in.Output, cfg.KeepAbsPaths),
+		NormSig:      Normalize(anchor),
+		AnchorLine:   anchor,
+	}
+}
+
+func unionBy(uf *unionFind, recs []record, key func(Signals) string) {
+	groups := make(map[string]int)
+	for i, r := range recs {
+		k := key(r.signals)
+		if k == "" {
+			continue
+		}
+		if first, ok := groups[k]; ok {
+			uf.union(first, i)
+		} else {
+			groups[k] = i
+		}
+	}
+}
+
+func unionByKey(uf *unionFind, recs []record, key func(Signals) string) {
+	unionBy(uf, recs, key)
+}
+
+func buildCluster(members []int, recs []record, cfg Config, taken map[ClusterID]struct{}) Cluster {
+	// Pick signature: most common non-empty TopUserFrame; ties go to
+	// lexicographically smallest. If no frames, fall back to most
+	// common NormSig. If both empty for all members → singleton.
+	frame, frameKind := mostCommon(members, recs, func(s Signals) string { return s.TopUserFrame })
+	norm, normKind := mostCommon(members, recs, func(s Signals) string { return s.NormSig })
+
+	var signature, kind string
+	switch {
+	case frame != "":
+		signature, kind = frame, "frame"
+	case norm != "":
+		signature, kind = norm, "norm"
+	default:
+		signature, kind = recs[members[0]].input.Key, "singleton"
+	}
+	_ = frameKind
+	_ = normKind
+
+	id := disambiguate(makeClusterID(signature, cfg.IDPrefix, cfg.IDHexLen), taken)
+
+	keys := make([]string, len(members))
+	for i, m := range members {
+		keys[i] = recs[m].input.Key
+	}
+	sort.Strings(keys)
+
+	return Cluster{
+		ID:            id,
+		Signature:     signature,
+		SignatureKind: kind,
+		TopUserFrame:  frame,
+		NormSig:       norm,
+		Members:       keys,
+	}
+}
+
+func mostCommon(members []int, recs []record, pick func(Signals) string) (string, int) {
+	counts := make(map[string]int)
+	for _, m := range members {
+		v := pick(recs[m].signals)
+		if v == "" {
+			continue
+		}
+		counts[v]++
+	}
+	if len(counts) == 0 {
+		return "", 0
+	}
+	type kv struct {
+		k string
+		n int
+	}
+	all := make([]kv, 0, len(counts))
+	for k, n := range counts {
+		all = append(all, kv{k, n})
+	}
+	sort.Slice(all, func(i, j int) bool {
+		if all[i].n != all[j].n {
+			return all[i].n > all[j].n
+		}
+		return all[i].k < all[j].k
+	})
+	return all[0].k, all[0].n
+}
+
+type record struct {
+	input   Input
+	signals Signals
+}
+
+type unionFind struct {
+	parent []int
+	rank   []int
+}
+
+func newUnionFind(n int) *unionFind {
+	p := make([]int, n)
+	r := make([]int, n)
+	for i := range p {
+		p[i] = i
+	}
+	return &unionFind{parent: p, rank: r}
+}
+
+func (u *unionFind) find(x int) int {
+	for u.parent[x] != x {
+		u.parent[x] = u.parent[u.parent[x]]
+		x = u.parent[x]
+	}
+	return x
+}
+
+func (u *unionFind) union(a, b int) {
+	ra, rb := u.find(a), u.find(b)
+	if ra == rb {
+		return
+	}
+	// Deterministic merge: smaller-index root wins ties. Keeps
+	// output independent of insertion order beyond the sorted keys.
+	if u.rank[ra] < u.rank[rb] {
+		ra, rb = rb, ra
+	} else if u.rank[ra] == u.rank[rb] && ra > rb {
+		ra, rb = rb, ra
+	}
+	u.parent[rb] = ra
+	if u.rank[ra] == u.rank[rb] {
+		u.rank[ra]++
+	}
 }

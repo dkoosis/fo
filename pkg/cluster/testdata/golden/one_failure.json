@@ -1,0 +1,12 @@
+[
+  {
+    "id": "F-3b4a9b",
+    "signature": "foo_test.go:10",
+    "signature_kind": "frame",
+    "top_user_frame": "foo_test.go:10",
+    "norm_sig": "foo_test.go:\u003cN\u003e: got \u003cN\u003e, want \u003cN\u003e",
+    "members": [
+      "pkg/foo|TestA"
+    ]
+  }
+]
