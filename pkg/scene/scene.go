@@ -145,6 +145,15 @@ func (p *parser) flushCmd() {
 	if p.curCmd == nil {
 		return
 	}
+	// The exit trailer is only a trailer if it's the FINAL indented
+	// line of the command block. Detect it here at flush time so an
+	// `(exit N)` appearing mid-output is treated as literal output.
+	if n := len(p.curCmd.Output); n > 0 {
+		if exit, ok, err := parseExitTrailer(p.curCmd.Output[n-1]); err == nil && ok {
+			p.curCmd.Exit = exit
+			p.curCmd.Output = p.curCmd.Output[:n-1]
+		}
+	}
 	p.curAct.Beats = append(p.curAct.Beats, Beat{Kind: BeatCommand, Command: *p.curCmd})
 	p.curCmd = nil
 }
