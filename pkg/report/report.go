@@ -91,6 +91,10 @@ type Report struct {
 	// sidecar state Save failure → diff classification will be stale on
 	// the next run). Empty in the happy path; never used for findings.
 	Notices []string `json:"notices,omitempty"`
+	// Suppressed counts findings removed by .fo/ignore active rules
+	// during this run. Zero when no suppressions matched or no .fo/ignore
+	// file was loaded.
+	Suppressed int `json:"suppressed,omitempty"`
 }
 
 // DiffItem mirrors the shape of state.Item without importing pkg/state
