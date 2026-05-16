@@ -12,7 +12,7 @@ import (
 func TestArchlint_Clean(t *testing.T) {
 	input := `{"Type":"models.Check","Payload":{"ArchHasWarnings":false,"ArchWarningsDeps":[],"ArchWarningsNotMatched":[],"ArchWarningsDeepScan":[],"OmittedCount":0,"Qualities":[{"ID":"component_imports","Used":true}]}}`
 	var buf bytes.Buffer
-	if err := newArchlint().Convert(strings.NewReader(input), &buf); err != nil {
+	if err := Convert(strings.NewReader(input), &buf); err != nil {
 		t.Fatal(err)
 	}
 
@@ -33,7 +33,7 @@ func TestArchlint_WithViolations(t *testing.T) {
 		{"ComponentName":"search","FileRelativePath":"pkg/search/search.go","ResolvedImportName":"embedder"}
 	],"ArchWarningsNotMatched":[],"ArchWarningsDeepScan":[],"OmittedCount":0,"Qualities":[]}}`
 	var buf bytes.Buffer
-	if err := newArchlint().Convert(strings.NewReader(input), &buf); err != nil {
+	if err := Convert(strings.NewReader(input), &buf); err != nil {
 		t.Fatal(err)
 	}
 
@@ -65,7 +65,7 @@ func TestArchlint_FixCommand(t *testing.T) {
 		{"ComponentName":"search","FileRelativePath":"pkg/search/search.go","ResolvedImportName":"embedder"}
 	],"ArchWarningsNotMatched":[],"ArchWarningsDeepScan":[],"OmittedCount":0,"Qualities":[]}}`
 	var buf bytes.Buffer
-	if err := newArchlint().Convert(strings.NewReader(input), &buf); err != nil {
+	if err := Convert(strings.NewReader(input), &buf); err != nil {
 		t.Fatal(err)
 	}
 	var doc sarif.Document
@@ -81,7 +81,7 @@ func TestArchlint_FixCommand(t *testing.T) {
 
 func TestArchlint_InvalidJSON(t *testing.T) {
 	var buf bytes.Buffer
-	err := newArchlint().Convert(strings.NewReader("bad"), &buf)
+	err := Convert(strings.NewReader("bad"), &buf)
 	if err == nil {
 		t.Error("expected error for invalid JSON")
 	}
@@ -89,7 +89,7 @@ func TestArchlint_InvalidJSON(t *testing.T) {
 
 func TestArchlint_EmptyInput(t *testing.T) {
 	var buf bytes.Buffer
-	err := newArchlint().Convert(strings.NewReader(""), &buf)
+	err := Convert(strings.NewReader(""), &buf)
 	if err == nil {
 		t.Error("expected error for empty input")
 	}
@@ -100,7 +100,7 @@ func TestArchlint_FullImportPath(t *testing.T) {
 		{"ComponentName":"agentSupervisor","FileRelativePath":"/internal/agent/supervisor/supervisor.go","ResolvedImportName":"github.com/example/project/internal/agent/shell"}
 	],"Qualities":[{"ID":"component_imports","Used":true}]}}`
 	var buf bytes.Buffer
-	if err := newArchlint().Convert(strings.NewReader(input), &buf); err != nil {
+	if err := Convert(strings.NewReader(input), &buf); err != nil {
 		t.Fatal(err)
 	}
 

@@ -313,26 +313,6 @@ func TestPanicOutput_Bounded(t *testing.T) {
 	}
 }
 
-func TestComputeStats(t *testing.T) {
-	t.Parallel()
-
-	results := []TestPackageResult{
-		{Name: "a", Passed: 5, Failed: 1, Skipped: 0},
-		{Name: "b", Passed: 3, Failed: 0, Skipped: 2},
-	}
-	s := ComputeStats(results)
-
-	if s.TotalTests != 11 {
-		t.Fatalf("total tests = %d, want 11", s.TotalTests)
-	}
-	if s.Failed != 1 {
-		t.Fatalf("failed tests = %d, want 1", s.Failed)
-	}
-	if s.FailedPkgs != 1 {
-		t.Fatalf("failed packages = %d, want 1", s.FailedPkgs)
-	}
-}
-
 func FuzzParseStream(f *testing.F) {
 	f.Add(`{"Action":"run","Package":"x","Test":"T"}` + "\n" + `{"Action":"pass","Package":"x","Test":"T","Elapsed":0.1}` + "\n")
 	f.Add(`not-json` + "\n" + `{"Action":"output","Package":"x","Output":"coverage: 80.0% of statements\n"}` + "\n")
@@ -346,6 +326,6 @@ func FuzzParseStream(f *testing.F) {
 		if malformed < 0 {
 			t.Fatalf("malformed should never be negative: %d", malformed)
 		}
-		_ = ComputeStats(results)
+		_ = results
 	})
 }

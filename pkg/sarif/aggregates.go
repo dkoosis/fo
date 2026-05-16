@@ -5,38 +5,6 @@ import (
 	"slices"
 )
 
-// Stats aggregates statistics from SARIF results.
-type Stats struct {
-	TotalIssues int
-	ByLevel     map[string]int // error, warning, note, none
-	ByRule      map[string]int
-	ByFile      map[string]int
-}
-
-// ComputeStats calculates aggregate statistics from a SARIF document.
-func ComputeStats(doc *Document) Stats {
-	stats := Stats{
-		ByLevel: make(map[string]int),
-		ByRule:  make(map[string]int),
-		ByFile:  make(map[string]int),
-	}
-
-	for _, run := range doc.Runs {
-		for _, result := range run.Results {
-			stats.TotalIssues++
-			stats.ByLevel[result.Level]++
-			stats.ByRule[result.RuleID]++
-
-			if len(result.Locations) > 0 {
-				file := result.Locations[0].PhysicalLocation.ArtifactLocation.URI
-				stats.ByFile[file]++
-			}
-		}
-	}
-
-	return stats
-}
-
 // FileIssue represents an issue in a specific file for leaderboard rendering.
 type FileIssue struct {
 	File       string

@@ -6,46 +6,6 @@ import (
 	"github.com/dkoosis/fo/pkg/sarif"
 )
 
-func TestComputeStats_ComputesLevelRuleAndFileTotals_When_DocumentHasMixedResults(t *testing.T) {
-	t.Parallel()
-
-	doc := &sarif.Document{
-		Version: "2.1.0",
-		Runs: []sarif.Run{{
-			Results: []sarif.Result{
-				result("rule-a", "error", "a.go", 10, 2),
-				result("rule-b", "warning", "a.go", 20, 4),
-				result("rule-a", "note", "b.go", 1, 1),
-				{RuleID: "rule-c", Level: "none"}, // no location should not contribute to file buckets.
-			},
-		}},
-	}
-
-	stats := sarif.ComputeStats(doc)
-
-	if stats.TotalIssues != 4 {
-		t.Fatalf("total issues invariant violated: got %d want %d", stats.TotalIssues, 4)
-	}
-
-	assertInt(t, stats.ByLevel["error"], 1, "error count")
-	assertInt(t, stats.ByLevel["warning"], 1, "warning count")
-	assertInt(t, stats.ByLevel["note"], 1, "note count")
-	assertInt(t, stats.ByLevel["none"], 1, "none count")
-	assertInt(t, stats.ByRule["rule-a"], 2, "rule-a count")
-	assertInt(t, stats.ByRule["rule-b"], 1, "rule-b count")
-	assertInt(t, stats.ByRule["rule-c"], 1, "rule-c count")
-	assertInt(t, stats.ByFile["a.go"], 2, "a.go count")
-	assertInt(t, stats.ByFile["b.go"], 1, "b.go count")
-
-	levelsTotal := 0
-	for _, count := range stats.ByLevel {
-		levelsTotal += count
-	}
-	if levelsTotal != stats.TotalIssues {
-		t.Fatalf("invariant violated: total by levels (%d) != total issues (%d)", levelsTotal, stats.TotalIssues)
-	}
-}
-
 func TestTopFiles_ReturnsSortedLimitedCounts_When_DocumentIncludesMissingLocations(t *testing.T) {
 	t.Parallel()
 
