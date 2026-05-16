@@ -1,0 +1,9 @@
+{
+  "inputs": [
+    {"key": "pkg/x|T1", "output": "    x_test.go:5: oops\n"},
+    {"key": "pkg/x|T2", "output": "    x_test.go:5: oops\n"},
+    {"key": "pkg/x|T3", "output": "    x_test.go:5: oops\n"},
+    {"key": "pkg/x|T4", "output": "    x_test.go:5: oops\n"},
+    {"key": "pkg/x|T5", "output": "    x_test.go:5: oops\n"}
+  ]
+}

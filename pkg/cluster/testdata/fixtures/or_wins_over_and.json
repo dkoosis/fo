@@ -1,0 +1,7 @@
+{
+  "inputs": [
+    {"key": "pkg/a|TestA", "output": "    a_test.go:10:\n        Error Trace:    /Users/x/proj/pkg/a/a_test.go:10\n        Error:          helper exploded: bad input\n        Test:           TestA\n"},
+    {"key": "pkg/b|TestB", "output": "    b_test.go:20:\n        Error Trace:    /Users/x/proj/pkg/b/b_test.go:20\n        Error:          helper exploded: bad input\n        Test:           TestB\n"},
+    {"key": "pkg/c|TestC", "output": "    c_test.go:30:\n        Error Trace:    /Users/x/proj/pkg/c/c_test.go:30\n        Error:          helper exploded: bad input\n        Test:           TestC\n"}
+  ]
+}

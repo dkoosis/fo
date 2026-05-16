@@ -1,0 +1,20 @@
+[
+  {
+    "id": "F-2b3825",
+    "signature": "./foo.go:\u003cL:C\u003e: undefined: Bar",
+    "signature_kind": "norm",
+    "norm_sig": "./foo.go:\u003cL:C\u003e: undefined: Bar",
+    "members": [
+      "pkg/a"
+    ]
+  },
+  {
+    "id": "F-c746ca",
+    "signature": "./quux.go:\u003cL:C\u003e: undefined: Bar",
+    "signature_kind": "norm",
+    "norm_sig": "./quux.go:\u003cL:C\u003e: undefined: Bar",
+    "members": [
+      "pkg/b"
+    ]
+  }
+]

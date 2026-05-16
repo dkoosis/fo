@@ -1,0 +1,7 @@
+{
+  "inputs": [
+    {"key": "pkg/foo|TestTable/case_1", "output": "    foo_test.go:42:\n        Error Trace:    /Users/x/proj/pkg/foo/foo_test.go:42\n        Error:          Not equal: expected 1 got 2\n        Test:           TestTable\n"},
+    {"key": "pkg/foo|TestTable/case_2", "output": "    foo_test.go:42:\n        Error Trace:    /Users/x/proj/pkg/foo/foo_test.go:42\n        Error:          Not equal: expected 5 got 7\n        Test:           TestTable\n"},
+    {"key": "pkg/foo|TestTable/case_3", "output": "    foo_test.go:42:\n        Error Trace:    /Users/x/proj/pkg/foo/foo_test.go:42\n        Error:          Not equal: expected 9 got 11\n        Test:           TestTable\n"}
+  ]
+}
