@@ -64,8 +64,10 @@ func parseWatchArgsWithOpts(args []string) ([]string, watchOpts, error) {
 // watchLoop invokes runOnce immediately, then re-invokes on each value
 // received from triggers. Returns when ctx is canceled or triggers closes.
 // Single-flight: runOnce is called synchronously, so a slow run blocks
-// further trigger handling until it returns.
-func watchLoop(ctx context.Context, runOnce func(), triggers <-chan struct{}) {
+// further trigger handling until it returns. between is invoked before
+// every rerun (not the initial run) so the caller can repaint a status
+// line / clear the screen.
+func watchLoop(ctx context.Context, runOnce func(), between func(), triggers <-chan struct{}) {
 	runOnce()
 	for {
 		select {
@@ -74,6 +76,9 @@ func watchLoop(ctx context.Context, runOnce func(), triggers <-chan struct{}) {
 		case _, ok := <-triggers:
 			if !ok {
 				return
+			}
+			if between != nil {
+				between()
 			}
 			runOnce()
 		}
@@ -105,11 +110,39 @@ func runWatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		triggers = debounce(ctx, raw, opts.debounce)
 	}
 
+	isTTY := isTTYWriter(stdout)
 	var lastCode int
-	watchLoop(ctx, func() {
+	var runN int
+	runOnce := func() {
+		runN++
+		started := time.Now()
 		lastCode = runChildAndRender(ctx, cmd, stdout, stderr)
-	}, triggers)
+		writeWatchStatus(stdout, isTTY, runN, started, time.Since(started), lastCode)
+	}
+	between := func() {
+		if isTTY {
+			// Cursor home + clear screen. Plain ANSI so we don't pull in a
+			// full TUI dep — A.4 minimum. Falls back to a blank line on
+			// non-TTY (handled by the !isTTY branch in writeWatchStatus).
+			fmt.Fprint(stdout, "\x1b[H\x1b[2J")
+		}
+	}
+	watchLoop(ctx, runOnce, between, triggers)
 	return lastCode
+}
+
+// writeWatchStatus prints a one-line trailer after each rerun showing
+// run-number, completion time, duration, exit code. Trailer-not-header
+// keeps it out of the way for piped/non-TTY consumers and avoids hiding
+// the render output behind a status bar.
+func writeWatchStatus(w io.Writer, isTTY bool, runN int, started time.Time, dur time.Duration, code int) {
+	if isTTY {
+		fmt.Fprintf(w, "\n— watch · run #%d · %s · %s · exit %d\n",
+			runN, started.Format("15:04:05"), dur.Round(time.Millisecond), code)
+		return
+	}
+	fmt.Fprintf(w, "# fo:watch run=%d at=%s dur=%s exit=%d\n",
+		runN, started.UTC().Format(time.RFC3339), dur.Round(time.Millisecond), code)
 }
 
 // stdinTriggers emits one struct{} per newline received on r. The returned

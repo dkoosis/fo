@@ -53,11 +53,14 @@ func TestWatchLoop_RunsInitiallyAndPerTrigger(t *testing.T) {
 	triggers <- struct{}{}
 	close(triggers)
 
-	var calls int
-	watchLoop(context.Background(), func() { calls++ }, triggers)
+	var calls, betweens int
+	watchLoop(context.Background(), func() { calls++ }, func() { betweens++ }, triggers)
 
 	if calls != 3 {
 		t.Fatalf("watchLoop: want 3 calls (initial + 2 triggers), got %d", calls)
+	}
+	if betweens != 2 {
+		t.Fatalf("watchLoop: want 2 between-hook calls (skip initial), got %d", betweens)
 	}
 }
 
@@ -68,7 +71,7 @@ func TestWatchLoop_ExitsOnCtxCancel(t *testing.T) {
 	var calls atomic.Int64
 	done := make(chan struct{})
 	go func() {
-		watchLoop(ctx, func() { calls.Add(1) }, triggers)
+		watchLoop(ctx, func() { calls.Add(1) }, nil, triggers)
 		close(done)
 	}()
 
@@ -91,6 +94,34 @@ func TestWatchLoop_ExitsOnCtxCancel(t *testing.T) {
 	}
 	if got := calls.Load(); got != 1 {
 		t.Fatalf("watchLoop: want exactly 1 call after cancel, got %d", got)
+	}
+}
+
+func TestWriteWatchStatus_NonTTYEmitsHygieneLine(t *testing.T) {
+	var buf bytes.Buffer
+	started := time.Date(2026, 5, 16, 19, 30, 0, 0, time.UTC)
+	writeWatchStatus(&buf, false, 3, started, 250*time.Millisecond, 1)
+	got := buf.String()
+	if !strings.HasPrefix(got, "# fo:watch ") {
+		t.Fatalf("want # fo:watch header on non-TTY, got %q", got)
+	}
+	for _, want := range []string{"run=3", "exit=1", "dur=250ms"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("status %q missing %q", got, want)
+		}
+	}
+}
+
+func TestWriteWatchStatus_TTYHumanFormat(t *testing.T) {
+	var buf bytes.Buffer
+	started := time.Date(2026, 5, 16, 19, 30, 0, 0, time.UTC)
+	writeWatchStatus(&buf, true, 2, started, time.Second, 0)
+	got := buf.String()
+	if !strings.Contains(got, "watch · run #2") {
+		t.Fatalf("want human trailer with run number, got %q", got)
+	}
+	if !strings.Contains(got, "exit 0") {
+		t.Fatalf("want exit code, got %q", got)
 	}
 }
 
