@@ -1,0 +1,9 @@
+# Mixed input that doesn't match a known format is a usage error.
+env FO_STATE_DIR=$WORK/state
+
+stdin bogus.in
+! fo
+
+-- bogus.in --
+10 alpha
+something else

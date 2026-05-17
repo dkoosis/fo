@@ -1,0 +1,11 @@
+# --as tally forces interpretation as a leaderboard even without a header.
+env FO_STATE_DIR=$WORK/state
+
+stdin minimal.in
+fo --as tally --format llm
+stdout '\ba\b'
+stdout '10'
+
+-- minimal.in --
+  10 a
+   3 b

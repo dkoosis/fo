@@ -1,0 +1,28 @@
+# wrap leaderboard → fo, end-to-end. Mirrors `make audit` usage:
+# `sort | uniq -c` style input flows through one pipe and renders as a Leaderboard.
+env FO_STATE_DIR=$WORK/state
+
+# Step 1: wrap leaderboard emits a fo:tally header.
+stdin tally.in
+fo wrap leaderboard --tool dk-types
+cp stdout wrapped.out
+grep '^# fo:tally tool=dk-types' wrapped.out
+
+# Step 2: pipe wrap output through `fo --format llm`.
+stdin wrapped.out
+fo --format llm --no-state
+stdout 'log\.friction'
+stdout '14332'
+stdout 'journal\.day'
+stdout '2578'
+
+# Step 3: JSON format exposes tool + values.
+stdin wrapped.out
+fo --format json --no-state
+stdout '"tool": "dk-types"'
+stdout '"value": 14332'
+
+-- tally.in --
+  14332 log.friction
+   2578 journal.day
+    701 log.session

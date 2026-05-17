@@ -1,0 +1,11 @@
+# Bare `count label` lines (no fo:tally header) auto-detect as a leaderboard.
+env FO_STATE_DIR=$WORK/state
+
+stdin bare.in
+fo --format llm
+stdout 'alpha'
+
+-- bare.in --
+  10 alpha
+   3 beta
+   1 gamma
