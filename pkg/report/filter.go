@@ -40,6 +40,10 @@ func ApplyFilter(r *Report, rs *suppress.Ruleset, now time.Time) FilterStats {
 			r.Notices = append(r.Notices, expiredNotice(rs.Rules[expiredIdx]))
 		}
 	}
+	// Zero the dropped tail so suppressed Finding structs (and their
+	// strings) don't stay pinned in the backing array. Matters under
+	// 'fo watch' reruns that reuse the same Report (fo-zp0).
+	clear(r.Findings[len(kept):])
 	r.Findings = kept
 	r.Suppressed += stats.Total
 	return stats

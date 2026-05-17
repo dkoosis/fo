@@ -18,6 +18,36 @@ func mustDate(s string) *time.Time {
 	return &t
 }
 
+// TestApplyFilter_ClearsSuppressedTail verifies that dropped Findings
+// don't stay pinned in the slice's backing array after filtering.
+// Regression for fo-zp0: ApplyFilter previously left suppressed structs
+// in r.Findings[len(kept):cap], retaining their strings.
+func TestApplyFilter_ClearsSuppressedTail(t *testing.T) {
+	r := &Report{
+		Findings: []Finding{
+			{RuleID: ruleSA1019, File: "pkg/a.go", Message: "drop me"},
+			{RuleID: "KEEP", File: "pkg/b.go", Message: "keep"},
+		},
+	}
+	rs := suppress.NewRuleset([]suppress.Suppression{
+		{RuleID: ruleSA1019, Glob: "**", Line: 1},
+	})
+	ApplyFilter(r, rs, time.Now())
+	if len(r.Findings) != 1 {
+		t.Fatalf("len(Findings) = %d, want 1", len(r.Findings))
+	}
+	// Inspect the tail via slice reslice up to original cap. The
+	// suppressed entry must be zero-valued — not still holding its
+	// Message string.
+	tail := r.Findings[:cap(r.Findings)][1:]
+	if len(tail) == 0 {
+		t.Skip("no tail capacity to verify")
+	}
+	if tail[0].RuleID != "" || tail[0].Message != "" {
+		t.Errorf("suppressed tail not cleared: %+v", tail[0])
+	}
+}
+
 func TestApplyFilter_ActiveRuleSuppresses(t *testing.T) {
 	r := &Report{
 		Findings: []Finding{
