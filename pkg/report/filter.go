@@ -28,28 +28,41 @@ func ApplyFilter(r *Report, rs *suppress.Ruleset, now time.Time) FilterStats {
 	expiredNotified := map[int]bool{}
 	kept := r.Findings[:0]
 	for _, f := range r.Findings {
-		idx := rs.Match(f.RuleID, f.File)
-		if idx < 0 {
-			kept = append(kept, f)
-			continue
-		}
-		rule := rs.Rules[idx]
-		if rule.Expired(now) {
-			kept = append(kept, f)
-			if !expiredNotified[idx] {
-				expiredNotified[idx] = true
-				until := ""
-				if rule.Until != nil {
-					until = rule.Until.Format("2006-01-02")
-				}
-				r.Notices = append(r.Notices, fmt.Sprintf(
-					"suppression for %s (line %d) expired %s; finding shown",
-					rule.RuleID, rule.Line, until))
+		activeIdx, expiredIdx := -1, -1
+		for i := range rs.Rules {
+			if !rs.Rules[i].Matches(f.RuleID, f.File) {
+				continue
 			}
+			if rs.Rules[i].Expired(now) {
+				if expiredIdx < 0 {
+					expiredIdx = i
+				}
+				continue
+			}
+			activeIdx = i
+			break
+		}
+		if activeIdx >= 0 {
+			stats.Total++
+			stats.PerRule[activeIdx]++
 			continue
 		}
-		stats.Total++
-		stats.PerRule[idx]++
+		if expiredIdx < 0 {
+			kept = append(kept, f)
+			continue
+		}
+		rule := rs.Rules[expiredIdx]
+		kept = append(kept, f)
+		if !expiredNotified[expiredIdx] {
+			expiredNotified[expiredIdx] = true
+			until := ""
+			if rule.Until != nil {
+				until = rule.Until.Format("2006-01-02")
+			}
+			r.Notices = append(r.Notices, fmt.Sprintf(
+				"suppression for %s (line %d) expired %s; finding shown",
+				rule.RuleID, rule.Line, until))
+		}
 	}
 	r.Findings = kept
 	r.Suppressed += stats.Total

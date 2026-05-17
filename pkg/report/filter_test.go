@@ -81,6 +81,30 @@ func TestApplyFilter_ExpiredRuleKeepsAndNotices(t *testing.T) {
 	}
 }
 
+func TestApplyFilter_ActiveRuleBeatsEarlierExpired(t *testing.T) {
+	r := &Report{
+		Findings: []Finding{
+			{RuleID: "SA1019", File: "pkg/a.go", Severity: SeverityWarning},
+		},
+	}
+	rs := suppress.NewRuleset([]suppress.Suppression{
+		{RuleID: "SA1019", Glob: "**", Until: mustDate("2025-01-01"), Line: 3},
+		{RuleID: "SA1019", Glob: "**", Line: 7},
+	})
+	now := time.Date(2026, 5, 16, 0, 0, 0, 0, time.UTC)
+	stats := ApplyFilter(r, rs, now)
+
+	if len(r.Findings) != 0 {
+		t.Errorf("active rule should suppress despite earlier expired: %+v", r.Findings)
+	}
+	if stats.Total != 1 || stats.PerRule[1] != 1 {
+		t.Errorf("expected active rule index 1 credited: stats=%+v", stats)
+	}
+	if len(r.Notices) != 0 {
+		t.Errorf("no notice when active rule wins: %v", r.Notices)
+	}
+}
+
 func TestApplyFilter_NoRulesetIsNoop(t *testing.T) {
 	r := &Report{
 		Findings: []Finding{{RuleID: "X", File: "a.go", Severity: SeverityWarning}},

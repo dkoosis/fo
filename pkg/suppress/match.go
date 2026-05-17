@@ -27,6 +27,11 @@ func (rs *Ruleset) Match(ruleID, path string) int {
 	return -1
 }
 
+// Matches reports whether s applies to (ruleID, path), ignoring expiry.
+func (s Suppression) Matches(ruleID, path string) bool {
+	return matchSuppression(s, ruleID, path)
+}
+
 func matchSuppression(s Suppression, ruleID, path string) bool {
 	if s.RuleID != ruleID {
 		return false
