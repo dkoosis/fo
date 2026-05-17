@@ -7,7 +7,12 @@ import (
 	"time"
 )
 
-const ruleSA1019 = "SA1019"
+const (
+	ruleSA1019     = "SA1019"
+	ruleG115       = "G115"
+	globLegacyStar = "internal/legacy/**"
+	globCmdStar    = "cmd/**"
+)
 
 func mustDate(t *testing.T, s string) time.Time {
 	t.Helper()
@@ -31,7 +36,7 @@ func TestParse_fullLine(t *testing.T) {
 	if s.RuleID != ruleSA1019 {
 		t.Errorf("RuleID = %q", s.RuleID)
 	}
-	if s.Glob != "internal/legacy/**" {
+	if s.Glob != globLegacyStar {
 		t.Errorf("Glob = %q", s.Glob)
 	}
 	if s.Until == nil || !s.Until.Equal(mustDate(t, "2026-12-31")) {
@@ -54,7 +59,7 @@ func TestParse_ruleIDOnly_defaults(t *testing.T) {
 		t.Fatalf("got %d", len(got))
 	}
 	s := got[0]
-	if s.RuleID != "G115" {
+	if s.RuleID != ruleG115 {
 		t.Errorf("RuleID = %q", s.RuleID)
 	}
 	if s.Glob != DefaultGlob {
@@ -84,7 +89,7 @@ G115 glob=cmd/**
 	if len(got) != 2 {
 		t.Fatalf("got %d, want 2", len(got))
 	}
-	if got[0].RuleID != ruleSA1019 || got[1].RuleID != "G115" || got[1].Glob != "cmd/**" {
+	if got[0].RuleID != ruleSA1019 || got[1].RuleID != ruleG115 || got[1].Glob != globCmdStar {
 		t.Errorf("rows = %+v", got)
 	}
 }
@@ -208,9 +213,9 @@ func TestFormat_roundTrip(t *testing.T) {
 	until := mustDate(t, "2026-12-31")
 	cases := []Suppression{
 		{RuleID: ruleSA1019},
-		{RuleID: "G115", Glob: "internal/legacy/**"},
+		{RuleID: ruleG115, Glob: globLegacyStar},
 		{RuleID: ruleSA1019, Glob: DefaultGlob, Until: &until, Reason: "upstream not migrated yet"},
-		{RuleID: "govet:shadow", Glob: "cmd/**", Until: &until},
+		{RuleID: "govet:shadow", Glob: globCmdStar, Until: &until},
 		{RuleID: "X", Reason: "plain"},
 		{RuleID: "X", Reason: `has "quotes" and spaces`},
 	}

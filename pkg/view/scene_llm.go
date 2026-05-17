@@ -100,7 +100,7 @@ func escapeQuoted(s string) string {
 	}
 	var b strings.Builder
 	b.Grow(len(s) + 2)
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		c := s[i]
 		if c == '"' || c == '\\' {
 			b.WriteByte('\\')

@@ -6,6 +6,11 @@ import (
 	"github.com/dkoosis/fo/pkg/report"
 )
 
+const (
+	pkgX        = "example.com/pkg/x"
+	xTestOutput = "    x_test.go:5: oops"
+)
+
 // assertSingleClusterOfTwo runs ToReport and verifies the resulting
 // report contains exactly one cluster with two members, both stamped
 // with its ClusterID. Shared helper for tests that expect two failing
@@ -24,8 +29,8 @@ func assertSingleClusterOfTwo(t *testing.T, results []TestPackageResult) {
 		t.Fatalf("len(Members) = %d, want 2", len(got.Members))
 	}
 	var stamped int
-	for _, tr := range r.Tests {
-		if tr.ClusterID == got.ID {
+	for i := range r.Tests {
+		if r.Tests[i].ClusterID == got.ID {
 			stamped++
 		}
 	}
@@ -40,11 +45,11 @@ func assertSingleClusterOfTwo(t *testing.T, results []TestPackageResult) {
 func TestAttachClusters_SharedFrameGroupsFailures(t *testing.T) {
 	t.Parallel()
 	assertSingleClusterOfTwo(t, []TestPackageResult{{
-		Name:   "example.com/pkg/x",
+		Name:   pkgX,
 		Failed: 2,
 		FailedTests: []FailedTest{
-			{Name: "TestA", Output: []string{"    x_test.go:5: oops"}},
-			{Name: "TestB", Output: []string{"    x_test.go:5: oops"}},
+			{Name: "TestA", Output: []string{xTestOutput}},
+			{Name: "TestB", Output: []string{xTestOutput}},
 		},
 	}})
 }
@@ -55,7 +60,7 @@ func TestAttachClusters_SharedFrameGroupsFailures(t *testing.T) {
 func TestAttachClusters_SingletonsHaveNoClusterID(t *testing.T) {
 	t.Parallel()
 	results := []TestPackageResult{{
-		Name:   "example.com/pkg/x",
+		Name:   pkgX,
 		Failed: 2,
 		FailedTests: []FailedTest{
 			{Name: "TestA", Output: []string{"    a_test.go:5: alpha distinct"}},
@@ -83,11 +88,11 @@ func TestAttachClusters_PassingTestsHaveNoClusterID(t *testing.T) {
 	t.Parallel()
 	results := []TestPackageResult{
 		{
-			Name:   "example.com/pkg/x",
+			Name:   pkgX,
 			Failed: 2,
 			FailedTests: []FailedTest{
-				{Name: "TestA", Output: []string{"    x_test.go:5: oops"}},
-				{Name: "TestB", Output: []string{"    x_test.go:5: oops"}},
+				{Name: "TestA", Output: []string{xTestOutput}},
+				{Name: "TestB", Output: []string{xTestOutput}},
 			},
 		},
 		{
@@ -118,7 +123,7 @@ func TestAttachClusters_PassingTestsHaveNoClusterID(t *testing.T) {
 func TestAttachClusters_RetriesWithSameFingerprintBothCount(t *testing.T) {
 	t.Parallel()
 	assertSingleClusterOfTwo(t, []TestPackageResult{{
-		Name:   "example.com/pkg/x",
+		Name:   pkgX,
 		Failed: 2,
 		FailedTests: []FailedTest{
 			{Name: "TestFlaky", Output: []string{"    x_test.go:5: boom"}},

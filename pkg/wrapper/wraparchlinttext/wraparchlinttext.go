@@ -51,35 +51,42 @@ func extractFile(line string) string {
 	return trimmed[:idx]
 }
 
+// handleLine advances the parser state by one input line. A header line
+// flushes any prior pending diagnostic and starts a new one; an indented
+// continuation line records the file path on the in-flight pending.
+func handleLine(line string, p *pending, b *sarif.Builder) *pending {
+	if next := parseHeader(line); next != nil {
+		emitPending(p, b)
+		return next
+	}
+	if p != nil {
+		if f := extractFile(line); f != "" {
+			p.file = f
+		}
+	}
+	return p
+}
+
+func emitPending(p *pending, b *sarif.Builder) {
+	if p == nil {
+		return
+	}
+	b.AddResult(ruleID, p.level, p.msg, p.file, 0, 0)
+}
+
 func Convert(r io.Reader, w io.Writer) error {
 	br := bufio.NewReaderSize(r, 64*1024)
 
 	b := sarif.NewBuilder("go-arch-lint", "")
 
 	var p *pending
-	flush := func() {
-		if p == nil {
-			return
-		}
-		b.AddResult(ruleID, p.level, p.msg, p.file, 0, 0)
-		p = nil
-	}
-
 	var dropped int
 	for {
 		raw, oversize, err := lineread.Read(br)
 		if oversize {
 			dropped++
 		} else {
-			line := string(raw)
-			if next := parseHeader(line); next != nil {
-				flush()
-				p = next
-			} else if p != nil {
-				if f := extractFile(line); f != "" {
-					p.file = f
-				}
-			}
+			p = handleLine(string(raw), p, b)
 		}
 		if err == nil {
 			continue
@@ -89,7 +96,7 @@ func Convert(r io.Reader, w io.Writer) error {
 		}
 		return fmt.Errorf("archlinttext: read: %w", err)
 	}
-	flush()
+	emitPending(p, b)
 	if dropped > 0 {
 		fmt.Fprintf(os.Stderr, "archlinttext: dropped %d line(s) exceeding %d bytes\n", dropped, lineread.MaxLineLen)
 	}

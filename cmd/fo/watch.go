@@ -17,6 +17,9 @@ import (
 
 var errWatchUsage = errors.New("usage: fo watch [flags] -- <command> [args...]")
 
+// sourceStdin is the watch-trigger source value selecting stdin newlines.
+const sourceStdin = "stdin"
+
 // watchOpts are flags accepted before `--` in `fo watch`.
 type watchOpts struct {
 	debounce time.Duration
@@ -55,7 +58,7 @@ func parseWatchArgsWithOpts(args []string) ([]string, watchOpts, error) {
 	if err := fs.Parse(flagArgs); err != nil {
 		return nil, watchOpts{}, fmt.Errorf("watch: %w", err)
 	}
-	if opts.source != "fs" && opts.source != "stdin" {
+	if opts.source != "fs" && opts.source != sourceStdin {
 		return nil, watchOpts{}, fmt.Errorf("%w: -source must be fs or stdin", errWatchUsage)
 	}
 	return cmd, opts, nil
@@ -102,14 +105,14 @@ func runWatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	// raw-mode keypress reads on the same descriptor.
 	var keyTriggers <-chan struct{}
 	restoreTTY := func() {}
-	if opts.source != "stdin" {
+	if opts.source != sourceStdin {
 		keyTriggers, restoreTTY = keyControl(ctx, stdin, stop)
 	}
 	defer restoreTTY()
 
 	var triggers <-chan struct{}
 	switch opts.source {
-	case "stdin":
+	case sourceStdin:
 		triggers = stdinTriggers(ctx, stdin)
 	default: // "fs"
 		raw, err := watchTree(ctx, ".")

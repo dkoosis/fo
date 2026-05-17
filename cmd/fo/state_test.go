@@ -14,6 +14,7 @@ const (
 	errcheckName = "errcheck"
 	fp1Name      = "fp1"
 	fp2Name      = "fp2"
+	aDotGo       = "a.go"
 )
 
 func TestStateReset_RemovesFile(t *testing.T) {
@@ -133,7 +134,7 @@ func TestWriteDiffDetail_RegressedItems(t *testing.T) {
 func TestWriteDiffDetail_BothNewAndRegressed(t *testing.T) {
 	r := &report.Report{
 		Findings: []report.Finding{
-			{Fingerprint: fp1Name, RuleID: errcheckName, File: "a.go", Line: 1, Message: "msg1"},
+			{Fingerprint: fp1Name, RuleID: errcheckName, File: aDotGo, Line: 1, Message: "msg1"},
 			{Fingerprint: fp2Name, RuleID: "gosec", File: "b.go", Line: 2, Message: "msg2"},
 		},
 		Diff: &report.DiffSummary{
@@ -190,7 +191,7 @@ func TestAttachDiff_SaveFailureRecordsNoticeAndReturnsErr(t *testing.T) {
 
 	r := &report.Report{
 		Findings: []report.Finding{
-			{Fingerprint: fp1Name, RuleID: errcheckName, File: "a.go", Line: 1, Severity: report.SeverityError, Message: "m"},
+			{Fingerprint: fp1Name, RuleID: errcheckName, File: aDotGo, Line: 1, Severity: report.SeverityError, Message: "m"},
 		},
 	}
 	var stderr bytes.Buffer

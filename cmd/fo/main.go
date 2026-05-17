@@ -1086,8 +1086,8 @@ func exitCodeReport(r *report.Report) int {
 			return 1
 		}
 	}
-	for _, t := range r.Tests {
-		switch t.Outcome {
+	for i := range r.Tests {
+		switch r.Tests[i].Outcome {
 		case report.OutcomeFail, report.OutcomePanic, report.OutcomeBuildError:
 			return 1
 		case report.OutcomePass, report.OutcomeSkip:

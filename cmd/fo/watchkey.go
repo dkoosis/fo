@@ -103,34 +103,59 @@ func fanIn(ctx context.Context, a, b <-chan struct{}) <-chan struct{} {
 		return a
 	}
 	out := make(chan struct{})
-	go func() {
-		defer close(out)
-		for a != nil || b != nil {
-			select {
-			case <-ctx.Done():
-				return
-			case _, ok := <-a:
-				if !ok {
-					a = nil
-					continue
-				}
-				select {
-				case out <- struct{}{}:
-				case <-ctx.Done():
-					return
-				}
-			case _, ok := <-b:
-				if !ok {
-					b = nil
-					continue
-				}
-				select {
-				case out <- struct{}{}:
-				case <-ctx.Done():
-					return
-				}
-			}
-		}
-	}()
+	go fanInLoop(ctx, a, b, out)
 	return out
+}
+
+// fanInStatus is the outcome of one select iteration in fanInLoop:
+// continue the loop, nil out a source (sender closed), or stop entirely.
+type fanInStatus int
+
+const (
+	fanInContinue fanInStatus = iota
+	fanInCloseA
+	fanInCloseB
+	fanInStop
+)
+
+func fanInLoop(ctx context.Context, a, b <-chan struct{}, out chan<- struct{}) {
+	defer close(out)
+	for a != nil || b != nil {
+		switch fanInStep(ctx, a, b, out) {
+		case fanInContinue:
+			// keep looping
+		case fanInCloseA:
+			a = nil
+		case fanInCloseB:
+			b = nil
+		case fanInStop:
+			return
+		}
+	}
+}
+
+func fanInStep(ctx context.Context, a, b <-chan struct{}, out chan<- struct{}) fanInStatus {
+	select {
+	case <-ctx.Done():
+		return fanInStop
+	case _, ok := <-a:
+		if !ok {
+			return fanInCloseA
+		}
+		return forwardOrStop(ctx, out)
+	case _, ok := <-b:
+		if !ok {
+			return fanInCloseB
+		}
+		return forwardOrStop(ctx, out)
+	}
+}
+
+func forwardOrStop(ctx context.Context, out chan<- struct{}) fanInStatus {
+	select {
+	case out <- struct{}{}:
+		return fanInContinue
+	case <-ctx.Done():
+		return fanInStop
+	}
 }

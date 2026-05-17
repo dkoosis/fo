@@ -89,7 +89,8 @@ func isClean(r report.Report) bool {
 	if len(r.Findings) > 0 {
 		return false
 	}
-	for _, t := range r.Tests {
+	for i := range r.Tests {
+		t := &r.Tests[i]
 		if t.Outcome != report.OutcomePass && t.Outcome != report.OutcomeSkip {
 			return false
 		}
@@ -98,11 +99,12 @@ func isClean(r report.Report) bool {
 }
 
 func pickHeadline(r report.Report) (Headline, bool) {
-	for _, t := range r.Tests {
+	for i := range r.Tests {
+		t := &r.Tests[i]
 		if t.Outcome == report.OutcomePanic {
 			return Headline{
 				Title:  "PANIC",
-				Detail: panicDetail(t),
+				Detail: panicDetail(*t),
 				Body:   panicBody(t.Output),
 			}, true
 		}
@@ -202,8 +204,8 @@ func buildErrorOnly(r report.Report) bool {
 		return false
 	}
 	sawBuild := false
-	for _, t := range r.Tests {
-		switch t.Outcome {
+	for i := range r.Tests {
+		switch r.Tests[i].Outcome {
 		case report.OutcomeBuildError:
 			sawBuild = true
 		case report.OutcomeFail, report.OutcomePanic:
@@ -394,8 +396,8 @@ func pickBullet(r report.Report) Bullet {
 	for _, f := range r.Findings {
 		items = append(items, findingItem(f))
 	}
-	for _, t := range r.Tests {
-		items = append(items, testItem(t))
+	for i := range r.Tests {
+		items = append(items, testItem(r.Tests[i]))
 	}
 	return Bullet{Items: items}
 }
@@ -480,8 +482,9 @@ func severityCounts(fs []report.Finding) (int, int, int) {
 
 func failCount(ts []report.TestResult) int {
 	var c int
-	for _, t := range ts {
-		if t.Outcome == report.OutcomeFail || t.Outcome == report.OutcomePanic || t.Outcome == report.OutcomeBuildError {
+	for i := range ts {
+		o := ts[i].Outcome
+		if o == report.OutcomeFail || o == report.OutcomePanic || o == report.OutcomeBuildError {
 			c++
 		}
 	}

@@ -28,10 +28,9 @@ const errorsLabel = "errors"
 // bolded forms used by Error/Fail. Substring match catches both.
 // #nosec G101 — these are ANSI SGR color-component substrings, not credentials.
 const (
-	escRed     = "38;5;196m"
-	escGreen   = "38;5;34m"
-	escOrange  = "38;5;214m"
-	escMagenta = "38;5;201m"
+	escRed    = "38;5;196m"
+	escGreen  = "38;5;34m"
+	escOrange = "38;5;214m"
 )
 
 func TestMain(m *testing.M) {

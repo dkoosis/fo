@@ -10,6 +10,8 @@ import (
 	"github.com/dkoosis/fo/pkg/view"
 )
 
+const frugalLapwing = "FrugalLapwing"
+
 var ansiRE = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
 func stripANSI(s string) string { return ansiRE.ReplaceAllString(s, "") }
@@ -17,7 +19,7 @@ func stripANSI(s string) string { return ansiRE.ReplaceAllString(s, "") }
 func TestRenderSceneHuman(t *testing.T) {
 	s := scene.Scene{
 		Title:  "Demo",
-		Actors: []string{"FrugalLapwing", "BraveOtter"},
+		Actors: []string{frugalLapwing, "BraveOtter"},
 		Acts: []scene.Act{
 			{
 				Number: "1",
@@ -25,8 +27,8 @@ func TestRenderSceneHuman(t *testing.T) {
 				Beats: []scene.Beat{
 					{Kind: scene.BeatNarration, Narration: "Two agents claim territory."},
 					{Kind: scene.BeatCommand, Command: scene.Command{
-						Actor: "FrugalLapwing", Cmd: "loto whoami",
-						Output: []string{"FrugalLapwing"},
+						Actor: frugalLapwing, Cmd: "loto whoami",
+						Output: []string{frugalLapwing},
 					}},
 				},
 			},
@@ -55,7 +57,7 @@ func TestRenderSceneHuman(t *testing.T) {
 		"1 · Setup",
 		"2 · Conflict",
 		"Two agents claim territory.",
-		"FrugalLapwing",
+		frugalLapwing,
 		"BraveOtter",
 		"❯ loto whoami",
 		"❯ loto acquire pkg/x",

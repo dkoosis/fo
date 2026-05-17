@@ -13,7 +13,7 @@ import (
 func TestApplySuppress_AbsentFileNoop(t *testing.T) {
 	r := &report.Report{
 		Findings: []report.Finding{
-			{RuleID: "X", File: "a.go", Severity: report.SeverityWarning},
+			{RuleID: "X", File: aDotGo, Severity: report.SeverityWarning},
 		},
 	}
 	var stderr bytes.Buffer
@@ -39,7 +39,7 @@ func TestApplySuppress_ParseErrorAddsNotice(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := &report.Report{
-		Findings: []report.Finding{{RuleID: "X", File: "a.go"}},
+		Findings: []report.Finding{{RuleID: "X", File: aDotGo}},
 	}
 	var stderr bytes.Buffer
 	applySuppress(r, path, &stderr)
@@ -60,7 +60,7 @@ func TestApplySuppress_ActiveRuleSuppresses(t *testing.T) {
 	}
 	r := &report.Report{
 		Findings: []report.Finding{
-			{RuleID: "SA1019", File: "a.go", Severity: report.SeverityWarning},
+			{RuleID: "SA1019", File: aDotGo, Severity: report.SeverityWarning},
 			{RuleID: "OTHER", File: "b.go", Severity: report.SeverityError},
 		},
 	}

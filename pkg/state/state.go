@@ -226,7 +226,8 @@ func RunFromReport(r *report.Report) Run {
 		findings[f.Fingerprint] = severityFromReport(f.Severity)
 	}
 	var tests map[string]string
-	for _, tr := range r.Tests {
+	for i := range r.Tests {
+		tr := &r.Tests[i]
 		switch tr.Outcome {
 		case report.OutcomeFail, report.OutcomePanic, report.OutcomeBuildError:
 			if tests == nil {

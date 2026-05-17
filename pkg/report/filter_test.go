@@ -8,6 +8,8 @@ import (
 	"github.com/dkoosis/fo/pkg/suppress"
 )
 
+const ruleSA1019 = "SA1019"
+
 func mustDate(s string) *time.Time {
 	t, err := time.Parse("2006-01-02", s)
 	if err != nil {
@@ -19,13 +21,13 @@ func mustDate(s string) *time.Time {
 func TestApplyFilter_ActiveRuleSuppresses(t *testing.T) {
 	r := &Report{
 		Findings: []Finding{
-			{RuleID: "SA1019", File: "pkg/a.go", Severity: SeverityWarning, Message: "deprecated"},
+			{RuleID: ruleSA1019, File: "pkg/a.go", Severity: SeverityWarning, Message: "deprecated"},
 			{RuleID: "G115", File: "internal/legacy/x.go", Severity: SeverityWarning, Message: "overflow"},
 			{RuleID: "KEEP", File: "pkg/b.go", Severity: SeverityError, Message: "keep me"},
 		},
 	}
 	rs := suppress.NewRuleset([]suppress.Suppression{
-		{RuleID: "SA1019", Glob: "**", Line: 1},
+		{RuleID: ruleSA1019, Glob: "**", Line: 1},
 		{RuleID: "G115", Glob: "internal/legacy/**", Line: 2},
 	})
 	now := time.Date(2026, 5, 16, 0, 0, 0, 0, time.UTC)
@@ -51,12 +53,12 @@ func TestApplyFilter_ActiveRuleSuppresses(t *testing.T) {
 func TestApplyFilter_ExpiredRuleKeepsAndNotices(t *testing.T) {
 	r := &Report{
 		Findings: []Finding{
-			{RuleID: "SA1019", File: "a.go", Severity: SeverityWarning},
-			{RuleID: "SA1019", File: "b.go", Severity: SeverityWarning},
+			{RuleID: ruleSA1019, File: "a.go", Severity: SeverityWarning},
+			{RuleID: ruleSA1019, File: "b.go", Severity: SeverityWarning},
 		},
 	}
 	rs := suppress.NewRuleset([]suppress.Suppression{
-		{RuleID: "SA1019", Glob: "**", Until: mustDate("2025-01-01"), Line: 7},
+		{RuleID: ruleSA1019, Glob: "**", Until: mustDate("2025-01-01"), Line: 7},
 	})
 	now := time.Date(2026, 5, 16, 0, 0, 0, 0, time.UTC)
 	stats := ApplyFilter(r, rs, now)
@@ -84,12 +86,12 @@ func TestApplyFilter_ExpiredRuleKeepsAndNotices(t *testing.T) {
 func TestApplyFilter_ActiveRuleBeatsEarlierExpired(t *testing.T) {
 	r := &Report{
 		Findings: []Finding{
-			{RuleID: "SA1019", File: "pkg/a.go", Severity: SeverityWarning},
+			{RuleID: ruleSA1019, File: "pkg/a.go", Severity: SeverityWarning},
 		},
 	}
 	rs := suppress.NewRuleset([]suppress.Suppression{
-		{RuleID: "SA1019", Glob: "**", Until: mustDate("2025-01-01"), Line: 3},
-		{RuleID: "SA1019", Glob: "**", Line: 7},
+		{RuleID: ruleSA1019, Glob: "**", Until: mustDate("2025-01-01"), Line: 3},
+		{RuleID: ruleSA1019, Glob: "**", Line: 7},
 	})
 	now := time.Date(2026, 5, 16, 0, 0, 0, 0, time.UTC)
 	stats := ApplyFilter(r, rs, now)

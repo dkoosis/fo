@@ -160,7 +160,7 @@ func TestWatchTree_IgnoresVendorDir(t *testing.T) {
 }
 
 func TestParseWatchArgs_FlagsBeforeSeparator(t *testing.T) {
-	cmd, opts, err := parseWatchArgsWithOpts([]string{"-debounce=200ms", "-source=stdin", "--", "go", testArg})
+	cmd, opts, err := parseWatchArgsWithOpts([]string{"-debounce=200ms", "-source=" + sourceStdin, "--", "go", testArg})
 	if err != nil {
 		t.Fatalf("parseWatchArgsWithOpts: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestParseWatchArgs_FlagsBeforeSeparator(t *testing.T) {
 	if opts.debounce != 200*time.Millisecond {
 		t.Errorf("debounce: got %v", opts.debounce)
 	}
-	if opts.source != "stdin" {
+	if opts.source != sourceStdin {
 		t.Errorf("source: got %q", opts.source)
 	}
 }

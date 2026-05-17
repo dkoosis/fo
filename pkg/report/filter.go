@@ -28,20 +28,7 @@ func ApplyFilter(r *Report, rs *suppress.Ruleset, now time.Time) FilterStats {
 	expiredNotified := map[int]bool{}
 	kept := r.Findings[:0]
 	for _, f := range r.Findings {
-		activeIdx, expiredIdx := -1, -1
-		for i := range rs.Rules {
-			if !rs.Rules[i].Matches(f.RuleID, f.File) {
-				continue
-			}
-			if rs.Rules[i].Expired(now) {
-				if expiredIdx < 0 {
-					expiredIdx = i
-				}
-				continue
-			}
-			activeIdx = i
-			break
-		}
+		activeIdx, expiredIdx := classifyFinding(rs, f.RuleID, f.File, now)
 		if activeIdx >= 0 {
 			stats.Total++
 			stats.PerRule[activeIdx]++
@@ -50,13 +37,37 @@ func ApplyFilter(r *Report, rs *suppress.Ruleset, now time.Time) FilterStats {
 		kept = append(kept, f)
 		if expiredIdx >= 0 && !expiredNotified[expiredIdx] {
 			expiredNotified[expiredIdx] = true
-			rule := rs.Rules[expiredIdx]
-			r.Notices = append(r.Notices, fmt.Sprintf(
-				"suppression for %s (line %d) expired %s; finding shown",
-				rule.RuleID, rule.Line, rule.Until.Format("2006-01-02")))
+			r.Notices = append(r.Notices, expiredNotice(rs.Rules[expiredIdx]))
 		}
 	}
 	r.Findings = kept
 	r.Suppressed += stats.Total
 	return stats
+}
+
+// classifyFinding scans rs once for (ruleID, file) and returns the first
+// active match index (or -1) and the first expired match index (or -1).
+// Active match short-circuits the scan.
+func classifyFinding(rs *suppress.Ruleset, ruleID, file string, now time.Time) (activeIdx, expiredIdx int) {
+	activeIdx, expiredIdx = -1, -1
+	for i := range rs.Rules {
+		if !rs.Rules[i].Matches(ruleID, file) {
+			continue
+		}
+		if rs.Rules[i].Expired(now) {
+			if expiredIdx < 0 {
+				expiredIdx = i
+			}
+			continue
+		}
+		activeIdx = i
+		return
+	}
+	return
+}
+
+func expiredNotice(rule suppress.Suppression) string {
+	return fmt.Sprintf(
+		"suppression for %s (line %d) expired %s; finding shown",
+		rule.RuleID, rule.Line, rule.Until.Format("2006-01-02"))
 }

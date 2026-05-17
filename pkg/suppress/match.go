@@ -55,33 +55,14 @@ func matchGlob(pattern, name string) bool {
 }
 
 func globHere(p, s string) bool {
-	for i := 0; i < len(p); i++ {
+	for i := range len(p) {
 		c := p[i]
 		switch c {
 		case '*':
 			if i+1 < len(p) && p[i+1] == '*' {
-				rest := p[i+2:]
-				rest = strings.TrimPrefix(rest, "/")
-				if rest == "" {
-					return true
-				}
-				for k := 0; k <= len(s); k++ {
-					if globHere(rest, s[k:]) {
-						return true
-					}
-				}
-				return false
+				return globDoubleStar(p[i+2:], s)
 			}
-			rest := p[i+1:]
-			for k := 0; k <= len(s); k++ {
-				if k > 0 && s[k-1] == '/' {
-					break
-				}
-				if globHere(rest, s[k:]) {
-					return true
-				}
-			}
-			return false
+			return globStar(p[i+1:], s)
 		case '?':
 			if len(s) == 0 || s[0] == '/' {
 				return false
@@ -95,4 +76,33 @@ func globHere(p, s string) bool {
 		}
 	}
 	return len(s) == 0
+}
+
+// globDoubleStar matches "**" followed by rest against s. "**" consumes
+// any sequence including path separators (and the empty string).
+func globDoubleStar(rest, s string) bool {
+	rest = strings.TrimPrefix(rest, "/")
+	if rest == "" {
+		return true
+	}
+	for k := 0; k <= len(s); k++ {
+		if globHere(rest, s[k:]) {
+			return true
+		}
+	}
+	return false
+}
+
+// globStar matches "*" followed by rest against s. "*" consumes any
+// sequence not crossing a "/" separator.
+func globStar(rest, s string) bool {
+	for k := 0; k <= len(s); k++ {
+		if k > 0 && s[k-1] == '/' {
+			return false
+		}
+		if globHere(rest, s[k:]) {
+			return true
+		}
+	}
+	return false
 }

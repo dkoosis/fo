@@ -53,7 +53,7 @@ func emitCoverRow(w io.Writer, line string) error {
 	}
 	v, err := strconv.ParseFloat(strings.TrimSuffix(pctTok, "%"), 64)
 	if err != nil {
-		return nil
+		return nil //nolint:nilerr // skip malformed lines (consistent with field-count/suffix guards above)
 	}
 	var key string
 	switch fields[0] {

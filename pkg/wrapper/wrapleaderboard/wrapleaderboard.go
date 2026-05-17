@@ -59,15 +59,11 @@ func Convert(r io.Reader, w io.Writer, opts Opts) error {
 		if oversize {
 			dropped++
 		} else {
-			line := strings.TrimSpace(string(raw))
-			if line != "" && !strings.HasPrefix(line, "#") {
-				countTok, label, perr := splitCountLabel(line)
-				if perr != nil {
-					return perr
-				}
-				if _, werr := fmt.Fprintf(bw, "%s %s\n", countTok, label); werr != nil {
-					return werr
-				}
+			wrote, perr := writeRow(bw, string(raw))
+			if perr != nil {
+				return perr
+			}
+			if wrote {
 				rows++
 			}
 		}
@@ -86,6 +82,23 @@ func Convert(r io.Reader, w io.Writer, opts Opts) error {
 		return ErrNoRows
 	}
 	return nil
+}
+
+// writeRow parses a single input line and emits one tally row. Returns
+// (false, nil) when the line is blank or a comment.
+func writeRow(w io.Writer, raw string) (bool, error) {
+	line := strings.TrimSpace(raw)
+	if line == "" || strings.HasPrefix(line, "#") {
+		return false, nil
+	}
+	countTok, label, err := splitCountLabel(line)
+	if err != nil {
+		return false, err
+	}
+	if _, err := fmt.Fprintf(w, "%s %s\n", countTok, label); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func writeHeader(w io.Writer, tool string) error {
