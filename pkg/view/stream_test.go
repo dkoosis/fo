@@ -168,6 +168,47 @@ func TestRenderStream_CleanReport(t *testing.T) {
 	}
 }
 
+// TestRenderStream_CleanHeartbeatsCoalesce — a multi-package green run
+// (every snapshot Clean) emits the "no findings" message exactly once,
+// not once per snapshot. fo-58k: per-package clean snapshots are
+// heartbeats, not changes.
+func TestRenderStream_CleanHeartbeatsCoalesce(t *testing.T) {
+	ch := make(chan report.Report, 9)
+	for range 9 {
+		ch <- report.Report{Tool: "test"}
+	}
+	close(ch)
+	var buf bytes.Buffer
+	if err := view.RenderStream(context.Background(), &buf, ch, theme.Mono(), 80); err != nil {
+		t.Fatalf("stream: %v", err)
+	}
+	out := buf.String()
+	if n := strings.Count(out, "no findings"); n != 1 {
+		t.Errorf("expected exactly 1 'no findings', got %d: %q", n, out)
+	}
+}
+
+// TestRenderStream_CleanHeartbeatsSuppressedAroundFailure — clean
+// snapshots before/after a failing one don't add stray "no findings"
+// lines; only the failure's own render appears. The final accumulated
+// snapshot drives the summary.
+func TestRenderStream_CleanHeartbeatsSuppressedAroundFailure(t *testing.T) {
+	ch := make(chan report.Report, 4)
+	ch <- report.Report{Tool: "test"}                  // clean pkg
+	ch <- sampleReport()                               // failing pkg snapshot
+	ch <- report.Report{Tool: "test"}                  // another clean pkg
+	ch <- sampleReport()                               // final accumulated
+	close(ch)
+	var buf bytes.Buffer
+	if err := view.RenderStream(context.Background(), &buf, ch, theme.Mono(), 80); err != nil {
+		t.Fatalf("stream: %v", err)
+	}
+	out := buf.String()
+	if strings.Contains(out, "no findings") {
+		t.Errorf("clean heartbeats around failures must not emit 'no findings': %q", out)
+	}
+}
+
 // TestRenderStream_ContextCancel — cancelling ctx returns ctx.Err()
 // without leaking the goroutine.
 func TestRenderStream_ContextCancel(t *testing.T) {

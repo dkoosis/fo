@@ -43,19 +43,37 @@ func RenderStream(ctx context.Context, w io.Writer, ch <-chan report.Report, t t
 }
 
 // RenderStreamMode is RenderStream with an explicit audience mode.
+//
+// Clean snapshots (no findings, no failures) are heartbeats, not changes:
+// a passing package in a passing run flattens the signal the reader is
+// scanning for (fo-58k). They are deferred and emitted at most once — at
+// end-of-stream, only if no non-clean snapshot ever rendered. Any
+// non-clean snapshot discards a pending Clean heartbeat.
 func RenderStreamMode(ctx context.Context, w io.Writer, ch <-chan report.Report, t theme.Theme, width int, mode Mode) error {
 	first := true
+	var pendingClean *report.Report
+	rendered := false
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case r, ok := <-ch:
 			if !ok {
+				if pendingClean != nil && !rendered {
+					return writeSnapshot(w, *pendingClean, t, width, &first, mode)
+				}
 				return nil
 			}
+			if _, isClean := PickViewMode(r, mode).(Clean); isClean {
+				snap := r
+				pendingClean = &snap
+				continue
+			}
+			pendingClean = nil
 			if err := writeSnapshot(w, r, t, width, &first, mode); err != nil {
 				return err
 			}
+			rendered = true
 		}
 	}
 }
