@@ -347,6 +347,34 @@ func renderMode(mode string, r *report.Report, stdout io.Writer, themeName strin
 	return nil
 }
 
+// renderHygiene dispatches the format switch shared by the hygiene
+// renderers (tally/status/metrics/scene). Each caller supplies the
+// JSON-encodable value plus closures for the LLM and human writers; the
+// helper handles encoding, error reporting, and the exit code. Returns 0
+// on success, 2 on writer error.
+func renderHygiene(stdout, stderr io.Writer, mode string, jsonValue any, llmFn, humanFn func(io.Writer) error) int {
+	switch mode {
+	case formatJSON:
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(jsonValue); err != nil {
+			fmt.Fprintf(stderr, "fo: %v\n", err)
+			return 2
+		}
+	case formatLLM:
+		if err := llmFn(stdout); err != nil {
+			fmt.Fprintf(stderr, "fo: %v\n", err)
+			return 2
+		}
+	default:
+		if err := humanFn(stdout); err != nil {
+			fmt.Fprintf(stderr, "fo: %v\n", err)
+			return 2
+		}
+	}
+	return 0
+}
+
 // renderTally parses tally-format input and emits the Leaderboard view.
 // Bypasses parseToReport/pickview because tallies aren't findings —
 // callers explicitly asked for a count-weighted bar chart, not a
@@ -358,40 +386,23 @@ func renderTally(input []byte, stdout io.Writer, stderr io.Writer, mode, themeNa
 		fmt.Fprintf(stderr, "fo: parsing tally: %v\n", err)
 		return 2
 	}
-
-	switch mode {
-	case formatJSON:
-		enc := json.NewEncoder(stdout)
-		enc.SetIndent("", "  ")
-		out := struct {
-			Tool  string      `json:"tool,omitempty"`
-			Total float64     `json:"total"`
-			Rows  []tally.Row `json:"rows"`
-		}{Tool: t.Tool, Rows: t.Rows}
-		for _, r := range t.Rows {
-			out.Total += r.Value
-		}
-		if err := enc.Encode(out); err != nil {
-			fmt.Fprintf(stderr, "fo: %v\n", err)
-			return 2
-		}
-		return 0
-	case formatLLM:
-		if err := t.RenderLLM(stdout); err != nil {
-			fmt.Fprintf(stderr, "fo: %v\n", err)
-			return 2
-		}
-		return 0
+	jsonOut := struct {
+		Tool  string      `json:"tool,omitempty"`
+		Total float64     `json:"total"`
+		Rows  []tally.Row `json:"rows"`
+	}{Tool: t.Tool, Rows: t.Rows}
+	for _, r := range t.Rows {
+		jsonOut.Total += r.Value
 	}
-	// formatHuman (or anything else resolved to human).
-	th := resolveTheme(themeName, stdout)
-	width := termSize(stdout)
-	out := view.Render(t.ToLeaderboard(), th, width)
-	if _, err := fmt.Fprintln(stdout, out); err != nil {
-		fmt.Fprintf(stderr, "fo: %v\n", err)
-		return 2
-	}
-	return 0
+	return renderHygiene(stdout, stderr, mode, jsonOut,
+		func(w io.Writer) error { return t.RenderLLM(w) },
+		func(w io.Writer) error {
+			th := resolveTheme(themeName, w)
+			width := termSize(w)
+			out := view.Render(t.ToLeaderboard(), th, width)
+			_, werr := fmt.Fprintln(w, out)
+			return werr
+		})
 }
 
 // renderScene parses # fo:scene input and dispatches to the human or
@@ -403,27 +414,9 @@ func renderScene(input []byte, stdout io.Writer, stderr io.Writer, mode string) 
 		fmt.Fprintf(stderr, "fo: parsing scene: %v\n", err)
 		return 2
 	}
-	switch mode {
-	case formatJSON:
-		enc := json.NewEncoder(stdout)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(s); err != nil {
-			fmt.Fprintf(stderr, "fo: %v\n", err)
-			return 2
-		}
-		return 0
-	case formatLLM:
-		if err := view.RenderSceneLLM(stdout, s); err != nil {
-			fmt.Fprintf(stderr, "fo: %v\n", err)
-			return 2
-		}
-		return 0
-	}
-	if err := view.RenderSceneHuman(stdout, s); err != nil {
-		fmt.Fprintf(stderr, "fo: %v\n", err)
-		return 2
-	}
-	return 0
+	return renderHygiene(stdout, stderr, mode, s,
+		func(w io.Writer) error { return view.RenderSceneLLM(w, s) },
+		func(w io.Writer) error { return view.RenderSceneHuman(w, s) })
 }
 
 // renderStatus parses status-format input and emits the PASS/FAIL table.
@@ -440,27 +433,9 @@ func renderStatus(input []byte, stdout io.Writer, stderr io.Writer, mode string)
 	for i, r := range s.Rows {
 		rows[i] = view.StatusRow{State: string(r.State), Label: r.Label, Value: r.Value, Note: r.Note}
 	}
-	switch mode {
-	case formatJSON:
-		enc := json.NewEncoder(stdout)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(s); err != nil {
-			fmt.Fprintf(stderr, "fo: %v\n", err)
-			return 2
-		}
-		return 0
-	case formatLLM:
-		if err := view.RenderStatusLLM(stdout, s.Tool, rows); err != nil {
-			fmt.Fprintf(stderr, "fo: %v\n", err)
-			return 2
-		}
-		return 0
-	}
-	if err := view.RenderStatusHuman(stdout, s.Tool, rows); err != nil {
-		fmt.Fprintf(stderr, "fo: %v\n", err)
-		return 2
-	}
-	return 0
+	return renderHygiene(stdout, stderr, mode, s,
+		func(w io.Writer) error { return view.RenderStatusLLM(w, s.Tool, rows) },
+		func(w io.Writer) error { return view.RenderStatusHuman(w, s.Tool, rows) })
 }
 
 // coerceAs converts headerless stdin into the requested format by either
@@ -554,27 +529,14 @@ func renderMetrics(input []byte, stdout io.Writer, stderr io.Writer, mode string
 		}
 	}
 
-	switch mode {
-	case formatJSON:
-		enc := json.NewEncoder(stdout)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(struct {
-			Tool   string              `json:"tool,omitempty"`
-			Deltas []state.MetricDelta `json:"deltas"`
-		}{Tool: m.Tool, Deltas: deltas}); err != nil {
-			fmt.Fprintf(stderr, "fo: %v\n", err)
-			return 2
-		}
-	case formatLLM:
-		if err := view.RenderMetricsLLM(stdout, m.Tool, rows); err != nil {
-			fmt.Fprintf(stderr, "fo: %v\n", err)
-			return 2
-		}
-	default:
-		if err := view.RenderMetricsHuman(stdout, m.Tool, rows); err != nil {
-			fmt.Fprintf(stderr, "fo: %v\n", err)
-			return 2
-		}
+	jsonOut := struct {
+		Tool   string              `json:"tool,omitempty"`
+		Deltas []state.MetricDelta `json:"deltas"`
+	}{Tool: m.Tool, Deltas: deltas}
+	if code := renderHygiene(stdout, stderr, mode, jsonOut,
+		func(w io.Writer) error { return view.RenderMetricsLLM(w, m.Tool, rows) },
+		func(w io.Writer) error { return view.RenderMetricsHuman(w, m.Tool, rows) }); code != 0 {
+		return code
 	}
 
 	if err := os.MkdirAll(state.Dir(), 0o755); err != nil {
