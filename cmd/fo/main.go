@@ -223,6 +223,13 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 
+	// Short-circuit when stdin is a terminal: Peek would block waiting for
+	// EOF (Ctrl-D) and the user sees a hang. fo only consumes piped input.
+	if f, ok := stdin.(*os.File); ok && term.IsTerminal(int(f.Fd())) {
+		fmt.Fprintf(stderr, "fo: no input on stdin (pipe data in or run 'fo --help')\n")
+		return 2
+	}
+
 	br := bufio.NewReaderSize(stdin, 8*1024)
 	peeked, peekErr := br.Peek(4096)
 	if len(peeked) == 0 {
