@@ -1,3 +1,7 @@
+> **Archived 2026-05-17.** Superseded by `.claude/rules/north-star.md`.
+> Kept for historical context only — some details (external YAML themes,
+> DensityMode references) drifted from the code.
+
 # Fo Vision
 
 Fo is a research-based presentation layer for the engineering lifecycle.
