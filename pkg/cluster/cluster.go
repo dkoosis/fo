@@ -102,9 +102,13 @@ func RunWith(inputs []Input, cfg Config) []Cluster {
 	}
 
 	// Dedupe by Key, last-write-wins, then sort to remove map-order
-	// dependence on the rest of the pipeline.
+	// dependence on the rest of the pipeline. Empty Key is invalid —
+	// it would collapse unrelated failures together (fo-yax).
 	byKey := make(map[string]Input, len(inputs))
 	for _, in := range inputs {
+		if in.Key == "" {
+			continue
+		}
 		byKey[in.Key] = in
 	}
 	keys := make([]string, 0, len(byKey))

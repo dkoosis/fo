@@ -132,6 +132,29 @@ func TestAttachClusters_RetriesWithSameFingerprintBothCount(t *testing.T) {
 	}})
 }
 
+// TestAttachClusters_CapsInputs verifies attachClusters does not feed
+// the clusterer more than maxClusterInputs failures, bounding alloc for
+// pathological runs with thousands of failures (fo-yax).
+func TestAttachClusters_CapsInputs(t *testing.T) {
+	t.Parallel()
+	n := maxClusterInputs + 100
+	failed := make([]FailedTest, n)
+	for i := range failed {
+		failed[i] = FailedTest{Name: "TestN", Output: []string{xTestOutput}}
+	}
+	results := []TestPackageResult{{Name: pkgX, Failed: n, FailedTests: failed}}
+	r := ToReport(results)
+	stamped := 0
+	for i := range r.Tests {
+		if r.Tests[i].ClusterID != "" {
+			stamped++
+		}
+	}
+	if stamped > maxClusterInputs {
+		t.Fatalf("stamped=%d, want ≤ maxClusterInputs=%d", stamped, maxClusterInputs)
+	}
+}
+
 // TestAttachClusters_EmptyTestsNoOp verifies attachClusters does not
 // allocate Clusters for a Report with no tests.
 func TestAttachClusters_EmptyTestsNoOp(t *testing.T) {

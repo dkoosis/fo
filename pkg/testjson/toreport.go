@@ -15,6 +15,13 @@ import (
 	"github.com/dkoosis/fo/pkg/score"
 )
 
+// maxClusterInputs caps how many failures attachClusters feeds into
+// cluster.RunWith. cluster.RunWith allocates ~7 maps/slices sized by
+// the input count; this bound keeps a pathological run (thousands of
+// failures) from spiking memory (fo-yax). Above the cap, the tail is
+// dropped — clusters still surface for the most common failures.
+const maxClusterInputs = 5000
+
 // ToReport projects parsed go test -json package results onto the canonical
 // Report shape. Each panic, build error, failed test, and passing package
 // becomes a TestResult; the Test field is "" for package-level results.
@@ -104,12 +111,19 @@ func attachClusters(r *report.Report) {
 	// (last-write-wins), so retries that share a Fingerprint would
 	// collapse to one input and get dropped as a singleton (fo-juf).
 	// Use the r.Tests index as the opaque key.
-	inputs := make([]cluster.Input, 0, len(r.Tests))
-	keyToTestIdx := make(map[string]int, len(r.Tests))
+	//
+	// Cap inputs at maxClusterInputs to bound the 7-map/slice alloc
+	// inside cluster.RunWith for pathological runs (fo-yax).
+	inCap := min(len(r.Tests), maxClusterInputs)
+	inputs := make([]cluster.Input, 0, inCap)
+	keyToTestIdx := make(map[string]int, inCap)
 	for i := range r.Tests {
 		t := &r.Tests[i]
 		if !isFailureOutcome(t.Outcome) {
 			continue
+		}
+		if len(inputs) >= maxClusterInputs {
+			break
 		}
 		key := strconv.Itoa(i)
 		keyToTestIdx[key] = i

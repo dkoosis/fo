@@ -34,6 +34,29 @@ func TestCluster_EmptyInputs(t *testing.T) {
 	}
 }
 
+func TestCluster_EmptyKeySkipped(t *testing.T) {
+	// Empty-Key inputs would otherwise collapse together via map dedup
+	// and silently merge unrelated failures. RunWith must drop them so
+	// only valid-keyed inputs survive into Cluster.Members.
+	inputs := []Input{
+		{Key: "", Output: "panic: runtime error A"},
+		{Key: "", Output: "panic: runtime error B"},
+		{Key: "k1", Output: "panic: runtime error C"},
+	}
+	got := RunWith(inputs, Config{})
+	for _, c := range got {
+		for _, m := range c.Members {
+			if m == "" {
+				t.Fatalf("empty Key leaked into Cluster.Members: %+v", c)
+			}
+		}
+	}
+	// After empty-Key skip, only k1 remains → at most one cluster.
+	if len(got) > 1 {
+		t.Fatalf("got %d clusters from one valid input, want ≤1: %+v", len(got), got)
+	}
+}
+
 func TestCluster_Fixtures(t *testing.T) {
 	fixtures, err := filepath.Glob(filepath.Join("testdata", "fixtures", "*.json"))
 	if err != nil {
