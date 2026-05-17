@@ -35,7 +35,9 @@ var actorPalette = []lipgloss.Color{
 // monospace command output. Exit zero is suppressed; non-zero is
 // rendered in the error color.
 func RenderSceneHuman(w io.Writer, s scene.Scene) error {
-	t := theme.Color()
+	// theme.Default respects NO_COLOR (downgrades to Mono); Color()
+	// would hardcode ANSI regardless (fo-5r4).
+	t := theme.Default(true)
 	return renderScene(w, s, t)
 }
 
@@ -85,7 +87,7 @@ func renderNarration(w io.Writer, text string, t theme.Theme) error {
 }
 
 func renderCommand(w io.Writer, cmd scene.Command, t theme.Theme) error {
-	actor := actorStyle(cmd.Actor).Render(cmd.Actor)
+	actor := actorStyle(cmd.Actor, t).Render(cmd.Actor)
 	prompt := t.Bold.Render("❯")
 	if _, err := fmt.Fprintf(w, "%s %s %s\n", actor, prompt, cmd.Cmd); err != nil {
 		return err
@@ -105,14 +107,18 @@ func renderCommand(w io.Writer, cmd scene.Command, t theme.Theme) error {
 }
 
 // actorStyle returns a stable foreground style for the actor by
-// hashing the name into actorPalette. Empty actor falls back to the
-// first palette slot.
-func actorStyle(actor string) lipgloss.Style {
+// hashing the name into actorPalette. Under mono themes (NO_COLOR /
+// non-TTY) the foreground is dropped so the actor appears in plain
+// bold (fo-5r4).
+func actorStyle(actor string, t theme.Theme) lipgloss.Style {
+	if t.Name == "mono" {
+		return lipgloss.NewStyle().Bold(true)
+	}
 	h := fnv.New32a()
 	_, _ = h.Write([]byte(actor))
-	idx := int(h.Sum32()) % len(actorPalette)
-	if idx < 0 {
-		idx = -idx
-	}
+	// Mod in uint32 space, then convert. Casting Sum32 to int and
+	// negating breaks on 32-bit (math.MinInt32 stays negative after
+	// negation and panics on slice index) (fo-5r4).
+	idx := int(h.Sum32() % uint32(len(actorPalette)))
 	return lipgloss.NewStyle().Foreground(actorPalette[idx]).Bold(true)
 }

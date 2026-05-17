@@ -72,3 +72,25 @@ func TestRenderSceneHuman(t *testing.T) {
 		t.Errorf("zero exit should be suppressed, got:\n%s", plain)
 	}
 }
+
+// TestRenderSceneHuman_NO_COLOR is a regression for fo-5r4: RenderSceneHuman
+// used theme.Color() which hardcodes ANSI; should use theme.Default(true)
+// so NO_COLOR strips it.
+func TestRenderSceneHuman_NO_COLOR(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	s := scene.Scene{
+		Acts: []scene.Act{{Number: "1", Title: "x", Beats: []scene.Beat{
+			{Kind: scene.BeatCommand, Command: scene.Command{Actor: "A", Cmd: "echo"}},
+		}}},
+	}
+	var buf bytes.Buffer
+	if err := view.RenderSceneHuman(&buf, s); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	// NO_COLOR strips foreground colors (38;5;N or 38;2;R;G;B); bold/dim
+	// attributes are not affected by NO_COLOR.
+	colorRE := regexp.MustCompile(`\x1b\[[0-9;]*38;`)
+	if colorRE.MatchString(buf.String()) {
+		t.Errorf("NO_COLOR=1 but output contains foreground color: %q", buf.String())
+	}
+}
