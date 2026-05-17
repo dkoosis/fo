@@ -42,6 +42,7 @@ import (
 	"github.com/dkoosis/fo/pkg/metrics"
 	"github.com/dkoosis/fo/pkg/report"
 	"github.com/dkoosis/fo/pkg/sarif"
+	"github.com/dkoosis/fo/pkg/scene"
 	"github.com/dkoosis/fo/pkg/state"
 	"github.com/dkoosis/fo/pkg/status"
 	"github.com/dkoosis/fo/pkg/tally"
@@ -123,6 +124,7 @@ INPUT FORMATS (auto-detected from stdin)
   tally           Count→label distribution (# fo:tally header) → leaderboard
   status          PASS/FAIL/WARN/SKIP rows (# fo:status header) → table
   metrics         Keyed numeric values (# fo:metrics header) → list with deltas
+  scene           Narrated multi-actor walk-through (# fo:scene header) → story
 
 OUTPUT FORMATS (--format)
   auto            TTY → human, piped → llm (default)
@@ -292,6 +294,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return renderMetrics(input, stdout, stderr, mode)
 	}
 
+	if scene.IsHeader(input) {
+		return renderScene(input, stdout, stderr, mode)
+	}
+
 	if sniffBareTally(input) {
 		var buf bytes.Buffer
 		if err := wrapleaderboard.Convert(bytes.NewReader(input), &buf, wrapleaderboard.Opts{}); err != nil {
@@ -382,6 +388,38 @@ func renderTally(input []byte, stdout io.Writer, stderr io.Writer, mode, themeNa
 	width := termSize(stdout)
 	out := view.Render(t.ToLeaderboard(), th, width)
 	if _, err := fmt.Fprintln(stdout, out); err != nil {
+		fmt.Fprintf(stderr, "fo: %v\n", err)
+		return 2
+	}
+	return 0
+}
+
+// renderScene parses # fo:scene input and dispatches to the human or
+// llm scene renderer (or JSON encoder). Always exits 0 on success —
+// scenes are narration, not gates (fo-fl0.4).
+func renderScene(input []byte, stdout io.Writer, stderr io.Writer, mode string) int {
+	s, err := scene.Parse(bytes.NewReader(input))
+	if err != nil {
+		fmt.Fprintf(stderr, "fo: parsing scene: %v\n", err)
+		return 2
+	}
+	switch mode {
+	case formatJSON:
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(s); err != nil {
+			fmt.Fprintf(stderr, "fo: %v\n", err)
+			return 2
+		}
+		return 0
+	case formatLLM:
+		if err := view.RenderSceneLLM(stdout, s); err != nil {
+			fmt.Fprintf(stderr, "fo: %v\n", err)
+			return 2
+		}
+		return 0
+	}
+	if err := view.RenderSceneHuman(stdout, s); err != nil {
 		fmt.Fprintf(stderr, "fo: %v\n", err)
 		return 2
 	}

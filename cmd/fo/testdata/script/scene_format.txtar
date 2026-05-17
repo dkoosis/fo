@@ -1,0 +1,28 @@
+# fo:scene dispatches to scene renderers and round-trips in --format json.
+# Regression for fo-fl0.4.
+
+stdin scene.in
+fo --format llm --no-state
+stdout '# fo:scene'
+stdout '## 1 · setup'
+stdout '@FrugalLapwing \$ loto whoami'
+
+stdin scene.in
+fo --format human --no-state
+stdout 'demo'
+stdout '1 · setup'
+
+stdin scene.in
+fo --format json --no-state
+stdout '"title": "demo"'
+stdout '"actors"'
+
+-- scene.in --
+# fo:scene title="demo" actors=FrugalLapwing
+
+## 1 · setup
+
+> first beat
+
+@FrugalLapwing $ loto whoami
+  FrugalLapwing
