@@ -210,3 +210,91 @@ func TestParse_outputTerminatesOnNonIndented(t *testing.T) {
 		t.Errorf("narr beat = %+v", beats[1])
 	}
 }
+
+// fo-fl0.5 grammar edge cases.
+
+// Consecutive > lines produce separate narration beats, preserving order.
+func TestParse_consecutiveNarrationBeats(t *testing.T) {
+	in := "# fo:scene\n## 01 · t\n> first\n> second\n> third\n"
+	s, err := Parse(strings.NewReader(in))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	beats := s.Acts[0].Beats
+	if len(beats) != 3 {
+		t.Fatalf("beats = %d, want 3: %+v", len(beats), beats)
+	}
+	for i, want := range []string{"first", "second", "third"} {
+		if beats[i].Kind != BeatNarration || beats[i].Narration != want {
+			t.Errorf("beat[%d] = %+v, want narration %q", i, beats[i], want)
+		}
+	}
+}
+
+// Blank lines between narration beats are ignored (act-scope skips them).
+func TestParse_blankLineBetweenNarrationBeats(t *testing.T) {
+	in := "# fo:scene\n## 01 · t\n> first\n\n> second\n"
+	s, err := Parse(strings.NewReader(in))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	beats := s.Acts[0].Beats
+	if len(beats) != 2 || beats[0].Narration != "first" || beats[1].Narration != "second" {
+		t.Errorf("beats = %+v", beats)
+	}
+}
+
+// (exit 0) is the implicit default — omitted exit line still yields Exit==0.
+func TestParse_defaultExitZero(t *testing.T) {
+	in := "# fo:scene\n## 01 · t\n@a $ cmd\n  out\n"
+	s, err := Parse(strings.NewReader(in))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got := s.Acts[0].Beats[0].Command.Exit; got != 0 {
+		t.Errorf("Exit = %d, want 0", got)
+	}
+}
+
+// Non-zero exit is captured on Command.Exit.
+func TestParse_nonZeroExit(t *testing.T) {
+	in := "# fo:scene\n## 01 · t\n@a $ cmd\n  out\n  (exit 137)\n"
+	s, err := Parse(strings.NewReader(in))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if got := s.Acts[0].Beats[0].Command.Exit; got != 137 {
+		t.Errorf("Exit = %d, want 137", got)
+	}
+}
+
+// An empty act header followed immediately by the next act parses
+// cleanly — first act has zero beats, second has its content.
+func TestParse_emptyActFollowedByNextAct(t *testing.T) {
+	in := "# fo:scene\n## 01 · empty\n## 02 · second\n> hi\n"
+	s, err := Parse(strings.NewReader(in))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(s.Acts) != 2 {
+		t.Fatalf("acts = %d", len(s.Acts))
+	}
+	if len(s.Acts[0].Beats) != 0 {
+		t.Errorf("act 0 beats = %+v, want empty", s.Acts[0].Beats)
+	}
+	if len(s.Acts[1].Beats) != 1 || s.Acts[1].Beats[0].Narration != "hi" {
+		t.Errorf("act 1 beats = %+v", s.Acts[1].Beats)
+	}
+}
+
+// Parser errors carry the offending line number in the message.
+func TestParse_errorsCarryLineNumber(t *testing.T) {
+	in := "# fo:scene\n## 01 · t\n@a oops no dollar\n"
+	_, err := Parse(strings.NewReader(in))
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "line 3") {
+		t.Errorf("error missing line 3: %v", err)
+	}
+}
