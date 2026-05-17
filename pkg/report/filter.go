@@ -47,21 +47,13 @@ func ApplyFilter(r *Report, rs *suppress.Ruleset, now time.Time) FilterStats {
 			stats.PerRule[activeIdx]++
 			continue
 		}
-		if expiredIdx < 0 {
-			kept = append(kept, f)
-			continue
-		}
-		rule := rs.Rules[expiredIdx]
 		kept = append(kept, f)
-		if !expiredNotified[expiredIdx] {
+		if expiredIdx >= 0 && !expiredNotified[expiredIdx] {
 			expiredNotified[expiredIdx] = true
-			until := ""
-			if rule.Until != nil {
-				until = rule.Until.Format("2006-01-02")
-			}
+			rule := rs.Rules[expiredIdx]
 			r.Notices = append(r.Notices, fmt.Sprintf(
 				"suppression for %s (line %d) expired %s; finding shown",
-				rule.RuleID, rule.Line, until))
+				rule.RuleID, rule.Line, rule.Until.Format("2006-01-02")))
 		}
 	}
 	r.Findings = kept
