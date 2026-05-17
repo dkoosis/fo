@@ -196,7 +196,7 @@ demo-live: install ## Run real go test + vet through fo
 
 clean: ## Remove build artifacts
 	rm -f fo
-	rm -rf build/ .sandbox/bin/
+	rm -rf bin/ build/ .sandbox/bin/
 
 install:
 	go install ./cmd/fo/
