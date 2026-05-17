@@ -130,15 +130,15 @@ func TestParse_errors(t *testing.T) {
 		in   string
 		want error
 	}{
-		{"no header", "## 01 · t\n", ErrNoHeader},
-		{"empty input", "", ErrNoHeader},
-		{"malformed act no dot", "# fo:scene\n## 01 nothing\n", ErrMalformedAct},
-		{"malformed act empty title", "# fo:scene\n## 01 · \n", ErrMalformedAct},
-		{"malformed actor no dollar", "# fo:scene\n## 01 · t\n@actor cmd\n", ErrMalformedActor},
-		{"malformed actor empty cmd", "# fo:scene\n## 01 · t\n@actor $ \n", ErrMalformedActor},
-		{"bad exit code", "# fo:scene\n## 01 · t\n@a $ c\n  out\n  (exit oops)\n", ErrMalformedExit},
-		{"unknown attr", "# fo:scene foo=bar\n", ErrUnknownAttr},
-		{"narration before act", "# fo:scene\n> nope\n", ErrMalformedAct},
+		{"no header", "## 01 · t\n", errNoHeader},
+		{"empty input", "", errNoHeader},
+		{"malformed act no dot", "# fo:scene\n## 01 nothing\n", errMalformedAct},
+		{"malformed act empty title", "# fo:scene\n## 01 · \n", errMalformedAct},
+		{"malformed actor no dollar", "# fo:scene\n## 01 · t\n@actor cmd\n", errMalformedActor},
+		{"malformed actor empty cmd", "# fo:scene\n## 01 · t\n@actor $ \n", errMalformedActor},
+		{"bad exit code", "# fo:scene\n## 01 · t\n@a $ c\n  out\n  (exit oops)\n", errMalformedExit},
+		{"unknown attr", "# fo:scene foo=bar\n", errUnknownAttr},
+		{"narration before act", "# fo:scene\n> nope\n", errMalformedAct},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

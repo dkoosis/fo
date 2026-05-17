@@ -131,15 +131,15 @@ func TestParse_errors(t *testing.T) {
 		in   string
 		want error
 	}{
-		{"missing rule_id (key-only line)", "glob=foo/**\n", ErrMissingRuleID},
-		{"malformed until date", "SA1019 until=2026-13-40\n", ErrInvalidDate},
-		{"until not a date", "SA1019 until=soon\n", ErrInvalidDate},
-		{"unknown key", "SA1019 severity=high\n", ErrUnknownKey},
-		{"unclosed quote", `SA1019 reason="never closed` + "\n", ErrUnclosedQuote},
-		{"stray equals as token", "SA1019 =value\n", ErrMalformedLine},
-		{"bare token after rule", "SA1019 noequals\n", ErrMalformedLine},
-		{"empty glob", "SA1019 glob=\n", ErrMalformedLine},
-		{"zero-year until silently disables rule (fo-7jv)", "SA1019 until=0001-01-01\n", ErrInvalidDate},
+		{"missing rule_id (key-only line)", "glob=foo/**\n", errMissingRuleID},
+		{"malformed until date", "SA1019 until=2026-13-40\n", errInvalidDate},
+		{"until not a date", "SA1019 until=soon\n", errInvalidDate},
+		{"unknown key", "SA1019 severity=high\n", errUnknownKey},
+		{"unclosed quote", `SA1019 reason="never closed` + "\n", errUnclosedQuote},
+		{"stray equals as token", "SA1019 =value\n", errMalformedLine},
+		{"bare token after rule", "SA1019 noequals\n", errMalformedLine},
+		{"empty glob", "SA1019 glob=\n", errMalformedLine},
+		{"zero-year until silently disables rule (fo-7jv)", "SA1019 until=0001-01-01\n", errInvalidDate},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

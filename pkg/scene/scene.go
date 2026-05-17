@@ -106,11 +106,11 @@ func IsHeader(data []byte) bool {
 }
 
 var (
-	ErrNoHeader       = errors.New("scene: missing '# fo:scene' header")
-	ErrMalformedAct   = errors.New("scene: malformed act header")
-	ErrMalformedActor = errors.New("scene: malformed actor line")
-	ErrMalformedExit  = errors.New("scene: malformed exit trailer")
-	ErrUnknownAttr    = errors.New("scene: unknown header attr")
+	errNoHeader       = errors.New("scene: missing '# fo:scene' header")
+	errMalformedAct   = errors.New("scene: malformed act header")
+	errMalformedActor = errors.New("scene: malformed actor line")
+	errMalformedExit  = errors.New("scene: malformed exit trailer")
+	errUnknownAttr    = errors.New("scene: unknown header attr")
 )
 
 // Parse reads a scene document from r.
@@ -130,7 +130,7 @@ func Parse(r io.Reader) (Scene, error) {
 	}
 	p.flushCmd()
 	if !p.headerSeen {
-		return Scene{}, ErrNoHeader
+		return Scene{}, errNoHeader
 	}
 	return p.s, nil
 }
@@ -181,7 +181,7 @@ func (p *parser) feedHeader(raw string) error {
 		return nil
 	}
 	if !strings.HasPrefix(trimmed, HeaderPrefix) {
-		return ErrNoHeader
+		return errNoHeader
 	}
 	rest := strings.TrimSpace(strings.TrimPrefix(trimmed, HeaderPrefix))
 	if err := parseHeaderAttrs(rest, &p.s); err != nil {
@@ -219,14 +219,14 @@ func (p *parser) feedBody(trimmed string) error {
 		return nil
 	case strings.HasPrefix(trimmed, "> ") || trimmed == ">":
 		if p.curAct == nil {
-			return fmt.Errorf("scene: line %d: %w: narration before any act", p.lineNo, ErrMalformedAct)
+			return fmt.Errorf("scene: line %d: %w: narration before any act", p.lineNo, errMalformedAct)
 		}
 		text := strings.TrimPrefix(strings.TrimPrefix(trimmed, ">"), " ")
 		p.curAct.Beats = append(p.curAct.Beats, Beat{Kind: BeatNarration, Narration: text})
 		return nil
 	case strings.HasPrefix(trimmed, "@"):
 		if p.curAct == nil {
-			return fmt.Errorf("scene: line %d: %w: command before any act", p.lineNo, ErrMalformedActor)
+			return fmt.Errorf("scene: line %d: %w: command before any act", p.lineNo, errMalformedActor)
 		}
 		cmd, err := parseActorLine(trimmed)
 		if err != nil {
@@ -235,7 +235,7 @@ func (p *parser) feedBody(trimmed string) error {
 		p.curCmd = &cmd
 		return nil
 	}
-	return fmt.Errorf("scene: line %d: %w: %q", p.lineNo, ErrMalformedAct, trimmed)
+	return fmt.Errorf("scene: line %d: %w: %q", p.lineNo, errMalformedAct, trimmed)
 }
 
 func isOutputLine(raw string) bool {
@@ -260,11 +260,11 @@ func parseExitTrailer(body string) (int, bool, error) {
 	inner := strings.TrimSuffix(strings.TrimPrefix(t, "(exit"), ")")
 	inner = strings.TrimSpace(inner)
 	if inner == "" {
-		return 0, false, fmt.Errorf("%w: missing exit code in %q", ErrMalformedExit, body)
+		return 0, false, fmt.Errorf("%w: missing exit code in %q", errMalformedExit, body)
 	}
 	n, err := strconv.Atoi(inner)
 	if err != nil {
-		return 0, false, fmt.Errorf("%w: %q", ErrMalformedExit, inner)
+		return 0, false, fmt.Errorf("%w: %q", errMalformedExit, inner)
 	}
 	return n, true, nil
 }
@@ -274,12 +274,12 @@ func parseActHeader(line string) (Act, error) {
 	// expect: N · title (middle-dot separator)
 	numTok, titleTok, ok := strings.Cut(rest, "·")
 	if !ok {
-		return Act{}, fmt.Errorf("%w: expected 'N · title', got %q", ErrMalformedAct, line)
+		return Act{}, fmt.Errorf("%w: expected 'N · title', got %q", errMalformedAct, line)
 	}
 	number := strings.TrimSpace(numTok)
 	title := strings.TrimSpace(titleTok)
 	if number == "" || title == "" {
-		return Act{}, fmt.Errorf("%w: empty number or title in %q", ErrMalformedAct, line)
+		return Act{}, fmt.Errorf("%w: empty number or title in %q", errMalformedAct, line)
 	}
 	return Act{Number: number, Title: title}, nil
 }
@@ -289,16 +289,16 @@ func parseActorLine(line string) (Command, error) {
 	rest := strings.TrimPrefix(line, "@")
 	sp := strings.IndexAny(rest, " \t")
 	if sp <= 0 {
-		return Command{}, fmt.Errorf("%w: expected '@actor $ cmd', got %q", ErrMalformedActor, line)
+		return Command{}, fmt.Errorf("%w: expected '@actor $ cmd', got %q", errMalformedActor, line)
 	}
 	actor := rest[:sp]
 	tail := strings.TrimLeft(rest[sp:], " \t")
 	if !strings.HasPrefix(tail, "$") {
-		return Command{}, fmt.Errorf("%w: missing '$' after actor in %q", ErrMalformedActor, line)
+		return Command{}, fmt.Errorf("%w: missing '$' after actor in %q", errMalformedActor, line)
 	}
 	cmd := strings.TrimLeft(strings.TrimPrefix(tail, "$"), " \t")
 	if cmd == "" {
-		return Command{}, fmt.Errorf("%w: empty command in %q", ErrMalformedActor, line)
+		return Command{}, fmt.Errorf("%w: empty command in %q", errMalformedActor, line)
 	}
 	return Command{Actor: actor, Cmd: cmd}, nil
 }
@@ -319,7 +319,7 @@ func parseHeaderAttrs(tail string, s *Scene) error {
 func applyAttr(tok string, s *Scene) error {
 	key, val, ok := strings.Cut(tok, "=")
 	if !ok || key == "" {
-		return fmt.Errorf("%w: expected key=value, got %q", ErrUnknownAttr, tok)
+		return fmt.Errorf("%w: expected key=value, got %q", errUnknownAttr, tok)
 	}
 	switch strings.ToLower(key) {
 	case "title":
@@ -331,7 +331,7 @@ func applyAttr(tok string, s *Scene) error {
 			}
 		}
 	default:
-		return fmt.Errorf("%w: %q", ErrUnknownAttr, key)
+		return fmt.Errorf("%w: %q", errUnknownAttr, key)
 	}
 	return nil
 }
@@ -348,7 +348,7 @@ func tokenizeAttrs(line string) ([]string, error) {
 		}
 	}
 	if st.inQuote {
-		return nil, fmt.Errorf("%w: unclosed quote in header", ErrUnknownAttr)
+		return nil, fmt.Errorf("%w: unclosed quote in header", errUnknownAttr)
 	}
 	if cur.Len() > 0 {
 		toks = append(toks, cur.String())
@@ -395,7 +395,7 @@ func (st *attrTokState) stepBare(c byte, cur *strings.Builder, toks *[]string) e
 	case '"':
 		s := cur.String()
 		if len(s) == 0 || s[len(s)-1] != '=' {
-			return fmt.Errorf("%w: stray '\"' in header", ErrUnknownAttr)
+			return fmt.Errorf("%w: stray '\"' in header", errUnknownAttr)
 		}
 		st.inQuote = true
 	default:

@@ -94,11 +94,11 @@ func writeValue(b *strings.Builder, v string) {
 // Sentinel errors. Parse failures wrap one of these so callers can
 // errors.Is for category checks.
 var (
-	ErrMalformedLine = errors.New("suppress: malformed line")
-	ErrMissingRuleID = errors.New("suppress: missing rule_id")
-	ErrInvalidDate   = errors.New("suppress: invalid until date")
-	ErrUnknownKey    = errors.New("suppress: unknown key")
-	ErrUnclosedQuote = errors.New("suppress: unclosed quoted value")
+	errMalformedLine = errors.New("suppress: malformed line")
+	errMissingRuleID = errors.New("suppress: missing rule_id")
+	errInvalidDate   = errors.New("suppress: invalid until date")
+	errUnknownKey    = errors.New("suppress: unknown key")
+	errUnclosedQuote = errors.New("suppress: unclosed quoted value")
 )
 
 // Parse reads .fo/ignore content from r and returns the parsed
@@ -135,47 +135,47 @@ func parseLine(line string) (Suppression, error) {
 		return Suppression{}, err
 	}
 	if len(toks) == 0 {
-		return Suppression{}, ErrMissingRuleID
+		return Suppression{}, errMissingRuleID
 	}
 	if strings.ContainsRune(toks[0], '=') {
-		return Suppression{}, fmt.Errorf("%w: first token %q looks like a key=value", ErrMissingRuleID, toks[0])
+		return Suppression{}, fmt.Errorf("%w: first token %q looks like a key=value", errMissingRuleID, toks[0])
 	}
 
 	s := Suppression{RuleID: toks[0], Glob: DefaultGlob}
 	if s.RuleID == "" {
-		return Suppression{}, ErrMissingRuleID
+		return Suppression{}, errMissingRuleID
 	}
 
 	for _, tok := range toks[1:] {
 		eq := strings.IndexByte(tok, '=')
 		if eq <= 0 {
-			return Suppression{}, fmt.Errorf("%w: expected key=value, got %q", ErrMalformedLine, tok)
+			return Suppression{}, fmt.Errorf("%w: expected key=value, got %q", errMalformedLine, tok)
 		}
 		key := strings.ToLower(tok[:eq])
 		val := tok[eq+1:]
 		switch key {
 		case "glob":
 			if val == "" {
-				return Suppression{}, fmt.Errorf("%w: empty glob value", ErrMalformedLine)
+				return Suppression{}, fmt.Errorf("%w: empty glob value", errMalformedLine)
 			}
 			s.Glob = val
 		case "until":
 			t, perr := time.Parse("2006-01-02", val)
 			if perr != nil {
-				return Suppression{}, fmt.Errorf("%w: %q", ErrInvalidDate, val)
+				return Suppression{}, fmt.Errorf("%w: %q", errInvalidDate, val)
 			}
 			// Reject zero-year. time.Parse accepts "0001-01-01"; if a
 			// caller hands us that (deserialization bug, default-zero
 			// time), Expired returns true for every call, silently
 			// disabling the rule (fo-7jv).
 			if t.Year() <= 1 {
-				return Suppression{}, fmt.Errorf("%w: zero-year %q", ErrInvalidDate, val)
+				return Suppression{}, fmt.Errorf("%w: zero-year %q", errInvalidDate, val)
 			}
 			s.Until = &t
 		case "reason":
 			s.Reason = val
 		default:
-			return Suppression{}, fmt.Errorf("%w: %q", ErrUnknownKey, key)
+			return Suppression{}, fmt.Errorf("%w: %q", errUnknownKey, key)
 		}
 	}
 	return s, nil
@@ -196,7 +196,7 @@ func tokenize(line string) ([]string, error) {
 		}
 	}
 	if st.inQuote {
-		return nil, ErrUnclosedQuote
+		return nil, errUnclosedQuote
 	}
 	if cur.Len() > 0 {
 		toks = append(toks, cur.String())
@@ -235,7 +235,7 @@ func (st *tokState) step(c byte, cur *strings.Builder, toks *[]string) error {
 	case '"':
 		s := cur.String()
 		if len(s) == 0 || s[len(s)-1] != '=' {
-			return fmt.Errorf("%w: stray '\"' outside key=value", ErrMalformedLine)
+			return fmt.Errorf("%w: stray '\"' outside key=value", errMalformedLine)
 		}
 		st.inQuote = true
 	default:
