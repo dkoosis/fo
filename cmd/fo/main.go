@@ -74,6 +74,7 @@ const (
 	flagTool      = "--tool"
 
 	subState       = "state"
+	subSuppress    = "suppress"
 	subWatch       = "watch"
 	subWrap        = "wrap"
 	subDiag        = "diag"
@@ -144,12 +145,14 @@ FLAGS
                       (tally|status|metrics|diag)
 
 SUBCOMMANDS
-  fo wrap <name>     Convert tool output to SARIF
-  fo wrap list       List wrappers (--json for machine output)
-  fo wrap --help     Show available wrappers
-  fo watch -- <cmd>  Run <cmd>, render output, rerun on stdin newline (A.1)
-  fo --version       Print build version and exit
-  fo --print-schema  Print JSON Schema for Report (--format json output) and exit
+  fo wrap <name>             Convert tool output to SARIF
+  fo wrap list               List wrappers (--json for machine output)
+  fo wrap --help             Show available wrappers
+  fo watch -- <cmd>          Run <cmd>, render output, rerun on stdin newline (A.1)
+  fo suppress add|list|rm    Manage .fo/ignore suppressions (rule-id, glob, expiry)
+  fo state reset             Clear diff classification baseline
+  fo --version               Print build version and exit
+  fo --print-schema          Print JSON Schema for Report (--format json output) and exit
 
 EXAMPLES
   # Static analysis (SARIF) — golangci-lint v2
@@ -187,6 +190,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return runWrap(args[1:], stdin, stdout, stderr)
 		case subState:
 			return runState(args[1:], stdout, stderr)
+		case subSuppress:
+			return runSuppress(args[1:], stdout, stderr)
 		case subWatch:
 			return runWatch(args[1:], stdin, stdout, stderr)
 		case "help", "-h", "--help":
