@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -99,14 +100,21 @@ func attachClusters(r *report.Report) {
 		return
 	}
 
+	// Key must be unique per test result — cluster.Run dedupes by Key
+	// (last-write-wins), so retries that share a Fingerprint would
+	// collapse to one input and get dropped as a singleton (fo-juf).
+	// Use the r.Tests index as the opaque key.
 	inputs := make([]cluster.Input, 0, len(r.Tests))
+	keyToTestIdx := make(map[string]int, len(r.Tests))
 	for i := range r.Tests {
 		t := &r.Tests[i]
 		if !isFailureOutcome(t.Outcome) {
 			continue
 		}
+		key := strconv.Itoa(i)
+		keyToTestIdx[key] = i
 		inputs = append(inputs, cluster.Input{
-			Key:     t.Fingerprint,
+			Key:     key,
 			Package: t.Package,
 			Test:    t.Test,
 			Outcome: string(t.Outcome),
@@ -122,7 +130,6 @@ func attachClusters(r *report.Report) {
 		return
 	}
 
-	keyToID := make(map[string]string)
 	out := make([]report.Cluster, 0, len(groups))
 	for _, g := range groups {
 		if len(g.Members) < 2 {
@@ -130,7 +137,9 @@ func attachClusters(r *report.Report) {
 		}
 		id := string(g.ID)
 		for _, m := range g.Members {
-			keyToID[m] = id
+			if idx, ok := keyToTestIdx[m]; ok {
+				r.Tests[idx].ClusterID = id
+			}
 		}
 		out = append(out, report.Cluster{
 			ID:            id,
@@ -140,12 +149,6 @@ func attachClusters(r *report.Report) {
 			NormSig:       g.NormSig,
 			Members:       append([]string(nil), g.Members...),
 		})
-	}
-
-	for i := range r.Tests {
-		if id, ok := keyToID[r.Tests[i].Fingerprint]; ok {
-			r.Tests[i].ClusterID = id
-		}
 	}
 	if len(out) > 0 {
 		r.Clusters = out

@@ -104,6 +104,43 @@ func TestAttachClusters_PassingTestsHaveNoClusterID(t *testing.T) {
 	}
 }
 
+// TestAttachClusters_RetriesWithSameFingerprintBothCount verifies that two
+// failing test results with identical fingerprints (e.g. a retried failure
+// with the same name, package, and output) both survive the clusterer
+// rather than collapsing to a singleton and being dropped. Regression for
+// fo-juf: attachClusters previously used Fingerprint as cluster.Input.Key,
+// and the clusterer dedupes by Key (last-write-wins).
+func TestAttachClusters_RetriesWithSameFingerprintBothCount(t *testing.T) {
+	t.Parallel()
+	results := []TestPackageResult{{
+		Name:   "example.com/pkg/x",
+		Failed: 2,
+		FailedTests: []FailedTest{
+			{Name: "TestFlaky", Output: []string{"    x_test.go:5: boom"}},
+			{Name: "TestFlaky", Output: []string{"    x_test.go:5: boom"}},
+		},
+	}}
+
+	r := ToReport(results)
+
+	if len(r.Clusters) != 1 {
+		t.Fatalf("len(Clusters) = %d, want 1; clusters=%#v", len(r.Clusters), r.Clusters)
+	}
+	got := r.Clusters[0]
+	if len(got.Members) != 2 {
+		t.Fatalf("len(Members) = %d, want 2", len(got.Members))
+	}
+	var stamped int
+	for _, tr := range r.Tests {
+		if tr.ClusterID == got.ID {
+			stamped++
+		}
+	}
+	if stamped != 2 {
+		t.Fatalf("expected 2 tests stamped with cluster ID %q, got %d", got.ID, stamped)
+	}
+}
+
 // TestAttachClusters_EmptyTestsNoOp verifies attachClusters does not
 // allocate Clusters for a Report with no tests.
 func TestAttachClusters_EmptyTestsNoOp(t *testing.T) {
