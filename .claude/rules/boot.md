@@ -1,11 +1,8 @@
 # Boot
-updated: 2026-05-16
+updated: 2026-05-17
+
+→ next: `bd ready` — 5 beads remain, all `human`-labeled (clustering epic, design-pass, roadmap). Surface choice to dk, ✗ pick autonomously.
 
 ✓ done
-- shipped 10 PRs across two drains (#272-#281); main is clean, no open PRs
-- filed 6 follow-up beads from Gemini review on the last drain:
-  fo-oq9 (watch race), fo-juf (cluster Key), fo-sc7 (suppress shadow),
-  fo-2sk (stream snapshot suppress), fo-5r4 (scene_human 32-bit + NO_COLOR),
-  fo-drd (scene_llm actors escape)
-
-→ next: `bd ready` to pick up. fo-oq9 + fo-juf are the load-bearing follow-ups.
+- shipped fo-ov9 (renderHygiene helper, -38 LOC) + fo-u15.2.3 (suppress add|list|remove CLI); closed fo-u15.2 epic
+- deferred fo-eh4 → 2026-07-01 (align fo internals before cross-tool audit)
