@@ -1,14 +1,16 @@
 # fo Makefile
 #
-# Primary: scan check audit report deploy doctor cross
-#   scan   — changed pkgs only (fast inner loop)
-#   check  — full repo: vet + lint + test + build
-#   audit  — everything: +race +dupl +vuln
+# Primary: scan check audit deploy doctor cross
+#   scan          — changed pkgs only (fast inner loop)
+#   check         — full repo: vet + lint + test + build
+#   audit         — exhaustive stream through fo (auto: human@TTY, llm piped)
+#   audit-human   — force human format
+#   audit-llm     — force llm format (for agents/CI)
 # Run `make help` for full target list.
 
 .DEFAULT_GOAL := check
 
-.PHONY: help scan check audit report deploy install doctor cross \
+.PHONY: help scan check audit audit-human audit-llm report deploy install doctor cross \
         vet lint test race fmt fmt-fix dupl vuln \
         qa-goldens qa-goldens-update \
         snipe-index baseline \
@@ -26,14 +28,18 @@ SNIPE_SRC         ?= $(HOME)/Projects/snipe
 GOMOD_VER         := $(shell awk '/^go /{print $$2}' go.mod)
 VERSION           ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
-# Report stream — fo eats its own dog food
+# Report stream — fo eats its own dog food.
+# Race tests subsume plain tests (-race -json is a superset).
+# Build errors go through wrap diag so they join the SARIF stream.
 REPORT_CMD = \
 	echo '--- tool:vet format:sarif ---'; \
 	go vet ./... 2>&1 | fo wrap diag --tool govet; echo; \
 	echo '--- tool:lint format:sarif ---'; \
 	golangci-lint run --output.sarif.path=/dev/stdout --output.text.path=/dev/null ./... 2>/dev/null | head -1; echo; \
+	echo '--- tool:build format:sarif ---'; \
+	go build ./... 2>&1 | fo wrap diag --tool gobuild; echo; \
 	echo '--- tool:test format:testjson ---'; \
-	go test -json -count=1 ./... 2>&1; echo; \
+	go test -race -json -timeout=5m -count=1 ./... 2>&1; echo; \
 	echo '--- tool:dupl format:sarif ---'; \
 	TMP_JSCPD=$$(mktemp -d); jscpd . --silent --reporters json --output $$TMP_JSCPD >/dev/null 2>&1; cat $$TMP_JSCPD/jscpd-report.json | fo wrap jscpd; echo; rm -rf $$TMP_JSCPD; \
 	echo '--- tool:vuln format:sarif ---'; \
@@ -52,11 +58,16 @@ check: vet lint test ## Full repo: vet + lint + test + build
 	@go build ./...
 	@echo "=== check pass ==="
 
-audit: snipe-index check race dupl vuln ## Exhaustive: +race +dupl +vuln
-	@echo "=== audit pass ==="
+audit: snipe-index ## Exhaustive stream through fo (auto: human@TTY, llm piped)
+	@( $(REPORT_CMD) ) | fo || true
 
-report: snipe-index ## Structured QA output for agents/tools (always exits 0)
+audit-human: snipe-index ## Force human-formatted audit
+	@( $(REPORT_CMD) ) | fo --format human || true
+
+audit-llm: snipe-index ## Force llm-formatted audit (agents/CI)
 	@( $(REPORT_CMD) ) | fo --format llm || true
+
+report: audit-llm ## Alias for audit-llm (back-compat)
 
 deploy: install ## Build and install binary
 	@echo "=== deployed ($$(which fo)) ==="
