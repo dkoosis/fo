@@ -164,6 +164,13 @@ func parseLine(line string) (Suppression, error) {
 			if perr != nil {
 				return Suppression{}, fmt.Errorf("%w: %q", ErrInvalidDate, val)
 			}
+			// Reject zero-year. time.Parse accepts "0001-01-01"; if a
+			// caller hands us that (deserialization bug, default-zero
+			// time), Expired returns true for every call, silently
+			// disabling the rule (fo-7jv).
+			if t.Year() <= 1 {
+				return Suppression{}, fmt.Errorf("%w: zero-year %q", ErrInvalidDate, val)
+			}
 			s.Until = &t
 		case "reason":
 			s.Reason = val

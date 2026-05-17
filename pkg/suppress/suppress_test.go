@@ -139,6 +139,7 @@ func TestParse_errors(t *testing.T) {
 		{"stray equals as token", "SA1019 =value\n", ErrMalformedLine},
 		{"bare token after rule", "SA1019 noequals\n", ErrMalformedLine},
 		{"empty glob", "SA1019 glob=\n", ErrMalformedLine},
+		{"zero-year until silently disables rule (fo-7jv)", "SA1019 until=0001-01-01\n", ErrInvalidDate},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -200,6 +201,22 @@ func TestExpired(t *testing.T) {
 		{"future until → not expired", Suppression{Until: &future}, false},
 		{"same day → not expired", Suppression{Until: &now}, false},
 	}
+	// Day-boundary regression (fo-7jv): same-day at 23:59 is still valid;
+	// 00:00 the next day expires.
+	endOfDay := time.Date(2026, 5, 16, 23, 59, 59, 0, time.UTC)
+	nextDay := time.Date(2026, 5, 17, 0, 0, 0, 0, time.UTC)
+	t.Run("23:59 same day → not expired", func(t *testing.T) {
+		s := Suppression{Until: &now}
+		if got := s.Expired(endOfDay); got {
+			t.Errorf("Expired at 23:59 same day = true, want false")
+		}
+	})
+	t.Run("00:00 next day → expired", func(t *testing.T) {
+		s := Suppression{Until: &now}
+		if got := s.Expired(nextDay); !got {
+			t.Errorf("Expired at 00:00 next day = false, want true")
+		}
+	})
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			if got := c.s.Expired(now); got != c.want {
