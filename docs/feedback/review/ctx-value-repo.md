@@ -1,15 +1,15 @@
 # ctx-value review — fo (repo scope)
 
-- **Run:** f62c7fc3af14
+- **Run:** bd775e303d86-ctx-value
 - **Linter:** ctx-value (mode: report, scope: project)
 - **Target:** /Users/vcto/Projects/fo
-- **Date:** 2026-05-16
+- **Date:** 2026-05-17
 
 ## Summary
 
-No `context.WithValue` producers and no `ctx.Value(...)` consumers anywhere in the
-Go source tree. `context.Context` appears ~19 times in the codebase, used strictly
-for cancellation / deadline propagation (the intended use), never as a service
+No `context.WithValue` producers and no `ctx.Value(...)` consumers anywhere in
+the Go source tree. `context.Context` appears in 7 files, used strictly for
+cancellation / deadline propagation (the intended use), never as a service
 locator or value bag.
 
 This is the ideal state for the ctx-value linter:
@@ -35,17 +35,20 @@ Overall: 🟢 clean.
 ## Evidence
 
 ```bash
-$ rg -n 'context\.WithValue|ctx\.Value\(|\.Value\(' --type go
+$ rg -n 'WithValue|ctx\.Value|context\.Value' --type go
 (no matches)
 
-$ rg -n 'WithValue|\.Value\(' --type go
-(no matches)
-
-$ rg -n 'context\.Context' --type go | wc -l
-19
+$ rg -n 'context\.Context' --type go -l
+pkg/view/stream.go
+pkg/testjson/parser.go
+cmd/fo/watch.go
+cmd/fo/watchkey.go
+cmd/fo/fswatch.go
+cmd/fo/stream_cancel_test.go
+cmd/fo/main.go
 ```
 
-All 19 `context.Context` occurrences are parameter passing for cancellation,
+All `context.Context` occurrences are parameter passing for cancellation,
 not value retrieval. Spot-checked sites (watch loop, stream parsers) confirm
 ctx is used only for `<-ctx.Done()` / propagation.
 

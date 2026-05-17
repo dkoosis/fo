@@ -1,9 +1,9 @@
 # SOLID review — fo (repo)
 
-run_id: f62c7fc3af14
+run_id: bd775e303d86-solid
 linter: solid (SRP / LSP / ISP)
 scope: project
-date: 2026-05-16
+date: 2026-05-17
 
 ## Orientation
 

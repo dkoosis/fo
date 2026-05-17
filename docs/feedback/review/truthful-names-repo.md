@@ -1,87 +1,135 @@
 # truthful-names — repo
 
-scope: project · mode: report · run: f62c7fc3af14 · date: 2026-05-16
+run: `bd775e303d86-truthful-names` · date: 2026-05-17 · scope: whole repo · mode: report
 
-## Verdict
+Overall: 🟢 — names are largely honest. Three small contracts to tighten, all P2.
 
-🟢 Names are largely honest. Packages are domain-specific (no `util`/`common`/`helpers`); file basenames match contents; most top-PageRank symbols predict their bodies. Two minor findings below; the rest of the surface reads clean.
+## Summary
 
-| Tier | Count | Worst |
+| Tier | Pattern | Count |
 |---|---|---|
-| P1 receiver/function mismatch | 0 | 🟢 |
-| P1 package generic basename | 0 | 🟢 |
-| P2 file/module | 1 | 🟡 |
-| P2 test mismatch | 0 | 🟢 |
-| P3 boolean-trap / param | 1 | 🟡 |
+| 🟢 P1 mismatch | receiver / function-body | 0 |
+| 🟢 P1 package | generic basename / drift | 0 |
+| 🟡 P2 type/field | terminology-drift | 1 |
+| 🟡 P2 function | imprecise-function-name | 1 |
+| 🟡 P2 type | imprecise-type-name | 1 |
+| 🟢 P2 file/module | — | 0 |
+| 🟢 P2 test | — | 0 |
 
-Overall: **🟡** (driven by one mildly-generic exported type name on the highly-imported `pkg/state` surface).
-
----
+Package basenames (`fingerprint`, `score`, `suppress`, `cluster`, `scene`, `tally`, `status`, `metrics`, `paint`, `theme`, `state`, `report`, `sarif`, `testjson`, `view`) all sit inside the package's exported vocabulary. No `util`/`common`/`helpers`. Module `github.com/dkoosis/fo` — trailing segment is the binary name; honest.
 
 ## Findings
 
-### 1. [F1] `pkg/state.Item`
+### 1. [F1] `pkg/suppress/match.go:7-13` — terminology-drift
 
-- **Pattern:** `imprecise-function-name` (applied to a type — generic noun on a public API)
-- **Symbol:** `github.com/dkoosis/fo/pkg/state.Item`
-- **Predicted from name:** "an item" — a row of something unspecified. Reader has to read fields to learn it's a diff classification.
-- **Actual from body:** A single classified finding-or-test entry in the diff envelope. Carries `Class` (new/persistent/resolved/regressed/flaky), `Fingerprint`, `Severity`, `PriorSeverity`. `pkg/state/diff.go:25`.
+- **Symbol:** `suppress.Ruleset`, field `Ruleset.Rules`
+- **Pattern:** `terminology-drift`
+- **Predicted from name:** A `Ruleset` is a set of rules; `.Rules` returns rules.
+- **Actual from body:** The element type is `Suppression`, not `Rule`. The package itself is named `suppress`, the file format is `.fo/ignore`, the parsed type is `Suppression`, and the only entry point is `Parse() []Suppression`. Then a single wrapper introduces a new term — "rule" — that has no other surface in the package.
 - **Evidence:**
   ```go
-  // Item is one classified entry in the diff envelope. Resolved entries
-  // carry the prior fingerprint+severity; new/regressed/persistent carry
-  // the current snapshot.
-  type Item struct {
-      Fingerprint   string          `json:"fingerprint"`
-      RuleID        string          `json:"rule_id,omitempty"`
-      ...
-      Class         Class           `json:"class"`
+  // pkg/suppress/match.go
+  type Ruleset struct {
+      Rules []Suppression
   }
+  func NewRuleset(rs []Suppression) *Ruleset {
+      return &Ruleset{Rules: rs}
+  }
+  func (rs *Ruleset) Match(ruleID, path string) int { ... }
   ```
-  Used everywhere as `[]Item` inside `Diff` and `Envelope` (`pkg/state/diff.go:40-55`, `pkg/state/headline.go:46-58`). Re-exported through `report.DiffItem` (`cmd/fo/state.go:67`) — so the consumer side already needed a more specific name.
-- **Why it matters:** `state` is the 13th-highest pagerank package and `Item` is the JSON shape that LLM/JSON consumers see. The downstream renderer code (`cmd/fo/state.go`) had to invent `report.DiffItem` for clarity, which is the tell.
-- **Fix:** rename `state.Item` → `state.DiffEntry` (or `ClassifiedFinding`). Field tag `json` stays the same (entries are inside named slices `new`/`resolved`/… so the type name isn't on the wire).
-  - grep map:
-    ```
-    \bstate\.Item\b      → state.DiffEntry
-    \[\]Item\b           → []DiffEntry        # inside pkg/state only
-    type Item struct     → type DiffEntry struct
-    func.*Item\)         → func.*DiffEntry)
-    ```
-  - Touch: `pkg/state/diff.go`, `pkg/state/headline.go`, `pkg/state/diff_test.go`, `pkg/state/state_test.go`, `cmd/fo/state.go` (the conversion site).
-
-### 2. [F2] `cmd/fo/fswatch.go` parameter `name` in `shouldIgnoreDir`
-
-- **Pattern:** `imprecise-function-name` (parameter naming variant)
-- **Symbol:** `cmd/fo/fswatch.go:25 shouldIgnoreDir(name string) bool`
-- **Predicted from name:** `name` could be a full path or a basename.
-- **Actual from body:** Strictly a directory **basename** — compared against `defaultIgnoreDirs` (`"vendor"`, `"node_modules"`, …) and the leading `.`-prefix rule. Passing a full path silently fails the membership check.
-- **Evidence:**
-  ```go
-  func shouldIgnoreDir(name string) bool {
-      if name == "" || name == "." {
-          return false
-      }
-      if slices.Contains(defaultIgnoreDirs, name) {
-          return true
-      }
-      // hidden-dir check on name[0] == '.'
+  Caller side (`pkg/report/filter.go:ApplyFilter`) takes `*suppress.Ruleset` and iterates suppressions through it. Two readers — the one inside `suppress` (sees `Suppression`) and the one outside (sees `Ruleset.Rules`) — speak different dialects for one concept.
+- **Fix:** Rename type and field to match the package's existing vocabulary.
   ```
-- **Fix:** rename parameter `name` → `basename` (doc-comment already uses that word). Single-file change.
-  - grep map: `shouldIgnoreDir(name` → `shouldIgnoreDir(basename`; update body refs.
+  suppress.Ruleset                 → suppress.Set            (or suppress.Suppressions)
+  Ruleset.Rules                    → Set.Items               (or .List)
+  NewRuleset(rs)                   → NewSet(rs)
+  *suppress.Ruleset (caller types) → *suppress.Set
+  ```
+  Grep map:
+  ```
+  rg -l 'suppress\.Ruleset|NewRuleset' --type go
+  # pkg/report/filter.go, pkg/report/filter_test.go, pkg/suppress/match*.go, cmd/fo/main.go (if wired)
+  ```
+- **Tier:** 🟡 P2
 
 ---
 
-## Notes (sub-threshold, not findings)
+### 2. [F2] `pkg/state/metrics_history.go:94` — imprecise-function-name
 
-- `pkg/view/multiples.go` — file name shortens the only topic inside (`SmallMultiples` ViewSpec + renderer). Borderline; the package doc and the type name carry the precision, and there's no other `multiples*.go` to confuse it with. Don't flag.
-- Two `Headline` types co-exist (`state.Headline` returns a summary string; `view.Headline` is a ViewSpec variant). Distinct packages, distinct roles, each name is locally accurate. Don't flag.
-- `pkg/testjson.processLine` and `pkg/testjson.processEventLine` are byte-identical (`pkg/testjson/parser.go:45,156`). Naming is interchangeable; the real defect is duplication — out of scope for truthful-names, belongs to `/review dedup` or a manual consolidation.
-- `pkg/sarif.Stats` vs `pkg/testjson.Stats` — same word for two different aggregates, but in distinct packages with distinct domains (SARIF findings vs Go test outcomes). Idiomatic Go; not terminology drift.
-- Module path `github.com/dkoosis/fo` — short, but `fo` is the established binary name and matches the `fo` CLI noun used throughout README/CLAUDE.md. Not uninformative once you know the project; don't flag (rule explicitly excludes established reputations).
+- **Symbol:** `state.AppendMetrics`
+- **Pattern:** `imprecise-function-name`
+- **Predicted from name:** "Append" reads as a pure append — open file, write samples at the end.
+- **Actual from body:** Load full history → prepend new run → trim to `MaxMetricsHistory` → re-serialize the whole envelope → atomic write. Three concerns the name doesn't carry: (a) prepend, not append; (b) trimming/eviction with a configurable bound; (c) full read-modify-write of the on-disk envelope, not an incremental write. The doc comment even calls out that it replaces "the prior overwrite-only `SaveMetrics`" — but the new name swung past "rotate" or "record" all the way to a verb that means the opposite of what the function does at the slice level.
+- **Evidence:**
+  ```go
+  // pkg/state/metrics_history.go:94
+  func AppendMetrics(path string, samples []MetricSample) error {
+      hist, err := LoadMetricsHistory(path)
+      ...
+      hist.Runs = append([]MetricsRun{{GeneratedAt: time.Now().UTC(), Samples: samples}}, hist.Runs...)
+      if len(hist.Runs) > MaxMetricsHistory {
+          hist.Runs = hist.Runs[:MaxMetricsHistory]
+      }
+      // ... atomic write
+  }
+  ```
+- **Fix:** Rename to a verb that names the actual operation. Preferred: `RecordMetricsRun` (mirrors `RunFromReport` vocabulary, names the unit being captured, doesn't lie about insertion order).
+  ```
+  state.AppendMetrics       → state.RecordMetricsRun
+  ```
+  Alternatives if a shorter name is desired: `state.RotateMetrics` (foregrounds the eviction), `state.PrependMetricsRun` (literal-but-ugly).
+  Grep map:
+  ```
+  rg -l 'state\.AppendMetrics|AppendMetrics\(' --type go
+  # pkg/state/metrics_history*.go, plus whichever cmd/wrapper calls it (likely cmd/fo + a wrap* package)
+  ```
+- **Tier:** 🟡 P2
 
-## Don't-flag log
+---
 
-- `Get`-style getters absent — N/A.
-- Receivers all map cleanly to the verb their method names promise (`(*aggregator).ProcessEvent`, `(*aggregator).Results`, `(*Builder).AddResultWithFix` — every body matches).
-- Test names match tested code (`TestFingerprint_*`, `TestScore_*`, `TestParseStream_*`, `TestPickView_*` all exercise the named function).
+### 3. [F3] `pkg/sarif/aggregates.go:9` — imprecise-type-name
+
+- **Symbol:** `sarif.FileIssue`
+- **Pattern:** `imprecise-type-name` (close cousin of `terminology-drift`)
+- **Predicted from name:** A `FileIssue` is one issue in a file — the SARIF `Result` projected to its file location. Reader expects `len(TopFiles(doc, 10)) == 10 single issues`.
+- **Actual from body:** It's an aggregate row: `{File, IssueCount, ErrorCount, WarnCount}`. There is no single issue here — it's the "per-file rollup" shape used to feed a leaderboard render. `TopFiles` returns up to `limit` *files* (each carrying counts), not up to `limit` issues.
+- **Evidence:**
+  ```go
+  // pkg/sarif/aggregates.go
+  type FileIssue struct {
+      File       string
+      IssueCount int
+      ErrorCount int
+      WarnCount  int
+  }
+  func TopFiles(doc *Document, limit int) []FileIssue { ... }
+  ```
+  Reinforced by the field name: a struct whose own field is `IssueCount` is obviously not "one issue". And `ErrorCount + WarnCount` need not equal `IssueCount` (note-level results count toward `IssueCount` only), which is another sign the singular framing has slipped.
+- **Fix:** Rename to the aggregate it represents. Preferred: `FileIssueCounts` (plural + role-tagged). Acceptable: `FileSummary`, `FileStats`. Avoid `FileIssues` alone — still reads as "the issues for the file" (a slice), not a counts struct.
+  ```
+  sarif.FileIssue          → sarif.FileIssueCounts
+  // call sites: TopFiles return type, any iteration variables
+  ```
+  Grep map:
+  ```
+  rg -l 'sarif\.FileIssue|\[\]FileIssue|TopFiles' --type go
+  # pkg/sarif/aggregates*.go, pkg/sarif/*_test.go, likely pkg/view/leaderboard.go or pkg/view/pickview.go
+  ```
+- **Tier:** 🟡 P2
+
+---
+
+## Looked at, not flagged
+
+- **`state.Headline` (func returning string) vs `view.Headline` (struct)** — different packages, different domains (one is a sentence about the diff; the other is a renderable section). Acceptable polysemy at the package boundary.
+- **`sarif.Run` vs `state.Run`** — same word, very different referents, but each is unambiguous inside its package and the cross-package call sites disambiguate via the `pkg.` prefix.
+- **`pkg/cluster.Run([]Input) []Cluster`** — `Run` here is a verb (execute the clusterer); the function's body matches. Not a noun collision in callers (`cluster.Run(...)` reads correctly).
+- **`internal/lineread.Read`** — `lineread.Read(br)` predicts "read a line from `br`", body reads exactly that.
+- **`pkg/state/state.go` containing `Dir/Path/Load/Save/Reset/Append/RunFromReport`** — file basename matches package lifecycle; not a dumping ground.
+- **Hygiene packages (`status`, `metrics`, `tally`, `scene`)** — each package's basename matches its `# fo:<name>` header sentinel and the parsed root type. Strong self-documenting structure.
+- **Tests** — all sampled `Test<Foo>` names target real `Foo` symbols (`TestExtractTopUserFrame_*`, `TestClassify*`, `TestHeadline_*`, `TestMakeClusterID_*`).
+- **Wrappers (`pkg/wrapper/wrap*`)** — file/package basenames match the tool they adapt (cover, jscpd, gobench, archlint, diag, leaderboard). Honest.
+
+## Verdict
+
+3 findings, all P2 cosmetic. Repo's naming hygiene is high. The two highest-impact renames are F1 (`Ruleset` → `Set`, propagates to one caller package) and F3 (`FileIssue` → `FileIssueCounts`, propagates to the leaderboard view). F2 is single-call-site if `AppendMetrics` is only invoked from `cmd/fo` and one wrapper.

@@ -1,163 +1,113 @@
-# zero-sentinel — repo
+# zero-sentinel — fo repo
 
-Run: f62c7fc3af14 · 2026-05-16 · scope=project · mode=report
+run_id: bd775e303d86-zero-sentinel
+date: 2026-05-17
+scope: whole repo
+findings: 3 (cap 10)
 
-Scanned: all `time.Time` fields and uses (no `uuid.UUID` in tree, no custom
-`MarshalJSON`/`Scan`/`Value`, no map-index chained reads on non-counter maps).
-Surface is small; the live hazards cluster on the `GeneratedAt` field across
-three sibling structs that all flow into JSON / sidecar output.
-
-## Summary
-
-| Rule | Findings | Tier |
-|---|---|---|
-| time-zero-as-missing | 3 | 🟡 |
-| optional-value-without-pointer | 1 | 🟢 |
-| map-index-no-comma-ok | 0 | 🟢 |
-| nil-uuid-as-sentinel | 0 | 🟢 (no uuid dep) |
-| string-empty-as-absent | 0 | 🟢 |
-| boundary-zero-roundtrip | 0 | 🟢 (no custom marshal/scan) |
-| nil-vs-empty-slice-conflated | 0 | 🟢 |
-
-Overall: 🟡 — one persistence-path hazard (F1) reachable through a normal
-control-flow branch, two adjacent risks that depend on caller discipline.
+Overall tier: 🟢 — fo treats zero values carefully. `Suppression.Until` is `*time.Time`; `RunFromReport` IsZero-guards before persisting; fo-7jv already hardened the 0001-year deserialization path. The three findings below are latent contract gaps, not active bugs.
 
 ---
 
-### 1. [F1] merged Report.GeneratedAt left zero on all-failed-section parse
+### 1. [F1] `pkg/report/filter.go:22` — time-zero-as-missing
 
-- **Site:** `cmd/fo/main.go:754`
-- **Zero value:** `time.Time{}`
-- **Domain meaning conflated:** "report not stamped" vs "report generated at year 0001"
-- **Failure mode:** `merged := &report.Report{Tool: "multi"}` starts with a
-  zero `GeneratedAt`. The loop only advances it when a sub-report parses
-  successfully (`sub.GeneratedAt.After(merged.GeneratedAt)`). If every
-  section fails (`perr != nil`, `continue`) or every body is empty (the
-  `len(body) == 0` skip), the merged Report exits with `GeneratedAt =
-  time.Time{}` and that zero is JSON-encoded as `"generated_at":
-  "0001-01-01T00:00:00Z"` — the exact pgx-style sentinel the rule warns
-  about. Downstream consumers (state sidecar, metrics history, any tail
-  reader) cannot distinguish "this run produced no parseable section"
-  from "this run was generated at the dawn of the Gregorian calendar".
-- **Code:**
-  ```go
-  merged := &report.Report{Tool: "multi"}
-  for _, sec := range sections {
-      ...
-      sub, perr := parseSection(sec, body, stderr)
-      if perr != nil { ...; continue }
-      ...
-      if sub.GeneratedAt.After(merged.GeneratedAt) {
-          merged.GeneratedAt = sub.GeneratedAt
-      }
-  }
-  return merged, nil
-  ```
-- **Fix:** stamp `merged.GeneratedAt = time.Now().UTC()` at construction,
-  matching `pkg/testjson/toreport.go:25` and `pkg/sarif/toreport.go:23`.
-  Then the `After` step only narrows when sub-reports carry a later
-  time — and the field is never zero on the wire.
+**Diagnosis.** `ApplyFilter(r, rs, now time.Time)` and `classifyFinding(..., now time.Time)` accept a zero `time.Time` silently. If a caller ever passes `time.Time{}`, the year-0001 reference flips `Suppression.Expired` behaviour across the whole ruleset — every Until-bearing rule reports the opposite of its real state.
+
+**Why.** The function is a pure-data API on the public package — nothing in its signature, doc, or body asserts `!now.IsZero()`. Today all four call sites pass `time.Now()`, but the trap is one refactor away (e.g., a future "evaluate as of report.GeneratedAt" change where GeneratedAt happens to be zero on a parse-failure path).
+
+**Evidence (Read-verified).**
+```go
+// pkg/report/filter.go:22
+func ApplyFilter(r *Report, rs *suppress.Ruleset, now time.Time) FilterStats {
+    ...
+    activeIdx, expiredIdx := classifyFinding(rs, f.RuleID, f.File, now)
+
+// pkg/report/filter.go:55-66
+func classifyFinding(rs *suppress.Ruleset, ruleID, file string, now time.Time) (activeIdx, expiredIdx int) {
+    ...
+    if rs.Rules[i].Expired(now) { ... }
+
+// pkg/suppress/suppress.go:50-59 — Expired computes today from now.UTC().Date();
+// zero now yields today=0001-01-01, after which today.After(*Until) is false
+// for any sane Until, silently extending every suppression past its real expiry.
+```
+
+**Fix.** Either (a) add a defensive default at the top of `ApplyFilter`: `if now.IsZero() { now = time.Now().UTC() }` (preserves the lenient contract), or (b) rename the parameter `evalAt` and document the precondition; in tests, assert `!evalAt.IsZero()`. (a) is the safer choice for a public-package function.
+
+**Tier.** 🟡 — latent, not active. Public API surface raises the cost of a future mistake.
 
 ---
 
-### 2. [F2] state.Run.GeneratedAt is `time.Time` (value) — zero-on-write is masked, not prevented
+### 2. [F2] `pkg/sarif/types.go:86-89` `pkg/report/report.go:37` — optional-value-without-pointer
 
-- **Site:** `pkg/state/state.go:67` (struct), `pkg/state/state.go:240-245` (guard)
-- **Zero value:** `time.Time{}`
-- **Domain meaning conflated:** "run never stamped" vs "epoch run"
-- **Failure mode:** `NewRun` does the right thing —
-  `if ts.IsZero() { ts = time.Now().UTC() }` — but the *struct* still
-  exposes a value `time.Time`. Any future caller that constructs a
-  `state.Run{Findings: ..., Tests: ...}` literal without going through
-  `NewRun` writes `0001-01-01...` to the sidecar JSON. The guard is at
-  the wrong layer: it lives in a constructor, not the type. The pgx
-  incident was exactly this shape — guards in app code, zero permitted
-  in the type, driver swap silently writes the sentinel.
-- **Code:**
-  ```go
-  type Run struct {
-      GeneratedAt time.Time           `json:"generated_at"`
-      ...
-  }
+**Diagnosis.** `Region.StartLine/StartColumn/EndLine/EndColumn` and `Finding.Line/Col` are plain `int` with `omitempty`. Zero means both "absent from source" and "line 0" — but line 0 is not a valid source location. The SARIF spec uses absence-of-field to mean "no precise location"; with `omitempty + int`, fo cannot distinguish a tool that emitted `startLine: 0` (malformed) from one that omitted the field.
 
-  // NewRun
-  ts := r.GeneratedAt
-  if ts.IsZero() {
-      ts = time.Now().UTC()
-  }
-  return Run{ GeneratedAt: ts, ... }
-  ```
-- **Fix:** either (a) make the field `*time.Time` with `omitempty` and
-  treat nil as "not stamped, defaulted on read", or (b) keep the value
-  but add an `IsZero` guard inside `Save` (the only write seam) so the
-  invariant lives with the persistence boundary. Option (b) is the
-  minimum change.
+**Why.** `Result.Line()` (pkg/sarif/types.go:97) returns `r.Locations[0].PhysicalLocation.Region.StartLine` directly. Downstream renderers display `file:0` as if it were a real location. When a new wrapper (jscpd, archlint) is added and forgets to set StartLine, the rendered output silently shows `file:0:0:` — the reader can't tell whether the tool failed to locate the finding or pointed at the file header.
+
+**Evidence (Read-verified).**
+```go
+// pkg/sarif/types.go:86-89
+type Region struct {
+    StartLine   int `json:"startLine,omitempty"`
+    StartColumn int `json:"startColumn,omitempty"`
+    ...
+}
+
+// pkg/sarif/types.go:93-98
+func (r *Result) Line() int {
+    if len(r.Locations) == 0 { return 0 }
+    return r.Locations[0].PhysicalLocation.Region.StartLine
+}
+
+// pkg/report/report.go:37-38
+Line  int `json:"line,omitempty"`
+Col   int `json:"col,omitempty"`
+```
+
+**Fix.** Either treat 0 as "absent" by convention everywhere (document in `report.Finding` and in `pkg/sarif/types.go`; renderers must skip `file:0` formatting), or change to `*int` at the IR boundary. The lighter fix is documentation + a render-side guard: when Line==0, print `file` without a `:line` suffix.
+
+**Tier.** 🟡 — production path (every SARIF wrapper hits it) but cosmetic, not a correctness bug.
 
 ---
 
-### 3. [F3] state.MetricsRun.GeneratedAt has no IsZero guard at the write seam
+### 3. [F3] `pkg/testjson/types.go:72-80` — optional-value-without-pointer (Status semantics)
 
-- **Site:** `pkg/state/metrics_history.go:37-40`, `pkg/state/metrics_history.go:73`, `pkg/state/metrics_history.go:100`
-- **Zero value:** `time.Time{}`
-- **Domain meaning conflated:** "sample set not stamped" vs "epoch sample set"
-- **Failure mode:** Current call sites at lines 73 and 100 both set
-  `GeneratedAt: time.Now().UTC()`, so today the field is always
-  populated. There is no guard in `Save`-equivalent code (the package
-  marshals the envelope directly). If a future code path appends to
-  `hist.Runs` without setting `GeneratedAt` — symmetrical to F2 — the
-  persisted history will contain a year-0001 sample group. Trend windows
-  and sparklines that order by `GeneratedAt` will silently rank that run
-  as the oldest forever, corrupting trend math without any error.
-- **Code:**
-  ```go
-  type MetricsRun struct {
-      GeneratedAt time.Time      `json:"generated_at"`
-      Samples     []MetricSample `json:"samples"`
-  }
-  ...
-  Runs: []MetricsRun{{GeneratedAt: time.Now().UTC(), Samples: legacy}}
-  ...
-  hist.Runs = append([]MetricsRun{{GeneratedAt: time.Now().UTC(), Samples: samples}}, hist.Runs...)
-  ```
-- **Fix:** add an IsZero default in the save path (mirroring `NewRun`),
-  or wrap the append in a `NewMetricsRun` constructor that stamps the
-  field. Type-level fix (`*time.Time`) is overkill here — the field is
-  required by contract; a constructor is enough.
+**Diagnosis.** `TestPackageResult.Status()` returns `StatusPass` when `Passed == Failed == Skipped == 0`. A zero-test package (e.g., `-run` pattern matched nothing, or a package built but no tests ran) is indistinguishable from a one-pass-zero-fail success. The reader sees "PASS" for a package that ran nothing.
+
+**Why.** `TotalTests()` exists but `Status()` doesn't consult it. The view layer relies on `Status()` to pick the green checkmark vs. red X. A package whose tests were all filtered out renders as a clean pass, masking a likely user mistake.
+
+**Evidence (Read-verified).**
+```go
+// pkg/testjson/types.go:72-80
+func (r *TestPackageResult) Status() Status {
+    if r.BuildError != "" || r.Panicked || r.Failed > 0 {
+        return StatusFail
+    }
+    if r.Passed == 0 && r.Skipped > 0 {
+        return StatusSkip
+    }
+    return StatusPass        // ← also returned when Passed==Failed==Skipped==0
+}
+```
+
+**Fix.** Add an explicit branch: `if r.Passed == 0 && r.Failed == 0 && r.Skipped == 0 { return StatusSkip }` (or introduce a `StatusEmpty` if the renderer wants to distinguish "no tests" from "all skipped"). Aligns with `go test`'s own `ok pkg [no test files]` convention.
+
+**Tier.** 🟡 — affects reader interpretation in a legitimate edge case.
 
 ---
 
-### 4. [F4] report.Report.GeneratedAt is value-typed for a required-on-wire field
+## Not flagged (positive controls)
 
-- **Site:** `pkg/report/report.go:67-78`
-- **Zero value:** `time.Time{}`
-- **Domain meaning conflated:** the field is required by the JSON schema
-  (no `omitempty`) but the type permits zero. F1 is the live exploit;
-  this is the latent type-level shape that admits it.
-- **Failure mode:** Same family as F2 — the constructor discipline lives
-  in parsers (`pkg/testjson/toreport.go:25`, `pkg/sarif/toreport.go:23`)
-  rather than the type. Every new producer that doesn't import a
-  constructor (e.g. the `merged` builder in F1) is one diff away from
-  shipping `0001-01-01`. JSON schema consumers reading the schema
-  exposed via `fo --print-schema` will see `generated_at: string` and
-  trust it.
-- **Fix:** lowest-friction is a `report.New(tool string) *Report`
-  constructor that stamps `GeneratedAt = time.Now().UTC()`, plus a lint
-  rule (or simple grep test) that forbids `report.Report{` literals
-  outside that constructor. Pointer typing is unnecessary because the
-  domain has no "absent" case for this field — every report has a
-  generation time by definition.
+- `pkg/state/state.go:241-244` — RunFromReport guards `r.GeneratedAt.IsZero()` before persisting. ✓
+- `pkg/suppress/suppress.go:43` — `Until *time.Time` correctly nullable. ✓
+- `pkg/suppress/suppress.go:173-175` — explicit `t.Year() <= 1` reject in Parse (fo-7jv hardening). ✓
+- `pkg/state/metrics_history.go:73,100` — GeneratedAt populated unconditionally on append. ✓
+- `pkg/report/report.go:84` `Report.GeneratedAt` as plain `time.Time` — populated unconditionally by every ToReport path (`pkg/sarif/toreport.go:23`, `pkg/testjson/toreport.go:34`), so absent-vs-zero ambiguity cannot arise. ✓
+- No `uuid` library in use; UUID-shaped strings are regex-normalized, not used as IDs. ✓
+- No raw map-index-then-deref patterns in non-test code. ✓
 
----
+## Don't-flag exclusions applied
 
-## Notes / non-findings (kept for audit trail)
-
-- `pkg/testjson/types.go:37` — `TestEvent.Time` is read straight from
-  `go test -json` and only round-tripped into intermediate aggregates;
-  no path uses it as a domain signal or persists it. Not flagged.
-- `cmd/fo/fswatch.go` — `time.Time` channels and timers are all
-  in-process control flow, never crossing a wire/persistence boundary.
-  Not flagged.
-- No `uuid.UUID`, no `sql.Null*`, no custom `MarshalJSON`/`Scan`/`Value`,
-  no map-index chained reads on non-counter maps. The repo's surface
-  for this linter is genuinely small; almost all risk concentrates on
-  the three sibling `GeneratedAt` fields above.
+- `pkg/testjson/types.go:37` `TestEvent.Time` — populated by `go test -json`; never consumed downstream where zero would change behaviour.
+- `pkg/testjson/types.go:53` `Coverage float64` — currently unused by renderers; flag deferred until a consumer treats 0.0 specially.
+- All `if s == ""` checks reviewed are guards on user input or parser tokens where empty == absent is the domain convention.

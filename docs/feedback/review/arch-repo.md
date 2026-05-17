@@ -1,87 +1,80 @@
-# arch · repo · /Users/vcto/Projects/fo
+# arch · repo
 
-RUN_ID: f62c7fc3af14
-linter: arch (project, report-only)
-target: repo
-module: `github.com/dkoosis/fo`
+run-id: bd775e303d86-arch · target: repo (whole) · mode: report
 
-## Summary
+Overall: **green-yellow**. Small repo (20 pkgs, ~9.5k LOC). No import cycles, no >50 coupling pairs (excl. tests), no orphans, no danger-zone Ca+I combos. Two structural notes worth surfacing: the absence of a `.go-arch-lint.yml` (declared layering is informal) and multi-domain mixing inside `pkg/state`.
 
-| Dimension | Tier | Note |
-|-----------|------|------|
-| Conformance | green | no cycles; no `.go-arch-lint.yml` (gap, not a violation) |
-| Coupling | green | no danger-zone pkgs; top cross-pkg pair `cmd/fo→pkg/testjson` = 27 calls (<50 threshold) |
-| API Surface | yellow | 1 pkg with mixed-family surface; rest <=35 |
-| Pkg Health | green | no god pkgs (cmd/fo exempt); 2 lazy/seam-borderline wrappers |
-| Structural | yellow | no `.go-arch-lint.yml` to lock the declared layering in `.claude/rules/CLAUDE.md` |
-
-Overall: **yellow**. Repo topology is clean (no cycles, no reverse-DAG since single module, no orphans, no god pkgs). One pkg mixes unrelated families; one structural gap (missing layering config) leaves the documented architecture unenforced.
+| Dimension | Score | Notes |
+|---|---|---|
+| Conformance | yellow | no `.go-arch-lint.yml`; layering exists only in `CLAUDE.md` prose |
+| Coupling | green | max cross-pkg call pair (non-test) = 25 (cmd/fo→testjson) |
+| API Surface | green-yellow | pkg/state ~36 non-test exports across 3 domains |
+| Pkg Health | green-yellow | pkg/state multi-domain; pkg/view LCOM4=14 (defer to cohesion) |
+| Structural | green | no cycles, no orphans, no reverse-DAG (single module) |
 
 ## Findings
 
-### 1. [F1] `pkg/state/state.go:23` — pkg-surface-bloat
+### 1. [F1] `.go-arch-lint.yml:0` — layering-violation
 
-**Diagnosis.** `pkg/state` exports 41 symbols spanning three distinct families: sidecar persistence (`File`, `Envelope`, `Load`, `Save`, `Reset`, `Run`, `RunFromReport`, `Path`, `Dir`, `SchemaVersion`, `DefaultPath`, `MaxHistory`, `ErrVersionSkew`, `ErrDurabilityDegraded`); diff classification (`Class`, `Class*` consts, `Diff`, `Item`, `Classify`, `Severity`, `Sev*` consts, `Headline`); and metrics-history (`MetricSample`, `MetricDelta`, `MetricsRun`, `MetricsFile`, `LoadMetricsHistory`, `LoadMetrics`, `AppendMetrics`, `DiffMetrics`, `MetricsHistoryPath`, `MaxMetricsHistory`, `MetricsSchemaVersion`).
+**Diagnosis.** No `.go-arch-lint.yml` (or `-target.yml`) in repo root. The architecture-layering contract documented in `/Users/vcto/Projects/fo/.claude/rules/CLAUDE.md` (stdin→read→sniff→parse→Report→diff→render→exit, plus "Report is the IR" / "wrappers don't render" rules) is enforced only by code review.
 
-**Why.** Readers can't predict which file owns which behavior; consumers (currently only `cmd/fo`) pull a wide surface they don't all need. Three orthogonal lifecycles share one import path — touching one family forces re-reading the others.
+**Why.** `arch.rules.md#layering-violation` treats the YAML as source-of-truth for intended layering. With nothing to check against, every layering question is an opinion. The north-star doc lists six load-bearing decisions any of which a future renderer-that-imports-state or wrapper-that-imports-view could quietly violate.
 
-**Evidence.**
-- 41 exported non-test symbols (`snipe` symbols table, `name GLOB '[A-Z]*' AND name NOT LIKE 'Test%'`).
-- File-level split already implicit: `state.go` (278 LOC), `diff.go`, `metrics_history.go` (136 LOC), `headline.go`.
-- 14 call edges `cmd/fo → pkg/state` confirm single-consumer fan-in.
-- Architecture doc (`.claude/rules/CLAUDE.md`) describes `pkg/state` as "sidecar `.fo/last-run.json` for diff classification" — the metrics-history sub-family was bolted on later (fo-2nj, #258 in recent commits).
+**Evidence.** `ls /Users/vcto/Projects/fo/.go-arch-lint*.yml` → no matches. `/Users/vcto/Projects/fo/.claude/rules/CLAUDE.md` lines 15-58 carry the prose contract.
 
-**Fix.** Split along family lines — keep persistence in `pkg/state`, move diff classification to `pkg/state/diff` (or merge into `pkg/fingerprint`/`pkg/score` next to its peers), move metrics history to `pkg/metrics` (which already exists at 8 exports and is the natural home). Or, if splitting is too disruptive, demote families' internal helpers to unexported and keep only the narrow surface `cmd/fo` actually wires.
+**Fix.** Add `.go-arch-lint.yml` codifying: (a) `pkg/wrapper/*` may import `pkg/sarif`, `pkg/report`, `pkg/metrics`, `pkg/status`, `pkg/tally` — never `pkg/view`/`pkg/paint`/`pkg/theme`; (b) parsers (`pkg/sarif`, `pkg/testjson`) never import `pkg/view`; (c) `internal/*` is leaf-only; (d) `cmd/fo` is the only composition root. Wire `go-arch-lint check` into the target that already runs `make report`.
 
-**Rule:** `pkg-surface-bloat`
+**Tier.** P0 (conformance) — gap, not regression.
 
 ---
 
-### 2. [F2] `.claude/rules/CLAUDE.md:1` — layering-violation (gap)
+### 2. [F2] `pkg/state/state.go:1` — pkg-surface-bloat
 
-**Diagnosis.** Project documents a layered architecture (`stdin → read → sniff → parse → Report (IR) → diff → render → exit`) and an explicit pkg-role table, but there is no `.go-arch-lint.yml` or `.go-arch-lint-target.yml`. The layering exists only in prose; nothing prevents a future change from importing `pkg/sarif` directly from `pkg/view`, or `pkg/state` from `pkg/report`, etc.
+**Diagnosis.** `pkg/state` exports ~36 non-test symbols spanning three distinct domains: run persistence (`Run`, `RunFromReport`, `Save`, `Load`, `Envelope`, `File`, `Diff`, `Item`, `Severity`+constants, `Classify`+classes, `Class*` consts), metrics history (`MetricsRun`, `MetricSample`, `MetricsFile`, `MetricDelta`, `AppendMetrics`, `LoadMetricsHistory`, `DiffMetrics`, `MetricsHistoryPath`, `MetricsSchemaVersion`, `MaxMetricsHistory`), and presentation (`Headline`). Different lifecycles, different callers, different invariants.
 
-**Why.** Without a config, the catalog rule fires as a *gap* rather than a violation — but it is the highest-leverage structural finding here because every other dimension is green and the docs already encode the rules. Tier-2 (target) config would let drift accumulate visibly instead of silently.
+**Why.** `arch.rules.md#pkg-surface-bloat` flags multi-domain pkgs because consumers can't predict where behavior lives. `Headline` in particular is a presentation helper riding inside a persistence pkg; metrics history is a parallel storage system with its own schema version (`MetricsSchemaVersion` vs `SchemaVersion`). A consumer importing `pkg/state` for `Run.Save` drags the metrics history surface and a presentation formatter.
 
-**Evidence.**
-- No `.go-arch-lint*.yml` in repo root.
-- `.claude/rules/CLAUDE.md` lines documenting the pipeline + the `Package Structure` table with explicit roles per pkg.
-- Current topology happens to conform (pagerank: `pkg/report` is top hub with Ca=5, instability=0; renderers depend on report, not the reverse), so a config codifies the current shape without forcing a refactor.
+**Evidence.** Files: `pkg/state/state.go` (279 LOC, run+diff+severity), `pkg/state/metrics_history.go` (parallel persisted format), `pkg/state/headline.go` (presentation), `pkg/state/diff.go` (classification). Two `SchemaVersion` constants confirm two independent persisted formats. `sqlite3 .snipe/index.db` shows 70 raw exports including tests, ~36 production exports.
 
-**Fix.** Add `.go-arch-lint-target.yml` first (advisory, no failures) mapping the seven pipeline stages to component constraints — e.g. `view` may depend on `report|paint|theme` but not `sarif|testjson|state`; `sarif|testjson` may depend on `report` but not on each other; `wrapper/*` may depend on `sarif|tally|metrics|status` but not on `view|state`. Once green for a release cycle, promote to `.go-arch-lint.yml`.
+**Fix.** Three sub-pkgs along the verb-clusters already present in the filenames: `pkg/state` (run + diff + severity + classify), `pkg/state/metrics` (metrics history), and move `Headline` into `pkg/view` or a new `pkg/state/summary` — it formats, doesn't store. Keep `state.Save/Load` as the only persistence entry points.
 
-**Rule:** `layering-violation`
+**Tier.** P2 (API surface).
 
 ---
 
-### 3. [F3] `pkg/wrapper/wrapcover/wrapcover.go:1` — lazy-package
+### 3. [F3] `pkg/cluster/cluster.go:1` — lazy-package (borderline)
 
-**Diagnosis.** `pkg/wrapper/wrapcover` exports 2 non-test symbols (`Convert`, `key`) with Ca=1 (only `cmd/fo`). Mirror analysis: `pkg/wrapper/wrapgobench` exports 3 (`Convert`, `unitKey`, plus regex vars) with Ca=1. Both are below the catalog threshold of `<3 exported AND Ca<2`.
+**Diagnosis.** `pkg/cluster` has Ca=1 (only `pkg/testjson` imports it), ~14 non-test exports, ~800 LOC including extensive property tests. Borderline against the lazy-pkg rule (<3 exports AND Ca<2) — the export count clears the bar but the single consumer triggers a look.
 
-**Why.** Two notes here: (a) the catalog rule's own "don't flag" carve-out applies — `pkg/wrapper/*` is a deliberate seam for the `fo wrap <name>` dispatch, and per the architecture doc adding a wrapper means "new package under `pkg/wrapper/`, expose `Convert`". (b) However, both `wrapcover` and `wrapgobench` are *strictly thinner* than their peers (`wraparchlint`, `wrapdiag`, `wrapjscpd` each have 7-15 exports and 88-150 LOC of real work) — they're the boundary cases for whether the seam pattern is paying off.
+**Why.** `arch.rules.md#lazy-package` says deliberate seams (plugin boundaries, DI ports, build-tag gates) get a pass. Cluster is a deliberate seam — test-failure deduplication engine with its own normalize+frame extraction pipeline and property-tested invariants. With a single consumer and no extension point, the boundary buys test isolation but not modularity. Worth a note, not a fix.
 
-**Evidence.**
-- `wrapcover/wrapcover.go`: 2 exports, Ca=1, 1 production .go file (other is its test).
-- `wrapgobench`: 3 exports, Ca=1.
-- Compare `wraparchlint`: 7 exports, Ca=1, but ships a `convert.go` + `archlint.go` split; `wraparchlinttext`: 3 exports, Ca=1 — same border.
-- The wrapper dispatch in `cmd/fo/main.go` is the single caller, so folding into `cmd/fo/wrap_*.go` would lose nothing structurally.
+**Evidence.** `sqlite3 .snipe/index.db "SELECT DISTINCT importer_pkg FROM imports WHERE pkg_path='github.com/dkoosis/fo/pkg/cluster'"` → `pkg/testjson` only. metrics-ca.txt rank 11: Ca=1. metrics-instability shows I=0 (stable leaf).
 
-**Fix.** Hold as-is (seam exemption applies and the pattern is uniform across 7 wrappers, which is its own virtue). If the seam ever earns a non-cmd caller (e.g. a library mode), the pattern pays off retroactively. Re-check in 6 months: any wrapper still at <=3 exports / Ca=1 with no second caller is a real lazy-package candidate.
+**Fix.** Leave as-is — property tests and orthogonal normalize/frame modes justify the boundary. Revisit if a second consumer never materialises and the surface shrinks; then fold into `pkg/testjson/internal/cluster`.
 
-**Rule:** `lazy-package`
+**Tier.** P3 (structural, informational).
 
 ---
 
-## Not flagged (with reason)
+### 4. [F4] `pkg/scene/scene.go:1` — pkg-surface-bloat (mild)
 
-- **cmd/fo as god-package.** 80 exported (mostly tests), Ce=17, ~3.8k LOC. Catalog explicitly carves out `cmd/*` composition roots. Production-only export count is 6.
-- **cmd/fo → pkg/testjson coupling.** 27 cross-pkg calls. Below the 50-call coupling-hotspot threshold and the relationship is intentional (cmd/fo is the only consumer of the parser).
-- **pkg/sarif, pkg/testjson, pkg/view at 35/32/32 exports.** All single-family (SARIF types, testjson parser, renderers). Yellow tier, no surface-bloat split.
-- **No orphans.** All non-`cmd/*`, non-`*_test` pkgs have at least one importer.
-- **No cycles.** `snipe metrics --kind=cycles` returned empty SCC list.
-- **No reverse-DAG.** Single module (`github.com/dkoosis/fo`), no `go.work`.
+**Diagnosis.** `pkg/scene` has 14 non-test exports including 5 sentinel error vars (`ErrMalformedAct`, `ErrMalformedActor`, `ErrMalformedExit`, `ErrNoHeader`, `ErrUnknownAttr`) for a single consumer (`pkg/view`). Single domain (scene parsing), so not multi-family bloat — but the sentinel-error surface is large for one importer.
 
-## Data sources
+**Why.** `arch.rules.md#pkg-surface-bloat` covers wide consumer surface. Sentinels exported "in case the consumer wants to switch on them" that the consumer never branches on = avoidable export and an API stability liability.
 
-- Pre-built bundle: `metrics-ca`, `metrics-ce`, `metrics-instability`, `metrics-pagerank` from `/tmp/snipe-bundle-f62c7fc3af14/`.
-- Live: `snipe metrics --kind=cycles` (empty); `snipe lifecycle Report --depth 2` (Mutate=0, healthy); direct SQL over `.snipe/index.db` for tightly-coupled pairs and exported-symbol counts (filtering `Test*` prefixes).
+**Evidence.** `sqlite3 .snipe/index.db "SELECT DISTINCT importer_pkg FROM imports WHERE pkg_path='github.com/dkoosis/fo/pkg/scene'"` → `pkg/view` plus tests. Sentinels listed via `sqlite3` exports query above.
+
+**Fix.** Either keep one `ErrMalformed` umbrella + `errors.Is` paths, or unexport the four narrow variants and surface only `ErrNoHeader` + `ErrUnknownAttr` if those carry distinct caller semantics. Audit the four `Err*` call sites in `pkg/view` first.
+
+**Tier.** P3 (surface trim).
+
+---
+
+## Empty / informational buckets
+
+- **dependency-cycle** — none in the import graph. The 2 call-graph SCCs in `metrics-cycles.txt` are deliberate recursion: `Render`↔`renderDelta` (delta wraps an inner ViewSpec re-rendered through the same dispatch in `pkg/view/render.go:21` + `pkg/view/delta.go:13`), and `run`↔`runWatch`↔`runChildAndRender` (watch loop in `cmd/fo/watch.go:91-222` calls back into the render pipeline per trigger). Both intended.
+- **reverse-dag-import** — single-module repo, n/a.
+- **coupling-hotspot** — max non-test cross-pkg call count is 25 (cmd/fo→testjson); threshold is 50. Ca/I danger zone empty: `internal/lineread` Ca=10 has I=0 (leaf reader, stable as it should be); `pkg/report` Ca=5 I=0.167. No fragile coordinators (max non-cmd Ce=5 in `pkg/testjson`).
+- **god-package** — `cmd/fo` (Ca=0, Ce=19, 81 exports, 3.1k LOC) is the composition root and exempt by rule. No other pkg combines high Ca + high LOC + wide surface.
+- **orphan-package** — none. `pkg/cluster` and `pkg/scene` each have exactly one production consumer; not zero.
+- **lifecycle-split-ownership** — `Report` (the IR) is constructed by `pkg/sarif`, `pkg/testjson`, and `pkg/report.ParseSections`; mutated by `pkg/state` (diff classification attaches `DiffSummary`); consumed read-only by `pkg/view`. Single mutation site, clean create→mutate→read pipeline. No split ownership.

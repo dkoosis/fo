@@ -1,15 +1,17 @@
 # sqlite review — repo
 
-run_id: f62c7fc3af14
-scope: project
-target: repo
+RUN_ID: bd775e303d86-sqlite
+Scope: whole repo (/Users/vcto/Projects/fo)
+Findings: 0
 
-## Summary
+## Note
 
-Nothing to change — no SQLite usage detected.
+`fo` is a streaming output renderer (stdin → IR → render). It does not use SQLite.
 
-fo has no SQLite driver imports, no `.db` files, no `PRAGMA` statements, and no migrations. The only matches for "sqlite" are inside `testdata/golden/v*/gotest/large-pass.input.json` (sample go-test event names from an unrelated upstream fixture), which are intentionally frozen test fixtures and out of scope.
+Verification:
+- `rg -l "sqlite|database/sql|mattn/go-sqlite|modernc.org/sqlite" --type go` → no matches
+- `grep -i sqlite go.mod go.sum` → no matches
+- The only persistent state is a JSON sidecar at `.fo/last-run.json` (see `pkg/state/`).
+- The "sqlite" string appears only in frozen go-test fixture data under `testdata/golden/v*/gotest/` (out of scope).
 
-## Findings
-
-(none)
+No findings to report. Linter not applicable to this codebase.

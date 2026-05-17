@@ -1,139 +1,66 @@
-# test-tables — repo
+# test-tables — repo review
 
-Scope: project. Linter: test-tables. Mode: report.
-go.mod: `go 1.24.0` — no legacy `tt := tt` rescope needed (none found, clean).
+**Run:** `bd775e303d86-test-tables`
+**Date:** 2026-05-17
+**Scope:** repo (30 table-test literals across 21 files)
+**Go version:** `go 1.24.0` (per `go.mod`)
 
-Overall: table-tests in this repo are mostly well-shaped. Most have `name` fields and use `t.Run(tt.name, ...)`. Findings below are concentrated in three files; the rest is clean.
+## Tier roll-up
 
-### 1. [F1] per-case-branching — `testjson.TestParseStream_Behavior`
+| Rule | Status |
+|---|---|
+| `table-per-case-branching` | 🟢 0 |
+| `table-one-row` | 🟢 0 |
+| `table-unused-field` | 🟡 1 |
+| `table-tt-rescope-go-1-22` | 🟢 0 |
+| `table-style-inconsistent` | 🟢 0 (intra-pkg) |
+| `table-name-field-missing` | 🟢 0 (recognizable inputs exempt) |
 
-**Test:** `pkg/testjson/parser_test.go:10` (loop body at `:97-137`)
-**Issue:** `per-case-branching`
+Overall: 🟢 — the test-table surface is healthy. One unused-field finding, one info nit.
 
-The table has 5 rows but the body conditionally asserts on different fields per row, so the cases don't share a shape:
+## Findings
 
-```go
-if len(results) != tt.wantPackages { ... }
-if tt.wantPackages == 0 { return }                              // shape-1 early return
-got := results[0]
-if got.Name != tt.wantPackageName { ... }
-if got.Passed != tt.wantPassed { ... }
-...
-if tt.wantStatus != "" && got.Status() != tt.wantStatus { ... } // shape-2: status row
-if tt.wantCoverage > 0 && (got.Coverage < tt.wantCoverage-0.01 ...) // shape-3: coverage row
-if got.Panicked != tt.wantPanicked { ... }                      // shape-4: panic row
-```
+### 1. [F1] `pkg/testjson/parser_test.go:20` — table-unused-field
 
-The struct has 10 fields, most rows leave 5+ at zero. "package with no test activity is skipped" diverges entirely (returns before the per-package asserts). "coverage is parsed" and "panic output marks package" each carry a single distinctive assertion guarded by a non-zero/empty check.
+**Diagnosis.** `TestParseStream_Behavior` declares `wantSkipped int` on the row struct and asserts it (`got.Skipped != tt.wantSkipped`), but no row in the table ever sets it to a non-zero value. Every assertion compares `got.Skipped` against `0` — a zero-value assertion that hides the field's real purpose.
 
-**Fix:** split into focused tests with uniform shapes:
-- `TestParseStream_AggregatesPassFail` — base case asserting Passed/Failed/Status
-- `TestParseStream_ParsesCoverage` — one or two cases, asserts Coverage
-- `TestParseStream_DetectsPanic` — asserts Panicked
-- `TestParseStream_SkipsMalformedLines` — asserts Malformed counter
-- `TestParseStream_SkipsEmptyPackages` — asserts len(results)==0
+**Why.** Either a deliberate "passes today, will trip if regression" guard (in which case it should be exercised by at least one row), or vestigial from a removed test case. Today it's neither a real constraint nor documentation.
 
-Each then has its own narrow struct and body. The "if field != zero { assert }" pattern is the smell.
+**Evidence (Read-verified).** `pkg/testjson/parser_test.go:20` declares the field; rows at L26–94 (5 cases) never reference `wantSkipped`; assertion at L124–125 always fires against zero. `rg -n 'wantSkipped' pkg/testjson/parser_test.go` returns only the declaration + the two assertion lines — no row populates it.
 
----
+**Fix.** Pick one:
+- Add a row that exercises a `skip` outcome and sets `wantSkipped: 1`. The skip-handling code path is already real (one of the existing rows could be extended).
+- Or drop the field and the assertion. Skip behavior is already covered by `TestProcessEvent_FreesOutputOnPassAndSkip` in the same package.
 
-### 2. [F2] name-field-missing — `wrapdiag.TestFixCommandFor`
-
-**Test:** `pkg/wrapper/wrapdiag/diag_test.go:176`
-**Issue:** `table-name-field-missing`
-
-```go
-tests := []struct {
-    tool, rule, file string
-    want             string
-}{
-    {toolGolangciLint, "SA4006", mainGoName, "golangci-lint run --fix --enable-only=SA4006 main.go"},
-    ...
-}
-for _, tt := range tests {
-    got := fixCommandFor(tt.tool, tt.rule, tt.file)
-    if got != tt.want { t.Errorf(...) }
-}
-```
-
-7 rows, no `name` field, no `t.Run`. On failure the diagnostic depends on `t.Errorf` formatting the inputs — workable for this case, but inconsistent with the rest of the repo where `name + t.Run` is the norm. Failures don't surface in `go test -v` as named subtests.
-
-**Fix:** add `name string` as first field; wrap loop body in `t.Run(tt.name, ...)`.
+**Tier.** 🟡 (P2 unused field, count = 1).
 
 ---
 
-### 3. [F3] name-field-missing — `wrapdiag.TestParseDiagLine`
+### 2. [F2] `pkg/wrapper/wrapdiag/diag_test.go:177,198` — table-name-field-missing (info)
 
-**Test:** `pkg/wrapper/wrapdiag/diag_test.go:197`
-**Issue:** `table-name-field-missing`
+**Diagnosis.** `TestFixCommandFor` (L176–195) and `TestParseDiagLine` (L197–220) iterate tables without `t.Run(...)`. Failures print the inputs (rule/file/tool/raw line) which are unique and recognizable, so this falls under the "don't flag" carve-out in the rule.
 
-Same shape as F2 — 8 rows, positional struct, no `name`, no `t.Run`. The struct fields are descriptive (`wantFile, wantLine, wantCol, wantMsg`) but a subtest name like "windows drive path" would make failures self-describing. Consistency with `TestNormalizeMessage` in `pkg/fingerprint/fingerprint_test.go` (which does use `name` + `t.Run`) argues for the same form here.
+**Why.** Logged as info, not a defect — the inputs themselves serve as case labels. If these tables grow past ~8 rows or start sharing inputs across cases, add `name string` + `t.Run`.
 
-**Fix:** add `name string` as first field; use `t.Run(tt.name, ...)`.
+**Evidence (Read-verified).** Tables at L177–188 and L198–212 use positional struct fields with `tool`, `rule`, `file`, `input` — each combination is uniquely identifiable in `t.Errorf` output (verified by inspecting the error format strings at L191 and L215).
 
----
+**Fix.** No action required. Note for future growth.
 
-### 4. [F4] style-inconsistent — `pkg/score` package
-
-**Test:** `pkg/score/score_test.go` (lines 9, 25, 56)
-**Issue:** `table-style-inconsistent`
-
-Within one file:
-
-- `TestSeverityWeight_MapsKnownLevels` uses `map[string]int{...}` then `for level, want := range cases`
-- `TestFileCentrality_PrecedenceRules` and `TestScore_SeverityOccurrenceCentralityMatrix` use `[]struct{name, ...}{...}` with `t.Run(tc.name, ...)`
-
-The map form is fine for trivial enum→weight mapping, but readers now have to predict which form a given test uses. The slice-of-struct form is the package convention everywhere else.
-
-**Fix:** migrate the map case to the same `[]struct{name, level string; want int}` form with `t.Run(tc.name, ...)`. Cheap, makes the file uniform.
+**Tier.** 🟢 info.
 
 ---
 
-### 5. [F5] unused-field across rows — `testjson.TestStream_EventDeliveryAndMalformedCounting`
+## Notes (audited, no finding)
 
-**Test:** `pkg/testjson/stream_test.go:12`
-**Issue:** `table-unused-field` (partial — field used by 1 of 3 rows)
+- **No per-case branching.** Scanned every table body — none switch on a row field. The `if tt.wantErr { ... } else { ... }` anti-pattern is absent.
+- **No one-row tables.** Smallest table found is 2 rows (e.g. `pkg/metrics/metrics_test.go:46` has 4 rows; `pkg/scene/scene_test.go:10` has 6).
+- **No legacy `tt := tt` rescopes** — `rg 'tt := tt|tc := tc'` returns empty. Already adapted to go 1.22+.
+- **Intra-package style is consistent.** Naming convention (`cases :=` vs `tests :=`) varies between packages but is uniform within each. `pkg/testjson/` uses `tests` across all 3 test files; `pkg/report/` uses `cases` across all 4 in `multiplex_test.go`. No `table-style-inconsistent` triggers.
+- **`pkg/scene/scene_test.go:10` `TestIsHeader`**, **`pkg/suppress/match_test.go:6` `TestMatchGlob`**, **`pkg/status/status_test.go:10`**, **`pkg/tally/tally_test.go:11`** all use no `name` field. In each case the literal inputs are short and self-describing — exempt per rule's "trivial tests where the inputs themselves are recognizable" clause.
+- **`pkg/score/score_test.go:9` `TestSeverityWeight_MapsKnownLevels`** uses a `map[string]int` rather than a struct slice. The map key is the label; appropriate for the shape (one input → one output).
 
-```go
-tests := []struct {
-    name          string
-    input         string
-    wantMalformed int
-    wantEvents    int
-    check         func(t *testing.T, events []TestEvent)
-}{
-    { name: "valid stream...", ..., check: func(...) { ... } },     // uses check
-    { name: "malformed lines are skipped", ... },                   // check nil
-    { name: "mixed malformed and valid lines", ... },               // check nil
-}
-```
+## Audit envelope
 
-Two of three rows leave `check` nil; only the first row has an event-content assertion. This is a soft per-case-branching smell — that one row wants a different shape (event-shape verification, not just counts). Body has `if tt.check != nil { tt.check(t, events) }`.
-
-**Fix:** extract the event-content assertion into a dedicated test (`TestStream_PreservesEventOrderAndContent`); shrink this table to a uniform `(input, wantMalformed, wantEvents)` shape and drop the `check` field.
-
----
-
-### 6. [F6] borderline two-row table — `sarif.TestTopFiles_ReturnsFilesSortedByIssueCountDescending`
-
-**Test:** `pkg/sarif/aggregates_external_test.go:66`
-**Issue:** `table-one-row` (borderline — 2 rows, threshold is `1`)
-
-The table has exactly 2 cases ("no limit returns all", "positive limit truncates"). Not below threshold for the linter's `one-row` rule, but worth flagging: the two cases differ only in `limit` (0 vs 1) and the truncated `want` slice. A second-case-as-placeholder feel.
-
-**Fix:** acceptable as-is. If a third behavior is added (e.g. `limit > N`), keep the table; otherwise consider two named subtests inline.
-
----
-
-## Summary
-
-| Tier | Count | Status |
-|------|-------|--------|
-| P1 per-case-branching | 1 (parser_test.go) + 1 partial (stream_test.go) | yellow |
-| P1 one-row | 0 (one borderline) | green |
-| P2 name-field-missing | 2 (wrapdiag) | yellow |
-| P2 style-inconsistent | 1 (score) | yellow |
-| P2 unused-field | 1 partial (stream_test.go) | green |
-| P2 1.22 rescope | 0 | green |
-
-Highest leverage: fix F1 (parser_test.go) — splitting that test will make each shape's assertions self-describing and remove the "conditional assertion on zero-value field" pattern. F2/F3/F4 are cheap mechanical fixes.
+- Tables scanned: 30
+- Rule firings: 1 (P2 unused-field)
+- Info notes: 1 (name-field-missing, exempt)

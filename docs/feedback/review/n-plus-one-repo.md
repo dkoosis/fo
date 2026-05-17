@@ -1,9 +1,10 @@
 # n-plus-one — repo
 
-run_id: f62c7fc3af14
+run_id: bd775e303d86-n-plus-one
 scope: project
 mode: report
 target: /Users/vcto/Projects/fo
+date: 2026-05-17
 
 ## Summary
 

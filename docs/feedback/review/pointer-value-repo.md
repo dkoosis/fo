@@ -1,70 +1,131 @@
-# pointer-value — repo review
+# pointer-value review — repo
 
-- Run: f62c7fc3af14
-- Date: 2026-05-16
-- Scope: project (/Users/vcto/Projects/fo)
-- Linter: pointer-value (mode: report)
+RUN_ID: bd775e303d86-pointer-value
+Scope: whole repo (`pkg/`, `cmd/`, `internal/`), non-test files
+Mode: report
 
 ## Summary
 
-Codebase is mostly disciplined on pointer-vs-value. Pointer receivers cluster around legitimate mutation (`sarif.Builder`, `state.File`/`Run` parsers) or std-lib-interface satisfaction (`Result` JSON unmarshaling). The clearest defect is in `pkg/wrapper/wrapdiag`, which uses `*string` for every flag field on an internal struct — confirmed by `gcflags=-m` to force `opts` onto the heap. A few P2/P3 candidates around `Finding` pointer aliasing and `*File` from `Append`. Overall tier: 🟡.
+The codebase is unusually disciplined about pointer-vs-value. No `[]*T`
+collections of small elements, no constructor cargo-culting (every `New*`
+returning `*T` is either a mutating builder or has pointer-receiver
+methods), no primitive pointer wrappers used to fake absence in user-facing
+APIs. The one concrete cluster of findings is the `wrapdiag` package, which
+preserved a stale `*flag.FlagSet` shape after the v2 CLI dispatch removed
+the FlagSet plumbing — leaving four `*string` fields that the body
+dereferences as plain values.
 
 ## Findings
 
-### 1. [F1] small-by-pointer / pointer-wrapper-no-nil-use — wrapdiag.diag uses *string for every flag field
+### 1. [F1] `pkg/wrapper/wrapdiag/diag.go:35-41` — pointer-wrapper-no-nil-use
 
-- **Site:** `wrapdiag.diag` struct + `wrapdiag.Convert` — `/Users/vcto/Projects/fo/pkg/wrapper/wrapdiag/diag.go:34-41`, `/Users/vcto/Projects/fo/pkg/wrapper/wrapdiag/convert.go:27-33`
-- **Issue:** pointer-wrapper-no-nil-use (P1)
-- **Size estimate:** Each `*string` is 8 bytes vs 16 for `string`; 4 fields = 32 vs 64 bytes — but the struct itself is heap-allocated either way (`&diag{...}`). The pointers are the cargo-cult.
-- **Mutation/nil-use:** The only `nil` check is `if d.toolName == nil` at line 45, which is unreachable on the v2 path (`Convert` always sets `&opts.Tool` etc.) and only existed for the (now-removed) plugin FlagSet path per the `DiagOpts` doc comment. Every other dereference (`*d.toolName`, `*d.ruleID`, `*d.level`, `*d.version`) is unconditional. Nil-as-absence has no semantic role.
-- **Escape:** `go build -gcflags='-m' ./pkg/wrapper/wrapdiag/` reports `convert.go:20:40: moved to heap: opts` — the entire `DiagOpts` value escapes because four of its string fields are address-taken into the `diag` struct. With value-string fields, `opts` can stay on the stack.
-- **Fix:** Change `diag` fields to `string`. Drop the `if d.toolName == nil` guard (replace with `if d.toolName == ""` if defensive check is still wanted — `toolRequired` already covers it). `convert.go` becomes `diag{toolName: opts.Tool, ruleID: opts.Rule, level: opts.Level, version: opts.Version, stderr: opts.Stderr}`. Net: one fewer heap allocation per Convert call and four fewer `*` dereferences per parsed line.
+**Site:** `wrapdiag.diag` struct (fields `toolName`, `ruleID`, `level`, `version`)
+**Issue:** `pointer-wrapper-no-nil-use`
+**Size estimate:** each `*string` is 8B; replacing with `string` is 16B per
+field — same word count on a 64-bit machine, but removes the indirection,
+allocation, and nil-check.
 
-### 2. [F2] ctor-returns-pointer-no-mutation borderline — state.Append returns *File
+**Diagnosis.** The `diag` struct stores four `*string` fields:
 
-- **Site:** `state.Append` — `/Users/vcto/Projects/fo/pkg/state/state.go:196`
-- **Issue:** ctor-returns-pointer-no-mutation (P3, borderline)
-- **Size estimate:** `File` is 32 bytes (int + slice header). Small.
-- **Mutation/nil-use:** Caller is `cmd/fo/state.go` writing the result to disk via `state.Save(path, f)`. `Save` takes `*File`. So the pointer flows directly into a mutation-capable API. Returning `File` would force `Save(path, &out)` at the call site — same allocation, just at the caller.
-- **Escape:** Not measured for this site; `Save` already mandates a pointer.
-- **Fix:** Low-priority. Keep `*File` for consistency with `Load(path) (*File, error)` and `Save(path, *File)`. Flagged only because the rules call for ctor symmetry; in practice the `*File` is justified by the `Save`/`Load` API shape, which itself is justified by the unmarshal target idiom. **Recommend: no action.**
+```go
+type diag struct {
+    toolName *string
+    ruleID   *string
+    level    *string
+    version  *string
+    stderr   io.Writer
+}
+```
 
-### 3. [F3] pointer-slice-small-element — indexFindings stores *report.Finding aliases
+The only constructor is `Convert` in `convert.go:27`, which takes plain
+values via `DiagOpts` and immediately addresses each field:
 
-- **Site:** `state.indexFindings` + `state.classifyFinding` — `/Users/vcto/Projects/fo/pkg/state/diff.go:164-173`, `:176`
-- **Issue:** pointer-slice-small-element / small-by-pointer (P2)
-- **Size estimate:** `report.Finding` ≈ 6 strings + 2 ints + 1 float64 + 1 Severity string ≈ 128–136 bytes. Above the rules' "small ≤ 64 bytes" line.
-- **Mutation/nil-use:** The map values are read-only (`makeItem` reads `f.File`, etc.). The pointer is used purely to alias back into the caller's `[]Finding` slice rather than copy. With ~136B values and N findings the copy cost is real but modest; the pointer aliasing is defensible.
-- **Escape:** Not measured.
-- **Fix:** Leave as-is. Type is too large to satisfy the P2 "small element" rule; aliasing into the caller-owned slice is intentional. **No action — documenting the call as out-of-scope for this linter.**
+```go
+d := &diag{
+    toolName: &opts.Tool,
+    ruleID:   &opts.Rule,
+    level:    &opts.Level,
+    version:  &opts.Version,
+    ...
+}
+```
 
-### 4. [F4] cargo-cult pointer-receiver — sarif.Result.Line / Col / FixCommand
+The body then unconditionally dereferences `*d.toolName`, `*d.ruleID`,
+`*d.level`, `*d.version` at `diag.go:48,51,54,57,107,108`. Nil is not a
+meaningful state — the comment on `convert.go:5-9` says "DiagOpts carries
+the wrapdiag flags as plain values for the v2 CLI dispatch — bypasses the
+*flag.FlagSet ceremony of the plugin path." The `*string` shape is the
+fossil of that removed plugin path.
 
-- **Site:** `sarif.Result.Line/Col/FixCommand` — `/Users/vcto/Projects/fo/pkg/sarif/types.go:93,101,110`
-- **Issue:** receiver-mix candidate, but rules.md says receiver-mix is out of scope for this linter (defer to `/review api-surface`). Noted only for the api-surface pass.
-- **Fix:** Out of scope. Skip.
+**Why (gates).**
+1. Mutation through the pointer? **No** — every use is a deref-read.
+2. Caller branches on nil? **No** — `d.toolName == nil` at line 45 is a
+   struct-level "not initialized" guard, not nil-as-absent semantics for a
+   field; once `Convert` is called via the public API it cannot be nil.
+3. Wrong linter (receiver-mix, hugeParam, sentinel)? **No.**
+4. Below cap? **Cap is 10; we have one cluster.**
 
-### 5. [F5] writeSnapshot's first *bool — legitimate mutation
+**Evidence (Read-verified).**
+- `pkg/wrapper/wrapdiag/diag.go` lines 35-41 (struct), 44-63 (deref sites),
+  99-108 (`addLine` derefs).
+- `pkg/wrapper/wrapdiag/convert.go` lines 20-35 (sole constructor, comment
+  acknowledging the legacy shape).
+- `rg '\*string|\*bool|\*int\b' pkg/wrapper/` returns exactly these four
+  lines — no other wrapper has the pattern.
 
-- **Site:** `view.writeSnapshot` — `/Users/vcto/Projects/fo/pkg/view/stream.go:65`
-- **Issue:** Not a defect — `*first` is mutated (`*first = false`) to drive the "blank line between snapshots" behavior. Pointer is the correct choice.
-- **Fix:** None.
+**Fix.** Drop the indirection; let `diag` own values.
 
-## Tier Roll-up
+```go
+type diag struct {
+    toolName string
+    ruleID   string
+    level    string
+    version  string
+    stderr   io.Writer
+}
 
-| Tier | Count | Result |
-|------|-------|--------|
-| P1 small-by-ptr | 0 | 🟢 |
-| P1 pointer-wrapper unused-nil | 1 (wrapdiag.diag) | 🟡 |
-| P2 ptr-slice | 0 (one borderline, out-of-rule by size) | 🟢 |
-| P3 ctor | 0 actionable (state.Append justified by Save/Load symmetry) | 🟢 |
+func Convert(r io.Reader, w io.Writer, opts DiagOpts) error {
+    if opts.Rule == "" { opts.Rule = "finding" }
+    if opts.Level == "" { opts.Level = "warning" }
+    d := &diag{
+        toolName: opts.Tool,
+        ruleID:   opts.Rule,
+        level:    opts.Level,
+        version:  opts.Version,
+        stderr:   opts.Stderr,
+    }
+    return d.Convert(r, w)
+}
+```
 
-Overall: 🟡 — single actionable defect, concentrated in `pkg/wrapper/wrapdiag`. Fix is mechanical (drop four `*` from struct fields + Convert call), confirmed by escape analysis to remove a heap allocation per call.
+Then change `*d.toolName` → `d.toolName` (4 sites), drop the
+`d.toolName == nil` guard at line 45 (replace with `d.toolName == ""`
+which already exists on the next line as `errToolRequired`), and update
+`diag.go:36-40` field docs. No call-site changes outside the package —
+`diag` is unexported.
 
-## Methodology
+**Tier:** 🟡 — one cluster, four fields, isolated to a single unexported
+struct. Mechanical fix, no API impact, removes a documented-as-legacy
+shape and three or four nil-check branches.
 
-- Read pointer-value.md + pointer-value.rules.md
-- Surveyed pointer receivers (`func (x *T)`), `*T` return values, `*T` parameters, `[]*T` slices, and `*primitive` fields
-- Spot-checked struct sizes against the ≤ 64-byte rule
-- Confirmed F1 with `go build -gcflags='-m' ./pkg/wrapper/wrapdiag/` (moved-to-heap: opts)
-- Excluded: pointer-receiver mutation cases (`sarif.Builder`), JSON unmarshal targets (`*File`), legitimate `*bool` mutation (`writeSnapshot`).
+## Surveyed and cleared
+
+For completeness, the following candidates were inspected and **dropped**
+per the linter's per-finding gates — not findings.
+
+| Site | Rule considered | Why dropped |
+|---|---|---|
+| `state/diff.go:176` `classifyFinding(f *report.Finding)` | small-by-pointer | `f` is nil-meaningful (`if f != nil` at `makeItem` line 213). Gate 2. |
+| `state/diff.go:32` `Item.report *report.Finding` | small-by-pointer | Same — nil signals "no back-pointer". |
+| `state/state.go:93,129,196` `*File` / `Append(*File, Run) *File` | ctor-returns-pointer | `File` carries `[]Run` that grows; pointer for identity across lifecycle. |
+| `sarif/builder.go:23` `NewBuilder() *Builder` | ctor-returns-pointer | `Builder` is a fluent mutator; pointer-receiver methods require it. |
+| `sarif/builder.go:51,58,92,98` `(b *Builder)` | small-by-pointer | Pointer-receiver mutation — exactly what `*T` is for. |
+| `sarif/types.go:93,101,110` `(r *Result)` read-only methods | small-by-pointer | `Result` carries `Locations []Location` + `Fixes []Fix`; not small. |
+| `testjson/parser.go:174` `NewAggregator() *Aggregator` | ctor-returns-pointer | Stateful event-consumer with pointer-receiver methods. |
+| `testjson/types.go:67,72` `(r *TestPackageResult)` | small-by-pointer | Type holds `FailedTests []FailedTest` + `PanicOutput []string`; not small. |
+| `suppress/match.go:12` `NewRuleset() *Ruleset` | ctor-returns-pointer | `Match` is on `*Ruleset` and nil-checks the receiver. |
+| `suppress/suppress.go:43` `Suppression.Until *time.Time` | pointer-wrapper | Nil-meaningful ("no expiry"); explicit in `Expired` at line 51. |
+| `metrics/metrics.go:83` / `status/status.go:97` / `tally/tally.go:109` `absorbXxxLine(..., headerSeen *bool, lineNo *int)` | pointer-wrapper | Pointers mutate caller state — the pointer doing its job. |
+| `view/stream.go:83` `writeSnapshot(..., first *bool, ...)` | pointer-wrapper | Same — mutates caller's "have we emitted yet" flag. |
+| `sarif/aggregates.go:17` returns `[]FileIssue` (value) | pointer-slice-small | Already returns value slice. Clean. |
+| Whole-repo grep `make([]*` in `pkg/` | pointer-slice-small | Zero hits. Clean. |

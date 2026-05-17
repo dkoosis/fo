@@ -1,31 +1,51 @@
-# io-parallel review — repo
+# io-parallel — repo review
 
-run_id: f62c7fc3af14
-scope: project
-target: /Users/vcto/Projects/fo
+- **Run:** `bd775e303d86-io-parallel`
+- **Date:** 2026-05-17
+- **Scope:** whole repo
+- **Findings:** 0
 
 ## Summary
 
-No findings. The io-parallel linter targets sequential independent I/O — RPC orchestras, parallel DB reads, fanout-able loops. fo is a stdin-to-stdout data pipeline with no surface for the smells this linter looks for.
+No findings. `fo` is a streaming presentation filter — stdin → IR (`Report`) → stdout
+render. The smell io-parallel hunts (sequential independent RPC/HTTP/DB calls in a
+single function) requires multi-client orchestration that this codebase does not do.
 
-## Orientation
+## Evidence (Read-verified)
 
-- `rg 'http\.|client\.\w+\(|\.Exec\(|\.Query\(|rpc\.' --type go -g '!*_test.go'` — zero matches.
-- `rg 'errgroup|sync\.WaitGroup|go func\(' --type go -g '!*_test.go'` — two `go func()` sites only:
-  - `cmd/fo/main.go:907` — single goroutine reading from stdin (not parallel I/O).
-  - `cmd/fo/watch.go:119` — single goroutine in the watch loop runner (not parallel I/O).
-- File I/O is confined to:
-  - `pkg/state/state.go` Load/Save — one read, one atomic write, sequenced by data dependency (load → mutate → save).
-  - `pkg/state/metrics_history.go` — read/append/write to one sidecar.
-  - `cmd/fo/watch.go` — `exec.CommandContext` runs the user-supplied command (the contract; serializing it is intentional).
-  - `cmd/fo/fswatch.go` — open `.gitignore` once.
+- `head -1 go.mod` → `module github.com/dkoosis/fo` (single module, no service clients).
+- `rg 'errgroup\.|golang\.org/x/sync'` → 0 matches. No parallel-IO library in use.
+- `rg 'http\.|client\.|\.Get\(|\.Post\(|\.Exec\(|\.Query\(|\.Fetch\('` → 0 matches in
+  non-test source. No HTTP, RPC, or DB clients.
+- I/O surface is filesystem-only and minimal:
+  - `pkg/state/state.go:94` `os.ReadFile` — single sidecar `.fo/last-run.json`.
+  - `pkg/state/state.go:172` `os.Open` — directory handle for atomic rename.
+  - `pkg/state/metrics_history.go:55` `os.ReadFile` — single history file.
+  - `cmd/fo/suppress.go:46`, `cmd/fo/suppress_cmd.go:200` `os.Open` — single
+    suppress-config read.
+  - `cmd/fo/fswatch.go:39` `os.Open` — `.gitignore`.
+  - `cmd/fo/fswatch.go:98` `filepath.WalkDir` — watch-mode tree scan (inherently
+    serial directory traversal; not parallelizable per io-parallel's contract).
+  - `cmd/fo/watch.go:217` `exec.CommandContext` — single user-supplied command per
+    watch tick.
+- Goroutines that exist (`pkg/testjson/parser.go`, `cmd/fo/watch.go`,
+  `cmd/fo/watchkey.go`, `cmd/fo/main.go:933`, `cmd/fo/fswatch.go`) are single
+  scanner/reader producers, not parallel-IO fanouts. Out of scope per linter
+  prelude ("defer goroutine lifecycle/safety to /review goroutine-lifecycle").
 
-## Why nothing fires
+## Rule-by-rule
 
-- **sequential-independent-rpc / sequential-db-reads / phased-mixed-deps**: no RPC, HTTP, or DB clients in the tree. The architecture (CLAUDE.md) is `stdin → parse → diff → render → stdout`.
-- **loop-independent-io**: the only ranged loops walk parsed report sections (`pkg/report`, `pkg/view`) — pure in-memory transforms, no per-iteration I/O.
-- **not-using-errgroup-for-parallel-io**: there is no parallel I/O, with or without errgroup.
+| Rule | Result |
+|------|--------|
+| `sequential-independent-rpc` | N/A — no RPC/HTTP clients |
+| `phased-mixed-deps` | N/A — no multi-call I/O functions |
+| `loop-independent-io` | N/A — no per-item I/O loops |
+| `sequential-db-reads` | N/A — no DB |
+| `not-using-errgroup-for-parallel-io` | N/A — no raw-goroutine parallel I/O |
 
-## Verdict
+## Architectural note
 
-io-parallel is not a meaningful axis for this codebase. If fo ever grows network adapters or concurrent file scanning across many roots, re-run; for the current renderer pipeline, sequential is by design and the right choice.
+Per `.claude/rules/north-star.md`, fo's contract is "stdin → IR → render. ✗ owning
+tool invocation." Callers run tools and pipe results in; fo never orchestrates
+remote calls. io-parallel will remain N/A for this repo as long as that contract
+holds. Consider skipping this linter in fo's lintbrush rotation.
