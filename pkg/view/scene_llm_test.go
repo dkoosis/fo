@@ -56,6 +56,32 @@ func TestRenderSceneLLM_roundTrip(t *testing.T) {
 	}
 }
 
+// TestRenderSceneLLM_roundTrip_ActorWithSpace is a regression for fo-drd:
+// renderer emitted the actors list bare, so a name like "Odd Plover" broke
+// the parser's tokenizer on round-trip.
+func TestRenderSceneLLM_roundTrip_ActorWithSpace(t *testing.T) {
+	in := "# fo:scene title=\"x\" actors=\"Frugal Lapwing,OddPlover\"\n"
+	first, err := scene.Parse(strings.NewReader(in))
+	if err != nil {
+		t.Fatalf("parse 1: %v", err)
+	}
+	if len(first.Actors) != 2 || first.Actors[0] != "Frugal Lapwing" {
+		t.Fatalf("parse 1 actors: %+v", first.Actors)
+	}
+	var buf bytes.Buffer
+	if err := view.RenderSceneLLM(&buf, first); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	second, err := scene.Parse(&buf)
+	if err != nil {
+		t.Fatalf("parse 2: %v\n--- rendered ---\n%s", err, buf.String())
+	}
+	if !reflect.DeepEqual(first, second) {
+		t.Errorf("round-trip not stable\nfirst:  %+v\nsecond: %+v\n--- rendered ---\n%s",
+			first, second, buf.String())
+	}
+}
+
 func TestRenderSceneLLM_noANSI(t *testing.T) {
 	s, err := scene.Parse(strings.NewReader(canonicalSceneInput))
 	if err != nil {

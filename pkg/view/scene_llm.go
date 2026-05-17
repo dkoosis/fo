@@ -41,8 +41,12 @@ func writeSceneHeader(w io.Writer, s scene.Scene) error {
 		b.WriteByte('"')
 	}
 	if len(s.Actors) > 0 {
-		b.WriteString(" actors=")
-		b.WriteString(strings.Join(s.Actors, ","))
+		// Actor names may contain spaces (e.g. "Odd Plover"); quote and
+		// escape so the joined list round-trips through the parser's
+		// quote-aware tokenizer (fo-drd).
+		b.WriteString(` actors="`)
+		b.WriteString(escapeQuoted(strings.Join(s.Actors, ",")))
+		b.WriteByte('"')
 	}
 	b.WriteByte('\n')
 	_, err := io.WriteString(w, b.String())

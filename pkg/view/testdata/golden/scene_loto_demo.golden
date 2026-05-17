@@ -1,4 +1,4 @@
-# fo:scene title="loto demo" actors=FrugalLapwing,OddPlover
+# fo:scene title="loto demo" actors="FrugalLapwing,OddPlover"
 
 ## 01 · whoami — every session has a handle
 
