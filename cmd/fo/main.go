@@ -906,6 +906,12 @@ func runStream(stdin io.Reader, br *bufio.Reader, stdout io.Writer, t theme.Them
 func runStreamCtx(ctx context.Context, stdin io.Reader, br *bufio.Reader, stdout io.Writer, t theme.Theme, stateFile string, noState, stateStrict bool, stderr io.Writer) int {
 	width := termSize(stdout)
 
+	// Load suppression ruleset once for the run so streaming snapshots
+	// don't show findings the final summary will then drop (fo-2sk).
+	// Stream-time r is nil — Notices for load/parse failures land on
+	// the final report via applySuppress below.
+	streamRuleset := loadSuppressRuleset(nil, suppressPath(), stderr)
+
 	snapshots := make(chan report.Report, 8)
 	// resultCh carries the producer goroutine's terminal state. Using a
 	// single struct + blocking receive (a) ensures the producer is fully
@@ -923,7 +929,12 @@ func runStreamCtx(ctx context.Context, stdin io.Reader, br *bufio.Reader, stdout
 		defer close(snapshots)
 		r, parseErr := runTestJSONPipeline(ctx, stdin, br, func(snap report.Report) {
 			// Emit a snapshot only at package-finish events. Per-test
-			// events would flood RenderStream and PickView.
+			// events would flood RenderStream and PickView. Apply the
+			// streaming ruleset so findings don't flicker into the
+			// terminal and then disappear in the final summary (fo-2sk).
+			if streamRuleset != nil {
+				report.ApplyFilter(&snap, streamRuleset, time.Now())
+			}
 			sendCoalesceSnapshot(ctx, snapshots, snap)
 		})
 		// Final snapshot with diff attached. Skip state Save on parse

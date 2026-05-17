@@ -30,27 +30,44 @@ func applySuppress(r *report.Report, path string, stderr io.Writer) {
 	if r == nil {
 		return
 	}
+	rs := loadSuppressRuleset(r, path, stderr)
+	if rs == nil {
+		return
+	}
+	report.ApplyFilter(r, rs, time.Now())
+}
+
+// loadSuppressRuleset reads path and parses it into a Ruleset. Returns
+// nil if the file is absent, empty, or fails to load/parse (with a
+// Notice appended to r and a line to stderr). Suitable for streaming
+// callers that want to load once and reuse the ruleset across snapshots
+// (fo-2sk).
+func loadSuppressRuleset(r *report.Report, path string, stderr io.Writer) *suppress.Ruleset {
 	f, err := os.Open(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return
+			return nil
 		}
 		fmt.Fprintf(stderr, "fo: suppress: %v\n", err)
-		r.Notices = append(r.Notices,
-			fmt.Sprintf("suppress: load failed (%v) — .fo/ignore not applied", err))
-		return
+		if r != nil {
+			r.Notices = append(r.Notices,
+				fmt.Sprintf("suppress: load failed (%v) — .fo/ignore not applied", err))
+		}
+		return nil
 	}
 	defer f.Close()
 
 	rules, err := suppress.Parse(f)
 	if err != nil {
 		fmt.Fprintf(stderr, "fo: suppress: %v\n", err)
-		r.Notices = append(r.Notices,
-			fmt.Sprintf("suppress: parse failed (%v) — .fo/ignore not applied", err))
-		return
+		if r != nil {
+			r.Notices = append(r.Notices,
+				fmt.Sprintf("suppress: parse failed (%v) — .fo/ignore not applied", err))
+		}
+		return nil
 	}
 	if len(rules) == 0 {
-		return
+		return nil
 	}
-	report.ApplyFilter(r, suppress.NewRuleset(rules), time.Now())
+	return suppress.NewRuleset(rules)
 }

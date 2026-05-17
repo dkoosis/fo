@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dkoosis/fo/pkg/report"
 )
@@ -49,6 +50,37 @@ func TestApplySuppress_ParseErrorAddsNotice(t *testing.T) {
 	if len(r.Notices) != 1 || !strings.Contains(r.Notices[0], "suppress") {
 		t.Errorf("expected suppress notice, got %v", r.Notices)
 	}
+}
+
+// TestLoadSuppressRuleset_StreamingPath covers the helper used by
+// runStreamCtx to share a ruleset across snapshots (fo-2sk).
+func TestLoadSuppressRuleset_StreamingPath(t *testing.T) {
+	t.Run("absent file returns nil", func(t *testing.T) {
+		var stderr bytes.Buffer
+		got := loadSuppressRuleset(nil, filepath.Join(t.TempDir(), "x"), &stderr)
+		if got != nil {
+			t.Errorf("got %v, want nil for absent file", got)
+		}
+	})
+	t.Run("valid file returns ruleset", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "ignore")
+		if err := os.WriteFile(path, []byte("SA1019\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		var stderr bytes.Buffer
+		rs := loadSuppressRuleset(nil, path, &stderr)
+		if rs == nil {
+			t.Fatal("got nil, want a Ruleset")
+		}
+		// Apply to a finding to confirm it works.
+		r := &report.Report{Findings: []report.Finding{
+			{RuleID: "SA1019", File: aDotGo, Severity: report.SeverityWarning},
+		}}
+		report.ApplyFilter(r, rs, time.Now())
+		if len(r.Findings) != 0 {
+			t.Errorf("ruleset did not filter: %+v", r.Findings)
+		}
+	})
 }
 
 func TestApplySuppress_ActiveRuleSuppresses(t *testing.T) {
