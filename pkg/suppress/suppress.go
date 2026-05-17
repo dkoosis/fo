@@ -29,6 +29,8 @@ import (
 	"io"
 	"strings"
 	"time"
+
+	"github.com/dkoosis/fo/internal/kvtok"
 )
 
 // DefaultGlob is applied when a suppression line omits a `glob=` key.
@@ -181,65 +183,20 @@ func parseLine(line string) (Suppression, error) {
 	return s, nil
 }
 
-// tokenize splits a line into whitespace-separated tokens, honoring
-// double-quoted values (which may contain spaces and \" escapes). The
-// quoted region must follow an `=` — quotes inside barewords are not
-// treated specially. Returned tokens are key=value or bare rule_id; the
-// surrounding quotes are stripped.
+// tokenize delegates to internal/kvtok and wraps its sentinels into
+// suppress's parse-error categories so existing errors.Is callers
+// keep matching errUnclosedQuote / errMalformedLine (fo-009).
 func tokenize(line string) ([]string, error) {
-	var toks []string
-	var cur strings.Builder
-	st := tokState{}
-	for i := range len(line) {
-		if err := st.step(line[i], &cur, &toks); err != nil {
-			return nil, err
+	toks, err := kvtok.Tokenize(line)
+	if err != nil {
+		switch {
+		case errors.Is(err, kvtok.ErrUnclosedQuote):
+			return nil, errUnclosedQuote
+		case errors.Is(err, kvtok.ErrStrayQuote):
+			return nil, fmt.Errorf("%w: stray '\"' outside key=value", errMalformedLine)
 		}
-	}
-	if st.inQuote {
-		return nil, errUnclosedQuote
-	}
-	if cur.Len() > 0 {
-		toks = append(toks, cur.String())
+		return nil, err
 	}
 	return toks, nil
 }
 
-type tokState struct {
-	inQuote bool
-	escape  bool
-}
-
-func (st *tokState) step(c byte, cur *strings.Builder, toks *[]string) error {
-	if st.escape {
-		cur.WriteByte(c)
-		st.escape = false
-		return nil
-	}
-	if st.inQuote {
-		switch c {
-		case '\\':
-			st.escape = true
-		case '"':
-			st.inQuote = false
-		default:
-			cur.WriteByte(c)
-		}
-		return nil
-	}
-	switch c {
-	case ' ', '\t':
-		if cur.Len() > 0 {
-			*toks = append(*toks, cur.String())
-			cur.Reset()
-		}
-	case '"':
-		s := cur.String()
-		if len(s) == 0 || s[len(s)-1] != '=' {
-			return fmt.Errorf("%w: stray '\"' outside key=value", errMalformedLine)
-		}
-		st.inQuote = true
-	default:
-		cur.WriteByte(c)
-	}
-	return nil
-}

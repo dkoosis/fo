@@ -38,6 +38,8 @@ import (
 	"io"
 	"strconv"
 	"strings"
+
+	"github.com/dkoosis/fo/internal/kvtok"
 )
 
 const HeaderPrefix = "# fo:scene"
@@ -336,70 +338,19 @@ func applyAttr(tok string, s *Scene) error {
 	return nil
 }
 
-// tokenizeAttrs splits on whitespace, honoring double-quoted values
-// after `=`. Quote-aware; mirrors pkg/suppress conventions.
+// tokenizeAttrs delegates to internal/kvtok and wraps its sentinels
+// into scene's parse-error categories so existing errors.Is callers
+// keep matching errUnknownAttr (fo-009).
 func tokenizeAttrs(line string) ([]string, error) {
-	var toks []string
-	var cur strings.Builder
-	st := attrTokState{}
-	for i := range len(line) {
-		if err := st.step(line[i], &cur, &toks); err != nil {
-			return nil, err
+	toks, err := kvtok.Tokenize(line)
+	if err != nil {
+		switch {
+		case errors.Is(err, kvtok.ErrUnclosedQuote):
+			return nil, fmt.Errorf("%w: unclosed quote in header", errUnknownAttr)
+		case errors.Is(err, kvtok.ErrStrayQuote):
+			return nil, fmt.Errorf("%w: stray '\"' in header", errUnknownAttr)
 		}
-	}
-	if st.inQuote {
-		return nil, fmt.Errorf("%w: unclosed quote in header", errUnknownAttr)
-	}
-	if cur.Len() > 0 {
-		toks = append(toks, cur.String())
+		return nil, err
 	}
 	return toks, nil
-}
-
-type attrTokState struct {
-	inQuote bool
-	escape  bool
-}
-
-func (st *attrTokState) step(c byte, cur *strings.Builder, toks *[]string) error {
-	if st.escape {
-		cur.WriteByte(c)
-		st.escape = false
-		return nil
-	}
-	if st.inQuote {
-		return st.stepInQuote(c, cur)
-	}
-	return st.stepBare(c, cur, toks)
-}
-
-func (st *attrTokState) stepInQuote(c byte, cur *strings.Builder) error {
-	switch c {
-	case '\\':
-		st.escape = true
-	case '"':
-		st.inQuote = false
-	default:
-		cur.WriteByte(c)
-	}
-	return nil
-}
-
-func (st *attrTokState) stepBare(c byte, cur *strings.Builder, toks *[]string) error {
-	switch c {
-	case ' ', '\t':
-		if cur.Len() > 0 {
-			*toks = append(*toks, cur.String())
-			cur.Reset()
-		}
-	case '"':
-		s := cur.String()
-		if len(s) == 0 || s[len(s)-1] != '=' {
-			return fmt.Errorf("%w: stray '\"' in header", errUnknownAttr)
-		}
-		st.inQuote = true
-	default:
-		cur.WriteByte(c)
-	}
-	return nil
 }
