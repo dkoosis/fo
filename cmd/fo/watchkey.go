@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"sync"
 
 	"golang.org/x/term"
 )
@@ -38,20 +39,25 @@ func keyControl(ctx context.Context, in io.Reader, cancel context.CancelFunc) (<
 		return nil, func() {}
 	}
 
-	var restored bool
+	// restore is idempotent and safe to call from multiple goroutines: the
+	// ctx-cancel goroutine restores before closing the fd, and the caller's
+	// defer is a safety net for early-exit paths where the goroutine hasn't
+	// fired yet.
+	var once sync.Once
 	restore := func() {
-		if restored {
-			return
-		}
-		restored = true
-		_ = term.Restore(fd, oldState)
+		once.Do(func() {
+			_ = term.Restore(fd, oldState)
+		})
 	}
 
 	out := make(chan struct{}, 1)
 	// Best-effort: a blocking Read on the raw TTY can't be interrupted by ctx
 	// alone. Closing the descriptor from another goroutine unblocks it.
+	// Restore terminal state before closing — calling term.Restore on a closed
+	// fd would leave the terminal in raw mode.
 	go func() {
 		<-ctx.Done()
+		restore()
 		_ = f.Close()
 	}()
 	go readKeys(f, out, cancel)

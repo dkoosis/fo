@@ -6,22 +6,13 @@ import (
 	"github.com/dkoosis/fo/pkg/report"
 )
 
-// TestAttachClusters_SharedFrameGroupsFailures verifies that two failing
-// tests sharing the same user-code frame land in the same cluster and
-// both TestResults receive the matching ClusterID.
-func TestAttachClusters_SharedFrameGroupsFailures(t *testing.T) {
-	t.Parallel()
-	results := []TestPackageResult{{
-		Name:   "example.com/pkg/x",
-		Failed: 2,
-		FailedTests: []FailedTest{
-			{Name: "TestA", Output: []string{"    x_test.go:5: oops"}},
-			{Name: "TestB", Output: []string{"    x_test.go:5: oops"}},
-		},
-	}}
-
+// assertSingleClusterOfTwo runs ToReport and verifies the resulting
+// report contains exactly one cluster with two members, both stamped
+// with its ClusterID. Shared helper for tests that expect two failing
+// tests to cluster together.
+func assertSingleClusterOfTwo(t *testing.T, results []TestPackageResult) {
+	t.Helper()
 	r := ToReport(results)
-
 	if len(r.Clusters) != 1 {
 		t.Fatalf("len(Clusters) = %d, want 1; got %#v", len(r.Clusters), r.Clusters)
 	}
@@ -32,7 +23,6 @@ func TestAttachClusters_SharedFrameGroupsFailures(t *testing.T) {
 	if len(got.Members) != 2 {
 		t.Fatalf("len(Members) = %d, want 2", len(got.Members))
 	}
-
 	var stamped int
 	for _, tr := range r.Tests {
 		if tr.ClusterID == got.ID {
@@ -42,6 +32,21 @@ func TestAttachClusters_SharedFrameGroupsFailures(t *testing.T) {
 	if stamped != 2 {
 		t.Fatalf("expected 2 tests stamped with cluster ID %q, got %d", got.ID, stamped)
 	}
+}
+
+// TestAttachClusters_SharedFrameGroupsFailures verifies that two failing
+// tests sharing the same user-code frame land in the same cluster and
+// both TestResults receive the matching ClusterID.
+func TestAttachClusters_SharedFrameGroupsFailures(t *testing.T) {
+	t.Parallel()
+	assertSingleClusterOfTwo(t, []TestPackageResult{{
+		Name:   "example.com/pkg/x",
+		Failed: 2,
+		FailedTests: []FailedTest{
+			{Name: "TestA", Output: []string{"    x_test.go:5: oops"}},
+			{Name: "TestB", Output: []string{"    x_test.go:5: oops"}},
+		},
+	}})
 }
 
 // TestAttachClusters_SingletonsHaveNoClusterID verifies that a failure
@@ -102,6 +107,24 @@ func TestAttachClusters_PassingTestsHaveNoClusterID(t *testing.T) {
 				tr.Package, tr.ClusterID)
 		}
 	}
+}
+
+// TestAttachClusters_RetriesWithSameFingerprintBothCount verifies that two
+// failing test results with identical fingerprints (e.g. a retried failure
+// with the same name, package, and output) both survive the clusterer
+// rather than collapsing to a singleton and being dropped. Regression for
+// fo-juf: attachClusters previously used Fingerprint as cluster.Input.Key,
+// and the clusterer dedupes by Key (last-write-wins).
+func TestAttachClusters_RetriesWithSameFingerprintBothCount(t *testing.T) {
+	t.Parallel()
+	assertSingleClusterOfTwo(t, []TestPackageResult{{
+		Name:   "example.com/pkg/x",
+		Failed: 2,
+		FailedTests: []FailedTest{
+			{Name: "TestFlaky", Output: []string{"    x_test.go:5: boom"}},
+			{Name: "TestFlaky", Output: []string{"    x_test.go:5: boom"}},
+		},
+	}})
 }
 
 // TestAttachClusters_EmptyTestsNoOp verifies attachClusters does not
