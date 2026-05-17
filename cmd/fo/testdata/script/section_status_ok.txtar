@@ -1,0 +1,8 @@
+# status:ok with clean SARIF → no synthetic findings, exit 0.
+stdin ok.in
+fo --format json --no-state
+! stdout 'fo/section-'
+
+-- ok.in --
+--- tool:vet format:sarif status:ok ---
+{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"vet"}},"results":[]}]}

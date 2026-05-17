@@ -1,0 +1,15 @@
+# Diag wrapper → SARIF → LLM emits a `fix:` hint line.
+env FO_STATE_DIR=$WORK/state
+
+stdin gofmt.in
+fo wrap diag --tool gofmt --rule needs-formatting
+cp stdout sarif.out
+
+stdin sarif.out
+fo --format llm --no-state
+stdout 'fix: gofmt -w'
+! stdout '\x1b\['
+
+-- gofmt.in --
+/tmp/gofmt-sample/bad.go
+/tmp/gofmt-sample/bad2.go

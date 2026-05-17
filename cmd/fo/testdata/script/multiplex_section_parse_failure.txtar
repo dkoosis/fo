@@ -1,0 +1,10 @@
+# A section that fails to parse becomes a synthetic fo/section-parse-error finding.
+stdin bad.in
+! fo --format json --no-state
+stdout '"rule_id": "fo/section-parse-error"'
+
+-- bad.in --
+--- tool:vet format:sarif ---
+this is not json at all
+--- tool:test format:testjson ---
+{"Action":"pass","Package":"bar"}

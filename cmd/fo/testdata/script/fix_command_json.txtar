@@ -1,0 +1,13 @@
+# Diag wrapper → SARIF → JSON exposes fix_command (gofmt path).
+stdin gofmt.in
+fo wrap diag --tool gofmt --rule needs-formatting
+cp stdout sarif.out
+
+stdin sarif.out
+fo --format json --no-state
+stdout '"fix_command"'
+stdout 'gofmt -w'
+
+-- gofmt.in --
+/tmp/gofmt-sample/bad.go
+/tmp/gofmt-sample/bad2.go

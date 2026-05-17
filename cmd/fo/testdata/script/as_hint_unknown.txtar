@@ -1,0 +1,7 @@
+# Unknown --as hint → usage error mentioning --as.
+stdin junk.in
+! fo --as bogus
+stderr '--as'
+
+-- junk.in --
+x

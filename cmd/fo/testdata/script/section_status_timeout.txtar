@@ -1,0 +1,7 @@
+# status:timeout on an empty section → synthetic fo/section-timeout error.
+stdin t.in
+! fo --format json --no-state
+stdout 'fo/section-timeout'
+
+-- t.in --
+--- tool:govulncheck format:sarif status:timeout ---

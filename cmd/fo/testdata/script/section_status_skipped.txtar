@@ -1,0 +1,9 @@
+# status:skipped emits a note-level fo/section-skipped finding; exit 0.
+stdin s.in
+fo --format json --no-state
+stdout 'fo/section-skipped'
+
+-- s.in --
+--- tool:govulncheck format:sarif status:skipped ---
+--- tool:vet format:sarif status:ok ---
+{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"vet"}},"results":[]}]}

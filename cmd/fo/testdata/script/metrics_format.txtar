@@ -1,0 +1,10 @@
+# fo:metrics header is recognized; rows render verbatim in llm mode.
+env FO_STATE_DIR=$WORK/state
+stdin metrics.in
+fo --format llm
+stdout 'pkg/x 87\.3 %'
+
+-- metrics.in --
+# fo:metrics tool=cover
+pkg/x 87.3 %
+pkg/y 100 %

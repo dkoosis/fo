@@ -1,0 +1,3 @@
+# No input → usage error (exit 2).
+! fo
+stderr 'no input on stdin'

@@ -1,0 +1,12 @@
+# Multiplex SARIF + go test -json sections merge into a single tool=multi report.
+stdin combo.in
+! fo --format json --no-state
+stdout '"tool": "multi"'
+stdout '"rule_id": "R1"'
+stdout '"package": "foo"'
+
+-- combo.in --
+--- tool:vet format:sarif ---
+{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"vet"}},"results":[{"ruleId":"R1","level":"error","message":{"text":"boom"}}]}]}
+--- tool:test format:testjson ---
+{"Time":"2026-04-27T15:00:00Z","Action":"fail","Package":"foo","Test":"TestX"}

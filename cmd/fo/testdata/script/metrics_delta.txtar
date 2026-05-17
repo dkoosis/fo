@@ -1,0 +1,16 @@
+# Second run of fo:metrics renders the +2 delta against the prior run.
+env FO_STATE_DIR=$WORK/state
+
+stdin first.in
+fo --format llm
+
+stdin second.in
+fo --format human
+stdout '\+2'
+
+-- first.in --
+# fo:metrics
+x 10
+-- second.in --
+# fo:metrics
+x 12

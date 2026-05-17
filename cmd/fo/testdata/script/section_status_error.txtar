@@ -1,0 +1,7 @@
+# status:error on an empty section → synthetic fo/section-error.
+stdin e.in
+! fo --format json --no-state
+stdout 'fo/section-error'
+
+-- e.in --
+--- tool:govulncheck format:sarif status:error ---

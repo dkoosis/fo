@@ -1,0 +1,17 @@
+# fo:status renders labeled rows in llm; tool surfaces in JSON envelope.
+stdin status.in
+fo --format llm --no-state
+stdout 'doctor'
+stdout '\bok\b'
+stdout '\benv\b'
+stdout '\bfail\b'
+stdout '\bdolt\b'
+
+stdin status.in
+fo --format json --no-state
+stdout '"tool": "doctor"'
+
+-- status.in --
+# fo:status tool=doctor
+ok	env
+fail	dolt	warn-note
