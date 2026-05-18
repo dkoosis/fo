@@ -384,6 +384,10 @@ func (a *aggregator) results() []TestPackageResult {
 			continue
 		}
 
+		// Copy slices: appendCapped continues to mutate the backing
+		// arrays after this snapshot returns, so streaming consumers
+		// who hold a reference must see a stable view.
+		panicCopy := append([]string(nil), pkg.panicOutput...)
 		r := TestPackageResult{
 			Name:        pkg.name,
 			Passed:      pkg.passed,
@@ -393,14 +397,15 @@ func (a *aggregator) results() []TestPackageResult {
 			Coverage:    pkg.coverage,
 			BuildError:  pkg.buildError,
 			Panicked:    pkg.panicked,
-			PanicOutput: pkg.panicOutput,
+			PanicOutput: panicCopy,
 		}
 
 		// Build failed tests list in run order
 		for _, testName := range pkg.failedOrder {
+			outCopy := append([]string(nil), pkg.outputBuf[testName]...)
 			r.FailedTests = append(r.FailedTests, FailedTest{
 				Name:   testName,
-				Output: pkg.outputBuf[testName],
+				Output: outCopy,
 			})
 		}
 
