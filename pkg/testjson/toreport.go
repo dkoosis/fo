@@ -106,19 +106,31 @@ func attachClusters(r *report.Report) {
 	if len(r.Tests) == 0 {
 		return
 	}
+	inputs, keyToTestIdx := buildClusterInputs(r.Tests)
+	if len(inputs) == 0 {
+		return
+	}
+	groups := cluster.Run(inputs)
+	if len(groups) == 0 {
+		return
+	}
+	if out := materializeClusters(r.Tests, keyToTestIdx, groups); len(out) > 0 {
+		r.Clusters = out
+	}
+}
 
-	// Key must be unique per test result — cluster.Run dedupes by Key
-	// (last-write-wins), so retries that share a Fingerprint would
-	// collapse to one input and get dropped as a singleton (fo-juf).
-	// Use the r.Tests index as the opaque key.
-	//
-	// Cap inputs at maxClusterInputs to bound the 7-map/slice alloc
-	// inside cluster.RunWith for pathological runs (fo-yax).
-	inCap := min(len(r.Tests), maxClusterInputs)
+// buildClusterInputs collects failing tests into cluster.Input rows.
+// Key must be unique per test result — cluster.Run dedupes by Key
+// (last-write-wins), so retries that share a Fingerprint would collapse
+// to one input and get dropped as a singleton (fo-juf). Cap inputs at
+// maxClusterInputs to bound the 7-map/slice alloc inside cluster.RunWith
+// for pathological runs (fo-yax).
+func buildClusterInputs(tests []report.TestResult) ([]cluster.Input, map[string]int) {
+	inCap := min(len(tests), maxClusterInputs)
 	inputs := make([]cluster.Input, 0, inCap)
 	keyToTestIdx := make(map[string]int, inCap)
-	for i := range r.Tests {
-		t := &r.Tests[i]
+	for i := range tests {
+		t := &tests[i]
 		if !isFailureOutcome(t.Outcome) {
 			continue
 		}
@@ -135,15 +147,10 @@ func attachClusters(r *report.Report) {
 			Output:  t.Output,
 		})
 	}
-	if len(inputs) == 0 {
-		return
-	}
+	return inputs, keyToTestIdx
+}
 
-	groups := cluster.Run(inputs)
-	if len(groups) == 0 {
-		return
-	}
-
+func materializeClusters(tests []report.TestResult, keyToTestIdx map[string]int, groups []cluster.Cluster) []report.Cluster {
 	out := make([]report.Cluster, 0, len(groups))
 	for _, g := range groups {
 		if len(g.Members) < 2 {
@@ -152,7 +159,7 @@ func attachClusters(r *report.Report) {
 		id := string(g.ID)
 		for _, m := range g.Members {
 			if idx, ok := keyToTestIdx[m]; ok {
-				r.Tests[idx].ClusterID = id
+				tests[idx].ClusterID = id
 			}
 		}
 		out = append(out, report.Cluster{
@@ -164,9 +171,7 @@ func attachClusters(r *report.Report) {
 			Members:       append([]string(nil), g.Members...),
 		})
 	}
-	if len(out) > 0 {
-		r.Clusters = out
-	}
+	return out
 }
 
 func isFailureOutcome(o report.TestOutcome) bool {

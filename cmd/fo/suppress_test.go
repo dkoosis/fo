@@ -74,7 +74,7 @@ func TestLoadSuppressRuleset_StreamingPath(t *testing.T) {
 		}
 		// Apply to a finding to confirm it works.
 		r := &report.Report{Findings: []report.Finding{
-			{RuleID: "SA1019", File: aDotGo, Severity: report.SeverityWarning},
+			{RuleID: ruleSA1019, File: aDotGo, Severity: report.SeverityWarning},
 		}}
 		report.ApplyFilter(r, rs, time.Now())
 		if len(r.Findings) != 0 {
@@ -92,7 +92,7 @@ func TestApplySuppress_ActiveRuleSuppresses(t *testing.T) {
 	}
 	r := &report.Report{
 		Findings: []report.Finding{
-			{RuleID: "SA1019", File: aDotGo, Severity: report.SeverityWarning},
+			{RuleID: ruleSA1019, File: aDotGo, Severity: report.SeverityWarning},
 			{RuleID: "OTHER", File: "b.go", Severity: report.SeverityError},
 		},
 	}

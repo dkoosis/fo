@@ -428,8 +428,8 @@ func pickBullet(r report.Report, mode Mode, expand expandSet) Bullet {
 		}
 		items = append(items, BulletItem{Cluster: cr})
 	}
-	for _, s := range singletons {
-		items = append(items, testItem(s))
+	for i := range singletons {
+		items = append(items, testItem(singletons[i]))
 	}
 	return Bullet{Items: items}
 }

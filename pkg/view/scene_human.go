@@ -119,6 +119,6 @@ func actorStyle(actor string, t theme.Theme) lipgloss.Style {
 	// Mod in uint32 space, then convert. Casting Sum32 to int and
 	// negating breaks on 32-bit (math.MinInt32 stays negative after
 	// negation and panics on slice index) (fo-5r4).
-	idx := int(h.Sum32() % uint32(len(actorPalette)))
+	idx := int(h.Sum32() % uint32(len(actorPalette))) //nolint:gosec // len of fixed palette is small positive int
 	return lipgloss.NewStyle().Foreground(actorPalette[idx]).Bold(true)
 }

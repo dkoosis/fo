@@ -156,38 +156,52 @@ func parseLine(line string) (Suppression, error) {
 	}
 
 	for _, tok := range toks[1:] {
-		eq := strings.IndexByte(tok, '=')
-		if eq <= 0 {
-			return Suppression{}, fmt.Errorf("%w: expected key=value, got %q", errMalformedLine, tok)
-		}
-		key := strings.ToLower(tok[:eq])
-		val := tok[eq+1:]
-		switch key {
-		case "glob":
-			if val == "" {
-				return Suppression{}, fmt.Errorf("%w: empty glob value", errMalformedLine)
-			}
-			s.Glob = val
-		case "until":
-			t, perr := time.Parse("2006-01-02", val)
-			if perr != nil {
-				return Suppression{}, fmt.Errorf("%w: %q", errInvalidDate, val)
-			}
-			// Reject zero-year. time.Parse accepts "0001-01-01"; if a
-			// caller hands us that (deserialization bug, default-zero
-			// time), Expired returns true for every call, silently
-			// disabling the rule (fo-7jv).
-			if t.Year() <= 1 {
-				return Suppression{}, fmt.Errorf("%w: zero-year %q", errInvalidDate, val)
-			}
-			s.Until = &t
-		case "reason":
-			s.Reason = val
-		default:
-			return Suppression{}, fmt.Errorf("%w: %q", errUnknownKey, key)
+		if err := applyAttr(&s, tok); err != nil {
+			return Suppression{}, err
 		}
 	}
 	return s, nil
+}
+
+func applyAttr(s *Suppression, tok string) error {
+	eq := strings.IndexByte(tok, '=')
+	if eq <= 0 {
+		return fmt.Errorf("%w: expected key=value, got %q", errMalformedLine, tok)
+	}
+	key := strings.ToLower(tok[:eq])
+	val := tok[eq+1:]
+	switch key {
+	case "glob":
+		if val == "" {
+			return fmt.Errorf("%w: empty glob value", errMalformedLine)
+		}
+		s.Glob = val
+	case "until":
+		t, err := parseUntil(val)
+		if err != nil {
+			return err
+		}
+		s.Until = &t
+	case "reason":
+		s.Reason = val
+	default:
+		return fmt.Errorf("%w: %q", errUnknownKey, key)
+	}
+	return nil
+}
+
+func parseUntil(val string) (time.Time, error) {
+	t, perr := time.Parse("2006-01-02", val)
+	if perr != nil {
+		return time.Time{}, fmt.Errorf("%w: %q", errInvalidDate, val)
+	}
+	// Reject zero-year. time.Parse accepts "0001-01-01"; if a caller
+	// hands us that (deserialization bug, default-zero time), Expired
+	// returns true for every call, silently disabling the rule (fo-7jv).
+	if t.Year() <= 1 {
+		return time.Time{}, fmt.Errorf("%w: zero-year %q", errInvalidDate, val)
+	}
+	return t, nil
 }
 
 // tokenize delegates to internal/kvtok and wraps its sentinels into
@@ -206,4 +220,3 @@ func tokenize(line string) ([]string, error) {
 	}
 	return toks, nil
 }
-

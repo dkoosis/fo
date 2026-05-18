@@ -230,11 +230,11 @@ func TestExpired(t *testing.T) {
 // silently disable the rest of .fo/ignore.
 func TestParse_collectsErrorsAndReturnsValidRules(t *testing.T) {
 	in := strings.Join([]string{
-		"SA1019 until=2026-12-31",       // valid
-		"BADRULE until=not-a-date",      // bad
-		"G115 glob=internal/legacy/**",  // valid
-		"WORSE severity=high",           // bad: unknown key
-		"govet:shadow glob=cmd/**",      // valid
+		"SA1019 until=2026-12-31",      // valid
+		"BADRULE until=not-a-date",     // bad
+		"G115 glob=internal/legacy/**", // valid
+		"WORSE severity=high",          // bad: unknown key
+		"govet:shadow glob=cmd/**",     // valid
 	}, "\n") + "\n"
 
 	got, err := Parse(strings.NewReader(in))

@@ -8,13 +8,19 @@ import (
 	"testing"
 )
 
+const (
+	ruleSA1019 = "SA1019"
+	cmdAdd     = "add"
+	cmdList    = "list"
+)
+
 func TestSuppress_AddCreatesFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, ".fo", "ignore")
 	t.Setenv("FO_IGNORE", path)
 
 	var out, errOut bytes.Buffer
-	code := runSuppress([]string{"add", "SA1019", "--until=2026-12-31", "--reason=upstream"}, &out, &errOut)
+	code := runSuppress([]string{cmdAdd, ruleSA1019, "--until=2026-12-31", "--reason=upstream"}, &out, &errOut)
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%q", code, errOut.String())
 	}
@@ -27,7 +33,7 @@ func TestSuppress_AddCreatesFile(t *testing.T) {
 	if string(got) != want {
 		t.Fatalf("file=%q want=%q", got, want)
 	}
-	if !strings.Contains(out.String(), "SA1019") {
+	if !strings.Contains(out.String(), ruleSA1019) {
 		t.Fatalf("stdout should echo added rule: %q", out.String())
 	}
 }
@@ -41,13 +47,13 @@ func TestSuppress_AddAppendsAndDeduplicates(t *testing.T) {
 	t.Setenv("FO_IGNORE", path)
 
 	var out, errOut bytes.Buffer
-	if code := runSuppress([]string{"add", "SA1019"}, &out, &errOut); code != 0 {
+	if code := runSuppress([]string{cmdAdd, ruleSA1019}, &out, &errOut); code != 0 {
 		t.Fatalf("first add exit=%d stderr=%q", code, errOut.String())
 	}
 	// Adding the same rule again should be idempotent.
 	out.Reset()
 	errOut.Reset()
-	if code := runSuppress([]string{"add", "SA1019"}, &out, &errOut); code != 0 {
+	if code := runSuppress([]string{cmdAdd, ruleSA1019}, &out, &errOut); code != 0 {
 		t.Fatalf("second add exit=%d stderr=%q", code, errOut.String())
 	}
 
@@ -55,7 +61,7 @@ func TestSuppress_AddAppendsAndDeduplicates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(string(got), "SA1019") != 1 {
+	if strings.Count(string(got), ruleSA1019) != 1 {
 		t.Fatalf("SA1019 should appear once, got: %q", got)
 	}
 	if !strings.Contains(string(got), "G115 glob=internal/legacy/**") {
@@ -72,12 +78,12 @@ func TestSuppress_List(t *testing.T) {
 	t.Setenv("FO_IGNORE", path)
 
 	var out, errOut bytes.Buffer
-	code := runSuppress([]string{"list"}, &out, &errOut)
+	code := runSuppress([]string{cmdList}, &out, &errOut)
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%q", code, errOut.String())
 	}
 	s := out.String()
-	if !strings.Contains(s, "SA1019") || !strings.Contains(s, "G115") {
+	if !strings.Contains(s, ruleSA1019) || !strings.Contains(s, "G115") {
 		t.Fatalf("list output missing rules: %q", s)
 	}
 }
@@ -87,7 +93,7 @@ func TestSuppress_ListEmptyWhenAbsent(t *testing.T) {
 	t.Setenv("FO_IGNORE", filepath.Join(dir, "nope"))
 
 	var out, errOut bytes.Buffer
-	code := runSuppress([]string{"list"}, &out, &errOut)
+	code := runSuppress([]string{cmdList}, &out, &errOut)
 	if code != 0 {
 		t.Fatalf("absent file should exit 0, got %d stderr=%q", code, errOut.String())
 	}
@@ -102,12 +108,12 @@ func TestSuppress_Remove(t *testing.T) {
 	t.Setenv("FO_IGNORE", path)
 
 	var out, errOut bytes.Buffer
-	code := runSuppress([]string{"remove", "SA1019"}, &out, &errOut)
+	code := runSuppress([]string{"remove", ruleSA1019}, &out, &errOut)
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%q", code, errOut.String())
 	}
 	got, _ := os.ReadFile(path)
-	if strings.Contains(string(got), "SA1019") {
+	if strings.Contains(string(got), ruleSA1019) {
 		t.Fatalf("SA1019 should be removed: %q", got)
 	}
 	if !strings.Contains(string(got), "G115") {
@@ -124,7 +130,7 @@ func TestSuppress_RemoveMissing(t *testing.T) {
 	t.Setenv("FO_IGNORE", path)
 
 	var out, errOut bytes.Buffer
-	code := runSuppress([]string{"remove", "SA1019"}, &out, &errOut)
+	code := runSuppress([]string{"remove", ruleSA1019}, &out, &errOut)
 	if code == 0 {
 		t.Fatalf("removing missing rule should exit non-zero")
 	}
@@ -143,7 +149,7 @@ func TestSuppress_AddRejectsInvalidDate(t *testing.T) {
 	t.Setenv("FO_IGNORE", filepath.Join(dir, "ignore"))
 
 	var out, errOut bytes.Buffer
-	code := runSuppress([]string{"add", "SA1019", "--until=tomorrow"}, &out, &errOut)
+	code := runSuppress([]string{cmdAdd, ruleSA1019, "--until=tomorrow"}, &out, &errOut)
 	if code == 0 {
 		t.Fatalf("invalid date should exit non-zero")
 	}

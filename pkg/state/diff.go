@@ -23,12 +23,12 @@ const (
 // (since a flaky finding is, by definition, present in the current run
 // after having been resolved).
 type Item struct {
-	Fingerprint   string          `json:"fingerprint"`
-	RuleID        string          `json:"rule_id,omitempty"`
-	File          string          `json:"file,omitempty"`
-	Severity      Severity        `json:"severity"`
-	PriorSeverity Severity        `json:"prior_severity,omitempty"`
-	Class         Class           `json:"class"`
+	Fingerprint   string   `json:"fingerprint"`
+	RuleID        string   `json:"rule_id,omitempty"`
+	File          string   `json:"file,omitempty"`
+	Severity      Severity `json:"severity"`
+	PriorSeverity Severity `json:"prior_severity,omitempty"`
+	Class         Class    `json:"class"`
 }
 
 // Diff is the classifier output, both the headline summary inputs and

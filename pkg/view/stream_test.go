@@ -14,11 +14,13 @@ import (
 	"github.com/dkoosis/fo/pkg/view"
 )
 
+const toolTest = "test"
+
 // sampleReport is a small Report that picks Bullet (count too low for
 // Leaderboard/Grouped, no panic, not clean).
 func sampleReport() report.Report {
 	return report.Report{
-		Tool: "test",
+		Tool: toolTest,
 		Findings: []report.Finding{
 			{RuleID: "X1", File: "a.go", Line: 1, Severity: report.SeverityError, Message: "boom"},
 			{RuleID: "X2", File: "b.go", Line: 2, Severity: report.SeverityWarning, Message: "warn"},
@@ -145,7 +147,7 @@ func TestRenderStream_EmptyClose(t *testing.T) {
 // TestRenderStream_CleanReport — a clean Report renders the empty-state
 // view, both via batch and stream, identically.
 func TestRenderStream_CleanReport(t *testing.T) {
-	r := report.Report{Tool: "test"}
+	r := report.Report{Tool: toolTest}
 	tm := theme.Mono()
 
 	var batch bytes.Buffer
@@ -175,7 +177,7 @@ func TestRenderStream_CleanReport(t *testing.T) {
 func TestRenderStream_CleanHeartbeatsCoalesce(t *testing.T) {
 	ch := make(chan report.Report, 9)
 	for range 9 {
-		ch <- report.Report{Tool: "test"}
+		ch <- report.Report{Tool: toolTest}
 	}
 	close(ch)
 	var buf bytes.Buffer
@@ -194,10 +196,10 @@ func TestRenderStream_CleanHeartbeatsCoalesce(t *testing.T) {
 // snapshot drives the summary.
 func TestRenderStream_CleanHeartbeatsSuppressedAroundFailure(t *testing.T) {
 	ch := make(chan report.Report, 4)
-	ch <- report.Report{Tool: "test"}                  // clean pkg
-	ch <- sampleReport()                               // failing pkg snapshot
-	ch <- report.Report{Tool: "test"}                  // another clean pkg
-	ch <- sampleReport()                               // final accumulated
+	ch <- report.Report{Tool: toolTest} // clean pkg
+	ch <- sampleReport()                // failing pkg snapshot
+	ch <- report.Report{Tool: toolTest} // another clean pkg
+	ch <- sampleReport()                // final accumulated
 	close(ch)
 	var buf bytes.Buffer
 	if err := view.RenderStream(context.Background(), &buf, ch, theme.Mono(), 80); err != nil {

@@ -8,7 +8,10 @@ import (
 	"github.com/dkoosis/fo/pkg/suppress"
 )
 
-const ruleSA1019 = "SA1019"
+const (
+	ruleSA1019 = "SA1019"
+	fileADotGo = "pkg/a.go"
+)
 
 func mustDate(s string) *time.Time {
 	t, err := time.Parse("2006-01-02", s)
@@ -25,7 +28,7 @@ func mustDate(s string) *time.Time {
 func TestApplyFilter_ClearsSuppressedTail(t *testing.T) {
 	r := &Report{
 		Findings: []Finding{
-			{RuleID: ruleSA1019, File: "pkg/a.go", Message: "drop me"},
+			{RuleID: ruleSA1019, File: fileADotGo, Message: "drop me"},
 			{RuleID: "KEEP", File: "pkg/b.go", Message: "keep"},
 		},
 	}
@@ -51,7 +54,7 @@ func TestApplyFilter_ClearsSuppressedTail(t *testing.T) {
 func TestApplyFilter_ActiveRuleSuppresses(t *testing.T) {
 	r := &Report{
 		Findings: []Finding{
-			{RuleID: ruleSA1019, File: "pkg/a.go", Severity: SeverityWarning, Message: "deprecated"},
+			{RuleID: ruleSA1019, File: fileADotGo, Severity: SeverityWarning, Message: "deprecated"},
 			{RuleID: "G115", File: "internal/legacy/x.go", Severity: SeverityWarning, Message: "overflow"},
 			{RuleID: "KEEP", File: "pkg/b.go", Severity: SeverityError, Message: "keep me"},
 		},
@@ -87,7 +90,7 @@ func TestApplyFilter_ZeroNowDoesNotInvertExpiry(t *testing.T) {
 	past := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	r := &Report{
 		Findings: []Finding{
-			{RuleID: ruleSA1019, File: "pkg/a.go", Severity: SeverityWarning, Message: "msg"},
+			{RuleID: ruleSA1019, File: fileADotGo, Severity: SeverityWarning, Message: "msg"},
 		},
 	}
 	rs := suppress.NewRuleset([]suppress.Suppression{
@@ -144,7 +147,7 @@ func TestApplyFilter_ExpiredRuleKeepsAndNotices(t *testing.T) {
 func TestApplyFilter_ActiveRuleBeatsEarlierExpired(t *testing.T) {
 	r := &Report{
 		Findings: []Finding{
-			{RuleID: ruleSA1019, File: "pkg/a.go", Severity: SeverityWarning},
+			{RuleID: ruleSA1019, File: fileADotGo, Severity: SeverityWarning},
 		},
 	}
 	rs := suppress.NewRuleset([]suppress.Suppression{

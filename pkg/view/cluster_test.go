@@ -200,7 +200,10 @@ func TestPickBullet_LLM_SharedOutput(t *testing.T) {
 		},
 	}
 	spec := PickViewModeWithExpand(r, ModeLLM, newExpandSet(nil))
-	b := spec.(Bullet)
+	b, ok := spec.(Bullet)
+	if !ok {
+		t.Fatalf("expected Bullet, got %T", spec)
+	}
 	cr := b.Items[0].Cluster
 	if cr == nil {
 		t.Fatal("expected Cluster")
@@ -258,7 +261,7 @@ func TestRender_ClusterExpanded_Human(t *testing.T) {
 	}
 	spec := PickViewModeWithExpand(r, ModeHuman, newExpandSet([]string{"all"}))
 	got := Render(spec, theme.Mono(), 80)
-	if !strings.Contains(got,"TA") || !strings.Contains(got,"TB") {
+	if !strings.Contains(got, "TA") || !strings.Contains(got, "TB") {
 		t.Errorf("expanded cluster missing members in:\n%s", got)
 	}
 }

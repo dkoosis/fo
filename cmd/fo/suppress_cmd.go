@@ -27,9 +27,9 @@ func runSuppress(args []string, stdout, stderr io.Writer) int {
 	sub := args[0]
 	rest := args[1:]
 	switch sub {
-	case "add":
+	case subAdd:
 		return runSuppressAdd(rest, stdout, stderr)
-	case "list":
+	case subList:
 		return runSuppressList(rest, stdout, stderr)
 	case "remove", "rm":
 		return runSuppressRemove(rest, stdout, stderr)
@@ -41,6 +41,11 @@ func runSuppress(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 }
+
+const (
+	subAdd  = "add"
+	subList = "list"
+)
 
 const suppressUsage = `Usage: fo suppress <add|list|remove> [args]
 
@@ -74,23 +79,10 @@ func runSuppressAdd(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "fo suppress add: unexpected extra args: %v\n", fset.Args())
 		return 2
 	}
-	rule := suppress.Suppression{RuleID: ruleID, Glob: suppress.DefaultGlob}
-	if *glob != "" {
-		rule.Glob = *glob
+	rule, code := buildSuppressionRule(ruleID, *glob, *until, *reason, stderr)
+	if code != 0 {
+		return code
 	}
-	if *until != "" {
-		t, err := time.Parse("2006-01-02", *until)
-		if err != nil {
-			fmt.Fprintf(stderr, "fo suppress add: --until: %v\n", err)
-			return 2
-		}
-		if t.Year() <= 1 {
-			fmt.Fprintf(stderr, "fo suppress add: --until: zero-year %q\n", *until)
-			return 2
-		}
-		rule.Until = &t
-	}
-	rule.Reason = *reason
 
 	path := suppressPath()
 	existing, err := loadFile(path)
@@ -116,6 +108,27 @@ func runSuppressAdd(args []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stdout, "added: %s\n", rule.Format())
 	return 0
+}
+
+func buildSuppressionRule(ruleID, glob, until, reason string, stderr io.Writer) (suppress.Suppression, int) {
+	rule := suppress.Suppression{RuleID: ruleID, Glob: suppress.DefaultGlob, Reason: reason}
+	if glob != "" {
+		rule.Glob = glob
+	}
+	if until == "" {
+		return rule, 0
+	}
+	t, err := time.Parse("2006-01-02", until)
+	if err != nil {
+		fmt.Fprintf(stderr, "fo suppress add: --until: %v\n", err)
+		return suppress.Suppression{}, 2
+	}
+	if t.Year() <= 1 {
+		fmt.Fprintf(stderr, "fo suppress add: --until: zero-year %q\n", until)
+		return suppress.Suppression{}, 2
+	}
+	rule.Until = &t
+	return rule, 0
 }
 
 func runSuppressList(args []string, stdout, stderr io.Writer) int {
@@ -189,10 +202,12 @@ func extractPositional(args []string) (string, []string, error) {
 		rest = append(rest, a)
 	}
 	if !found {
-		return "", nil, errors.New("exactly one <rule-id> required")
+		return "", nil, errMissingRuleID
 	}
 	return pos, rest, nil
 }
+
+var errMissingRuleID = errors.New("exactly one <rule-id> required")
 
 // loadFile parses the .fo/ignore at path. Absent file → no rules,
 // nil error (treated as empty).
@@ -241,4 +256,3 @@ func writeFile(path string, rules []suppress.Suppression) error {
 	}
 	return nil
 }
-

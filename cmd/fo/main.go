@@ -370,9 +370,11 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 // single statePolicy. The two flags are mutually exclusive: --no-state
 // disables I/O, so --state-strict cannot escalate a save that never
 // happened. Rejecting the combination here keeps the policy unambiguous.
+var errStateFlagsConflict = errors.New("--no-state and --state-strict are mutually exclusive")
+
 func resolveStatePolicy(noState, strict bool) (statePolicy, error) {
 	if noState && strict {
-		return stateOff, errors.New("--no-state and --state-strict are mutually exclusive")
+		return stateOff, errStateFlagsConflict
 	}
 	switch {
 	case noState:
@@ -1248,7 +1250,7 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if args[0] == "-h" || args[0] == "--help" || args[0] == "help" {
 		return runWrapHelp(stderr)
 	}
-	if args[0] == "list" {
+	if args[0] == subList {
 		return runWrapList(args[1:], stdout, stderr)
 	}
 

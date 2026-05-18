@@ -65,23 +65,42 @@ func RenderStreamMode(ctx context.Context, w io.Writer, ch <-chan report.Report,
 			return ctx.Err()
 		case r, ok := <-ch:
 			if !ok {
-				if pendingClean != nil && !rendered {
-					return writeSnapshot(w, *pendingClean, t, width, &first, mode)
-				}
-				return nil
+				return flushStream(w, pendingClean, t, width, &first, mode, rendered)
 			}
-			if _, isClean := PickViewMode(r, mode).(Clean); isClean {
-				snap := r
-				pendingClean = &snap
-				continue
-			}
-			pendingClean = nil
-			if err := writeSnapshot(w, r, t, width, &first, mode); err != nil {
+			next, err := handleSnapshot(w, r, t, width, &first, mode, pendingClean)
+			if err != nil {
 				return err
 			}
-			rendered = true
+			pendingClean = next.pending
+			if next.rendered {
+				rendered = true
+			}
 		}
 	}
+}
+
+type streamStep struct {
+	pending  *report.Report
+	rendered bool
+}
+
+func handleSnapshot(w io.Writer, r report.Report, t theme.Theme, width int, first *bool, mode Mode, pending *report.Report) (streamStep, error) {
+	if _, isClean := PickViewMode(r, mode).(Clean); isClean {
+		snap := r
+		return streamStep{pending: &snap}, nil
+	}
+	_ = pending // drop pending Clean
+	if err := writeSnapshot(w, r, t, width, first, mode); err != nil {
+		return streamStep{}, err
+	}
+	return streamStep{rendered: true}, nil
+}
+
+func flushStream(w io.Writer, pendingClean *report.Report, t theme.Theme, width int, first *bool, mode Mode, rendered bool) error {
+	if pendingClean != nil && !rendered {
+		return writeSnapshot(w, *pendingClean, t, width, first, mode)
+	}
+	return nil
 }
 
 // writeSnapshot renders one report snapshot and writes it to w, prepending a

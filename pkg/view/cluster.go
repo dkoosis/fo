@@ -12,12 +12,13 @@ import (
 func partitionTests(tests []report.TestResult) (map[string][]report.TestResult, []report.TestResult) {
 	clustered := map[string][]report.TestResult{}
 	singletons := make([]report.TestResult, 0, len(tests))
-	for _, t := range tests {
+	for i := range tests {
+		t := &tests[i]
 		if t.ClusterID == "" {
-			singletons = append(singletons, t)
+			singletons = append(singletons, *t)
 			continue
 		}
-		clustered[t.ClusterID] = append(clustered[t.ClusterID], t)
+		clustered[t.ClusterID] = append(clustered[t.ClusterID], *t)
 	}
 	return clustered, singletons
 }
@@ -33,8 +34,8 @@ func sharedOutput(members []report.TestResult) (string, bool) {
 		return "", false
 	}
 	first := members[0].Output
-	for _, m := range members[1:] {
-		if m.Output != first {
+	for i := 1; i < len(members); i++ {
+		if members[i].Output != first {
 			return "", false
 		}
 	}
@@ -52,6 +53,9 @@ func clusterHeader(c report.Cluster, k int, mode Mode) string {
 	return fmt.Sprintf("▸ %s · %d tests · --expand=%s", c.Signature, k, c.ID)
 }
 
+// expandAll is the sentinel --expand value that opens every cluster.
+const expandAll = "all"
+
 // expandSet is the parsed form of --expand flag values.
 // Empty set + all=false → all clusters collapsed (default).
 type expandSet struct {
@@ -62,7 +66,7 @@ type expandSet struct {
 func newExpandSet(values []string) expandSet {
 	e := expandSet{ids: map[string]struct{}{}}
 	for _, v := range values {
-		if v == "all" {
+		if v == expandAll {
 			e.all = true
 			continue
 		}

@@ -124,14 +124,15 @@ func renderClusterBlock(cr *ClusterRender, t theme.Theme, llmMode bool) string {
 			b.WriteString(cr.SharedOutput)
 			b.WriteByte('\n')
 			names := make([]string, len(cr.Members))
-			for i, m := range cr.Members {
-				names[i] = m.Test
+			for i := range cr.Members {
+				names[i] = cr.Members[i].Test
 			}
 			b.WriteString("  members: ")
 			b.WriteString(strings.Join(names, ", "))
 			return b.String()
 		}
-		for i, m := range cr.Members {
+		for i := range cr.Members {
+			m := &cr.Members[i]
 			b.WriteString("  ")
 			b.WriteString(m.Test)
 			b.WriteString(": ")
@@ -167,8 +168,8 @@ func renderClusterBlock(cr *ClusterRender, t theme.Theme, llmMode bool) string {
 // existing test-line formatter (glyph + label + value).
 func membersAsItems(members []report.TestResult) []BulletItem {
 	out := make([]BulletItem, 0, len(members))
-	for _, m := range members {
-		out = append(out, testItem(m))
+	for i := range members {
+		out = append(out, testItem(members[i]))
 	}
 	return out
 }
