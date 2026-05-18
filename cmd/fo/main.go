@@ -223,6 +223,11 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	stateStrictFlag := fs.Bool("state-strict", false, "Exit non-zero if sidecar Save fails")
 	streamFlag := fs.Bool("stream", false, "Stream go test -json incrementally (avoids 256 MiB cap)")
 	asFlag := fs.String("as", "", "Hint format when auto-detection is ambiguous: tally|status|metrics|diag")
+	var expandValues []string
+	fs.Func("expand", "Reveal cluster members; value is a cluster ID or 'all'. Repeatable.", func(v string) error {
+		expandValues = append(expandValues, v)
+		return nil
+	})
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -334,7 +339,24 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	saveErr := attachDiff(r, *stateFile, policy, stderr)
 
-	if err := renderMode(mode, r, stdout, *themeFlag); err != nil {
+	// Warn on unknown --expand IDs in human mode; LLM mode ignores --expand
+	// (clusters always render fully there).
+	if mode != formatLLM && len(expandValues) > 0 {
+		known := map[string]struct{}{}
+		for _, c := range r.Clusters {
+			known[c.ID] = struct{}{}
+		}
+		for _, v := range expandValues {
+			if v == "all" {
+				continue
+			}
+			if _, ok := known[v]; !ok {
+				fmt.Fprintf(stderr, "fo: --expand=%s not found\n", v)
+			}
+		}
+	}
+
+	if err := renderMode(mode, r, stdout, *themeFlag, expandValues); err != nil {
 		fmt.Fprintf(stderr, "fo: %v\n", err)
 		return 2
 	}
@@ -361,7 +383,7 @@ func resolveStatePolicy(noState, strict bool) (statePolicy, error) {
 	return stateOn, nil
 }
 
-func renderMode(mode string, r *report.Report, stdout io.Writer, themeName string) error {
+func renderMode(mode string, r *report.Report, stdout io.Writer, themeName string, expandValues []string) error {
 	if mode == formatJSON {
 		return writeReportJSON(stdout, r)
 	}
@@ -372,7 +394,8 @@ func renderMode(mode string, r *report.Report, stdout io.Writer, themeName strin
 		viewMode = view.ModeLLM
 	}
 	width := termSize(stdout)
-	if err := view.RenderReportMode(stdout, *r, t, width, viewMode); err != nil {
+	expand := view.NewExpandSet(expandValues)
+	if err := view.RenderReportModeWithExpand(stdout, *r, t, width, viewMode, expand); err != nil {
 		return err
 	}
 	if mode == formatLLM {
@@ -1092,7 +1115,7 @@ func runStreamBatch(opts streamOpts) int {
 	}
 	applySuppress(r, suppressPath(), opts.stderr)
 	saveErr := attachDiff(r, opts.stateFile, opts.policy, opts.stderr)
-	if err := renderMode(opts.mode, r, opts.stdout, opts.themeName); err != nil {
+	if err := renderMode(opts.mode, r, opts.stdout, opts.themeName, nil); err != nil {
 		fmt.Fprintf(opts.stderr, "fo: %v\n", err)
 		return 2
 	}

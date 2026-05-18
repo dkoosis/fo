@@ -17,7 +17,13 @@ func RenderReport(w io.Writer, r report.Report, t theme.Theme, width int) error 
 
 // RenderReportMode is RenderReport with an explicit audience mode.
 func RenderReportMode(w io.Writer, r report.Report, t theme.Theme, width int, mode Mode) error {
-	out := Render(PickViewMode(r, mode), t, width)
+	return RenderReportModeWithExpand(w, r, t, width, mode, expandSet{})
+}
+
+// RenderReportModeWithExpand is RenderReportMode plus an --expand set.
+// LLM mode ignores the set (clusters always render fully).
+func RenderReportModeWithExpand(w io.Writer, r report.Report, t theme.Theme, width int, mode Mode, expand expandSet) error {
+	out := Render(PickViewModeWithExpand(r, mode, expand), t, width)
 	if out == "" {
 		return nil
 	}
