@@ -125,3 +125,87 @@ func TestClusterHeader_LLM(t *testing.T) {
 		t.Errorf("\ngot:  %q\nwant: %q", got, want)
 	}
 }
+
+func TestPickBullet_CollapsedCluster_Human(t *testing.T) {
+	r := report.Report{
+		Tests: []report.TestResult{
+			{Test: "TA", Outcome: report.OutcomeFail, ClusterID: "cluster-a3f2c1", Output: "boom"},
+			{Test: "TB", Outcome: report.OutcomeFail, ClusterID: "cluster-a3f2c1", Output: "boom"},
+			{Test: "TC", Outcome: report.OutcomeFail, ClusterID: "cluster-a3f2c1", Output: "boom"},
+			{Test: "TSolo", Outcome: report.OutcomeFail, Output: "lonely"},
+		},
+		Clusters: []report.Cluster{
+			{ID: "cluster-a3f2c1", Signature: "pkg/store.(*DB).Get", Members: []string{"TA", "TB", "TC"}},
+		},
+	}
+	spec := PickViewModeWithExpand(r, ModeHuman, newExpandSet(nil))
+	b, ok := spec.(Bullet)
+	if !ok {
+		t.Fatalf("expected Bullet variant, got %T", spec)
+	}
+	if got := len(b.Items); got != 2 {
+		t.Fatalf("Items len: got %d, want 2 (1 cluster + 1 singleton)", got)
+	}
+	first := b.Items[0]
+	if first.Cluster == nil {
+		t.Fatal("first item: expected Cluster != nil")
+	}
+	if got := len(first.Cluster.Members); got != 1 {
+		t.Errorf("collapsed cluster: visible members got %d, want 1", got)
+	}
+	if first.Cluster.Members[0].Test != "TA" {
+		t.Errorf("rep: got %q, want TA (source-order first)", first.Cluster.Members[0].Test)
+	}
+}
+
+func TestPickBullet_ExpandedCluster_Human(t *testing.T) {
+	r := report.Report{
+		Tests: []report.TestResult{
+			{Test: "TA", Outcome: report.OutcomeFail, ClusterID: "cluster-a3f2c1", Output: "boom"},
+			{Test: "TB", Outcome: report.OutcomeFail, ClusterID: "cluster-a3f2c1", Output: "boom"},
+		},
+		Clusters: []report.Cluster{
+			{ID: "cluster-a3f2c1", Signature: "sig", Members: []string{"TA", "TB"}},
+		},
+	}
+	spec := PickViewModeWithExpand(r, ModeHuman, newExpandSet([]string{"all"}))
+	b, ok := spec.(Bullet)
+	if !ok {
+		t.Fatalf("expected Bullet variant, got %T", spec)
+	}
+	first := b.Items[0]
+	if first.Cluster == nil {
+		t.Fatal("expected Cluster != nil")
+	}
+	if got := len(first.Cluster.Members); got != 2 {
+		t.Errorf("expanded cluster: visible members got %d, want 2", got)
+	}
+}
+
+func TestPickBullet_LLM_SharedOutput(t *testing.T) {
+	r := report.Report{
+		Tests: []report.TestResult{
+			{Test: "TA", Outcome: report.OutcomeFail, ClusterID: "c1", Output: "boom"},
+			{Test: "TB", Outcome: report.OutcomeFail, ClusterID: "c1", Output: "boom"},
+		},
+		Clusters: []report.Cluster{
+			{ID: "c1", Signature: "sig", Members: []string{"TA", "TB"}},
+		},
+	}
+	spec := PickViewModeWithExpand(r, ModeLLM, newExpandSet(nil))
+	b := spec.(Bullet)
+	cr := b.Items[0].Cluster
+	if cr == nil {
+		t.Fatal("expected Cluster")
+	}
+	if !cr.UsesSharedRow {
+		t.Error("expected UsesSharedRow=true for byte-equal LLM mode")
+	}
+	if cr.SharedOutput != "boom" {
+		t.Errorf("SharedOutput: got %q", cr.SharedOutput)
+	}
+	// LLM mode always shows all members (no collapse).
+	if len(cr.Members) != 2 {
+		t.Errorf("LLM members: got %d, want 2", len(cr.Members))
+	}
+}

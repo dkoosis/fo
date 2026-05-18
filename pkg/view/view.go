@@ -39,12 +39,28 @@ type Bullet struct {
 func (Bullet) isViewSpec() {}
 
 // BulletItem is one row in a Bullet or Grouped view.
+// When Cluster != nil, this item represents a cluster block (header + visible
+// members) and the singleton fields (Severity/Outcome/Label/Value/FixCommand)
+// are ignored.
 type BulletItem struct {
 	Severity   report.Severity // optional — drives glyph + color
 	Outcome    report.TestOutcome
 	Label      string
 	Value      string // free-form right-side detail (e.g. file:line)
 	FixCommand string // optional copy-pastable suggestion
+	Cluster    *ClusterRender
+}
+
+// ClusterRender carries the formatted cluster header and the visible members
+// (collapsed: 1 rep; expanded: all members). Singletons stay in Bullet.Items
+// with Cluster == nil and the existing fields populated.
+type ClusterRender struct {
+	ID            string
+	Header        string              // formatted via clusterHeader
+	Members       []report.TestResult // visible — 1 (collapsed) or all (expanded)
+	Total         int                 // total member count (for "K tests" display)
+	SharedOutput  string              // non-empty only in LLM Shape A
+	UsesSharedRow bool                // true → Shape A; false → Shape B
 }
 
 // Grouped — flat list with section labels. Used when count is larger

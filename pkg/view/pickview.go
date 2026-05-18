@@ -51,7 +51,13 @@ func PickView(r report.Report) ViewSpec {
 
 // PickViewMode is PickView with an explicit audience mode.
 func PickViewMode(r report.Report, mode Mode) ViewSpec {
-	inner := pickInner(r, mode)
+	return PickViewModeWithExpand(r, mode, expandSet{})
+}
+
+// PickViewModeWithExpand is PickViewMode plus an --expand set that controls
+// cluster collapse/expand in human mode. LLM mode always shows full members.
+func PickViewModeWithExpand(r report.Report, mode Mode, expand expandSet) ViewSpec {
+	inner := pickInner(r, mode, expand)
 	if r.Diff != nil {
 		buckets := deltaBuckets(r, r.Diff)
 		if hasNonZero(buckets) {
@@ -61,7 +67,7 @@ func PickViewMode(r report.Report, mode Mode) ViewSpec {
 	return inner
 }
 
-func pickInner(r report.Report, mode Mode) ViewSpec {
+func pickInner(r report.Report, mode Mode, expand expandSet) ViewSpec {
 	if isClean(r) {
 		return Clean{Message: "no findings"}
 	}
@@ -82,7 +88,7 @@ func pickInner(r report.Report, mode Mode) ViewSpec {
 	if g, ok := pickGrouped(r); ok {
 		return g
 	}
-	return pickBullet(r)
+	return pickBullet(r, mode, expand)
 }
 
 func isClean(r report.Report) bool {
@@ -391,13 +397,38 @@ func pickGrouped(r report.Report) (Grouped, bool) {
 	return Grouped{Sections: sections}, true
 }
 
-func pickBullet(r report.Report) Bullet {
+func pickBullet(r report.Report, mode Mode, expand expandSet) Bullet {
 	items := make([]BulletItem, 0, len(r.Findings)+len(r.Tests))
 	for _, f := range r.Findings {
 		items = append(items, findingItem(f))
 	}
-	for i := range r.Tests {
-		items = append(items, testItem(r.Tests[i]))
+	clustered, singletons := partitionTests(r.Tests)
+	// Iterate Report.Clusters order (set by pkg/cluster: member-count desc, ID asc).
+	for _, c := range r.Clusters {
+		members := clustered[c.ID]
+		if len(members) == 0 {
+			continue
+		}
+		visible := members
+		if mode == ModeHuman && !expand.wants(c.ID) {
+			visible = members[:1] // collapsed: just the rep
+		}
+		cr := &ClusterRender{
+			ID:      c.ID,
+			Header:  clusterHeader(c, len(members), mode),
+			Members: visible,
+			Total:   len(members),
+		}
+		if mode == ModeLLM {
+			if shared, ok := sharedOutput(members); ok {
+				cr.SharedOutput = shared
+				cr.UsesSharedRow = true
+			}
+		}
+		items = append(items, BulletItem{Cluster: cr})
+	}
+	for _, s := range singletons {
+		items = append(items, testItem(s))
 	}
 	return Bullet{Items: items}
 }
