@@ -147,7 +147,29 @@ func TestWatchTree_IgnoresVendorDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("watchTree: %v", err)
 	}
-	time.Sleep(50 * time.Millisecond)
+
+	// Positive control: write a non-vendor file first and wait for the
+	// event to confirm the watcher is wired up. Without this, the
+	// negative assertion below could pass for the wrong reason (slow
+	// fsnotify start-up rather than actual filtering). fo-u60.
+	if err := os.WriteFile(filepath.Join(dir, "alive.go"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-events:
+	case <-time.After(2 * time.Second):
+		t.Fatal("watchTree: control event never arrived — watcher not alive")
+	}
+
+	// Drain any follow-up events from the control write.
+	for draining := true; draining; {
+		select {
+		case <-events:
+		case <-time.After(50 * time.Millisecond):
+			draining = false
+		}
+	}
+
 	if err := os.WriteFile(filepath.Join(vendor, "ignored.go"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}

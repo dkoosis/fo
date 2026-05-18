@@ -47,8 +47,9 @@ func TestInvariant_LeaderboardRowsUniqueByLabel(t *testing.T) {
 	lb, ok := got.(view.Leaderboard)
 	if !ok {
 		// Falling through to bullet/grouped is also acceptable —
-		// a one-row leaderboard is uninformative.
-		return
+		// a one-row leaderboard is uninformative. Skip so the
+		// invariant isn't silently a no-op (fo-u60).
+		t.Skipf("PickView returned %T, not Leaderboard — invariant not exercised", got)
 	}
 	seen := map[string]int{}
 	for _, row := range lb.Rows {
