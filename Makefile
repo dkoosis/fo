@@ -34,6 +34,8 @@ VERSION           ?= $(shell git describe --tags --always --dirty 2>/dev/null ||
 REPORT_CMD = \
 	echo '--- tool:vet format:sarif ---'; \
 	go vet ./... 2>&1 | fo wrap diag --tool govet; echo; \
+	echo '--- tool:arch format:sarif ---'; \
+	go-arch-lint check --json 2>/dev/null | fo wrap archlint; echo; \
 	echo '--- tool:lint format:sarif ---'; \
 	golangci-lint run --output.sarif.path=/dev/stdout --output.text.path=/dev/null ./... 2>/dev/null | head -1; echo; \
 	echo '--- tool:build format:sarif ---'; \

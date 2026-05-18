@@ -1,0 +1,129 @@
+version: 3
+workdir: .
+
+# Exclude test files so `package foo_test` external-test files (which
+# import their own package by design) don't trip self-dep notices.
+excludeFiles:
+  - ".*_test\\.go$"
+
+# Encodes the layering described in .claude/rules/CLAUDE.md so the
+# contract is enforced in code rather than just prose (fo-kfs).
+#
+# Topology:
+#   cmd/fo        → may import any pkg/*
+#   pkg/report    → IR sink (depends only on pkg/suppress for ApplyFilter)
+#   pkg/sarif     → produces report  (→ pkg/report)
+#   pkg/testjson  → produces report  (→ pkg/report)
+#   pkg/state     → diff classifier  (→ pkg/report + internal helpers)
+#   pkg/view      → consumes report  (→ pkg/report, paint, theme, scene)
+#   pkg/scene     → leaf renderer primitive
+#   pkg/paint     → leaf rendering primitives (sparklines, bars)
+#   pkg/theme     → leaf style table
+#   pkg/cluster   → groups failing tests (→ pkg/report)
+#   pkg/fingerprint, pkg/score, pkg/suppress → leaves
+#   pkg/status, pkg/metrics, pkg/tally     → hygiene formats (→ pkg/report)
+#   pkg/wrapper/* → independent adapters (→ pkg/sarif or hygiene formats)
+
+allow:
+  depOnAnyVendor: true
+
+components:
+  cmd:
+    in: cmd/fo/**
+
+  report:        { in: pkg/report }
+  sarif:         { in: pkg/sarif }
+  testjson:      { in: pkg/testjson }
+  view:          { in: pkg/view }
+  state:         { in: pkg/state }
+  cluster:       { in: pkg/cluster }
+  scene:         { in: pkg/scene }
+  paint:         { in: pkg/paint }
+  theme:         { in: pkg/theme }
+  fingerprint:   { in: pkg/fingerprint }
+  score:         { in: pkg/score }
+  suppress:      { in: pkg/suppress }
+  status:        { in: pkg/status }
+  metrics:       { in: pkg/metrics }
+  tally:         { in: pkg/tally }
+  wrapper-root:  { in: pkg/wrapper }
+  wrappers:      { in: pkg/wrapper/** }
+
+  internal:      { in: internal/** }
+
+commonComponents:
+  - internal
+
+deps:
+  cmd:
+    mayDependOn:
+      - report
+      - sarif
+      - testjson
+      - view
+      - state
+      - cluster
+      - scene
+      - paint
+      - theme
+      - fingerprint
+      - score
+      - suppress
+      - status
+      - metrics
+      - tally
+      - wrapper-root
+      - wrappers
+
+  # IR sink: report depends only on suppress (for ApplyFilter).
+  report:
+    mayDependOn: [suppress]
+
+  sarif:
+    mayDependOn: [report, fingerprint, score]
+  testjson:
+    mayDependOn: [report, fingerprint, score, cluster]
+  cluster:
+    mayDependOn: [report]
+  status:
+    mayDependOn: [report]
+  metrics:
+    mayDependOn: [report]
+  tally:
+    mayDependOn: [report]
+
+  state:
+    mayDependOn: [report]
+
+  view:
+    mayDependOn:
+      - report
+      - paint
+      - theme
+      - scene
+      - score
+      - fingerprint
+      - cluster
+      - state
+      - status
+      - metrics
+      - tally
+      - suppress
+
+  # Leaves — no fo deps. anyVendorDeps lets them import stdlib/x.
+  paint:        { anyVendorDeps: true }
+  theme:        { anyVendorDeps: true }
+  scene:        { anyVendorDeps: true }
+  fingerprint:  { anyVendorDeps: true }
+  score:        { anyVendorDeps: true }
+  suppress:     { anyVendorDeps: true }
+
+  # Each wrapper is an independent adapter: SARIF producers depend on
+  # pkg/sarif; hygiene-format producers depend on their target format.
+  wrappers:
+    mayDependOn:
+      - sarif
+      - report
+      - tally
+      - metrics
+      - status
