@@ -195,7 +195,7 @@ func TestAttachDiff_SaveFailureRecordsNoticeAndReturnsErr(t *testing.T) {
 		},
 	}
 	var stderr bytes.Buffer
-	err := attachDiff(r, statePath, false, &stderr)
+	err := attachDiff(r, statePath, stateOn, &stderr)
 	if err == nil {
 		t.Fatalf("expected save error, got nil")
 	}

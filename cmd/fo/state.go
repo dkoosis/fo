@@ -15,8 +15,8 @@ import (
 // caller (so --state-strict can escalate) and recorded on r.Notices so
 // every renderer — including JSON consumers and LLMs — sees that the
 // next run's NEW/REGRESSED classification will be stale.
-func attachDiff(r *report.Report, statePath string, noState bool, stderr io.Writer) error {
-	if noState || r == nil || statePath == "" {
+func attachDiff(r *report.Report, statePath string, policy statePolicy, stderr io.Writer) error {
+	if policy == stateOff || r == nil || statePath == "" {
 		return nil
 	}
 	prev, err := state.Load(statePath)

@@ -219,8 +219,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	formatFlag := fs.String("format", "auto", "Output format: auto, human, llm, json")
 	themeFlag := fs.String("theme", "auto", "Theme: auto, color, mono")
 	stateFile := fs.String("state-file", state.Path(), "Sidecar state file path")
-	noState := fs.Bool("no-state", false, "Skip diff classification and sidecar I/O")
-	stateStrict := fs.Bool("state-strict", false, "Exit non-zero if sidecar Save fails")
+	noStateFlag := fs.Bool("no-state", false, "Skip diff classification and sidecar I/O")
+	stateStrictFlag := fs.Bool("state-strict", false, "Exit non-zero if sidecar Save fails")
 	streamFlag := fs.Bool("stream", false, "Stream go test -json incrementally (avoids 256 MiB cap)")
 	asFlag := fs.String("as", "", "Hint format when auto-detection is ambiguous: tally|status|metrics|diag")
 	if err := fs.Parse(args); err != nil {
@@ -259,13 +259,25 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	//   - --stream (any format) → incremental parse, single batch render.
 	// Non-go-test input (SARIF, multiplex) ignores --stream and falls
 	// through to the batch path.
+	policy, perr := resolveStatePolicy(*noStateFlag, *stateStrictFlag)
+	if perr != nil {
+		fmt.Fprintf(stderr, "fo: %v\n", perr)
+		return 2
+	}
+
 	if sniffGoTestJSON(peeked) {
 		ttyAuto := *formatFlag == "auto" && isTTYWriter(stdout)
 		switch {
 		case ttyAuto:
-			return runStream(stdin, br, stdout, resolveTheme(*themeFlag, stdout), *stateFile, *noState, *stateStrict, stderr)
+			return runStream(streamOpts{
+				stdin: stdin, br: br, stdout: stdout, stderr: stderr,
+				theme: resolveTheme(*themeFlag, stdout), stateFile: *stateFile, policy: policy,
+			})
 		case *streamFlag:
-			return runStreamBatch(stdin, br, stdout, mode, *themeFlag, *stateFile, *noState, *stateStrict, stderr)
+			return runStreamBatch(streamOpts{
+				stdin: stdin, br: br, stdout: stdout, stderr: stderr,
+				mode: mode, themeName: *themeFlag, stateFile: *stateFile, policy: policy,
+			})
 		}
 	}
 
@@ -320,16 +332,33 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	applySuppress(r, suppressPath(), stderr)
 
-	saveErr := attachDiff(r, *stateFile, *noState, stderr)
+	saveErr := attachDiff(r, *stateFile, policy, stderr)
 
 	if err := renderMode(mode, r, stdout, *themeFlag); err != nil {
 		fmt.Fprintf(stderr, "fo: %v\n", err)
 		return 2
 	}
-	if saveErr != nil && *stateStrict {
+	if saveErr != nil && policy == stateStrict {
 		return 2
 	}
 	return exitCodeReport(r)
+}
+
+// resolveStatePolicy translates the (noState, strict) flag pair to a
+// single statePolicy. The two flags are mutually exclusive: --no-state
+// disables I/O, so --state-strict cannot escalate a save that never
+// happened. Rejecting the combination here keeps the policy unambiguous.
+func resolveStatePolicy(noState, strict bool) (statePolicy, error) {
+	if noState && strict {
+		return stateOff, errors.New("--no-state and --state-strict are mutually exclusive")
+	}
+	switch {
+	case noState:
+		return stateOff, nil
+	case strict:
+		return stateStrict, nil
+	}
+	return stateOn, nil
 }
 
 func renderMode(mode string, r *report.Report, stdout io.Writer, themeName string) error {
@@ -895,20 +924,51 @@ func termSize(w io.Writer) int {
 	return width
 }
 
+// statePolicy names how the sidecar state writer should be wired.
+// Replaces an inverted (noState, stateStrict) bool pair that was
+// propagated through 4 signatures and 6 call sites (fo-pii).
+type statePolicy int
+
+const (
+	// stateOn: load + save sidecar; save failures emit a Notice only.
+	stateOn statePolicy = iota
+	// stateOff: skip diff classification and sidecar I/O entirely.
+	stateOff
+	// stateStrict: same as stateOn but a save failure forces exit 2.
+	stateStrict
+)
+
+// streamOpts bundles the parameters shared by runStream{,Ctx,Batch}.
+// One struct instead of an 8-arg signature; one StatePolicy instead of
+// an inverted bool pair (fo-pii).
+type streamOpts struct {
+	stdin     io.Reader
+	br        *bufio.Reader
+	stdout    io.Writer
+	stderr    io.Writer
+	theme     theme.Theme
+	themeName string // only used by runStreamBatch's deferred renderMode
+	mode      string // only used by runStreamBatch
+	stateFile string
+	policy    statePolicy
+}
+
 // runStream pumps go test -json events into per-package Report snapshots and
 // hands them to view.RenderStream. One channel send per finished package
 // keeps PickView's total-driven thresholds meaningful. Cancellation (SIGINT)
 // closes the underlying reader so blocked Reads unblock promptly — fo-op6.
-func runStream(stdin io.Reader, br *bufio.Reader, stdout io.Writer, t theme.Theme, stateFile string, noState, stateStrict bool, stderr io.Writer) int {
+func runStream(opts streamOpts) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	return runStreamCtx(ctx, stdin, br, stdout, t, stateFile, noState, stateStrict, stderr)
+	return runStreamCtx(ctx, opts)
 }
 
 // runStreamCtx is runStream's testable core: cancellation root injected.
 // Streams events incrementally — never buffers the whole stdin — so large
 // CI runs cannot OOM and Ctrl-C exits within the next event boundary.
-func runStreamCtx(ctx context.Context, stdin io.Reader, br *bufio.Reader, stdout io.Writer, t theme.Theme, stateFile string, noState, stateStrict bool, stderr io.Writer) int {
+func runStreamCtx(ctx context.Context, opts streamOpts) int {
+	stdin, br, stdout, stderr := opts.stdin, opts.br, opts.stdout, opts.stderr
+	t, stateFile := opts.theme, opts.stateFile
 	width := termSize(stdout)
 
 	// Load suppression ruleset once for the run so streaming snapshots
@@ -947,7 +1007,7 @@ func runStreamCtx(ctx context.Context, stdin io.Reader, br *bufio.Reader, stdout
 		var saveErr error
 		if parseErr == nil {
 			applySuppress(r, suppressPath(), stderr)
-			saveErr = attachDiff(r, stateFile, noState, stderr)
+			saveErr = attachDiff(r, stateFile, opts.policy, stderr)
 		}
 		resultCh <- streamResult{report: r, parseErr: parseErr, saveErr: saveErr}
 		select {
@@ -982,7 +1042,7 @@ func runStreamCtx(ctx context.Context, stdin io.Reader, br *bufio.Reader, stdout
 		fmt.Fprintf(stderr, "fo: %v\n", renderErr)
 		return 2
 	}
-	if res.saveErr != nil && stateStrict {
+	if res.saveErr != nil && opts.policy == stateStrict {
 		return 2
 	}
 	return exitCodeReport(res.report)
@@ -1021,22 +1081,22 @@ func sendCoalesceSnapshot(ctx context.Context, ch chan report.Report, snap repor
 // Used when --stream is set with format=human|llm|json and stdout is not a
 // TTY-driving incremental render. Closes fo-frl: piped CI callers can opt
 // into streaming and bypass the 256 MiB boundread cap.
-func runStreamBatch(stdin io.Reader, br *bufio.Reader, stdout io.Writer, mode, themeName, stateFile string, noState, stateStrict bool, stderr io.Writer) int {
+func runStreamBatch(opts streamOpts) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	r, err := runTestJSONPipeline(ctx, stdin, br, nil)
+	r, err := runTestJSONPipeline(ctx, opts.stdin, opts.br, nil)
 	if err != nil {
-		fmt.Fprintf(stderr, "fo: %v\n", err)
+		fmt.Fprintf(opts.stderr, "fo: %v\n", err)
 		return 2
 	}
-	applySuppress(r, suppressPath(), stderr)
-	saveErr := attachDiff(r, stateFile, noState, stderr)
-	if err := renderMode(mode, r, stdout, themeName); err != nil {
-		fmt.Fprintf(stderr, "fo: %v\n", err)
+	applySuppress(r, suppressPath(), opts.stderr)
+	saveErr := attachDiff(r, opts.stateFile, opts.policy, opts.stderr)
+	if err := renderMode(opts.mode, r, opts.stdout, opts.themeName); err != nil {
+		fmt.Fprintf(opts.stderr, "fo: %v\n", err)
 		return 2
 	}
-	if saveErr != nil && stateStrict {
+	if saveErr != nil && opts.policy == stateStrict {
 		return 2
 	}
 	return exitCodeReport(r)

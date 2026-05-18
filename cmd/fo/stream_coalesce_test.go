@@ -102,7 +102,10 @@ func TestRunStreamCtx_SlowWriterDoesNotStallParser(t *testing.T) {
 	defer cancel()
 
 	start := time.Now()
-	rc := runStreamCtx(ctx, stdin, br, stdout, theme.Mono(), "", true, false, &stderr)
+	rc := runStreamCtx(ctx, streamOpts{
+		stdin: stdin, br: br, stdout: stdout, stderr: &stderr,
+		theme: theme.Mono(), policy: stateOff,
+	})
 	elapsed := time.Since(start)
 
 	// If the parser were blocking on the bounded channel under back-pressure
