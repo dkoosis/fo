@@ -152,7 +152,7 @@ func TestHeadline_Format(t *testing.T) {
 		Flaky:           []Item{{Fingerprint: "g"}, {Fingerprint: "h"}},
 		PersistentCount: 41,
 	}
-	h := Headline(d)
+	h := headline(d)
 	want := "3 new · 2 resolved · 1 regressed · 2 flaky · 41 persistent"
 	if h != want {
 		t.Fatalf("headline mismatch:\n got: %q\nwant: %q", h, want)
@@ -165,7 +165,7 @@ func TestHeadline_DropsZero(t *testing.T) {
 		New:             []Item{{Fingerprint: "a"}},
 		PersistentCount: 5,
 	}
-	h := Headline(d)
+	h := headline(d)
 	if !strings.Contains(h, "1 new") || !strings.Contains(h, "5 persistent") {
 		t.Fatalf("missing segments: %q", h)
 	}
@@ -176,7 +176,7 @@ func TestHeadline_DropsZero(t *testing.T) {
 
 func TestHeadline_Empty(t *testing.T) {
 	t.Parallel()
-	if got := Headline(Diff{}); got != "no changes" {
+	if got := headline(Diff{}); got != "no changes" {
 		t.Fatalf("empty headline: %q", got)
 	}
 }
@@ -320,7 +320,7 @@ func TestHeadline_IncludesTestDiffs(t *testing.T) {
 		NewFailures:   []Item{{RuleID: testNameA}},
 		FixedFailures: []Item{{RuleID: "TestB"}, {RuleID: "TestC"}},
 	}
-	h := Headline(d)
+	h := headline(d)
 	if !strings.Contains(h, "1 new failure") {
 		t.Errorf("headline missing new failure: %q", h)
 	}

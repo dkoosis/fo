@@ -70,15 +70,8 @@ func TestPad(t *testing.T) {
 	if got := paint.PadLeft("ab", 5); got != "   ab" {
 		t.Errorf("PadLeft = %q, want %q", got, "   ab")
 	}
-	if got := paint.PadRight("ab", 5); got != "ab   " {
-		t.Errorf("PadRight = %q, want %q", got, "ab   ")
-	}
 	if got := paint.PadLeft("toolong", 3); got != "toolong" {
 		t.Errorf("PadLeft (too long) = %q, want unchanged", got)
-	}
-
-	if got := paint.PadRight("ⓐⓑ", 5); got != "ⓐⓑ   " {
-		t.Errorf("PadRight unicode = %q, want %q", got, "ⓐⓑ   ")
 	}
 }
 

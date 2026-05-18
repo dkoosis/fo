@@ -87,6 +87,17 @@ func sparkIndex(v, minV, span float64) int {
 	return max(1, min(8, int(math.Round((v-minV)/span*7))+1))
 }
 
+// padRight left-aligns s within a column of `width` runes, padding
+// with ASCII spaces. If s is wider than width, returns s unchanged.
+// Internal helper for Columnize.
+func padRight(s string, width int) string {
+	w := utf8.RuneCountInString(s)
+	if w >= width {
+		return s
+	}
+	return s + strings.Repeat(" ", width-w)
+}
+
 // PadLeft right-aligns s within a column of `width` runes, padding with
 // ASCII spaces. If s is wider than width, returns s unchanged.
 func PadLeft(s string, width int) string {
@@ -95,16 +106,6 @@ func PadLeft(s string, width int) string {
 		return s
 	}
 	return strings.Repeat(" ", width-w) + s
-}
-
-// PadRight left-aligns s within a column of `width` runes, padding with
-// ASCII spaces. If s is wider than width, returns s unchanged.
-func PadRight(s string, width int) string {
-	w := utf8.RuneCountInString(s)
-	if w >= width {
-		return s
-	}
-	return s + strings.Repeat(" ", width-w)
 }
 
 // Columnize aligns rows on whitespace columns. Each column is padded
@@ -160,7 +161,7 @@ func writeRow(out *strings.Builder, r []string, cols int, widths []int, sep stri
 		if i == cols-1 {
 			out.WriteString(cell)
 		} else {
-			out.WriteString(PadRight(cell, widths[i]))
+			out.WriteString(padRight(cell, widths[i]))
 			out.WriteString(sep)
 		}
 	}

@@ -5,10 +5,11 @@ import (
 	"strings"
 )
 
-// Headline returns the single-line headline band combining finding diffs
-// and test outcome diffs. Zero-count segments are dropped; an empty diff
-// returns "no changes".
-func Headline(d Diff) string {
+// headline returns the single-line headline band combining finding
+// diffs and test outcome diffs. Zero-count segments are dropped; an
+// empty diff returns "no changes". Internal — EnvelopeOf is the only
+// consumer and it lives in this package.
+func headline(d Diff) string {
 	parts := make([]string, 0, 8)
 	if n := len(d.New); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d new", n))
@@ -59,7 +60,7 @@ type Envelope struct {
 // EnvelopeOf builds the Envelope from a Diff, ready for JSON marshal.
 func EnvelopeOf(d Diff) Envelope {
 	return Envelope{
-		Headline:        Headline(d),
+		Headline:        headline(d),
 		New:             nonNil(d.New),
 		Resolved:        nonNil(d.Resolved),
 		Regressed:       nonNil(d.Regressed),

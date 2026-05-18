@@ -168,11 +168,6 @@ func RunWith(inputs []Input, cfg Config) []Cluster {
 	return clusters
 }
 
-// Extract returns the signals for one Input using default Config.
-func Extract(in Input) Signals {
-	return extractWith(in, Config{}.withDefaults())
-}
-
 func extractWith(in Input, cfg Config) Signals {
 	anchor := extractAnchor(in.Output, cfg.MaxAnchorLen)
 	return Signals{
