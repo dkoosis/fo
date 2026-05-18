@@ -25,10 +25,10 @@ func Convert(r io.Reader, w io.Writer, opts DiagOpts) error {
 		opts.Level = "warning"
 	}
 	d := &diag{
-		toolName: &opts.Tool,
-		ruleID:   &opts.Rule,
-		level:    &opts.Level,
-		version:  &opts.Version,
+		toolName: opts.Tool,
+		ruleID:   opts.Rule,
+		level:    opts.Level,
+		version:  opts.Version,
 		stderr:   opts.Stderr,
 	}
 	return d.Convert(r, w)

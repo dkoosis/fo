@@ -19,9 +19,8 @@ import (
 )
 
 var (
-	errDiagNotInitialized = errors.New("diag: options not initialized")
-	errToolRequired       = errors.New("--tool is required")
-	errInvalidLevel       = errors.New("--level: must be error, warning, note, or none")
+	errToolRequired = errors.New("--tool is required")
+	errInvalidLevel = errors.New("--level: must be error, warning, note, or none")
 )
 
 // Known --tool values with custom fix-command idioms.
@@ -31,30 +30,30 @@ const (
 	toolGoimports    = "goimports"
 )
 
-// diag converts line-based diagnostics to SARIF.
+// diag converts line-based diagnostics to SARIF. The string fields
+// previously held *string from a flag.FlagSet plumbing path that has
+// since been removed; the value form removes a layer of read-only
+// derefs and a nil-pointer trap (fo-708).
 type diag struct {
-	toolName *string
-	ruleID   *string
-	level    *string
-	version  *string
+	toolName string
+	ruleID   string
+	level    string
+	version  string
 	stderr   io.Writer
 }
 
 // Convert reads line diagnostics from r and writes SARIF to w.
 func (d *diag) Convert(r io.Reader, w io.Writer) error {
-	if d.toolName == nil {
-		return errDiagNotInitialized
-	}
-	if *d.toolName == "" {
+	if d.toolName == "" {
 		return errToolRequired
 	}
-	switch *d.level {
+	switch d.level {
 	case sarif.LevelError, sarif.LevelWarning, sarif.LevelNote, sarif.LevelNone:
 	default:
-		return fmt.Errorf("%w: %q", errInvalidLevel, *d.level)
+		return fmt.Errorf("%w: %q", errInvalidLevel, d.level)
 	}
 
-	b := sarif.NewBuilder(*d.toolName, *d.version)
+	b := sarif.NewBuilder(d.toolName, d.version)
 	if err := d.readAndAdd(r, b); err != nil {
 		return err
 	}
@@ -104,8 +103,8 @@ func (d *diag) addLine(b *sarif.Builder, line []byte) {
 	if file == "" {
 		return
 	}
-	fixCmd := fixCommandFor(*d.toolName, *d.ruleID, file)
-	b.AddResultWithFix(*d.ruleID, *d.level, msg, file, ln, col, fixCmd)
+	fixCmd := fixCommandFor(d.toolName, d.ruleID, file)
+	b.AddResultWithFix(d.ruleID, d.level, msg, file, ln, col, fixCmd)
 }
 
 // fixCommandFor returns a best-effort shell command the user can run to

@@ -29,7 +29,6 @@ type Item struct {
 	Severity      Severity        `json:"severity"`
 	PriorSeverity Severity        `json:"prior_severity,omitempty"`
 	Class         Class           `json:"class"`
-	report        *report.Finding // unexported back-pointer; not serialized
 }
 
 // Diff is the classifier output, both the headline summary inputs and
@@ -208,7 +207,6 @@ func makeItem(fp string, sev, prior Severity, c Class, f *report.Finding) Item {
 		Severity:      sev,
 		PriorSeverity: prior,
 		Class:         c,
-		report:        f,
 	}
 	if f != nil {
 		it.RuleID = f.RuleID
