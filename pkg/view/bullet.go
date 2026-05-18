@@ -88,8 +88,89 @@ func renderBullet(v Bullet, t theme.Theme) string {
 	if len(v.Items) == 0 {
 		return ""
 	}
-	rows, fixes := bulletRows(v.Items, t)
-	return interleaveFixes(paint.Columnize(rows, 2), fixes)
+	// Clusters render as multi-line blocks outside the columnize grid;
+	// singletons share one grid below. Order is preserved.
+	var blocks []string
+	var singletons []BulletItem
+	flushSingletons := func() {
+		if len(singletons) == 0 {
+			return
+		}
+		rows, fixes := bulletRows(singletons, t)
+		blocks = append(blocks, interleaveFixes(paint.Columnize(rows, 2), fixes))
+		singletons = singletons[:0]
+	}
+	for _, it := range v.Items {
+		if it.Cluster != nil {
+			flushSingletons()
+			blocks = append(blocks, renderClusterBlock(it.Cluster, t, false))
+			continue
+		}
+		singletons = append(singletons, it)
+	}
+	flushSingletons()
+	return strings.Join(blocks, "\n")
+}
+
+// renderClusterBlock paints a ClusterRender as header + indented member rows.
+// llmMode switches to Shape A (shared-output dedupe) / Shape B (per-member).
+func renderClusterBlock(cr *ClusterRender, t theme.Theme, llmMode bool) string {
+	var b strings.Builder
+	if llmMode {
+		b.WriteString(cr.Header)
+		b.WriteByte('\n')
+		if cr.UsesSharedRow {
+			b.WriteString("  shared: ")
+			b.WriteString(cr.SharedOutput)
+			b.WriteByte('\n')
+			names := make([]string, len(cr.Members))
+			for i, m := range cr.Members {
+				names[i] = m.Test
+			}
+			b.WriteString("  members: ")
+			b.WriteString(strings.Join(names, ", "))
+			return b.String()
+		}
+		for i, m := range cr.Members {
+			b.WriteString("  ")
+			b.WriteString(m.Test)
+			b.WriteString(": ")
+			b.WriteString(m.Output)
+			if i < len(cr.Members)-1 {
+				b.WriteByte('\n')
+			}
+		}
+		return b.String()
+	}
+	// Human mode: theme the header — signature+count via Heading,
+	// the "--expand=…" hint via Muted.
+	header := cr.Header
+	if idx := strings.Index(header, " · --expand="); idx >= 0 {
+		header = t.Heading.Render(header[:idx]) + t.Muted.Render(header[idx:])
+	} else {
+		header = t.Heading.Render(header)
+	}
+	b.WriteString(header)
+	b.WriteByte('\n')
+	rows, fixes := bulletRows(membersAsItems(cr.Members), t)
+	body := interleaveFixes(paint.Columnize(rows, 2), fixes)
+	// Indent member lines by 2 spaces for visual grouping.
+	for line := range strings.SplitSeq(body, "\n") {
+		b.WriteString("  ")
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+// membersAsItems wraps cluster members as BulletItems so they reuse the
+// existing test-line formatter (glyph + label + value).
+func membersAsItems(members []report.TestResult) []BulletItem {
+	out := make([]BulletItem, 0, len(members))
+	for _, m := range members {
+		out = append(out, testItem(m))
+	}
+	return out
 }
 
 func renderGrouped(v Grouped, t theme.Theme) string {

@@ -2,9 +2,11 @@
 package view
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/dkoosis/fo/pkg/report"
+	"github.com/dkoosis/fo/pkg/theme"
 )
 
 func TestExpandSet_All(t *testing.T) {
@@ -207,5 +209,51 @@ func TestPickBullet_LLM_SharedOutput(t *testing.T) {
 	// LLM mode always shows all members (no collapse).
 	if len(cr.Members) != 2 {
 		t.Errorf("LLM members: got %d, want 2", len(cr.Members))
+	}
+}
+
+func TestRender_ClusterCollapsed_Human(t *testing.T) {
+	r := report.Report{
+		Tests: []report.TestResult{
+			{Test: "TA", Outcome: report.OutcomeFail, ClusterID: "cluster-a3f2c1", Output: "boom"},
+			{Test: "TB", Outcome: report.OutcomeFail, ClusterID: "cluster-a3f2c1", Output: "boom"},
+			{Test: "TB2", Outcome: report.OutcomeFail, ClusterID: "cluster-a3f2c1", Output: "boom"},
+		},
+		Clusters: []report.Cluster{
+			{ID: "cluster-a3f2c1", Signature: "pkg/store.(*DB).Get", Members: []string{"TA", "TB", "TB2"}},
+		},
+	}
+	spec := PickViewModeWithExpand(r, ModeHuman, newExpandSet(nil))
+	got := Render(spec, theme.Mono(), 80)
+	// Header is themed in two halves (Heading + Muted) so styled escapes
+	// split the literal — check the substrings individually.
+	if !strings.Contains(got, "▸ pkg/store.(*DB).Get · 3 tests") {
+		t.Errorf("missing cluster header signature in:\n%s", got)
+	}
+	if !strings.Contains(got, "--expand=cluster-a3f2c1") {
+		t.Errorf("missing expand hint in:\n%s", got)
+	}
+	if !strings.Contains(got, "TA") {
+		t.Errorf("missing rep TA in:\n%s", got)
+	}
+	if strings.Contains(got, "TB ") || strings.Contains(got, "TB2") {
+		t.Errorf("collapsed cluster leaked non-rep members:\n%s", got)
+	}
+}
+
+func TestRender_ClusterExpanded_Human(t *testing.T) {
+	r := report.Report{
+		Tests: []report.TestResult{
+			{Test: "TA", Outcome: report.OutcomeFail, ClusterID: "c1", Output: "boom"},
+			{Test: "TB", Outcome: report.OutcomeFail, ClusterID: "c1", Output: "boom"},
+		},
+		Clusters: []report.Cluster{
+			{ID: "c1", Signature: "sig", Members: []string{"TA", "TB"}},
+		},
+	}
+	spec := PickViewModeWithExpand(r, ModeHuman, newExpandSet([]string{"all"}))
+	got := Render(spec, theme.Mono(), 80)
+	if !strings.Contains(got,"TA") || !strings.Contains(got,"TB") {
+		t.Errorf("expanded cluster missing members in:\n%s", got)
 	}
 }
