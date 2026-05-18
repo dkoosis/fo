@@ -1,7 +1,11 @@
 // Strategy: extend BulletItem with optional *ClusterRender (per Task 0 orient).
 package view
 
-import "github.com/dkoosis/fo/pkg/report"
+import (
+	"fmt"
+
+	"github.com/dkoosis/fo/pkg/report"
+)
 
 // partitionTests splits tests into clustered (keyed by ClusterID, source order
 // preserved per cluster) and singletons (tests with empty ClusterID).
@@ -35,6 +39,17 @@ func sharedOutput(members []report.TestResult) (string, bool) {
 		}
 	}
 	return first, true
+}
+
+// clusterHeader formats the leading line of a cluster block.
+// Human mode: "▸ <signature> · K tests · --expand=<id>" — ▸ is a static
+// marker (fo is one-shot stdin→stdout; no clickable disclosure).
+// LLM mode: "cluster <id> · <signature> · K tests" — no glyph, no flag hint.
+func clusterHeader(c report.Cluster, k int, mode Mode) string {
+	if mode == ModeLLM {
+		return fmt.Sprintf("cluster %s · %s · %d tests", c.ID, c.Signature, k)
+	}
+	return fmt.Sprintf("▸ %s · %d tests · --expand=%s", c.Signature, k, c.ID)
 }
 
 // expandSet is the parsed form of --expand flag values.

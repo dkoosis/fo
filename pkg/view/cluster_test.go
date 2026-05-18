@@ -107,3 +107,21 @@ func TestSharedOutput_WhitespaceMatters(t *testing.T) {
 		t.Fatal("expected ok=false on whitespace divergence (no normalization)")
 	}
 }
+
+func TestClusterHeader_Human(t *testing.T) {
+	c := report.Cluster{ID: "cluster-a3f2c1", Signature: "pkg/store.(*DB).Get"}
+	got := clusterHeader(c, 12, ModeHuman)
+	want := "▸ pkg/store.(*DB).Get · 12 tests · --expand=cluster-a3f2c1"
+	if got != want {
+		t.Errorf("\ngot:  %q\nwant: %q", got, want)
+	}
+}
+
+func TestClusterHeader_LLM(t *testing.T) {
+	c := report.Cluster{ID: "cluster-a3f2c1", Signature: "pkg/store.(*DB).Get"}
+	got := clusterHeader(c, 3, ModeLLM)
+	want := "cluster cluster-a3f2c1 · pkg/store.(*DB).Get · 3 tests"
+	if got != want {
+		t.Errorf("\ngot:  %q\nwant: %q", got, want)
+	}
+}
