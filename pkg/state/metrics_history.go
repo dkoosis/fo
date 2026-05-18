@@ -30,7 +30,7 @@ type MetricDelta struct {
 	Sample MetricSample `json:"sample"`
 	Prior  float64      `json:"prior"`
 	Delta  float64      `json:"delta"`
-	New    bool         `json:"new,omitempty"` // no prior sample matched
+	New    bool         `json:"new"` // no prior sample matched
 }
 
 // MetricsRun is one captured set of samples at a point in time.

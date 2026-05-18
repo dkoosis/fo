@@ -40,7 +40,7 @@ type Finding struct {
 	Message     string   `json:"message"`
 	FixCommand  string   `json:"fix_command,omitempty"`
 	Fingerprint string   `json:"fingerprint,omitempty"`
-	Score       float64  `json:"score,omitempty"`
+	Score       float64  `json:"score"`
 }
 
 // TestResult is a single test or package outcome from go test -json.
@@ -54,7 +54,7 @@ type TestResult struct {
 	Output      string        `json:"output,omitempty"`
 	FixCommand  string        `json:"fix_command,omitempty"`
 	Fingerprint string        `json:"fingerprint,omitempty"`
-	Score       float64       `json:"score,omitempty"`
+	Score       float64       `json:"score"`
 	ClusterID   string        `json:"cluster_id,omitempty"`
 }
 
@@ -94,7 +94,7 @@ type Report struct {
 	// Suppressed counts findings removed by .fo/ignore active rules
 	// during this run. Zero when no suppressions matched or no .fo/ignore
 	// file was loaded.
-	Suppressed int `json:"suppressed,omitempty"`
+	Suppressed int `json:"suppressed"`
 }
 
 // DiffItem mirrors the shape of state.Item without importing pkg/state
