@@ -176,7 +176,7 @@ func Extract(in Input) Signals {
 func extractWith(in Input, cfg Config) Signals {
 	anchor := extractAnchor(in.Output, cfg.MaxAnchorLen)
 	return Signals{
-		TopUserFrame: extractTopUserFrame(in.Output, cfg.KeepAbsPaths),
+		TopUserFrame: extractTopUserFrame(in.Output, pathMode(cfg.KeepAbsPaths)),
 		NormSig:      Normalize(anchor),
 		AnchorLine:   anchor,
 	}

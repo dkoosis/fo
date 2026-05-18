@@ -137,11 +137,32 @@ func Color() Theme {
 	return t
 }
 
+// OutputKind names the destination an output stream is connected to.
+// Used by Default to pick the right theme without exposing a bool trap.
+type OutputKind int
+
+const (
+	// OutputTTY: stdout is an interactive terminal.
+	OutputTTY OutputKind = iota
+	// OutputPipe: stdout is redirected (pipe, file, or non-TTY).
+	OutputPipe
+)
+
 // Default returns the right theme for the environment: Mono when
-// NO_COLOR is set or when stdout is not a TTY; Color otherwise.
-func Default(stdoutIsTTY bool) Theme {
-	if os.Getenv("NO_COLOR") != "" || !stdoutIsTTY {
+// NO_COLOR is set or when the output is not a TTY; Color otherwise.
+func Default(out OutputKind) Theme {
+	if os.Getenv("NO_COLOR") != "" || out != OutputTTY {
 		return Mono()
 	}
 	return Color()
+}
+
+// OutputKindFromTTY adapts a "is this a TTY?" bool to an OutputKind.
+// Convenience for the one place we still get the answer as a bool
+// (term.IsTerminal on a syscall fd).
+func OutputKindFromTTY(isTTY bool) OutputKind {
+	if isTTY {
+		return OutputTTY
+	}
+	return OutputPipe
 }

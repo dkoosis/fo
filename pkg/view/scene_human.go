@@ -37,7 +37,7 @@ var actorPalette = []lipgloss.Color{
 func RenderSceneHuman(w io.Writer, s scene.Scene) error {
 	// theme.Default respects NO_COLOR (downgrades to Mono); Color()
 	// would hardcode ANSI regardless (fo-5r4).
-	t := theme.Default(true)
+	t := theme.Default(theme.OutputTTY)
 	return renderScene(w, s, t)
 }
 

@@ -874,7 +874,7 @@ func resolveTheme(name string, w io.Writer) theme.Theme {
 	case "mono":
 		return theme.Mono()
 	default:
-		return theme.Default(isTTYWriter(w))
+		return theme.Default(theme.OutputKindFromTTY(isTTYWriter(w)))
 	}
 }
 

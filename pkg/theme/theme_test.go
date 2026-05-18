@@ -46,7 +46,7 @@ func TestColor_OverlaysMono(t *testing.T) {
 
 func TestDefault_NoColorEnvForcesMono(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
-	got := theme.Default(true)
+	got := theme.Default(theme.OutputTTY)
 	if got.Name != "mono" {
 		t.Errorf("Default(TTY=true) with NO_COLOR=1 = %q, want mono", got.Name)
 	}
@@ -54,7 +54,7 @@ func TestDefault_NoColorEnvForcesMono(t *testing.T) {
 
 func TestDefault_NonTTYForcesMono(t *testing.T) {
 	t.Setenv("NO_COLOR", "")
-	got := theme.Default(false)
+	got := theme.Default(theme.OutputPipe)
 	if got.Name != "mono" {
 		t.Errorf("Default(TTY=false) = %q, want mono", got.Name)
 	}
@@ -62,7 +62,7 @@ func TestDefault_NonTTYForcesMono(t *testing.T) {
 
 func TestDefault_TTYWithColor(t *testing.T) {
 	t.Setenv("NO_COLOR", "")
-	got := theme.Default(true)
+	got := theme.Default(theme.OutputTTY)
 	if got.Name != "color" {
 		t.Errorf("Default(TTY=true) = %q, want color", got.Name)
 	}

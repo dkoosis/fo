@@ -64,6 +64,28 @@ func isUserCodeFunc(fn string) bool {
 	return true
 }
 
+// pathMode bridges the exported Config.KeepAbsPaths bool to the
+// internal PathMode enum, isolating the bool trap to one site.
+func pathMode(keepAbs bool) PathMode {
+	if keepAbs {
+		return PathKeep
+	}
+	return PathTrim
+}
+
+// PathMode controls how cluster keys format absolute file paths.
+// PathTrim is the default (canonicalize to pkg/foo/bar.go); PathKeep
+// preserves the absolute path verbatim. Replaces an intra-package
+// bool-trap that propagated through 4 signatures (fo-8fb).
+type PathMode int
+
+const (
+	// PathTrim canonicalizes absolute paths to their module-relative form.
+	PathTrim PathMode = iota
+	// PathKeep preserves absolute file paths as-is.
+	PathKeep
+)
+
 // extractTopUserFrame walks failure output looking for the innermost
 // frame whose file qualifies as user code. Returns "" if no qualifying
 // frame is found.
@@ -71,20 +93,20 @@ func isUserCodeFunc(fn string) bool {
 // The returned form is path:line. The function name is intentionally
 // omitted from the cluster key — a single line can host multiple
 // sub-calls and line is the strongest stable signal within a run.
-func extractTopUserFrame(output string, keepAbsPaths bool) string {
-	if f := scanPanicStack(output, keepAbsPaths); f != "" {
+func extractTopUserFrame(output string, mode PathMode) string {
+	if f := scanPanicStack(output, mode); f != "" {
 		return f
 	}
-	if f := matchCite(errorTraceLine, output, keepAbsPaths); f != "" {
+	if f := matchCite(errorTraceLine, output, mode); f != "" {
 		return f
 	}
-	if f := matchCite(simpleCite, output, keepAbsPaths); f != "" {
+	if f := matchCite(simpleCite, output, mode); f != "" {
 		return f
 	}
 	return ""
 }
 
-func scanPanicStack(output string, keepAbsPaths bool) string {
+func scanPanicStack(output string, mode PathMode) string {
 	lines := strings.Split(output, "\n")
 	for i := range lines {
 		m := panicFrameFile.FindStringSubmatch(lines[i])
@@ -98,7 +120,7 @@ func scanPanicStack(output string, keepAbsPaths bool) string {
 		if !isUserCodeFunc(funcNameAbove(lines, i)) {
 			continue
 		}
-		return formatFrame(path, lno, keepAbsPaths)
+		return formatFrame(path, lno, mode)
 	}
 	return ""
 }
@@ -114,7 +136,7 @@ func funcNameAbove(lines []string, i int) string {
 	return fm[1]
 }
 
-func matchCite(re *regexp.Regexp, output string, keepAbsPaths bool) string {
+func matchCite(re *regexp.Regexp, output string, mode PathMode) string {
 	m := re.FindStringSubmatch(output)
 	if m == nil {
 		return ""
@@ -123,11 +145,11 @@ func matchCite(re *regexp.Regexp, output string, keepAbsPaths bool) string {
 	if !isUserCodeFile(path) {
 		return ""
 	}
-	return formatFrame(path, lno, keepAbsPaths)
+	return formatFrame(path, lno, mode)
 }
 
-func formatFrame(path, line string, keepAbs bool) string {
-	if !keepAbs {
+func formatFrame(path, line string, mode PathMode) string {
+	if mode == PathTrim {
 		path = trimAbsPath(path)
 	}
 	return path + ":" + line
