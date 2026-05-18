@@ -257,3 +257,55 @@ func TestRender_ClusterExpanded_Human(t *testing.T) {
 		t.Errorf("expanded cluster missing members in:\n%s", got)
 	}
 }
+
+func TestRender_ClusterShapeA_LLM(t *testing.T) {
+	r := report.Report{
+		Tests: []report.TestResult{
+			{Test: "TA", Outcome: report.OutcomeFail, ClusterID: "cluster-a3f2c1", Output: "got nil, want ErrMissing"},
+			{Test: "TB", Outcome: report.OutcomeFail, ClusterID: "cluster-a3f2c1", Output: "got nil, want ErrMissing"},
+			{Test: "TC", Outcome: report.OutcomeFail, ClusterID: "cluster-a3f2c1", Output: "got nil, want ErrMissing"},
+		},
+		Clusters: []report.Cluster{
+			{ID: "cluster-a3f2c1", Signature: "pkg/store.(*DB).Get", Members: []string{"TA", "TB", "TC"}},
+		},
+	}
+	spec := PickViewModeWithExpand(r, ModeLLM, newExpandSet(nil))
+	got := Render(spec, theme.Mono(), 0)
+	wantLines := []string{
+		"cluster cluster-a3f2c1 · pkg/store.(*DB).Get · 3 tests",
+		"  shared: got nil, want ErrMissing",
+		"  members: TA, TB, TC",
+	}
+	for _, line := range wantLines {
+		if !strings.Contains(got, line) {
+			t.Errorf("missing line %q in:\n%s", line, got)
+		}
+	}
+}
+
+func TestRender_ClusterShapeB_LLM(t *testing.T) {
+	r := report.Report{
+		Tests: []report.TestResult{
+			{Test: "TA", Outcome: report.OutcomeFail, ClusterID: "cluster-a3f2c1", Output: "got nil"},
+			{Test: "TB", Outcome: report.OutcomeFail, ClusterID: "cluster-a3f2c1", Output: "got 0 rows"},
+		},
+		Clusters: []report.Cluster{
+			{ID: "cluster-a3f2c1", Signature: "sig", Members: []string{"TA", "TB"}},
+		},
+	}
+	spec := PickViewModeWithExpand(r, ModeLLM, newExpandSet(nil))
+	got := Render(spec, theme.Mono(), 0)
+	wantLines := []string{
+		"cluster cluster-a3f2c1 · sig · 2 tests",
+		"  TA: got nil",
+		"  TB: got 0 rows",
+	}
+	for _, line := range wantLines {
+		if !strings.Contains(got, line) {
+			t.Errorf("missing line %q in:\n%s", line, got)
+		}
+	}
+	if strings.Contains(got, "shared:") {
+		t.Errorf("Shape B must not emit `shared:` line:\n%s", got)
+	}
+}

@@ -60,7 +60,8 @@ type ClusterRender struct {
 	Members       []report.TestResult // visible — 1 (collapsed) or all (expanded)
 	Total         int                 // total member count (for "K tests" display)
 	SharedOutput  string              // non-empty only in LLM Shape A
-	UsesSharedRow bool                // true → Shape A; false → Shape B
+	UsesSharedRow bool                // true → Shape A; false → Shape B (LLM mode only)
+	LLMMode       bool                // true → LLM Shape A/B; false → human header+rep
 }
 
 // Grouped — flat list with section labels. Used when count is larger

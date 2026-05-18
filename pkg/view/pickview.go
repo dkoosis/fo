@@ -420,6 +420,7 @@ func pickBullet(r report.Report, mode Mode, expand expandSet) Bullet {
 			Total:   len(members),
 		}
 		if mode == ModeLLM {
+			cr.LLMMode = true
 			if shared, ok := sharedOutput(members); ok {
 				cr.SharedOutput = shared
 				cr.UsesSharedRow = true

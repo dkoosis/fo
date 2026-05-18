@@ -103,7 +103,7 @@ func renderBullet(v Bullet, t theme.Theme) string {
 	for _, it := range v.Items {
 		if it.Cluster != nil {
 			flushSingletons()
-			blocks = append(blocks, renderClusterBlock(it.Cluster, t, false))
+			blocks = append(blocks, renderClusterBlock(it.Cluster, t, it.Cluster.LLMMode))
 			continue
 		}
 		singletons = append(singletons, it)
