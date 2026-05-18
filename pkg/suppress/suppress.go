@@ -68,7 +68,10 @@ func (s Suppression) Format() string {
 		b.WriteString(" glob=")
 		writeValue(&b, s.Glob)
 	}
-	if s.Until != nil {
+	// Skip until= when the time is zero/zero-year: Parse rejects
+	// "0001-01-01" (silently-disabled-rule guard, fo-7jv), so emitting
+	// it here would break round-trip.
+	if s.Until != nil && s.Until.Year() > 1 {
 		b.WriteString(" until=")
 		b.WriteString(s.Until.Format("2006-01-02"))
 	}
@@ -103,14 +106,17 @@ var (
 	errUnclosedQuote = errors.New("suppress: unclosed quoted value")
 )
 
-// Parse reads .fo/ignore content from r and returns the parsed
-// suppressions. Returns the first parse error encountered, pinned to a
-// line number. Blank lines and `#`-prefixed comment lines are skipped.
+// Parse reads .fo/ignore content from r and returns every parsable
+// suppression. Per-line parse errors are collected and returned as a
+// joined error alongside the valid rules — a single stale rule must not
+// silently disable later suppressions. Blank lines and `#`-prefixed
+// comment lines are skipped.
 func Parse(r io.Reader) ([]Suppression, error) {
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 64*1024), 1<<20)
 
 	var out []Suppression
+	var errs []error
 	lineNo := 0
 	for sc.Scan() {
 		lineNo++
@@ -120,15 +126,16 @@ func Parse(r io.Reader) ([]Suppression, error) {
 		}
 		s, err := parseLine(line)
 		if err != nil {
-			return nil, fmt.Errorf("suppress: line %d: %w", lineNo, err)
+			errs = append(errs, fmt.Errorf("suppress: line %d: %w", lineNo, err))
+			continue
 		}
 		s.Line = lineNo
 		out = append(out, s)
 	}
 	if err := sc.Err(); err != nil {
-		return nil, fmt.Errorf("suppress: read: %w", err)
+		errs = append(errs, fmt.Errorf("suppress: read: %w", err))
 	}
-	return out, nil
+	return out, errors.Join(errs...)
 }
 
 func parseLine(line string) (Suppression, error) {

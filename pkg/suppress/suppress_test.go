@@ -226,6 +226,57 @@ func TestExpired(t *testing.T) {
 	}
 }
 
+// fo-nrx: Parse must not abort on first error — one stale line cannot
+// silently disable the rest of .fo/ignore.
+func TestParse_collectsErrorsAndReturnsValidRules(t *testing.T) {
+	in := strings.Join([]string{
+		"SA1019 until=2026-12-31",       // valid
+		"BADRULE until=not-a-date",      // bad
+		"G115 glob=internal/legacy/**",  // valid
+		"WORSE severity=high",           // bad: unknown key
+		"govet:shadow glob=cmd/**",      // valid
+	}, "\n") + "\n"
+
+	got, err := Parse(strings.NewReader(in))
+	if err == nil {
+		t.Fatalf("Parse: want joined err, got nil")
+	}
+	if !errors.Is(err, errInvalidDate) {
+		t.Errorf("err missing errInvalidDate: %v", err)
+	}
+	if !errors.Is(err, errUnknownKey) {
+		t.Errorf("err missing errUnknownKey: %v", err)
+	}
+	if len(got) != 3 {
+		t.Fatalf("got %d rules, want 3 (valid lines preserved)", len(got))
+	}
+	wantIDs := []string{ruleSA1019, ruleG115, "govet:shadow"}
+	for i, w := range wantIDs {
+		if got[i].RuleID != w {
+			t.Errorf("got[%d].RuleID = %q, want %q", i, got[i].RuleID, w)
+		}
+	}
+}
+
+// fo-nrx: Format must not emit until= for zero-year times, since Parse
+// rejects that value as a silently-disabled-rule guard.
+func TestFormat_zeroYearUntilOmitted(t *testing.T) {
+	var zero time.Time
+	s := Suppression{RuleID: "SA1019", Glob: DefaultGlob, Until: &zero}
+	line := s.Format()
+	if strings.Contains(line, "until=") {
+		t.Fatalf("Format emitted until= for zero-year time: %q", line)
+	}
+	// Roundtrip: parses cleanly, no Until set.
+	got, err := Parse(strings.NewReader(line + "\n"))
+	if err != nil {
+		t.Fatalf("Parse(%q): %v", line, err)
+	}
+	if len(got) != 1 || got[0].Until != nil {
+		t.Fatalf("roundtrip lost: got %+v", got)
+	}
+}
+
 func TestFormat_roundTrip(t *testing.T) {
 	until := mustDate(t, "2026-12-31")
 	cases := []Suppression{

@@ -59,12 +59,22 @@ func loadSuppressRuleset(r *report.Report, path string, stderr io.Writer) *suppr
 
 	rules, err := suppress.Parse(f)
 	if err != nil {
+		// Partial parse: surface the errors but still apply any rules
+		// that did parse — one stale line shouldn't silently disable
+		// the rest of the file.
 		fmt.Fprintf(stderr, "fo: suppress: %v\n", err)
 		if r != nil {
-			r.Notices = append(r.Notices,
-				fmt.Sprintf("suppress: parse failed (%v) — .fo/ignore not applied", err))
+			msg := fmt.Sprintf("suppress: parse errors (%v)", err)
+			if len(rules) > 0 {
+				msg += fmt.Sprintf(" — %d valid rule(s) applied", len(rules))
+			} else {
+				msg += " — .fo/ignore not applied"
+			}
+			r.Notices = append(r.Notices, msg)
 		}
-		return nil
+		if len(rules) == 0 {
+			return nil
+		}
 	}
 	if len(rules) == 0 {
 		return nil
