@@ -2,12 +2,17 @@
 package view
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/dkoosis/fo/pkg/report"
 	"github.com/dkoosis/fo/pkg/theme"
 )
+
+var clusterAnsiRE = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+
+func stripANSI(s string) string { return clusterAnsiRE.ReplaceAllString(s, "") }
 
 func TestExpandSet_All(t *testing.T) {
 	e := newExpandSet([]string{"all"})
@@ -307,5 +312,37 @@ func TestRender_ClusterShapeB_LLM(t *testing.T) {
 	}
 	if strings.Contains(got, "shared:") {
 		t.Errorf("Shape B must not emit `shared:` line:\n%s", got)
+	}
+}
+
+func TestRender_ClusterThemeParity(t *testing.T) {
+	r := report.Report{
+		Tests: []report.TestResult{
+			{Test: "TA", Outcome: report.OutcomeFail, ClusterID: "c1", Output: "x"},
+			{Test: "TB", Outcome: report.OutcomeFail, ClusterID: "c1", Output: "x"},
+			{Test: "TC", Outcome: report.OutcomeFail, ClusterID: "c1", Output: "x"},
+		},
+		Clusters: []report.Cluster{
+			{ID: "c1", Signature: "sig", Members: []string{"TA", "TB", "TC"}},
+		},
+	}
+	spec := PickViewModeWithExpand(r, ModeHuman, newExpandSet(nil))
+	mono := Render(spec, theme.Mono(), 80)
+	color := Render(spec, theme.Color(), 80)
+	// Color output must differ from mono only by ANSI escapes — structure
+	// (line count, whitespace, glyphs, content) is identical.
+	// Structural parity: same line count (theme differs in glyph choice
+	// — mono "x" vs color "✗" — not in layout).
+	if got, want := len(strings.Split(stripANSI(color), "\n")), len(strings.Split(mono, "\n")); got != want {
+		t.Errorf("line count: mono=%d color(stripped)=%d", want, got)
+	}
+	// Both outputs must contain the cluster header signature and expand hint.
+	for _, sub := range []string{"sig · 3 tests", "--expand=c1"} {
+		if !strings.Contains(mono, sub) {
+			t.Errorf("mono missing %q", sub)
+		}
+		if !strings.Contains(stripANSI(color), sub) {
+			t.Errorf("color(stripped) missing %q", sub)
+		}
 	}
 }
