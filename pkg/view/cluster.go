@@ -18,6 +18,25 @@ func partitionTests(tests []report.TestResult) (map[string][]report.TestResult, 
 	return clustered, singletons
 }
 
+// sharedOutput reports whether every member's raw Output is byte-equal.
+// On match: returns the shared Output and true.
+// On any divergence (or empty input): returns "" and false.
+// Conservative: no normalization. The clusterer's normalizer
+// (pkg/cluster/normalize) strips numbers/paths/addrs and would otherwise
+// collapse genuinely-divergent failures behind a single "shared:" line.
+func sharedOutput(members []report.TestResult) (string, bool) {
+	if len(members) == 0 {
+		return "", false
+	}
+	first := members[0].Output
+	for _, m := range members[1:] {
+		if m.Output != first {
+			return "", false
+		}
+	}
+	return first, true
+}
+
 // expandSet is the parsed form of --expand flag values.
 // Empty set + all=false → all clusters collapsed (default).
 type expandSet struct {

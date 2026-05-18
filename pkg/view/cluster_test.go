@@ -57,3 +57,53 @@ func TestPartitionTests(t *testing.T) {
 			singletons[0].Test, singletons[1].Test)
 	}
 }
+
+func TestSharedOutput_AllEqual(t *testing.T) {
+	members := []report.TestResult{
+		{Test: "T1", Output: "got nil, want ErrMissing"},
+		{Test: "T2", Output: "got nil, want ErrMissing"},
+		{Test: "T3", Output: "got nil, want ErrMissing"},
+	}
+	got, ok := sharedOutput(members)
+	if !ok {
+		t.Fatal("expected ok=true when all byte-equal")
+	}
+	if got != "got nil, want ErrMissing" {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestSharedOutput_OneDiverges(t *testing.T) {
+	members := []report.TestResult{
+		{Test: "T1", Output: "got nil, want ErrMissing"},
+		{Test: "T2", Output: "got nil, want ErrMissing"},
+		{Test: "T3", Output: "got 0 rows, want 1"},
+	}
+	_, ok := sharedOutput(members)
+	if ok {
+		t.Fatal("expected ok=false when any member diverges")
+	}
+}
+
+func TestSharedOutput_EmptyAndSingle(t *testing.T) {
+	if _, ok := sharedOutput(nil); ok {
+		t.Error("nil → ok must be false")
+	}
+	if _, ok := sharedOutput([]report.TestResult{}); ok {
+		t.Error("empty → ok must be false")
+	}
+	members := []report.TestResult{{Output: "x"}}
+	if got, ok := sharedOutput(members); !ok || got != "x" {
+		t.Errorf("single-member: got %q ok=%v, want \"x\" ok=true", got, ok)
+	}
+}
+
+func TestSharedOutput_WhitespaceMatters(t *testing.T) {
+	members := []report.TestResult{
+		{Output: "got nil"},
+		{Output: "got nil "},
+	}
+	if _, ok := sharedOutput(members); ok {
+		t.Fatal("expected ok=false on whitespace divergence (no normalization)")
+	}
+}
