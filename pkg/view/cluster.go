@@ -1,6 +1,23 @@
 // Strategy: extend BulletItem with optional *ClusterRender (per Task 0 orient).
 package view
 
+import "github.com/dkoosis/fo/pkg/report"
+
+// partitionTests splits tests into clustered (keyed by ClusterID, source order
+// preserved per cluster) and singletons (tests with empty ClusterID).
+func partitionTests(tests []report.TestResult) (map[string][]report.TestResult, []report.TestResult) {
+	clustered := map[string][]report.TestResult{}
+	singletons := make([]report.TestResult, 0, len(tests))
+	for _, t := range tests {
+		if t.ClusterID == "" {
+			singletons = append(singletons, t)
+			continue
+		}
+		clustered[t.ClusterID] = append(clustered[t.ClusterID], t)
+	}
+	return clustered, singletons
+}
+
 // expandSet is the parsed form of --expand flag values.
 // Empty set + all=false → all clusters collapsed (default).
 type expandSet struct {
