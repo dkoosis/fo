@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/dkoosis/fo/internal/boundread"
 )
 
 // MaxMetricsHistory bounds the number of prior runs retained in
@@ -52,10 +54,15 @@ type MetricsFile struct {
 // []MetricSample is read as a single-run envelope so users keep their
 // last sample after the format change.
 func LoadMetricsHistory(path string) (*MetricsFile, error) {
-	data, err := os.ReadFile(path)
+	f, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return &MetricsFile{Version: MetricsSchemaVersion}, nil
 	}
+	if err != nil {
+		return nil, fmt.Errorf("metrics: open %s: %w", path, err)
+	}
+	defer f.Close()
+	data, err := boundread.All(f, sidecarMaxBytes)
 	if err != nil {
 		return nil, fmt.Errorf("metrics: read %s: %w", path, err)
 	}

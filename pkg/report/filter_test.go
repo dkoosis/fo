@@ -80,6 +80,34 @@ func TestApplyFilter_ActiveRuleSuppresses(t *testing.T) {
 	}
 }
 
+// fo-f3u: a zero `now` would silently invert every expiry check
+// (year-0001 is "before" every until-date, so expired rules look
+// active). ApplyFilter defaults to time.Now() instead.
+func TestApplyFilter_ZeroNowDoesNotInvertExpiry(t *testing.T) {
+	past := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	r := &Report{
+		Findings: []Finding{
+			{RuleID: ruleSA1019, File: "pkg/a.go", Severity: SeverityWarning, Message: "msg"},
+		},
+	}
+	rs := suppress.NewRuleset([]suppress.Suppression{
+		{RuleID: ruleSA1019, Glob: "**", Until: &past, Line: 1},
+	})
+	// Zero time. With no guard, Expired returns false → finding gets
+	// suppressed; with the guard, the expired rule is honored as expired
+	// → finding kept + notice emitted.
+	stats := ApplyFilter(r, rs, time.Time{})
+	if len(r.Findings) != 1 {
+		t.Fatalf("findings after filter: got %d, want 1 (kept)", len(r.Findings))
+	}
+	if stats.Total != 0 {
+		t.Errorf("stats.Total = %d, want 0", stats.Total)
+	}
+	if len(r.Notices) == 0 {
+		t.Errorf("expected expiry notice, got none")
+	}
+}
+
 func TestApplyFilter_ExpiredRuleKeepsAndNotices(t *testing.T) {
 	r := &Report{
 		Findings: []Finding{

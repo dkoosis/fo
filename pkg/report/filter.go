@@ -24,6 +24,13 @@ func ApplyFilter(r *Report, rs *suppress.Ruleset, now time.Time) FilterStats {
 	if r == nil || rs == nil || len(rs.Rules) == 0 || len(r.Findings) == 0 {
 		return stats
 	}
+	// Zero now would silently invert every expiry check (year-0001 is
+	// before every plausible until-date, so expired rules look active).
+	// Default to wall-clock time rather than refuse — callers in tests
+	// often forget to thread a time through.
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
 
 	expiredNotified := map[int]bool{}
 	kept := r.Findings[:0]

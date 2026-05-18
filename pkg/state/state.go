@@ -15,12 +15,19 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/dkoosis/fo/internal/boundread"
 	"github.com/dkoosis/fo/pkg/report"
 )
 
 // SchemaVersion is the on-disk envelope version. Bumped only on a
 // breaking shape change; readers reject unknown versions.
 const SchemaVersion = 1
+
+// sidecarMaxBytes caps the size of any single sidecar file we read.
+// 16 MiB is well above any plausible run history; the cap is here to
+// prevent a planted .fo/last-run.json (or metrics-history.json) from
+// OOM'ing fo.
+const sidecarMaxBytes = 16 << 20
 
 // MaxHistory bounds the number of prior runs kept in the file. Two is
 // the minimum needed for flake detection (resolved at t-1, new at t,
@@ -91,21 +98,28 @@ var ErrVersionSkew = errors.New("state: schema version skew")
 // returns a non-nil error so the caller can decide whether to overwrite
 // or refuse; the CLI treats both as "start fresh".
 func Load(path string) (*File, error) {
-	b, err := os.ReadFile(path)
+	f, err := os.Open(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, nil //nolint:nilnil // missing file is not an error; callers treat (nil, nil) as "no prior state"
 		}
+		return nil, fmt.Errorf("state: open %s: %w", path, err)
+	}
+	defer f.Close()
+	// Cap sidecar reads: a planted .fo/last-run.json must not OOM fo.
+	// 16 MiB covers any plausible run history; beyond that, refuse.
+	b, err := boundread.All(f, sidecarMaxBytes)
+	if err != nil {
 		return nil, fmt.Errorf("state: read %s: %w", path, err)
 	}
-	var f File
-	if err := json.Unmarshal(b, &f); err != nil {
+	var file File
+	if err := json.Unmarshal(b, &file); err != nil {
 		return nil, fmt.Errorf("state: parse %s: %w", path, err)
 	}
-	if f.Version != SchemaVersion {
+	if file.Version != SchemaVersion {
 		return nil, ErrVersionSkew
 	}
-	return &f, nil
+	return &file, nil
 }
 
 // ErrDurabilityDegraded is returned (wrapped) by Save when the atomic
