@@ -84,6 +84,84 @@ Norton Disk Defragmenter is the design reference: plain-English narration above 
 2. **Sketch the loto demo end-to-end** with one concrete `.txtar` → scene transcript → human render → cast file. Smallest end-to-end loop. Surfaces the real frame-model and state-diff questions.
 3. **Decide widget picker grammar** before generalizing it. `--view` flag? `# fo:view leaderboard` header? Auto-detect? Pick one.
 
+## Recommendations (Trixi, 2026-05-18)
+
+These are *recommendations*, not decisions. dk picks.
+
+### Q #3 — Widget picker grammar
+
+**Option A: auto-detect from input shape.**
+fo already does this for top-level format detection (SARIF, go-test-json, hygiene formats). Extending it to widget choice means each hygiene header (`# fo:tally`, `# fo:metrics`, `# fo:status`) implies a default widget (leaderboard, metrics-table, status-grid). Pure: zero CLI surface, zero per-call decisions. But coverage gaps: `# fo:metrics` could reasonably render as bar OR sparkline OR table depending on whether the values are a series, a distribution, or a snapshot. Auto can't distinguish without extra hints.
+
+**Option B: explicit `--view` flag.**
+`fo --view leaderboard < tally.txt`. Maximum control, zero ambiguity, fits the existing `--format` precedent. Costs: a per-call flag is shell noise, and the *most common* path (just pipe and render) deserves a sane default — so this almost certainly coexists with auto, doesn't replace it. Also: `--view` is invisible to anyone reading a saved transcript later. The next reader has to remember which flag the author used.
+
+**Option C: `# fo:view leaderboard` hygiene header.**
+The widget choice rides with the data, inside the same comment-prefix family as the format declarations. Self-describing: pipe a saved transcript through fo a year later, get the same render. Plays nicely with `make demo`-style scripts that emit hand-crafted transcripts. Doesn't preclude auto (header absent → auto-detect) or `--view` (CLI override wins).
+
+**Recommendation: C as primary, A as fallback, B as escape hatch.** Pick widget in this order: explicit `# fo:view`, then `--view` override, then auto-detect from header/shape. This is the same precedence pattern fo already uses for format (`--format` > sniffed header > content sniff), so it generalizes a known idiom rather than inventing a new one. The hygiene-header path is the load-bearing one because it keeps transcripts self-describing — which matters as soon as casts and demo files exist as artifacts in the repo.
+
+### Q #2/#4/#6 — Frame model (one type for three rails)
+
+**Sketch:**
+
+```go
+// Frame is one renderable unit — for the human rail, one act or one
+// beat; for cast, the payload of one timed event; for llm, ignored
+// (llm composes a single string regardless of frame boundaries).
+//
+// Tradeoff: making Frame the unit forces renderers to emit per-beat
+// rather than per-scene, which is moderate work for scene_human.go
+// (it currently writes the whole scene in one pass). The payoff is
+// that cast becomes a thin wrapper: walk frames, attach delays, write
+// asciinema events. Without Frame, cast has to either re-parse the
+// human render or duplicate the render logic.
+type Frame struct {
+    // Kind discriminates how the cast rail should pace this frame.
+    // The human rail ignores it (all frames concatenate); the cast
+    // rail consults a BeatTiming policy keyed on Kind.
+    Kind FrameKind
+
+    // Text is the rendered string for this unit. ANSI included iff
+    // the active theme is color; mono themes emit plain text. Cast
+    // and human consume Text verbatim; llm builds its own string and
+    // doesn't read this field.
+    Text string
+
+    // Source is an optional back-pointer to the parsed beat/act/row
+    // that produced this frame. Lets cast attach metadata (actor for
+    // a beat, act number for a header) without re-parsing. nil-safe.
+    Source any
+}
+
+type FrameKind int
+
+const (
+    FrameTitle FrameKind = iota
+    FrameActHeader
+    FrameNarration
+    FrameCommand
+    FrameOutputLine
+    FrameSeparator
+)
+```
+
+**How each rail consumes it:**
+
+- **human:** `RenderScene` returns `[]Frame`; caller (or a tiny helper) joins `f.Text` to get the composite string. Today's `RenderSceneHuman(w, s)` becomes a thin shim: build frames, write each `f.Text` to `w`.
+- **cast:** walks `[]Frame`, looks up delay-per-Kind in a `BeatTiming` policy, emits asciinema events. Doesn't care about parsed structure — `Text` is opaque.
+- **llm:** ignores `Frame`. The llm rail's whole point is token-density; it composes a single deterministic string from `scene.Scene` directly. Frame is a human/cast concern.
+
+**Tradeoffs:**
+
+- *Pro:* Three rails share one render pass. Cast becomes mechanical (~50 LOC). Human gets per-frame inspection for free (useful for diff classification of scene transcripts later).
+- *Pro:* Theme parity is automatic — frames already contain themed text. Cast inherits NO_COLOR / mono-theme behavior from the human renderer for free.
+- *Con:* Forces refactor of `scene_human.go` from "stream to writer" to "build frame slice." Audit says this is moderate, not deep, but it's still real work.
+- *Con:* `Source any` is a code smell — we lose type safety on the back-pointer. Could parameterize `Frame[T]` later if Go generics earn their weight here; for v1, `any` is fine and matches the IR's `ViewSpec` marker-interface pattern.
+- *Con:* Frame is scene-shaped. For non-scene inputs (SARIF findings, metrics, tally), a frame would map to one row / one widget panel. Naming is OK; the kinds would expand. Could end up with a sprawling `FrameKind` enum.
+
+**Open within this proposal:** Should `Frame` live in `pkg/view` (alongside renderers) or `pkg/scene` (alongside parsed beats)? Trixi leans `pkg/view` because Frame is a rendering concept, not a parsing one. dk decides.
+
 ## Questions for dk
 
 1. **Narration source for loto demo.** Should per-step narration live as annotation comments inside the `.txtar` (colocated, but pollutes testscript) or as a sidecar map like `whoami.demo.yaml` (clean separation, but two files to keep in sync)? Surfaced by the `whoami.txtar` sketch — `docs/design/loto-demo-sketch.md`. Trixi leans sidecar but doesn't know loto's conventions well enough to call it.
