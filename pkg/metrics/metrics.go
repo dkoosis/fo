@@ -10,16 +10,13 @@
 package metrics
 
 import (
-	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 
-	"github.com/dkoosis/fo/internal/lineread"
+	"github.com/dkoosis/fo/pkg/hygiene"
 )
 
 const HeaderPrefix = "# fo:metrics"
@@ -36,8 +33,7 @@ type Metrics struct {
 }
 
 func IsHeader(data []byte) bool {
-	trimmed := bytes.TrimLeft(data, " \t\r\n")
-	return bytes.HasPrefix(trimmed, []byte(HeaderPrefix))
+	return hygiene.HasHeader(data, HeaderPrefix)
 }
 
 var (
@@ -47,63 +43,26 @@ var (
 )
 
 func Parse(r io.Reader) (Metrics, error) {
-	br := bufio.NewReaderSize(r, 64*1024)
-
 	var m Metrics
-	headerSeen := false
-	lineNo := 0
-	var dropped int
-	for {
-		raw, oversize, err := lineread.Read(br)
-		if oversize {
-			dropped++
-		} else if perr := absorbMetricsLine(raw, &m, &headerSeen, &lineNo); perr != nil {
-			return Metrics{}, perr
-		}
-		if err == nil {
-			continue
-		}
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		return Metrics{}, fmt.Errorf("metrics: read: %w", err)
-	}
-	if dropped > 0 {
-		fmt.Fprintf(os.Stderr, "metrics: dropped %d line(s) exceeding %d bytes\n", dropped, lineread.MaxLineLen)
-	}
-	if !headerSeen {
-		return Metrics{}, ErrNoHeader
-	}
-	if len(m.Rows) == 0 {
-		return Metrics{}, ErrNoRows
-	}
-	return m, nil
-}
-
-func absorbMetricsLine(raw []byte, m *Metrics, headerSeen *bool, lineNo *int) error {
-	*lineNo++
-	line := strings.TrimSpace(string(raw))
-	if line == "" {
-		return nil
-	}
-	if !*headerSeen {
-		if !strings.HasPrefix(line, HeaderPrefix) {
-			return ErrNoHeader
-		}
-		rest := strings.TrimSpace(strings.TrimPrefix(line, HeaderPrefix))
-		m.Tool = parseAttr(rest, "tool")
-		*headerSeen = true
-		return nil
-	}
-	if strings.HasPrefix(line, "#") {
-		return nil
-	}
-	row, err := parseRow(line)
+	tool, err := hygiene.Scan(r, hygiene.Spec{
+		Prefix:      HeaderPrefix,
+		Name:        "metrics",
+		ErrNoHeader: ErrNoHeader,
+		ErrNoRows:   ErrNoRows,
+		OnRow: func(_ int, line string) error {
+			row, perr := parseRow(line)
+			if perr != nil {
+				return perr
+			}
+			m.Rows = append(m.Rows, row)
+			return nil
+		},
+	})
 	if err != nil {
-		return fmt.Errorf("metrics: line %d: %w", *lineNo, err)
+		return Metrics{}, err
 	}
-	m.Rows = append(m.Rows, row)
-	return nil
+	m.Tool = tool
+	return m, nil
 }
 
 func parseRow(line string) (Row, error) {
@@ -120,13 +79,4 @@ func parseRow(line string) (Row, error) {
 		row.Unit = fields[2]
 	}
 	return row, nil
-}
-
-func parseAttr(tail, key string) string {
-	for tok := range strings.FieldsSeq(tail) {
-		if eq := strings.IndexByte(tok, '='); eq > 0 && tok[:eq] == key {
-			return tok[eq+1:]
-		}
-	}
-	return ""
 }

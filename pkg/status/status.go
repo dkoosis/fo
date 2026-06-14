@@ -14,15 +14,12 @@
 package status
 
 import (
-	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
-	"github.com/dkoosis/fo/internal/lineread"
+	"github.com/dkoosis/fo/pkg/hygiene"
 )
 
 const HeaderPrefix = "# fo:status"
@@ -49,8 +46,7 @@ type Status struct {
 }
 
 func IsHeader(data []byte) bool {
-	trimmed := bytes.TrimLeft(data, " \t\r\n")
-	return bytes.HasPrefix(trimmed, []byte(HeaderPrefix))
+	return hygiene.HasHeader(data, HeaderPrefix)
 }
 
 var (
@@ -61,63 +57,26 @@ var (
 )
 
 func Parse(r io.Reader) (Status, error) {
-	br := bufio.NewReaderSize(r, 64*1024)
-
 	var s Status
-	headerSeen := false
-	lineNo := 0
-	var dropped int
-	for {
-		raw, oversize, err := lineread.Read(br)
-		if oversize {
-			dropped++
-		} else if perr := absorbStatusLine(raw, &s, &headerSeen, &lineNo); perr != nil {
-			return Status{}, perr
-		}
-		if err == nil {
-			continue
-		}
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		return Status{}, fmt.Errorf("status: read: %w", err)
-	}
-	if dropped > 0 {
-		fmt.Fprintf(os.Stderr, "status: dropped %d line(s) exceeding %d bytes\n", dropped, lineread.MaxLineLen)
-	}
-	if !headerSeen {
-		return Status{}, ErrNoHeader
-	}
-	if len(s.Rows) == 0 {
-		return Status{}, ErrNoRows
-	}
-	return s, nil
-}
-
-func absorbStatusLine(raw []byte, s *Status, headerSeen *bool, lineNo *int) error {
-	*lineNo++
-	line := strings.TrimSpace(string(raw))
-	if line == "" {
-		return nil
-	}
-	if !*headerSeen {
-		if !strings.HasPrefix(line, HeaderPrefix) {
-			return ErrNoHeader
-		}
-		rest := strings.TrimSpace(strings.TrimPrefix(line, HeaderPrefix))
-		s.Tool = parseAttr(rest, "tool")
-		*headerSeen = true
-		return nil
-	}
-	if strings.HasPrefix(line, "#") {
-		return nil
-	}
-	row, err := parseRow(line)
+	tool, err := hygiene.Scan(r, hygiene.Spec{
+		Prefix:      HeaderPrefix,
+		Name:        "status",
+		ErrNoHeader: ErrNoHeader,
+		ErrNoRows:   ErrNoRows,
+		OnRow: func(_ int, line string) error {
+			row, perr := parseRow(line)
+			if perr != nil {
+				return perr
+			}
+			s.Rows = append(s.Rows, row)
+			return nil
+		},
+	})
 	if err != nil {
-		return fmt.Errorf("status: line %d: %w", *lineNo, err)
+		return Status{}, err
 	}
-	s.Rows = append(s.Rows, row)
-	return nil
+	s.Tool = tool
+	return s, nil
 }
 
 func parseRow(line string) (Row, error) {
@@ -182,13 +141,4 @@ func (s Status) ToViewRows() []ViewRow {
 		out[i] = ViewRow{State: string(r.State), Label: r.Label, Value: r.Value, Note: r.Note}
 	}
 	return out
-}
-
-func parseAttr(tail, key string) string {
-	for tok := range strings.FieldsSeq(tail) {
-		if eq := strings.IndexByte(tok, '='); eq > 0 && tok[:eq] == key {
-			return tok[eq+1:]
-		}
-	}
-	return ""
 }

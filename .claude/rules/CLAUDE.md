@@ -5,6 +5,8 @@ Focused build output renderer. Accepts SARIF and go test -json on stdin, renders
 Language: Go 1.24+
 Workspace: /Users/vcto/Projects/fo
 
+‡ Go symbol questions → `snipe` (def/refs/callers/pack/impact/tests) before rg/Grep. rg = non-symbol text only.
+
 ## Architecture
 
 ```
@@ -55,6 +57,9 @@ Inputs: SARIF 2.1.0, go test -json, multiplex-delimited combo, hygiene formats (
 | `pkg/status/` | Hygiene format: PASS/FAIL/WARN/SKIP labeled rows |
 | `pkg/metrics/` | Hygiene format: keyed numeric values (coverage, LOC, bench) |
 | `pkg/tally/` | Hygiene format: count→label distributions (Leaderboard view) |
+| `pkg/scene/` | Cast-rail/narration: `Frame` + scene rendering (imported by view) |
+| `pkg/cluster/` | Finding clustering: anchors, frames, normalization, IDs |
+| `pkg/suppress/` | Finding suppression: match rules against findings |
 | `pkg/wrapper/wraparchlint/` | go-arch-lint JSON → SARIF |
 | `pkg/wrapper/wraparchlinttext/` | go-arch-lint plain-text → SARIF |
 | `pkg/wrapper/wrapcover/` | `go tool cover -func` → fo:metrics |
