@@ -58,18 +58,11 @@ func sniffBareTally(data []byte) bool {
 	for {
 		raw, oversize, err := lineread.Read(br)
 		if !oversize {
-			line := strings.TrimSpace(string(raw))
-			if line != "" && !strings.HasPrefix(line, "#") {
-				idx := strings.IndexAny(line, " \t")
-				if idx <= 0 {
-					return false
-				}
-				if _, perr := strconv.ParseFloat(line[:idx], 64); perr != nil {
-					return false
-				}
-				if strings.TrimSpace(line[idx:]) == "" {
-					return false
-				}
+			ok, counted := tallyRowOK(string(raw))
+			if !ok {
+				return false
+			}
+			if counted {
 				rows++
 			}
 		}
@@ -82,6 +75,28 @@ func sniffBareTally(data []byte) bool {
 		return false
 	}
 	return rows >= 2
+}
+
+// tallyRowOK classifies one raw line for sniffBareTally. It returns
+// ok=false when the line breaks the "<number> <label>" shape (aborting the
+// sniff), and counted=true when the line is a valid tally row that should
+// increment the row count. Blank and comment lines are ok but not counted.
+func tallyRowOK(raw string) (ok, counted bool) {
+	line := strings.TrimSpace(raw)
+	if line == "" || strings.HasPrefix(line, "#") {
+		return true, false
+	}
+	idx := strings.IndexAny(line, " \t")
+	if idx <= 0 {
+		return false, false
+	}
+	if _, err := strconv.ParseFloat(line[:idx], 64); err != nil {
+		return false, false
+	}
+	if strings.TrimSpace(line[idx:]) == "" {
+		return false, false
+	}
+	return true, true
 }
 
 // sniffGoTestJSON returns true when peeked stdin starts with a go test -json

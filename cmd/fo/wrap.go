@@ -30,6 +30,22 @@ var wrapDescriptions = map[string]string{
 	"leaderboard":   "Convert '<count> <label>' tally to fo's tally format",
 }
 
+// plainConvert is a wrapper whose only behavior is "parse no flags, then
+// run Convert(stdin, stdout)". The flagless wrappers all share this shape;
+// keeping them in a table collapses runWrap to a single dispatch.
+type plainConvert struct {
+	flagSet string
+	convert func(io.Reader, io.Writer) error
+}
+
+var plainWrappers = map[string]plainConvert{
+	subArchlint:     {"fo wrap archlint", wraparchlint.Convert},
+	subJSCPD:        {"fo wrap jscpd", wrapjscpd.Convert},
+	"archlint-text": {"fo wrap archlint-text", wraparchlinttext.Convert},
+	"cover":         {"fo wrap cover", wrapcover.Convert},
+	"gobench":       {"fo wrap gobench", wrapgobench.Convert},
+}
+
 func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintf(stderr, "fo wrap: wrapper name required\n\nAvailable wrappers: %s\n",
@@ -44,77 +60,10 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	name := args[0]
+	if pw, ok := plainWrappers[name]; ok {
+		return runPlainWrap(pw, args[1:], stdin, stdout, stderr)
+	}
 	switch name {
-	case subArchlint:
-		fs := flag.NewFlagSet("fo wrap archlint", flag.ContinueOnError)
-		fs.SetOutput(stderr)
-		if err := fs.Parse(args[1:]); err != nil {
-			if errors.Is(err, flag.ErrHelp) {
-				return 0
-			}
-			return 2
-		}
-		if err := wraparchlint.Convert(stdin, stdout); err != nil {
-			fmt.Fprintf(stderr, "fo wrap archlint: %v\n", err)
-			return 2
-		}
-		return 0
-	case subJSCPD:
-		fs := flag.NewFlagSet("fo wrap jscpd", flag.ContinueOnError)
-		fs.SetOutput(stderr)
-		if err := fs.Parse(args[1:]); err != nil {
-			if errors.Is(err, flag.ErrHelp) {
-				return 0
-			}
-			return 2
-		}
-		if err := wrapjscpd.Convert(stdin, stdout); err != nil {
-			fmt.Fprintf(stderr, "fo wrap jscpd: %v\n", err)
-			return 2
-		}
-		return 0
-	case "archlint-text":
-		fs := flag.NewFlagSet("fo wrap archlint-text", flag.ContinueOnError)
-		fs.SetOutput(stderr)
-		if err := fs.Parse(args[1:]); err != nil {
-			if errors.Is(err, flag.ErrHelp) {
-				return 0
-			}
-			return 2
-		}
-		if err := wraparchlinttext.Convert(stdin, stdout); err != nil {
-			fmt.Fprintf(stderr, "fo wrap archlint-text: %v\n", err)
-			return 2
-		}
-		return 0
-	case "cover":
-		fs := flag.NewFlagSet("fo wrap cover", flag.ContinueOnError)
-		fs.SetOutput(stderr)
-		if err := fs.Parse(args[1:]); err != nil {
-			if errors.Is(err, flag.ErrHelp) {
-				return 0
-			}
-			return 2
-		}
-		if err := wrapcover.Convert(stdin, stdout); err != nil {
-			fmt.Fprintf(stderr, "fo wrap cover: %v\n", err)
-			return 2
-		}
-		return 0
-	case "gobench":
-		fs := flag.NewFlagSet("fo wrap gobench", flag.ContinueOnError)
-		fs.SetOutput(stderr)
-		if err := fs.Parse(args[1:]); err != nil {
-			if errors.Is(err, flag.ErrHelp) {
-				return 0
-			}
-			return 2
-		}
-		if err := wrapgobench.Convert(stdin, stdout); err != nil {
-			fmt.Fprintf(stderr, "fo wrap gobench: %v\n", err)
-			return 2
-		}
-		return 0
 	case subDiag:
 		return runWrapDiag(args[1:], stdin, stdout, stderr)
 	case subLeaderboard:
@@ -124,6 +73,25 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fmt.Fprintf(stderr, "fo wrap: unknown wrapper %q\n\nAvailable wrappers: %s\n",
 		name, strings.Join(wrapNames, ", "))
 	return 2
+}
+
+// runPlainWrap parses (and rejects) flags for a flagless wrapper, then runs
+// its Convert. Mirrors the per-wrapper arms it replaced exactly: flag.ErrHelp
+// → 0, other parse error → 2, Convert error → "<flagSet>: <err>" on stderr + 2.
+func runPlainWrap(pw plainConvert, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet(pw.flagSet, flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 2
+	}
+	if err := pw.convert(stdin, stdout); err != nil {
+		fmt.Fprintf(stderr, "%s: %v\n", pw.flagSet, err)
+		return 2
+	}
+	return 0
 }
 
 func runWrapDiag(args []string, stdin io.Reader, stdout, stderr io.Writer) int {

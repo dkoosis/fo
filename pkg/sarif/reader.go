@@ -62,7 +62,7 @@ func checkDepth(data []byte) error {
 	for {
 		tok, err := dec.Token()
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // EOF + parse errors both mean no depth violation; caller's Decode surfaces real errors
 		}
 		switch tok {
 		case json.Delim('{'), json.Delim('['):
