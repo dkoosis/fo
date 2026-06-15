@@ -1,0 +1,34 @@
+# Golden cast for the loto whoami scene (docs/design/loto-demo-sketch.md).
+# Pins the exact asciinema v2 bytes `fo --format cast` emits: clean cumulative
+# timestamps (no float drift), measured geometry, full-redraw frames.
+# Regenerate with: UPDATE_SCRIPTS=1 go test ./cmd/fo -run TestScripts
+stdin whoami.in
+fo --format cast --no-state
+cmp stdout whoami.cast
+
+-- whoami.in --
+# fo:scene title="loto: every session has a handle" actors="AliceTester,BobTester"
+
+## 01 · two agents land in the same repo
+
+> a fresh session needs to know what it's called.
+
+> loto pins a handle from $LOTO_AGENT_ID — same env var, two different agents, two different identities.
+
+@AliceTester $ loto whoami
+  AliceTester
+
+> Bob opens his own session, same repo, different env.
+
+@BobTester $ loto whoami
+  BobTester
+
+> identity is stable per-session: Alice never appears as Bob.
+-- whoami.cast --
+{"version":2,"width":104,"height":13}
+[2.5,"o","\u001b[2J\u001b[Hloto: every session has a handle\n\n────────────────────────────────────────────────────────────\n01 · two agents land in the same repo\n\n  a fresh session needs to know what it's called.\n"]
+[5,"o","\u001b[2J\u001b[Hloto: every session has a handle\n\n────────────────────────────────────────────────────────────\n01 · two agents land in the same repo\n\n  a fresh session needs to know what it's called.\n  loto pins a handle from $LOTO_AGENT_ID — same env var, two different agents, two different identities.\n"]
+[6.2,"o","\u001b[2J\u001b[Hloto: every session has a handle\n\n────────────────────────────────────────────────────────────\n01 · two agents land in the same repo\n\n  a fresh session needs to know what it's called.\n  loto pins a handle from $LOTO_AGENT_ID — same env var, two different agents, two different identities.\nAliceTester ❯ loto whoami\n  AliceTester\n"]
+[8.7,"o","\u001b[2J\u001b[Hloto: every session has a handle\n\n────────────────────────────────────────────────────────────\n01 · two agents land in the same repo\n\n  a fresh session needs to know what it's called.\n  loto pins a handle from $LOTO_AGENT_ID — same env var, two different agents, two different identities.\nAliceTester ❯ loto whoami\n  AliceTester\n  Bob opens his own session, same repo, different env.\n"]
+[9.9,"o","\u001b[2J\u001b[Hloto: every session has a handle\n\n────────────────────────────────────────────────────────────\n01 · two agents land in the same repo\n\n  a fresh session needs to know what it's called.\n  loto pins a handle from $LOTO_AGENT_ID — same env var, two different agents, two different identities.\nAliceTester ❯ loto whoami\n  AliceTester\n  Bob opens his own session, same repo, different env.\nBobTester ❯ loto whoami\n  BobTester\n"]
+[12.4,"o","\u001b[2J\u001b[Hloto: every session has a handle\n\n────────────────────────────────────────────────────────────\n01 · two agents land in the same repo\n\n  a fresh session needs to know what it's called.\n  loto pins a handle from $LOTO_AGENT_ID — same env var, two different agents, two different identities.\nAliceTester ❯ loto whoami\n  AliceTester\n  Bob opens his own session, same repo, different env.\nBobTester ❯ loto whoami\n  BobTester\n  identity is stable per-session: Alice never appears as Bob.\n"]

@@ -41,6 +41,16 @@ func RenderSceneHuman(w io.Writer, s scene.Scene) error {
 	return renderScene(w, s, t)
 }
 
+// RenderSceneHumanString renders a Scene to a string. Companion to
+// RenderSceneHuman for callers (the cast rail) that need the rendered
+// frame as a value rather than a sink write. No error is returned: the
+// only writes go to a strings.Builder, whose Write never fails.
+func RenderSceneHumanString(s scene.Scene) string {
+	var b strings.Builder
+	_ = RenderSceneHuman(&b, s)
+	return b.String()
+}
+
 func renderScene(w io.Writer, s scene.Scene, t theme.Theme) error {
 	if s.Title != "" {
 		if _, err := fmt.Fprintf(w, "%s\n\n", t.Heading.Render(s.Title)); err != nil {

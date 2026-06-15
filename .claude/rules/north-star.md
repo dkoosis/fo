@@ -15,8 +15,15 @@ The reader's attention is the scarce resource; fo defends it.
 
 ## Load-bearing decisions
 
-1. **Report is the IR.** Every parser produces it; every renderer consumes it. New
-   inputs become parsers; new outputs become renderers. ✗ side channels.
+1. **Report is the IR — distinguish format from shape.** Report is THE IR for
+   tool-output *snapshots* (findings, tests, metrics). Every new **format** becomes
+   a parser to Report; every new **output** becomes a renderer. ✗ side channels for
+   formats. A new IR is permitted only for a genuinely different **shape** — and the
+   bar is high: prove it's a different structural/temporal beast, not just a new
+   wrapper. Snapshot = Report. Narrative-over-time = Scene (`pkg/scene`). Scene is a
+   *bounded exception, not a precedent* — it exists because a narrated, multi-actor,
+   time-ordered walkthrough does not fit Report's flat snapshot. Do not cite it to
+   justify a third pipeline; the exception list stays short.
 2. **Auto-detect by default.** TTY → human, piped → llm. `--format` only when forced.
 3. **Exit codes are the contract.** 0 clean | 1 findings/failures | 2 fo error.
    Callers parse exit code, not output.

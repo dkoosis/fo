@@ -73,6 +73,30 @@ func TestRenderSceneHuman(t *testing.T) {
 	}
 }
 
+// TestRenderSceneHumanString_matchesWriter checks the String companion
+// (cast-rail entrypoint) produces byte-identical output to the writer form.
+func TestRenderSceneHumanString_matchesWriter(t *testing.T) {
+	s := scene.Scene{
+		Title: "Demo",
+		Acts: []scene.Act{{
+			Number: "1", Title: "Setup",
+			Beats: []scene.Beat{
+				{Kind: scene.BeatNarration, Narration: "hi"},
+				{Kind: scene.BeatCommand, Command: scene.Command{
+					Actor: frugalLapwing, Cmd: "loto whoami", Output: []string{frugalLapwing}, Exit: 1,
+				}},
+			},
+		}},
+	}
+	var buf bytes.Buffer
+	if err := view.RenderSceneHuman(&buf, s); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if got := view.RenderSceneHumanString(s); got != buf.String() {
+		t.Errorf("String companion differs from writer\nwriter: %q\nstring: %q", buf.String(), got)
+	}
+}
+
 // TestRenderSceneHuman_NO_COLOR is a regression for fo-5r4: RenderSceneHuman
 // used theme.Color() which hardcodes ANSI; should use theme.Default(true)
 // so NO_COLOR strips it.

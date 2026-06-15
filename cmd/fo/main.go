@@ -62,6 +62,9 @@ const (
 	formatHuman = "human"
 	formatLLM   = "llm"
 	formatJSON  = "json"
+	// formatCast emits an asciinema v2 recording. It is Scene-native:
+	// only `# fo:scene` input animates, so other renderers reject it.
+	formatCast = "cast"
 )
 
 // CLI flag and subcommand names. Centralized to satisfy goconst and so
@@ -304,6 +307,12 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		input = coerced
 	}
 
+	// cast animates a scene; nothing else has a time axis to record.
+	if mode == formatCast && !scene.IsHeader(input) {
+		fmt.Fprintln(stderr, "fo: --format cast requires # fo:scene input")
+		return 2
+	}
+
 	if tally.IsHeader(input) {
 		return renderTally(input, stdout, stderr, mode, *themeFlag)
 	}
@@ -464,6 +473,17 @@ func renderTally(input []byte, stdout io.Writer, stderr io.Writer, mode, themeNa
 		})
 }
 
+// castDelay assigns the pause before each beat of a cast recording.
+// Narration beats hold longer (there is prose to read); command beats
+// pace like a brisk live demo. Tuned for watchability, not realism — a
+// recording, not a replay of actual wall-clock timing.
+func castDelay(b scene.Beat) time.Duration {
+	if b.Kind == scene.BeatNarration {
+		return 2500 * time.Millisecond
+	}
+	return 1200 * time.Millisecond
+}
+
 // renderScene parses # fo:scene input and dispatches to the human or
 // llm scene renderer (or JSON encoder). Always exits 0 on success —
 // scenes are narration, not gates (fo-fl0.4).
@@ -472,6 +492,14 @@ func renderScene(input []byte, stdout io.Writer, stderr io.Writer, mode string) 
 	if err != nil {
 		fmt.Fprintf(stderr, "fo: parsing scene: %v\n", err)
 		return 2
+	}
+	if mode == formatCast {
+		frames := scene.Cast(s, view.RenderSceneHumanString, castDelay)
+		if err := scene.EncodeAsciicast(stdout, frames); err != nil {
+			fmt.Fprintf(stderr, "fo: %v\n", err)
+			return 2
+		}
+		return 0
 	}
 	return renderHygiene(stdout, stderr, mode, s,
 		func(w io.Writer) error { return view.RenderSceneLLM(w, s) },
@@ -909,7 +937,7 @@ func resolveFormat(format string, w io.Writer) (string, error) {
 			return formatHuman, nil
 		}
 		return formatLLM, nil
-	case formatHuman, formatLLM, formatJSON:
+	case formatHuman, formatLLM, formatJSON, formatCast:
 		return format, nil
 	default:
 		return "", fmt.Errorf("%w: %q", errUnknownFormat, format)

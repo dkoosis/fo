@@ -56,6 +56,23 @@ func TestRenderSceneLLM_roundTrip(t *testing.T) {
 	}
 }
 
+// TestRenderSceneLLMString_matchesWriter checks the String companion
+// (cast-rail entrypoint) produces byte-identical output to the writer
+// form.
+func TestRenderSceneLLMString_matchesWriter(t *testing.T) {
+	s, err := scene.Parse(strings.NewReader(canonicalSceneInput))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	var buf bytes.Buffer
+	if err := view.RenderSceneLLM(&buf, s); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if got := view.RenderSceneLLMString(s); got != buf.String() {
+		t.Errorf("String companion differs from writer\nwriter: %q\nstring: %q", buf.String(), got)
+	}
+}
+
 // TestRenderSceneLLM_roundTrip_ActorWithSpace is a regression for fo-drd:
 // renderer emitted the actors list bare, so a name like "Odd Plover" broke
 // the parser's tokenizer on round-trip.

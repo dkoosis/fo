@@ -17,6 +17,18 @@ fo --format json --no-state
 stdout '"title": "demo"'
 stdout '"actors"'
 
+# --format cast emits an asciinema v2 recording: header line then one
+# timestamped "o" output event per beat (full-redraw: each clears+homes).
+stdin scene.in
+fo --format cast --no-state
+stdout '\{"version":2,"width":\d+,"height":\d+\}'
+stdout '\[[0-9.]+,"o","\\u001b\[2J\\u001b\[H'
+
+# cast is Scene-native; non-scene input is rejected with exit 2.
+stdin sarif.in
+! fo --format cast --no-state
+stderr 'requires # fo:scene input'
+
 -- scene.in --
 # fo:scene title="demo" actors=FrugalLapwing
 
@@ -26,3 +38,5 @@ stdout '"actors"'
 
 @FrugalLapwing $ loto whoami
   FrugalLapwing
+-- sarif.in --
+{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"t"}},"results":[]}]}
