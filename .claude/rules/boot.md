@@ -1,12 +1,18 @@
 # Boot
-updated: 2026-05-18
+updated: 2026-06-14
 
-→ next: `bd ready` — /clean pass landed; 9 audit findings remain (5 cosmetic test goconst + 1 arch report-only + 3 production rangeValCopy already fixed).
+→ next: cast-rail follow-up from docs/design/three-output-rails.md §"Open Requirements Questions" (full-redraw vs delta, playback target, distribution — none block). Or take a ready P1 bug: fo-j4m (lossy omitempty on IR fields), fo-nrx (suppress roundtrip + don't abort on first error).
+
+state: locked: Frame{} in pkg/scene · scene-vs-Report SETTLED (Report singular for snapshots; Scene = bounded exception).
 
 ✓ done
-- fo-u15.3.3 shipped 9 TDD commits: cluster render (collapsed human + Shape A/B llm + --expand flag), pushed `a738b58`
-- /clean pass: 19+ audit findings resolved across gofmt/goconst/err113/gosec/nestif/gocognit/rangeValCopy/forcetypeassert tiers, pushed `d5ef42a`
+- shipped `--format cast`: fo:scene → asciinema v2 recording (afc8ce6). cast.go + asciinema.go + golden whoami_cast.txtar; double-close race fix in stream_cancel_test (sync.Once).
+- north-star: codified Scene as bounded exception to Report-is-the-IR.
+- merged fo-76n (d4feb0f): untrack generated build/golangci.sarif, goconst test-fixture exemption, real `build` make target.
+- removed gas-city integration (35bd239): deleted .gc/ .quality/ identity.toml routes.jsonl; reverted gc.* config + dolt server-mode injection. we don't use it.
+- tree clean: 1 branch (main), 1 worktree, 0 stashes.
 
 ‡ traps
-- `bd dep add <child> <epic>` errors ("tasks can only block tasks") — use `bd update <child> --parent <epic>`
-- LSP diagnostics sometimes lag behind file edits (stale `it.Cluster undefined` warnings) — verify with `go build ./...` not the IDE stream
+- bd create/close broken: migration 0047 wisps table missing. reads ok.
+- doc-governance pre-commit hook blocks root *.md except README/decisions.log. CHANGELOG.md is UNCOMMITTED+blocked — needs a home decision (relocate to docs/, or --no-verify).
+- main ahead of origin, unpushed (push not yet authorized).
