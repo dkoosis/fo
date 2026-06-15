@@ -1,11 +1,32 @@
 package view
 
 import (
+	"fmt"
+	"io"
 	"strconv"
 
 	"github.com/dkoosis/fo/pkg/paint"
 	"github.com/dkoosis/fo/pkg/theme"
 )
+
+// RenderLeaderboardLLM emits a terse plain-text ranking. Used when fo's
+// output mode is llm — bar charts are useless to AI consumers; a sorted
+// "label  count" listing is the densest faithful form.
+func RenderLeaderboardLLM(w io.Writer, v Leaderboard) error {
+	labelMax := 0
+	for _, r := range v.Rows {
+		if l := len(r.Label); l > labelMax {
+			labelMax = l
+		}
+	}
+	for _, r := range v.Rows {
+		val := strconv.FormatFloat(r.Value, 'f', -1, 64)
+		if _, err := fmt.Fprintf(w, "%-*s  %s\n", labelMax, r.Label, val); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // leaderboardBarWidth picks the bar width given total terminal width.
 // Reserves room for label, value, and column gaps; clamps to [8, 40].

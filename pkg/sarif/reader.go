@@ -8,8 +8,8 @@ import (
 	"io"
 )
 
-// ErrMissingSARIFVersion is returned when a decoded document has no version field.
-var ErrMissingSARIFVersion = errors.New("missing sarif version")
+// errMissingSARIFVersion is returned when a decoded document has no version field.
+var errMissingSARIFVersion = errors.New("missing sarif version")
 
 // ErrNestingTooDeep is returned when a SARIF document nests objects/arrays
 // past maxNestingDepth. encoding/json's Decode is recursive and a
@@ -35,7 +35,7 @@ func Read(r io.Reader) (*Document, error) {
 	// after the SARIF JSON document, and the decoder already consumed the
 	// complete first JSON value successfully.
 	if doc.Version == "" {
-		return nil, ErrMissingSARIFVersion
+		return nil, errMissingSARIFVersion
 	}
 	return &doc, nil
 }

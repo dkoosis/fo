@@ -1,7 +1,6 @@
 package tally
 
 import (
-	"bytes"
 	"errors"
 	"strings"
 	"testing"
@@ -128,20 +127,5 @@ func TestToLeaderboard(t *testing.T) {
 	}
 	if len(lb.Rows) != 3 || lb.Rows[0].Label != "a" {
 		t.Errorf("rows = %+v", lb.Rows)
-	}
-}
-
-func TestRenderLLM(t *testing.T) {
-	tly := Tally{Rows: []Row{
-		{Label: "log.friction", Value: 14332},
-		{Label: "journal.day", Value: 2578},
-	}}
-	var buf bytes.Buffer
-	if err := tly.RenderLLM(&buf); err != nil {
-		t.Fatalf("RenderLLM: %v", err)
-	}
-	out := buf.String()
-	if !strings.Contains(out, "log.friction") || !strings.Contains(out, "14332") {
-		t.Errorf("output missing data: %q", out)
 	}
 }

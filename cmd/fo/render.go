@@ -87,7 +87,7 @@ func renderTally(input []byte, stdout io.Writer, stderr io.Writer, mode, themeNa
 		jsonOut.Total += r.Value
 	}
 	return renderHygiene(stdout, stderr, mode, jsonOut,
-		func(w io.Writer) error { return t.RenderLLM(w) },
+		func(w io.Writer) error { return view.RenderLeaderboardLLM(w, t.ToLeaderboard()) },
 		func(w io.Writer) error {
 			th := resolveTheme(themeName, w)
 			width := termSize(w)

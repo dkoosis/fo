@@ -122,22 +122,3 @@ func (t Tally) ToLeaderboard() view.Leaderboard {
 	}
 	return view.Leaderboard{Rows: rows, Total: total}
 }
-
-// RenderLLM emits a terse plain-text ranking. Used when fo's output
-// mode is llm — bar charts are useless to AI consumers; a sorted
-// "label\tcount" listing is the densest faithful form.
-func (t Tally) RenderLLM(w io.Writer) error {
-	labelMax := 0
-	for _, r := range t.Rows {
-		if l := len(r.Label); l > labelMax {
-			labelMax = l
-		}
-	}
-	for _, r := range t.Rows {
-		v := strconv.FormatFloat(r.Value, 'f', -1, 64)
-		if _, err := fmt.Fprintf(w, "%-*s  %s\n", labelMax, r.Label, v); err != nil {
-			return err
-		}
-	}
-	return nil
-}
