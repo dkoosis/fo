@@ -17,7 +17,20 @@ func TestRenderStatus_human(t *testing.T) {
 		t.Fatalf("render: %v", err)
 	}
 	out := buf.String()
-	for _, want := range []string{"doctor", "env-loaded", "dolt-installed", "not on PATH", "2h-old"} {
+	// Computed summary line: 1 ok / 1 fail / 1 warn / 0 skip.
+	if !strings.Contains(out, "1 ok · 1 fail · 1 warn · 0 skip") {
+		t.Errorf("missing or wrong summary counts in output:\n%s", out)
+	}
+	// State column must pair each state with its row — a renderer that drops
+	// the state glyph would still pass a bare label-substring check.
+	for _, want := range []string{
+		"doctor",
+		"ok   env-loaded",
+		"fail dolt-installed",
+		"not on PATH",
+		"warn snipe-fresh",
+		"2h-old",
+	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in output:\n%s", want, out)
 		}

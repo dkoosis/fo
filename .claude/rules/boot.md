@@ -1,18 +1,12 @@
 # Boot
-updated: 2026-06-14
+updated: 2026-06-15
 
-→ next: cast-rail follow-up from docs/design/three-output-rails.md §"Open Requirements Questions" (full-redraw vs delta, playback target, distribution — none block). Or take a ready P1 bug: fo-j4m (lossy omitempty on IR fields), fo-nrx (suppress roundtrip + don't abort on first error).
-
-state: locked: Frame{} in pkg/scene · scene-vs-Report SETTLED (Report singular for snapshots; Scene = bounded exception).
+→ next: `bd ready`, pick. No live bugs left — remaining are P3 design refactors (29w/061 extract-or-leave; e0v/ajw decompose, plan first) + `human`-labeled calls.
 
 ✓ done
-- shipped `--format cast`: fo:scene → asciinema v2 recording (afc8ce6). cast.go + asciinema.go + golden whoami_cast.txtar; double-close race fix in stream_cancel_test (sync.Once).
-- north-star: codified Scene as bounded exception to Report-is-the-IR.
-- merged fo-76n (d4feb0f): untrack generated build/golangci.sarif, goconst test-fixture exemption, real `build` make target.
-- removed gas-city integration (35bd239): deleted .gc/ .quality/ identity.toml routes.jsonl; reverted gc.* config + dolt server-mode injection. we don't use it.
-- tree clean: 1 branch (main), 1 worktree, 0 stashes.
+- Verified May bug audit (#257-271) fully resolved; fixed memory note.
+- Hardened #269 (sarif depth-bomb guard, tested); #268 needs no code (temp+rename neutralizes it).
 
 ‡ traps
-- bd create/close broken: migration 0047 wisps table missing. reads ok.
-- doc-governance pre-commit hook blocks root *.md except README/decisions.log. CHANGELOG.md is UNCOMMITTED+blocked — needs a home decision (relocate to docs/, or --no-verify).
-- main ahead of origin, unpushed (push not yet authorized).
+- 8 test files uncommitted (6 prior + sarif reader pair) — commit unauthorized.
+- doc-governance hook blocks root *.md.

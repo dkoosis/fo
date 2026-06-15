@@ -86,10 +86,18 @@ func TestSave_NoTmpLeak(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var sawTarget bool
 	for _, e := range entries {
-		if e.Name() != "last.json" {
-			t.Fatalf("unexpected leftover file: %s", e.Name())
+		if e.Name() == "last.json" {
+			sawTarget = true
+			continue
 		}
+		t.Fatalf("unexpected leftover file: %s", e.Name())
+	}
+	// Guard against false-green: an empty dir (Save wrote nothing) would
+	// satisfy the no-leak loop above without ever persisting the target.
+	if !sawTarget {
+		t.Fatal("last.json was not written")
 	}
 }
 

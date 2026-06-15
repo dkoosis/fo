@@ -15,7 +15,12 @@ func TestConvert_basic(t *testing.T) {
 		t.Fatalf("Convert: %v", err)
 	}
 	got := out.String()
-	for _, want := range []string{"# fo:metrics tool=cover", "github.com/x/y/foo.go:12:Foo 100", "total 87.3 %"} {
+	for _, want := range []string{
+		"# fo:metrics tool=cover",
+		"github.com/x/y/foo.go:12:Foo 100",
+		"github.com/x/y/foo.go:20:Bar 75",
+		"total 87.3 %",
+	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}

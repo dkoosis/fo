@@ -12,8 +12,9 @@ func TestVersionFlag(t *testing.T) {
 			if err != nil {
 				t.Fatalf("run %s: %v", arg, err)
 			}
-			if strings.TrimSpace(stdout) == "" {
-				t.Fatalf("expected non-empty version on stdout, got %q", stdout)
+			want := resolveVersion()
+			if got := strings.TrimSpace(stdout); !strings.Contains(got, want) {
+				t.Fatalf("expected stdout to contain resolved version %q, got %q", want, got)
 			}
 		})
 	}
