@@ -40,6 +40,7 @@ import (
 	"github.com/dkoosis/fo/internal/boundread"
 	"github.com/dkoosis/fo/internal/lineread"
 	"github.com/dkoosis/fo/pkg/metrics"
+	"github.com/dkoosis/fo/pkg/multiplex"
 	"github.com/dkoosis/fo/pkg/report"
 	"github.com/dkoosis/fo/pkg/sarif"
 	"github.com/dkoosis/fo/pkg/scene"
@@ -677,7 +678,7 @@ func sniffSARIF(data []byte) bool {
 // Multi-tool delimiter protocol takes precedence; SARIF next; go test -json
 // is the fallback when SARIF probe fails.
 func parseToReport(input []byte, stderr io.Writer) (*report.Report, error) {
-	if report.HasDelimiter(input) {
+	if multiplex.HasDelimiter(input) {
 		return parseMultiplex(input, stderr)
 	}
 	trimmed := bytes.TrimLeft(input, " \t\n\r")
@@ -827,9 +828,9 @@ func parseTestJSONTolerant(input []byte, stderr io.Writer) (*report.Report, erro
 // surface as synthetic error-severity findings so silent crashes can't
 // masquerade as a clean run.
 func parseMultiplex(input []byte, stderr io.Writer) (*report.Report, error) {
-	sections, prelude, err := report.ParseSections(input)
+	sections, prelude, err := multiplex.ParseSections(input)
 	if err != nil {
-		var ufe *report.UnknownFormatError
+		var ufe *multiplex.UnknownFormatError
 		if errors.As(err, &ufe) {
 			return nil, fmt.Errorf(
 				"%w\nhint: for raw line-diagnostic text (e.g. 'go vet', 'gofmt'), pipe through 'fo wrap diag --tool <name>' to produce SARIF",
@@ -871,27 +872,27 @@ func parseMultiplex(input []byte, stderr io.Writer) (*report.Report, error) {
 // sectionStatusFinding returns a synthetic finding for non-ok section statuses.
 // Returns (finding, true) when the status warrants a finding; (_, false) for
 // ok/clean/empty (normal execution).
-func sectionStatusFinding(sec report.Section) (report.Finding, bool) {
+func sectionStatusFinding(sec multiplex.Section) (report.Finding, bool) {
 	switch sec.Status {
-	case report.StatusTimeout:
+	case multiplex.StatusTimeout:
 		return report.Finding{
 			RuleID:   "fo/section-timeout",
 			Severity: report.SeverityError,
 			Message:  fmt.Sprintf("tool=%s timed out before producing output", sec.Tool),
 		}, true
-	case report.StatusError:
+	case multiplex.StatusError:
 		return report.Finding{
 			RuleID:   "fo/section-error",
 			Severity: report.SeverityError,
 			Message:  fmt.Sprintf("tool=%s exited with an error", sec.Tool),
 		}, true
-	case report.StatusPartial:
+	case multiplex.StatusPartial:
 		return report.Finding{
 			RuleID:   "fo/section-partial",
 			Severity: report.SeverityWarning,
 			Message:  fmt.Sprintf("tool=%s produced partial output (may have been interrupted)", sec.Tool),
 		}, true
-	case report.StatusSkipped:
+	case multiplex.StatusSkipped:
 		return report.Finding{
 			RuleID:   "fo/section-skipped",
 			Severity: report.SeverityNote,
@@ -902,7 +903,7 @@ func sectionStatusFinding(sec report.Section) (report.Finding, bool) {
 	}
 }
 
-func parseSection(sec report.Section, body []byte, stderr io.Writer) (*report.Report, error) {
+func parseSection(sec multiplex.Section, body []byte, stderr io.Writer) (*report.Report, error) {
 	switch sec.Format {
 	case "sarif":
 		doc, err := sarif.ReadBytes(body)

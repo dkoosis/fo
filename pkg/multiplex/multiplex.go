@@ -1,5 +1,6 @@
-// Multi-tool delimiter protocol — multiplexes several tool outputs into a
-// single stdin stream via lines of the form:
+// Package multiplex implements fo's multi-tool delimiter protocol, which
+// multiplexes several tool outputs into a single stdin stream via lines of
+// the form:
 //
 //	--- tool:<name> format:<sarif|testjson> [status:<value>] ---
 //
@@ -7,8 +8,9 @@
 // renderer. Valid values: ok, clean, partial, timeout, skipped, error.
 // Omitting status is equivalent to ok.
 //
-// Restored for fo-5b6 after the v2 cutover removed internal/report.
-package report
+// It is parsing logic, deliberately kept out of pkg/report so the Report IR
+// stays a pure data shape (fo-29w).
+package multiplex
 
 import (
 	"bytes"

@@ -14,11 +14,11 @@ stdin
   │
   ├─[1] read           internal/boundread (batch 256 MiB cap) | internal/lineread (stream)
   │
-  ├─[2] sniff          cmd/fo/main.go: sniffSARIF, sniffGoTestJSON, report.HasDelimiter
+  ├─[2] sniff          cmd/fo/main.go: sniffSARIF, sniffGoTestJSON, multiplex.HasDelimiter
   │
   ├─[3] parse          pkg/sarif (ReadBytes → ToReportWithMeta)
   │                    pkg/testjson (ParseBytes / Stream → ToReport)
-  │                    pkg/report.ParseSections (multiplex --- tool: --- protocol)
+  │                    pkg/multiplex.ParseSections (--- tool: --- protocol)
   │
   ├─[4] Report (IR)    pkg/report/report.go — Findings, Tests, Diff, Notices
   │
@@ -45,7 +45,8 @@ Inputs: SARIF 2.1.0, go test -json, multiplex-delimited combo, hygiene formats (
 | Path | Role |
 |---|---|
 | `cmd/fo/` | CLI entry, flag parsing, format sniffing, subcommand dispatch |
-| `pkg/report/` | Canonical `Report` struct + multiplex delimiter protocol |
+| `pkg/report/` | Canonical `Report` struct (pure IR) + JSON Schema |
+| `pkg/multiplex/` | Multi-tool delimiter protocol (`--- tool: --- `): sniff + ParseSections |
 | `pkg/sarif/` | SARIF 2.1.0 types, reader, builder, aggregates → Report |
 | `pkg/testjson/` | `go test -json` stream parser → Report |
 | `pkg/view/` | Renderers: human, llm, json; mode dispatch |
