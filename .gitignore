@@ -53,6 +53,9 @@ visual_test_outputs/
 bin/
 !.sandbox/bin/
 
+# Lint/build output (golangci sarif, etc.) — regenerated, removed by `make clean`
+/build/
+
 # Git worktrees
 .worktrees/
 

@@ -10,7 +10,7 @@
 
 .DEFAULT_GOAL := check
 
-.PHONY: help scan check audit audit-human audit-llm report deploy install doctor cross \
+.PHONY: help scan check audit audit-human audit-llm report deploy install build doctor cross \
         vet lint test race fmt fmt-fix dupl vuln \
         qa-goldens qa-goldens-update \
         snipe-index baseline \
@@ -56,8 +56,7 @@ help: ## Show this help
 		/^## [^-]/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 4) } \
 		/^[a-zA-Z0-9_-]+:.*?## / { printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
-check: vet lint test ## Full repo: vet + lint + test + build
-	@go build ./...
+check: vet lint test build ## Full repo: vet + lint + test + build
 	@echo "=== check pass ==="
 
 audit: snipe-index ## Exhaustive stream through fo (auto: human@TTY, llm piped)
@@ -210,6 +209,9 @@ demo-live: install ## Run real go test + vet through fo
 clean: ## Remove build artifacts
 	rm -f fo
 	rm -rf bin/ build/ .sandbox/bin/
+
+build: ## Compile the fo binary to ./fo (no install)
+	go build -ldflags "-X main.version=$(VERSION)" -o fo ./cmd/fo/
 
 install:
 	go install ./cmd/fo/
