@@ -1,2 +1,2 @@
-!  Printf format %d has arg "not-an-int" of wrong type string  fixture/main.go:4
-!  unreachable code                                            fixture/util.go:7
+!  F-cfe  Printf format %d has arg "not-an-int" of wrong type string  fixture/main.go:4
+!  F-477  unreachable code                                            fixture/util.go:7

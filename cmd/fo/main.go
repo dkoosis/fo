@@ -43,9 +43,10 @@ import (
 )
 
 const (
-	formatHuman = "human"
-	formatLLM   = "llm"
-	formatJSON  = "json"
+	formatHuman  = "human"
+	formatLLM    = "llm"
+	formatJSON   = "json"
+	formatGitHub = "github"
 	// formatCast emits an asciinema v2 recording. It is Scene-native:
 	// only `# fo:scene` input animates, so other renderers reject it.
 	formatCast = "cast"
@@ -59,10 +60,14 @@ const (
 	flagNoState   = "--no-state"
 	flagRule      = "--rule"
 	flagTool      = "--tool"
+	flagHelp      = "--help"
 
 	subState       = "state"
 	subSuppress    = "suppress"
 	subWatch       = "watch"
+	subExplain     = "explain"
+	subTrend       = "trend"
+	subReplay      = "replay"
 	subWrap        = "wrap"
 	subDiag        = "diag"
 	subLeaderboard = "leaderboard"
@@ -79,7 +84,7 @@ var version = "dev"
 var (
 	errUnrecognizedInput    = errors.New("unrecognized input (expected SARIF or go test -json)")
 	errTruncatedTestJSON    = errors.New("no complete events recovered (truncated stream?)")
-	errUnknownFormat        = errors.New("unknown format (expected auto, human, llm, json)")
+	errUnknownFormat        = errors.New("unknown format (expected auto, human, llm, json, github)")
 	errUnknownSectionFormat = errors.New("unknown section format")
 )
 
@@ -119,9 +124,11 @@ OUTPUT FORMATS (--format)
   human           Tufte-Swiss styled terminal output
   llm             Token-dense plain text, no ANSI
   json            Machine-parseable Report JSON
+  github          GitHub Actions annotations (::error/::warning/::notice),
+                  scoped to new findings when a diff baseline exists
 
 FLAGS
-  --format <mode>     auto | human | llm | json (default: auto)
+  --format <mode>     auto | human | llm | json | github (default: auto)
   --theme <name>      color | mono (default: auto — color on TTY, mono otherwise)
   --state-file <path> Sidecar state file (default: .fo/last-run.json)
   --no-state          Skip diff classification and sidecar I/O
@@ -136,6 +143,9 @@ SUBCOMMANDS
   fo wrap list               List wrappers (--json for machine output)
   fo wrap --help             Show available wrappers
   fo watch -- <cmd>          Run <cmd>, render output, rerun on stdin newline (A.1)
+  fo explain <id>            Expand a handle (F-7a2/T-3f1) from the last run
+  fo trend <rule-id>         Chart a rule's count across recorded runs (sparkline)
+  fo replay [--since=<dur>]   List recent runs with headline counts
   fo suppress add|list|rm    Manage .fo/ignore suppressions (rule-id, glob, expiry)
   fo state reset             Clear diff classification baseline
   fo --version               Print build version and exit
@@ -181,7 +191,13 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return runSuppress(args[1:], stdout, stderr)
 		case subWatch:
 			return runWatch(args[1:], stdin, stdout, stderr)
-		case "help", "-h", "--help":
+		case subExplain:
+			return runExplain(args[1:], stdout, stderr)
+		case subTrend:
+			return runTrend(args[1:], stdout, stderr)
+		case subReplay:
+			return runReplay(args[1:], stdout, stderr)
+		case "help", "-h", flagHelp:
 			fmt.Fprint(stderr, usage)
 			return 0
 		case "version", "-version", "--version":
@@ -203,7 +219,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("fo", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() { fmt.Fprint(stderr, usage) }
-	formatFlag := fs.String("format", "auto", "Output format: auto, human, llm, json")
+	formatFlag := fs.String("format", "auto", "Output format: auto, human, llm, json, github")
 	themeFlag := fs.String("theme", "auto", "Theme: auto, color, mono")
 	stateFile := fs.String("state-file", state.Path(), "Sidecar state file path")
 	noStateFlag := fs.Bool("no-state", false, "Skip diff classification and sidecar I/O")
@@ -332,6 +348,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	saveErr := attachDiff(r, *stateFile, policy, stderr)
 
+	assignAndPersistIDs(r, policy, stderr)
+	recordRun(r, policy, stderr)
+
 	// Warn on unknown --expand IDs in human mode; LLM mode ignores --expand
 	// (clusters always render fully there).
 	if mode != formatLLM && len(expandValues) > 0 {
@@ -385,7 +404,7 @@ func resolveFormat(format string, w io.Writer) (string, error) {
 			return formatHuman, nil
 		}
 		return formatLLM, nil
-	case formatHuman, formatLLM, formatJSON, formatCast:
+	case formatHuman, formatLLM, formatJSON, formatCast, formatGitHub:
 		return format, nil
 	default:
 		return "", fmt.Errorf("%w: %q", errUnknownFormat, format)

@@ -1,7 +1,7 @@
-x  ineffectual assignment to `err`                             pkg/api/client.go:33
-!  S1005: unnecessary assignment to the blank identifier       cmd/server/main.go:88
-!  printf: fmt.Sprintf format %d has arg of wrong type string  pkg/api/client.go:57
-!  SA1019: package `io/ioutil` is deprecated                   pkg/config/loader.go:7
-x  error return value of `db.Close` is not checked             internal/store/store.go:42
-x  error return value of `resp.Body.Close` is not checked      internal/store/store.go:78
-x  func `helperValidate` is unused                             internal/validate.go:15
+x  F-a20  ineffectual assignment to `err`                             pkg/api/client.go:33
+!  F-326  S1005: unnecessary assignment to the blank identifier       cmd/server/main.go:88
+!  F-27e  printf: fmt.Sprintf format %d has arg of wrong type string  pkg/api/client.go:57
+!  F-f91  SA1019: package `io/ioutil` is deprecated                   pkg/config/loader.go:7
+x  F-8e0  error return value of `db.Close` is not checked             internal/store/store.go:42
+x  F-c31  error return value of `resp.Body.Close` is not checked      internal/store/store.go:78
+x  F-e40  func `helperValidate` is unused                             internal/validate.go:15

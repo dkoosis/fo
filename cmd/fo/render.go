@@ -22,6 +22,9 @@ func renderMode(mode string, r *report.Report, stdout io.Writer, themeName strin
 	if mode == formatJSON {
 		return writeReportJSON(stdout, r)
 	}
+	if mode == formatGitHub {
+		return view.RenderGitHub(stdout, *r)
+	}
 	t := resolveTheme(themeName, stdout)
 	viewMode := view.ModeHuman
 	if mode == formatLLM {

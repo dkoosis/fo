@@ -17,9 +17,11 @@ OUTPUT FORMATS (--format)
   human           Tufte-Swiss styled terminal output
   llm             Token-dense plain text, no ANSI
   json            Machine-parseable Report JSON
+  github          GitHub Actions annotations (::error/::warning/::notice),
+                  scoped to new findings when a diff baseline exists
 
 FLAGS
-  --format <mode>     auto | human | llm | json (default: auto)
+  --format <mode>     auto | human | llm | json | github (default: auto)
   --theme <name>      color | mono (default: auto — color on TTY, mono otherwise)
   --state-file <path> Sidecar state file (default: .fo/last-run.json)
   --no-state          Skip diff classification and sidecar I/O
@@ -34,6 +36,9 @@ SUBCOMMANDS
   fo wrap list               List wrappers (--json for machine output)
   fo wrap --help             Show available wrappers
   fo watch -- <cmd>          Run <cmd>, render output, rerun on stdin newline (A.1)
+  fo explain <id>            Expand a handle (F-7a2/T-3f1) from the last run
+  fo trend <rule-id>         Chart a rule's count across recorded runs (sparkline)
+  fo replay [--since=<dur>]   List recent runs with headline counts
   fo suppress add|list|rm    Manage .fo/ignore suppressions (rule-id, glob, expiry)
   fo state reset             Clear diff classification baseline
   fo --version               Print build version and exit

@@ -52,9 +52,24 @@ func glyphFor(item BulletItem, t theme.Theme) (string, styler) {
 func bulletRows(items []BulletItem, t theme.Theme) ([][]string, []string) {
 	rows := make([][]string, 0, len(items))
 	fixes := make([]string, 0, len(items))
+	// Only reserve the ID column when at least one row carries a handle —
+	// otherwise hygiene formats and ID-less reports pay an empty gutter.
+	withIDs := false
+	for _, it := range items {
+		if it.ID != "" {
+			withIDs = true
+			break
+		}
+	}
 	for _, it := range items {
 		glyph, style := glyphFor(it, t)
-		rows = append(rows, []string{style(glyph), it.Label, t.Muted.Render(it.Value)})
+		var row []string
+		if withIDs {
+			row = []string{style(glyph), t.Muted.Render(it.ID), it.Label, t.Muted.Render(it.Value)}
+		} else {
+			row = []string{style(glyph), it.Label, t.Muted.Render(it.Value)}
+		}
+		rows = append(rows, row)
 		if it.FixCommand != "" {
 			fixes = append(fixes, "  "+t.Muted.Render("fix: "+it.FixCommand))
 		} else {

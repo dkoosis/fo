@@ -66,6 +66,7 @@
       "type": "object",
       "required": ["severity", "message"],
       "properties": {
+        "id":          { "type": "string", "description": "Short run-local handle (F-xxx) aliasing fingerprint; addressable via 'fo explain'. Ephemeral, not persisted." },
         "rule_id":     { "type": "string" },
         "file":        { "type": "string" },
         "line":        { "type": "integer", "minimum": 0 },
@@ -81,6 +82,7 @@
       "type": "object",
       "required": ["package", "outcome"],
       "properties": {
+        "id":          { "type": "string", "description": "Short run-local handle (T-xxx) for a failing test, aliasing fingerprint. Ephemeral, not persisted." },
         "package":     { "type": "string" },
         "test":        { "type": "string", "description": "Empty for package-level results." },
         "outcome":     { "$ref": "#/$defs/TestOutcome" },

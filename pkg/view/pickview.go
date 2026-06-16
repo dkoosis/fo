@@ -262,12 +262,13 @@ func pickLeaderboard(r report.Report) (Leaderboard, bool) {
 	agg := map[string]float64{}
 	order := []string{}
 	var total float64
-	for _, f := range r.Findings {
+	for i := range r.Findings {
+		f := &r.Findings[i]
 		v := f.Score
 		if v <= 0 {
 			v = 1
 		}
-		label := lbLabel(f)
+		label := lbLabel(*f)
 		if _, seen := agg[label]; !seen {
 			order = append(order, label)
 		}
@@ -327,9 +328,9 @@ func pickSmallMultiples(r report.Report) (SmallMultiples, bool) {
 
 func groupFindingsByPackage(fs []report.Finding) map[string][]report.Finding {
 	out := make(map[string][]report.Finding)
-	for _, f := range fs {
-		key := packageOf(f.File)
-		out[key] = append(out[key], f)
+	for i := range fs {
+		key := packageOf(fs[i].File)
+		out[key] = append(out[key], fs[i])
 	}
 	return out
 }
@@ -356,8 +357,8 @@ func sortedKeys(m map[string][]report.Finding) []string {
 
 func severityCounters(fs []report.Finding) []Counter {
 	var e, w, n int
-	for _, f := range fs {
-		switch f.Severity {
+	for i := range fs {
+		switch fs[i].Severity {
 		case report.SeverityError:
 			e++
 		case report.SeverityWarning:
@@ -384,8 +385,9 @@ func pickGrouped(r report.Report) (Grouped, bool) {
 		return Grouped{}, false
 	}
 	bySev := map[report.Severity][]BulletItem{}
-	for _, f := range r.Findings {
-		bySev[f.Severity] = append(bySev[f.Severity], findingItem(f))
+	for i := range r.Findings {
+		f := &r.Findings[i]
+		bySev[f.Severity] = append(bySev[f.Severity], findingItem(*f))
 	}
 	order := []report.Severity{report.SeverityError, report.SeverityWarning, report.SeverityNote}
 	sections := make([]GroupedSection, 0, len(order))
@@ -399,8 +401,8 @@ func pickGrouped(r report.Report) (Grouped, bool) {
 
 func pickBullet(r report.Report, mode Mode, expand expandSet) Bullet {
 	items := make([]BulletItem, 0, len(r.Findings)+len(r.Tests))
-	for _, f := range r.Findings {
-		items = append(items, findingItem(f))
+	for i := range r.Findings {
+		items = append(items, findingItem(r.Findings[i]))
 	}
 	clustered, singletons := partitionTests(r.Tests)
 	// Iterate Report.Clusters order (set by pkg/cluster: member-count desc, ID asc).
@@ -437,6 +439,7 @@ func pickBullet(r report.Report, mode Mode, expand expandSet) Bullet {
 func findingItem(f report.Finding) BulletItem {
 	return BulletItem{
 		Severity:   f.Severity,
+		ID:         f.ID,
 		Label:      f.Message,
 		Value:      fmt.Sprintf("%s:%d", f.File, f.Line),
 		FixCommand: f.FixCommand,
@@ -450,6 +453,7 @@ func testItem(t report.TestResult) BulletItem {
 	}
 	return BulletItem{
 		Outcome:    t.Outcome,
+		ID:         t.ID,
 		Label:      label,
 		Value:      t.Package,
 		FixCommand: t.FixCommand,
@@ -499,8 +503,8 @@ func severityDelta(d *report.DiffSummary, sev string) int {
 
 func severityCounts(fs []report.Finding) (int, int, int) {
 	var e, w, n int
-	for _, f := range fs {
-		switch f.Severity {
+	for i := range fs {
+		switch fs[i].Severity {
 		case report.SeverityError:
 			e++
 		case report.SeverityWarning:

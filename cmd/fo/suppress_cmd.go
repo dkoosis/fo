@@ -33,7 +33,7 @@ func runSuppress(args []string, stdout, stderr io.Writer) int {
 		return runSuppressList(rest, stdout, stderr)
 	case "remove", "rm":
 		return runSuppressRemove(rest, stdout, stderr)
-	case "-h", "--help", "help":
+	case "-h", flagHelp, "help":
 		fmt.Fprintln(stdout, suppressUsage)
 		return 0
 	default:

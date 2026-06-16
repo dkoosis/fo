@@ -36,9 +36,11 @@ stdin
                                                                                      stdout
 ```
 
-Subcommands (cmd/fo/main.go): `fo wrap <name>` dispatches to pkg/wrapper/wrap{archlint,archlinttext,cover,diag,gobench,jscpd,leaderboard}; `fo wrap list`; `fo state reset`; `fo --version`; `fo --print-schema` (pkg/report.Schema).
+Subcommands (cmd/fo/main.go): `fo wrap <name>` dispatches to pkg/wrapper/wrap{archlint,archlinttext,cover,coverprofile,diag,gobench,jscpd,leaderboard}; `fo wrap list`; `fo state reset`; `fo explain <id>` (resolve F-/T- handle from last run); `fo trend <rule-id>` / `fo replay [--since]` (run-log history); `fo --version`; `fo --print-schema` (pkg/report.Schema).
 
-Inputs: SARIF 2.1.0, go test -json, multiplex-delimited combo, hygiene formats (`# fo:status`, `# fo:metrics`, `# fo:tally`). Outputs: human (TTY), llm (piped), json.
+Inputs: SARIF 2.1.0, go test -json, multiplex-delimited combo, hygiene formats (`# fo:status`, `# fo:metrics`, `# fo:tally`). Outputs: human (TTY), llm (piped), json, github (Actions annotations, scoped to new findings via diff).
+
+Addressable surface (fo-u15): every finding/test carries a short handle (`F-7a2`/`T-3f1`) = shortest unique fingerprint prefix, assigned by `report.AssignShortIDs[Stable]` after suppress/diff, pinned cross-run via `.fo/findings.json` snapshot. `fo explain` resolves it; `.fo/run-log.json` feeds trend/replay.
 
 ## Package Structure
 
@@ -52,7 +54,7 @@ Inputs: SARIF 2.1.0, go test -json, multiplex-delimited combo, hygiene formats (
 | `pkg/view/` | Renderers: human, llm, json; mode dispatch |
 | `pkg/paint/` | Tufte-Swiss primitives: bars, sparklines, tables |
 | `pkg/theme/` | v2 theme system (color/mono) |
-| `pkg/state/` | Sidecar `.fo/last-run.json` for diff classification |
+| `pkg/state/` | Sidecars: `.fo/last-run.json` (diff), `.fo/findings.json` (ID snapshot+explain), `.fo/run-log.json` (trend/replay) |
 | `pkg/score/` | Severity scoring |
 | `pkg/fingerprint/` | Finding identity for diff classification |
 | `pkg/status/` | Hygiene format: PASS/FAIL/WARN/SKIP labeled rows |
@@ -64,6 +66,7 @@ Inputs: SARIF 2.1.0, go test -json, multiplex-delimited combo, hygiene formats (
 | `pkg/wrapper/wraparchlint/` | go-arch-lint JSON → SARIF |
 | `pkg/wrapper/wraparchlinttext/` | go-arch-lint plain-text → SARIF |
 | `pkg/wrapper/wrapcover/` | `go tool cover -func` → fo:metrics |
+| `pkg/wrapper/wrapcoverprofile/` | `-coverprofile` file → SARIF (note per uncovered block) |
 | `pkg/wrapper/wrapdiag/` | Line diagnostics (`file:line:col: msg`) → SARIF |
 | `pkg/wrapper/wrapgobench/` | `go test -bench` → fo:metrics |
 | `pkg/wrapper/wrapjscpd/` | jscpd JSON → SARIF |

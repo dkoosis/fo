@@ -34,14 +34,15 @@ func ApplyFilter(r *Report, rs *suppress.Ruleset, now time.Time) FilterStats {
 
 	expiredNotified := map[int]bool{}
 	kept := r.Findings[:0]
-	for _, f := range r.Findings {
+	for i := range r.Findings {
+		f := &r.Findings[i]
 		activeIdx, expiredIdx := classifyFinding(rs, f.RuleID, f.File, now)
 		if activeIdx >= 0 {
 			stats.Total++
 			stats.PerRule[activeIdx]++
 			continue
 		}
-		kept = append(kept, f)
+		kept = append(kept, *f)
 		if expiredIdx >= 0 && !expiredNotified[expiredIdx] {
 			expiredNotified[expiredIdx] = true
 			r.Notices = append(r.Notices, expiredNotice(rs.Rules[expiredIdx]))

@@ -50,6 +50,51 @@ func attachDiff(r *report.Report, statePath string, policy statePolicy, stderr i
 	return nil
 }
 
+// assignAndPersistIDs assigns short handles (F-/T-) to the report and,
+// unless state is off, pins them across runs: it loads the prior findings
+// snapshot for handle stability, assigns, then writes the new snapshot for
+// `fo explain` to resolve against. Snapshot I/O is best-effort — a failure
+// degrades cross-run stability and explain, never the run itself, so it is
+// surfaced on stderr only.
+func assignAndPersistIDs(r *report.Report, policy statePolicy, stderr io.Writer) {
+	if policy == stateOff || r == nil {
+		report.AssignShortIDs(r)
+		return
+	}
+	path := state.SnapshotPath()
+	prev, err := state.LoadSnapshot(path)
+	if err != nil {
+		fmt.Fprintf(stderr, "fo: state: snapshot: %v (ids not pinned)\n", err)
+		prev = nil
+	}
+	report.AssignShortIDsStable(r, prev.PriorIDs())
+	if err := state.SaveSnapshot(path, state.SnapshotFromReport(r)); err != nil &&
+		!errors.Is(err, state.ErrDurabilityDegraded) {
+		fmt.Fprintf(stderr, "fo: state: snapshot save: %v (explain unavailable next run)\n", err)
+	}
+}
+
+// recordRun appends a one-line summary of this run to the bounded run log
+// that powers `fo replay` and `fo trend`. Like the snapshot, it is
+// best-effort: a write failure costs history, never the run, so it is
+// surfaced on stderr only and skipped entirely when state is off.
+func recordRun(r *report.Report, policy statePolicy, stderr io.Writer) {
+	if policy == stateOff || r == nil {
+		return
+	}
+	path := state.RunLogPath()
+	prev, err := state.LoadRunLog(path)
+	if err != nil {
+		fmt.Fprintf(stderr, "fo: state: run-log: %v (starting fresh)\n", err)
+		prev = nil
+	}
+	updated := state.AppendRunLog(prev, state.RunLogEntryFromReport(r))
+	if err := state.SaveRunLog(path, updated); err != nil &&
+		!errors.Is(err, state.ErrDurabilityDegraded) {
+		fmt.Fprintf(stderr, "fo: state: run-log save: %v (trend/replay may miss this run)\n", err)
+	}
+}
+
 func envelopeToDiffSummary(e state.Envelope) *report.DiffSummary {
 	return &report.DiffSummary{
 		Headline:        e.Headline,
@@ -99,9 +144,9 @@ func writeDiffDetail(w io.Writer, r *report.Report) {
 
 	// Build fingerprint → finding index for O(1) lookup.
 	byFP := make(map[string]report.Finding, len(r.Findings))
-	for _, f := range r.Findings {
-		if f.Fingerprint != "" {
-			byFP[f.Fingerprint] = f
+	for i := range r.Findings {
+		if r.Findings[i].Fingerprint != "" {
+			byFP[r.Findings[i].Fingerprint] = r.Findings[i]
 		}
 	}
 

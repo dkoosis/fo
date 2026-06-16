@@ -100,6 +100,8 @@ func runStreamCtx(ctx context.Context, opts streamOpts) int {
 		if parseErr == nil {
 			applySuppress(r, suppressPath(), stderr)
 			saveErr = attachDiff(r, stateFile, opts.policy, stderr)
+			assignAndPersistIDs(r, opts.policy, stderr)
+			recordRun(r, opts.policy, stderr)
 		}
 		resultCh <- streamResult{report: r, parseErr: parseErr, saveErr: saveErr}
 		select {
@@ -184,6 +186,8 @@ func runStreamBatch(opts streamOpts) int {
 	}
 	applySuppress(r, suppressPath(), opts.stderr)
 	saveErr := attachDiff(r, opts.stateFile, opts.policy, opts.stderr)
+	assignAndPersistIDs(r, opts.policy, opts.stderr)
+	recordRun(r, opts.policy, opts.stderr)
 	if err := renderMode(opts.mode, r, opts.stdout, opts.themeName, nil); err != nil {
 		fmt.Fprintf(opts.stderr, "fo: %v\n", err)
 		return 2
@@ -249,8 +253,8 @@ func exitCodeReport(r *report.Report) int {
 	if r == nil {
 		return 0
 	}
-	for _, f := range r.Findings {
-		if f.Severity == report.SeverityError {
+	for i := range r.Findings {
+		if r.Findings[i].Severity == report.SeverityError {
 			return 1
 		}
 	}

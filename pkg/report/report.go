@@ -32,6 +32,11 @@ const (
 // the canonical input to the Bullet, Grouped, Leaderboard, and Headline
 // views.
 type Finding struct {
+	// ID is a short, run-stable handle ("F-7a2") an agent or human can
+	// name back at fo ("fo explain F-7a2"). It is a display alias over
+	// Fingerprint — the shortest hex prefix unique within the run —
+	// assigned by AssignShortIDs after parse/suppress, never persisted.
+	ID          string   `json:"id,omitempty"`
 	RuleID      string   `json:"rule_id,omitempty"`
 	File        string   `json:"file,omitempty"`
 	Line        int      `json:"line,omitempty"`
@@ -47,6 +52,10 @@ type Finding struct {
 // Test == "" means a package-level result (build error, panic, or whole-pkg
 // pass/fail rollup).
 type TestResult struct {
+	// ID is a short, run-stable handle ("T-3f1") for a failing test,
+	// mirroring Finding.ID. Only results carrying a Fingerprint
+	// (fail/panic/build_error) get one — a passing test is not addressed.
+	ID          string        `json:"id,omitempty"`
 	Package     string        `json:"package"`
 	Test        string        `json:"test,omitempty"`
 	Outcome     TestOutcome   `json:"outcome"`

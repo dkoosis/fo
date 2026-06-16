@@ -11,6 +11,7 @@ import (
 	"github.com/dkoosis/fo/pkg/wrapper/wraparchlint"
 	"github.com/dkoosis/fo/pkg/wrapper/wraparchlinttext"
 	"github.com/dkoosis/fo/pkg/wrapper/wrapcover"
+	"github.com/dkoosis/fo/pkg/wrapper/wrapcoverprofile"
 	"github.com/dkoosis/fo/pkg/wrapper/wrapdiag"
 	"github.com/dkoosis/fo/pkg/wrapper/wrapgobench"
 	"github.com/dkoosis/fo/pkg/wrapper/wrapjscpd"
@@ -18,12 +19,13 @@ import (
 )
 
 // wrapNames is the canonical list of `fo wrap` subcommands.
-var wrapNames = []string{"archlint", "archlint-text", "cover", "diag", "gobench", "jscpd", "leaderboard"}
+var wrapNames = []string{"archlint", "archlint-text", "cover", "coverprofile", "diag", "gobench", "jscpd", "leaderboard"}
 
 var wrapDescriptions = map[string]string{
 	"archlint":      "Convert go-arch-lint JSON to SARIF",
 	"archlint-text": "Convert go-arch-lint plain-text output to SARIF",
 	"cover":         "Convert `go tool cover -func` output to fo:metrics",
+	"coverprofile":  "Convert a `-coverprofile` file to SARIF (note per uncovered block)",
 	"diag":          "Convert line diagnostics (file:line:col: msg) to SARIF",
 	"gobench":       "Convert raw `go test -bench` output to fo:metrics",
 	"jscpd":         "Convert jscpd JSON duplication report to SARIF",
@@ -43,6 +45,7 @@ var plainWrappers = map[string]plainConvert{
 	subJSCPD:        {"fo wrap jscpd", wrapjscpd.Convert},
 	"archlint-text": {"fo wrap archlint-text", wraparchlinttext.Convert},
 	"cover":         {"fo wrap cover", wrapcover.Convert},
+	"coverprofile":  {"fo wrap coverprofile", wrapcoverprofile.Convert},
 	"gobench":       {"fo wrap gobench", wrapgobench.Convert},
 }
 
@@ -52,7 +55,7 @@ func runWrap(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			strings.Join(wrapNames, ", "))
 		return 2
 	}
-	if args[0] == "-h" || args[0] == "--help" || args[0] == "help" {
+	if args[0] == "-h" || args[0] == flagHelp || args[0] == "help" {
 		return runWrapHelp(stderr)
 	}
 	if args[0] == subList {

@@ -141,11 +141,19 @@ var ErrDurabilityDegraded = errors.New("state: durability degraded (parent dir n
 // disk, but durability is reduced. Callers should treat this as a
 // warning rather than a hard failure (fo-1x0).
 func Save(path string, f *File) error {
+	return writeAtomic(path, ".last-run.*.tmp", f)
+}
+
+// writeAtomic encodes v as indented JSON to a temp file in path's
+// directory, fsyncs it, then renames over path. tmpPattern is passed to
+// os.CreateTemp. On parent-directory fsync failure it returns an error
+// wrapping ErrDurabilityDegraded (data is on disk; durability reduced).
+func writeAtomic(path, tmpPattern string, v any) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("state: mkdir %s: %w", dir, err)
 	}
-	tmp, err := os.CreateTemp(dir, ".last-run.*.tmp")
+	tmp, err := os.CreateTemp(dir, tmpPattern)
 	if err != nil {
 		return fmt.Errorf("state: tempfile: %w", err)
 	}
@@ -154,7 +162,7 @@ func Save(path string, f *File) error {
 
 	enc := json.NewEncoder(tmp)
 	enc.SetIndent("", "  ")
-	if err := enc.Encode(f); err != nil {
+	if err := enc.Encode(v); err != nil {
 		_ = tmp.Close()
 		cleanup()
 		return fmt.Errorf("state: encode: %w", err)
@@ -233,7 +241,8 @@ func testKey(pkg, test string) string {
 // and skipped tests are absent (absence means pass-or-skip for diff purposes).
 func RunFromReport(r *report.Report) Run {
 	findings := make(map[string]Severity, len(r.Findings))
-	for _, f := range r.Findings {
+	for i := range r.Findings {
+		f := &r.Findings[i]
 		if f.Fingerprint == "" {
 			continue
 		}

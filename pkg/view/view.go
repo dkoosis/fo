@@ -45,6 +45,7 @@ func (Bullet) isViewSpec() {}
 type BulletItem struct {
 	Severity   report.Severity // optional — drives glyph + color
 	Outcome    report.TestOutcome
+	ID         string // optional short handle (F-7a2 / T-3f1) for `fo explain`
 	Label      string
 	Value      string // free-form right-side detail (e.g. file:line)
 	FixCommand string // optional copy-pastable suggestion
