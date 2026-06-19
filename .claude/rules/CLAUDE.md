@@ -83,5 +83,9 @@ Addressable surface (fo-u15): every finding/test carries a short handle (`F-7a2`
 - Wrappers: each is a package exposing `Convert(in, out) error`. Dispatched by `switch` in `cmd/fo/main.go` (no interface, no registry).
 - Adding a wrapper: new package under `pkg/wrapper/`, expose `Convert`, add a case to the wrap dispatch + import in `cmd/fo/main.go`.
 
+## Dev Workflow
+
+‡ **Batch small fixes → one PR.** Several small/independent fixes in flight → ONE branch, ONE PR, one commit per fix. Full `check`/CI fires once at the PR (+ once on merge to main), NOT once per fix — a PR-per-one-liner serializes the queue behind build time. Each fix stays its own commit (traceable); PR body lists them. Review reads per-commit. Bundle by session/theme; ✗ mix a risky change in with trivial ones (it drags the whole PR's review bar up). **Default: auto-batch** — ≥2 small fixes queued → roll them onto one PR without asking.
+
 ## Search Scope
 Skip: vendor, node_modules, build, .trash, dist, .git, .worktrees
