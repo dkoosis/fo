@@ -86,6 +86,7 @@ Addressable surface (fo-u15): every finding/test carries a short handle (`F-7a2`
 ## Dev Workflow
 
 ‡ **Batch small fixes → one PR.** Several small/independent fixes in flight → ONE branch, ONE PR, one commit per fix. Full `check`/CI fires once at the PR (+ once on merge to main), NOT once per fix — a PR-per-one-liner serializes the queue behind build time. Each fix stays its own commit (traceable); PR body lists them. Review reads per-commit. Bundle by session/theme; ✗ mix a risky change in with trivial ones (it drags the whole PR's review bar up). **Default: auto-batch** — ≥2 small fixes queued → roll them onto one PR without asking.
+‡ **PR ↔ beads.** Every PR body carries a `Closes:` trailer naming the beads it lands: `Closes: fo-abc, fo-def` (no bead → `Closes: none`). Squash-merge keeps the trailer in main's commit. On merge, close them with the landing ref: `bd close <ids> --reason "merged #<PR> (<sha>)"`. ✗ merge-then-forget — a bead whose code landed but stays open is a leak.
 
 ## Search Scope
 Skip: vendor, node_modules, build, .trash, dist, .git, .worktrees
