@@ -8,9 +8,8 @@
 
 Closes: <bead-ids, comma-separated — or "none">
 
-<!-- On merge, close them with the landing ref:
-     bd close <ids> --reason "merged #<PR> (<sha>)". See .claude/rules/CLAUDE.md (Dev Workflow). -->
+<!-- On merge, close these: bd close <ids> --reason "merged #<PR> (<sha>)". See .claude/rules/CLAUDE.md. -->
 
 ## Notes
 
-<!-- review pointers, risk, test/eval evidence -->
+<!-- review pointers, risk, test evidence -->
