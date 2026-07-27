@@ -345,6 +345,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	applySuppress(r, suppressPath(), stderr)
+	recordFullLog(r, input, policy, stderr)
 
 	saveErr := attachDiff(r, *stateFile, policy, stderr)
 

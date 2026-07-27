@@ -238,3 +238,6 @@ NEW (112)
   fo/section_render_test.go:275  testifylint  error-nil: use assert.NoError
   fo/section_render_test.go:317  testifylint  error-nil: use assert.Error
   pkg/sarif/orchestrator.go:224  unused  field spinners is unused
+
+NOTICES (1)
+  full: <redacted>

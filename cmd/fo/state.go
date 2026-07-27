@@ -50,6 +50,24 @@ func attachDiff(r *report.Report, statePath string, policy statePolicy, stderr i
 	return nil
 }
 
+// recordFullLog tees the complete, unfiltered input to a sidecar log and
+// notes its path on r.Notices as "full: <path>" — so a reader looking at
+// fo's (possibly truncated) output can recover the original in one
+// command, per the rtk pattern. Best-effort: a write failure degrades to
+// a Notice, not a run failure, matching attachDiff/assignAndPersistIDs.
+func recordFullLog(r *report.Report, input []byte, policy statePolicy, stderr io.Writer) {
+	if policy == stateOff || r == nil {
+		return
+	}
+	path, err := state.SaveFullLog(input)
+	if err != nil {
+		fmt.Fprintf(stderr, "fo: state: full log: %v\n", err)
+		r.Notices = append(r.Notices, fmt.Sprintf("full log: save failed (%v)", err))
+		return
+	}
+	r.Notices = append(r.Notices, "full: "+path)
+}
+
 // assignAndPersistIDs assigns short handles (F-/T-) to the report and,
 // unless state is off, pins them across runs: it loads the prior findings
 // snapshot for handle stability, assigns, then writes the new snapshot for
