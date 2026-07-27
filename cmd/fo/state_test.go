@@ -212,6 +212,29 @@ func TestRecordFullLog_StateOffSkips(t *testing.T) {
 	}
 }
 
+func TestRun_AsFlag_FullLogPreservesRawInput(t *testing.T) {
+	// --as coerces input for parsing (e.g. tally auto-wraps plain text),
+	// but the full-log sidecar must still capture what was actually piped
+	// in, not the coerced form fed to the parser (fo-w1f review).
+	dir := t.TempDir()
+	t.Setenv("FO_STATE_DIR", dir)
+
+	raw := "main.go:10:2: unused variable x\n"
+	var stdout, stderr bytes.Buffer
+	code := run([]string{flagFormat, "json", "--as", "diag"}, strings.NewReader(raw), &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("exit %d, stderr=%q", code, stderr.String())
+	}
+
+	got, err := os.ReadFile(filepath.Join(dir, "full.log"))
+	if err != nil {
+		t.Fatalf("ReadFile(full.log): %v", err)
+	}
+	if string(got) != raw {
+		t.Errorf("full.log = %q, want raw pre-coercion input %q", got, raw)
+	}
+}
+
 func TestRecordFullLog_WriteFailureRecordsNotice(t *testing.T) {
 	dir := t.TempDir()
 	blocker := filepath.Join(dir, "not-a-dir")

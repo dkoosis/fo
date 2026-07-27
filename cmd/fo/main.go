@@ -299,6 +299,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 
+	rawInput := input
 	if *asFlag != "" {
 		coerced, code := coerceAs(*asFlag, input, stderr)
 		if code != 0 {
@@ -345,7 +346,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	applySuppress(r, suppressPath(), stderr)
-	recordFullLog(r, input, policy, stderr)
+	recordFullLog(r, rawInput, policy, stderr)
 
 	saveErr := attachDiff(r, *stateFile, policy, stderr)
 
