@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -144,11 +145,20 @@ func Save(path string, f *File) error {
 	return writeAtomic(path, ".last-run.*.tmp", f)
 }
 
-// writeAtomic encodes v as indented JSON to a temp file in path's
-// directory, fsyncs it, then renames over path. tmpPattern is passed to
+// writeAtomic encodes v as indented JSON via writeAtomicTo.
+func writeAtomic(path, tmpPattern string, v any) error {
+	return writeAtomicTo(path, tmpPattern, func(w io.Writer) error {
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		return enc.Encode(v)
+	})
+}
+
+// writeAtomicTo writes content to a temp file in path's directory via
+// write, fsyncs it, then renames over path. tmpPattern is passed to
 // os.CreateTemp. On parent-directory fsync failure it returns an error
 // wrapping ErrDurabilityDegraded (data is on disk; durability reduced).
-func writeAtomic(path, tmpPattern string, v any) error {
+func writeAtomicTo(path, tmpPattern string, write func(io.Writer) error) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("state: mkdir %s: %w", dir, err)
@@ -160,12 +170,10 @@ func writeAtomic(path, tmpPattern string, v any) error {
 	tmpName := tmp.Name()
 	cleanup := func() { _ = os.Remove(tmpName) }
 
-	enc := json.NewEncoder(tmp)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(v); err != nil {
+	if err := write(tmp); err != nil {
 		_ = tmp.Close()
 		cleanup()
-		return fmt.Errorf("state: encode: %w", err)
+		return fmt.Errorf("state: write: %w", err)
 	}
 	if err := tmp.Sync(); err != nil {
 		_ = tmp.Close()

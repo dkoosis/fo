@@ -61,6 +61,13 @@ func recordFullLog(r *report.Report, input []byte, policy statePolicy, stderr io
 	}
 	path, err := state.SaveFullLog(input)
 	if err != nil {
+		if errors.Is(err, state.ErrDurabilityDegraded) {
+			fmt.Fprintf(stderr, "fo: state: full log: warning: %v\n", err)
+			r.Notices = append(r.Notices, "full: "+path)
+			r.Notices = append(r.Notices,
+				fmt.Sprintf("full log: durability degraded (%v) — sidecar may revert under crash", err))
+			return
+		}
 		fmt.Fprintf(stderr, "fo: state: full log: %v\n", err)
 		r.Notices = append(r.Notices, fmt.Sprintf("full log: save failed (%v)", err))
 		return

@@ -1,8 +1,8 @@
 package state
 
 import (
-	"fmt"
-	"os"
+	"errors"
+	"io"
 	"path/filepath"
 )
 
@@ -15,49 +15,17 @@ func FullLogPath() string { return filepath.Join(Dir(), "full.log") }
 
 // SaveFullLog durably writes data (the complete, unfiltered original
 // input) to FullLogPath, overwriting any prior log. Returns the resolved
-// path so the caller can point the reader at it.
+// path so the caller can point the reader at it — even under
+// ErrDurabilityDegraded, where the rename already landed the data on
+// disk and only the parent-dir fsync failed.
 func SaveFullLog(data []byte) (string, error) {
 	path := FullLogPath()
-	if err := writeAtomicBytes(path, ".full.*.tmp", data); err != nil {
+	err := writeAtomicTo(path, ".full.*.tmp", func(w io.Writer) error {
+		_, werr := w.Write(data)
+		return werr
+	})
+	if err != nil && !errors.Is(err, ErrDurabilityDegraded) {
 		return "", err
 	}
-	return path, nil
-}
-
-// writeAtomicBytes mirrors writeAtomic's durable-write shape (tempfile,
-// fsync, rename, parent-dir sync) for raw bytes instead of JSON.
-func writeAtomicBytes(path, tmpPattern string, data []byte) error {
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return fmt.Errorf("state: mkdir %s: %w", dir, err)
-	}
-	tmp, err := os.CreateTemp(dir, tmpPattern)
-	if err != nil {
-		return fmt.Errorf("state: tempfile: %w", err)
-	}
-	tmpName := tmp.Name()
-	cleanup := func() { _ = os.Remove(tmpName) }
-
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		cleanup()
-		return fmt.Errorf("state: write: %w", err)
-	}
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		cleanup()
-		return fmt.Errorf("state: fsync: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		cleanup()
-		return fmt.Errorf("state: close tmp: %w", err)
-	}
-	if err := os.Rename(tmpName, path); err != nil {
-		cleanup()
-		return fmt.Errorf("state: rename: %w", err)
-	}
-	if err := syncDir(filepath.Dir(path)); err != nil {
-		return fmt.Errorf("%w: %w", ErrDurabilityDegraded, err)
-	}
-	return nil
+	return path, err
 }
