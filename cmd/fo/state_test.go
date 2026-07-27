@@ -177,6 +177,84 @@ func TestWriteDiffDetail_FingerprintMiss_Fallback(t *testing.T) {
 	}
 }
 
+func TestRecordFullLog_AppendsFullNotice(t *testing.T) {
+	t.Setenv("FO_STATE_DIR", t.TempDir())
+
+	r := &report.Report{}
+	var stderr bytes.Buffer
+	recordFullLog(r, []byte("the complete original output"), stateOn, &stderr)
+
+	if len(r.Notices) != 1 {
+		t.Fatalf("expected one notice, got %v", r.Notices)
+	}
+	if !strings.HasPrefix(r.Notices[0], "full: ") {
+		t.Errorf("notice should start with %q, got %q", "full: ", r.Notices[0])
+	}
+	path := strings.TrimPrefix(r.Notices[0], "full: ")
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q): %v", path, err)
+	}
+	if string(got) != "the complete original output" {
+		t.Errorf("logged content = %q, want the full unfiltered input", got)
+	}
+}
+
+func TestRecordFullLog_StateOffSkips(t *testing.T) {
+	t.Setenv("FO_STATE_DIR", t.TempDir())
+
+	r := &report.Report{}
+	var stderr bytes.Buffer
+	recordFullLog(r, []byte("data"), stateOff, &stderr)
+
+	if len(r.Notices) != 0 {
+		t.Fatalf("expected no notice with state off, got %v", r.Notices)
+	}
+}
+
+func TestRun_AsFlag_FullLogPreservesRawInput(t *testing.T) {
+	// --as coerces input for parsing (e.g. tally auto-wraps plain text),
+	// but the full-log sidecar must still capture what was actually piped
+	// in, not the coerced form fed to the parser (fo-w1f review).
+	dir := t.TempDir()
+	t.Setenv("FO_STATE_DIR", dir)
+
+	raw := "main.go:10:2: unused variable x\n"
+	var stdout, stderr bytes.Buffer
+	code := run([]string{flagFormat, "json", "--as", "diag"}, strings.NewReader(raw), &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("exit %d, stderr=%q", code, stderr.String())
+	}
+
+	got, err := os.ReadFile(filepath.Join(dir, "full.log"))
+	if err != nil {
+		t.Fatalf("ReadFile(full.log): %v", err)
+	}
+	if string(got) != raw {
+		t.Errorf("full.log = %q, want raw pre-coercion input %q", got, raw)
+	}
+}
+
+func TestRecordFullLog_WriteFailureRecordsNotice(t *testing.T) {
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "not-a-dir")
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("FO_STATE_DIR", filepath.Join(blocker, "sub"))
+
+	r := &report.Report{}
+	var stderr bytes.Buffer
+	recordFullLog(r, []byte("data"), stateOn, &stderr)
+
+	if len(r.Notices) != 1 {
+		t.Fatalf("expected one notice, got %v", r.Notices)
+	}
+	if !strings.Contains(r.Notices[0], "save failed") {
+		t.Errorf("notice should describe the save failure, got %q", r.Notices[0])
+	}
+}
+
 func TestAttachDiff_SaveFailureRecordsNoticeAndReturnsErr(t *testing.T) {
 	// Point state-file at a path whose parent cannot be created
 	// (mkdir under a regular file → ENOTDIR). attachDiff must

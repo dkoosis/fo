@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -240,6 +241,15 @@ func TestE2E_LLMGoldens(t *testing.T) {
 	}
 }
 
+var fullLogNoticeRE = regexp.MustCompile(`(?m)^  full: .*$`)
+
+// redactFullLogNotice replaces the full-log notice's path (which lives
+// under t.TempDir() and so varies run to run) with a fixed placeholder,
+// so golden comparisons stay stable.
+func redactFullLogNotice(out []byte) []byte {
+	return fullLogNoticeRE.ReplaceAll(out, []byte("  full: <redacted>"))
+}
+
 // TestE2E_LLMDiffGolden verifies that the full LLM output — leaderboard then
 // NEW block — matches a checked-in golden when a prior state is present.
 // Run with UPDATE_LLM_DIFF_GOLDEN=1 to regenerate.
@@ -252,6 +262,7 @@ func TestE2E_LLMDiffGolden(t *testing.T) {
 	}
 
 	dir := t.TempDir()
+	t.Setenv("FO_STATE_DIR", dir)
 	stateFile := filepath.Join(dir, "fo-state.json")
 	if err := os.WriteFile(stateFile, []byte(priorState), 0o600); err != nil {
 		t.Fatalf("write state: %v", err)
@@ -271,6 +282,13 @@ func TestE2E_LLMDiffGolden(t *testing.T) {
 	if !bytes.Contains(out, []byte("\nNEW (")) {
 		t.Errorf("expected NEW block in diff output; got:\n%s", out)
 	}
+	if !bytes.Contains(out, []byte("full: ")) {
+		t.Errorf("expected full-log notice pointing at the unfiltered original; got:\n%s", out)
+	}
+
+	// The full-log path is under t.TempDir(), so it varies run to run —
+	// redact it to a fixed placeholder before comparing to the golden.
+	out = redactFullLogNotice(out)
 
 	goldenPath := fixturesRoot + "/golangci/issues-withdiff.llm.golden"
 	if os.Getenv("UPDATE_LLM_DIFF_GOLDEN") == "1" {
