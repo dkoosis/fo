@@ -1,0 +1,4 @@
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T04:53:22Z","linter":"error-semantics","scope":"pkg","target":"repo","target_slug":"repo","report_path":"docs/feedback/review/error-semantics-repo.md","n_findings":3,"status":"reviewed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F1","verdict":"worth-it","reason":"sole load caller never branches on exported sentinel, dead API surface","cite":"pkg/state/state.go:92-124","status":"assessed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F2","verdict":"worth-it","reason":"exported status/metrics sentinel taxonomy unused, collapsed to exit-2","cite":"pkg/status/status.go:52-57","status":"assessed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F3","verdict":"worth-it","reason":"ErrNoSections/ErrNestingTooDeep only tested, prod uses errors.As on sibling","cite":"cmd/fo/parse.go:293-303","status":"assessed"}

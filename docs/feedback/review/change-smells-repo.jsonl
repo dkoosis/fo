@@ -4,3 +4,4 @@
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:31:46Z","finding_id":"F3","outcome":"valid-not-applied","note":"wrapper trio co-change confirmed (13 joint commits archlint+jscpd); FixCommand/boundread duplication real","status":"assessed"}
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:31:46Z","finding_id":"F4","outcome":"valid-not-applied","note":"5 occurrences of (args,stdin,stdout,stderr) signature confirmed across cmd/fo; CLIEnv struct would help","status":"assessed"}
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:31:46Z","finding_id":"F5","outcome":"valid-not-applied","note":"renderMode at main.go:315 takes bare mode+themeName strings; project already uses typed Severity/TestOutcome","status":"assessed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T03:58:23Z","linter":"change-smells","scope":"project","target":"repo","target_slug":"repo","report_path":"docs/feedback/review/change-smells-repo.md","n_findings":0,"status":"reviewed"}

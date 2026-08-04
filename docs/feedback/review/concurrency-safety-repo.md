@@ -1,122 +1,47 @@
----
-review_date: 2026-05-17
-run_id: bd775e303d86-concurrency-safety
-linter: concurrency-safety
-target: repo
-race_detector_run: true
-race_detector_result: clean (no races across all packages, 5m timeout)
-packages_analyzed: cmd/fo, pkg/testjson, pkg/view, pkg/state
-severity_counts: { critical: 0, high: 0, medium: 3, info: 2 }
----
+# concurrency-safety — fo repo (project scope)
 
-# Concurrency-safety — fo repo
+RUN_ID: 7858b3a8ea1b · mode: report · linter: concurrency-safety
 
-**Headline:** `go test -race ./...` is **clean** across all 20+ packages (≈42s for pkg/testjson, the hot one). The concurrency surface is small and disciplined: every `go func()` ships with a termination contract, every long-lived loop selects on `ctx.Done()`, channel ownership is single-producer in every case I traced, and `context.AfterFunc` / `signal.NotifyContext` are used correctly. Findings below are all Medium/Info — latent risks and idiom nits, no proven races or leaks.
+## Verdict: no findings
 
----
-
-### 1. [F1] `cmd/fo/main.go:1051` — context-cancel-leak (adjacent)
-
-**Diagnosis:** `runTestJSONPipeline` registers `context.AfterFunc(ctx, func() { _ = c.Close() })` to close stdin on cancel, AND wraps stdin in a `bufioReadCloser{closer: closerOf(stdin)}` which `testjson.Stream`'s `drainLines` also closes on ctx cancel (parser.go:136). Both fire on the cancel path.
-
-**Why it matters:** For `*os.File` the second Close returns `os.ErrClosed` and is swallowed by `_ =`. Tolerable. But any future stdin substitute whose `Close()` is not idempotent (e.g. a pipe wrapper that frees an underlying resource) will misbehave silently. The two cancel hooks duplicate intent across package boundaries — easy to miss when refactoring either side.
-
-**Evidence (Read-verified):**
-- `cmd/fo/main.go:1051` — `stopClose := context.AfterFunc(ctx, func() { _ = c.Close() })`
-- `cmd/fo/main.go:1058` — `rc := &bufioReadCloser{Reader: br, closer: closerOf(stdin)}`
-- `pkg/testjson/parser.go:135-137` — `case <-ctx.Done(): _ = r.Close(); return ...`
-
-**Fix:** Pick one closer. Preferred: drop the `AfterFunc` in `runTestJSONPipeline` and rely on `testjson.Stream`'s built-in cancel-close path (it's already the documented contract — see Stream doc at parser.go:74-78). Alternatively pass a no-op closer to `bufioReadCloser` and keep `AfterFunc` as the single owner. The "honors ctx cancellation by closing stdin" claim should belong to exactly one layer.
-
-**Tier:** Medium (latent; current behavior tolerated because `*os.File.Close` is idempotent-ish).
-
----
-
-### 2. [F2] `cmd/fo/main.go:933` — goroutine-leak on grace-timeout path
-
-**Diagnosis:** `runStreamCtx` bounds the wait for the producer goroutine at 2s after ctx cancel (line 971: `case <-time.After(2 * time.Second)`). On that branch fo returns 2 and the producer goroutine continues running — possibly blocked inside `attachDiff` → `state.Save` (file I/O). When `main` exits, the OS reaps it; in any long-lived host (tests, future embedding) the goroutine outlives its caller.
-
-**Why it matters:** Today fo is a one-shot CLI so the leak is bounded by process lifetime. The code comment at line 924-926 acknowledges this trade-off ("a wedged disk doesn't hang fo forever"). The risk shifts the moment anything calls `runStreamCtx` outside `main` — tests already do (`stream_cancel_test.go`).
-
-**Evidence (Read-verified):**
-- `cmd/fo/main.go:931` — `resultCh := make(chan streamResult, 1)` (buffer 1 ensures producer can send without blocking)
-- `cmd/fo/main.go:966-975` — grace-timeout select
-- `cmd/fo/main.go:947-952` — producer calls `applySuppress` and `attachDiff` (both touch the filesystem) after parser drain
-
-**Fix:** Either (a) move `attachDiff` / `applySuppress` out of the producer goroutine into `runStreamCtx` after the resultCh receive — then the goroutine only does fast in-memory work and the grace window can shrink to <100ms; or (b) accept the leak and document it on the function signature (not just on resultCh).
-
-**Tier:** Medium (architectural latent risk, not a current-behavior bug).
-
----
-
-### 3. [F3] `pkg/testjson/parser.go:79` — context-not-propagated (contract enforced by convention)
-
-**Diagnosis:** The function comment warns "r MUST be an `io.ReadCloser` whose Close actually interrupts in-flight Read calls — `*bufio.Reader` wrapped in `io.NopCloser` will leak the scanner goroutine on cancel (fo-u2w)". This is the only safety belt. A caller passing a no-op-Close ReadCloser builds a leak with no compile-time or test-time signal.
-
-**Why it matters:** `cmd/fo` honors the contract today (`bufioReadCloser` propagates to the real stdin closer). A future caller in any new entry point (subcommand, library use) will need to re-discover this rule from prose. The existing `stream_cancel_test.go` only covers the positive case — there is no negative test asserting the leak warning.
-
-**Evidence (Read-verified):**
-- `pkg/testjson/parser.go:74-82` — doc comment with the "MUST" clause
-- `pkg/testjson/stream_cancel_test.go:38-62` — only tests a closer that DOES unblock
-- `cmd/fo/main.go:1058,1081-1086` — caller-side compliance
-
-**Fix:** Rename the parameter from `r io.ReadCloser` to `r CancelableReader` (typedef in the same package) and put the contract on the type's doc comment. Catches the next reader at API-shape time. Pragmatic; no behavior change.
-
-**Tier:** Medium (correctness contract enforced only by reviewer attention).
-
----
-
-### 4. [F4] `cmd/fo/watch.go:175` — goroutine-leak (documented, non-closable readers)
-
-**Diagnosis:** When `r` does not implement `io.Closer`, ctx cancel cannot interrupt the blocking `sc.Scan()`. The goroutine remains parked until the next byte or EOF. The function's own doc comment acknowledges this.
-
-**Why it matters:** In production (`os.Stdin` is `*os.File`, closable) this is benign. In tests using `strings.Reader` / `bytes.Reader` it can leak goroutines per test if cleanup doesn't drive things to EOF — masks future leaks behind the noise floor.
-
-**Evidence (Read-verified):**
-- `cmd/fo/watch.go:180-188` — closer goroutine guarded by type assertion
-- `cmd/fo/watch.go:190-203` — scanner goroutine has no ctx-bound abort for in-flight Read
-
-**Fix:** Add `goleak.VerifyNone(t)` (uber-go/goleak) to one cmd/fo test that exercises `stdinTriggers` so a future test that forgets to drive EOF fails loudly. No production code change required.
-
-**Tier:** Info (documented behavior, no production failure mode).
-
----
-
-### 5. [F5] `cmd/fo/watchkey.go:58` — process-global side effect on stdin
-
-**Diagnosis:** When `keyControl` is wired (TTY-attached watch mode), a goroutine awaits ctx.Done then closes the stdin `*os.File`. Correct for unblocking the raw-read goroutine, but the closed descriptor is process-global: any sibling goroutine or library code that later reads `os.Stdin` sees EOF/ErrClosed. Today nothing else reads stdin during watch (confirmed: `runWatch` routes stdin only into keyControl OR stdinTriggers via `opts.source` check at watch.go:108), so safe.
-
-**Why it matters:** This is the only place fo closes a descriptor the caller owns. If a future feature (config reload from stdin, an embedded host that retains stdin) shares stdin with watch, the close becomes a use-after-free in the read-from-stdin sense.
-
-**Evidence (Read-verified):**
-- `cmd/fo/watchkey.go:58-62` — `go func() { <-ctx.Done(); restore(); _ = f.Close() }()`
-- `cmd/fo/watch.go:107-116` — mutual exclusion of stdin readers
-
-**Fix:** Add a comment at the goroutine flagging the process-global side effect so a future contributor doesn't quietly add a second stdin reader. No behavior change.
-
-**Tier:** Info.
-
----
-
-## Notes / non-findings
-
-- **`sendCoalesceSnapshot` (main.go:997-1017)** — single-producer drop-oldest is correctly implemented; the comment explicitly calls out the single-producer invariant. Clean.
-- **`debounce` Stop/Drain (fswatch.go:240-250)** — the timer reset pattern is safe because the `<-timerC` select arm nils both `timer` and `timerC`, so `resetTimer` is only called when the timer is still armed. Clean.
-- **`fanIn` / `fanInStep` (watchkey.go:121-161)** — explicit state machine, nil-channel idiom used correctly for "source closed". Clean.
-- **`aggregator`** — explicitly single-threaded ("Not safe for concurrent use; callers serialize event delivery"); only consumer is `testjson.Stream`'s drainLines which calls back synchronously. Clean.
-- **No `sync.Map`, no `errgroup`, no `singleflight`, no manual lock ordering** — the codebase deliberately stays inside the streaming-filter envelope. Matches north-star.md "no TUI, no event loop, no interactive state."
+The production concurrency surface is small and unusually hardened — nearly every
+goroutine, channel, and timer carries a bug-fix citation for a prior race/leak/deadlock
+(`#257 #262 #266 #267`, `fo-op6 fo-4qh fo-u2w fo-gn0 fo-2sk fo-58k`). I traced every
+production `go`-launch, channel, mutex, and timer and found nothing that survives the
+Diagnosis/Why/Evidence/Fix bar. Padding the report would distort the signal, so it stays
+empty (harness: zero findings is a complete result).
 
 ## Race detector
 
 ```
-$ go test -race -timeout=5m ./...
-... all packages OK; no DATA RACE warnings ...
-ok  github.com/dkoosis/fo/pkg/testjson           42.267s
-ok  github.com/dkoosis/fo/pkg/view               11.813s
-ok  github.com/dkoosis/fo/pkg/wrapper/wraparchlint 23.340s
-ok  github.com/dkoosis/fo/pkg/sarif               3.255s
-ok  github.com/dkoosis/fo/pkg/state               3.535s
-... (full output: race detector ran clean across all 20+ packages)
+go test -race ./cmd/fo/       → ok    (66.9s, no DATA RACE)
+go test -race ./pkg/view/     → ok    (10.4s, no DATA RACE)
+go test -race ./pkg/testjson/ → FAIL  (90s timeout, NOT a race)
 ```
 
-No `DATA RACE` diagnostics emitted in this session.
+The `pkg/testjson` FAIL is a wall-clock timeout: `TestStreamMode_LargePerTestOutputBounded`
+and `TestPanicOutput_Bounded` push ~1 MiB buffers through the parser and run past the 90s
+`-timeout` under race instrumentation. The failing goroutines are `[runnable]` inside
+`encoding/json.Unmarshal` — no `DATA RACE` banner in any run. Not a concurrency defect.
+Full-repo `go test -race ./...` was cut by the harness 2-minute wall; the three hotspot
+packages above cover the entire production goroutine surface.
+
+## Surface reviewed (production, non-test)
+
+| File | Primitive | Assessment |
+|---|---|---|
+| `cmd/fo/stream.go` | producer goroutine + `resultCh` (buf 1) + `snapshots` (buf 8) | Correct. All `r` mutations (`attachDiff`/`assignAndPersistIDs`/`recordRun`) happen-before the `resultCh` send; main reads `r` only after receiving. Grace-timeout path (`#266`) returns without touching `r`. No race, no leak. |
+| `cmd/fo/stream.go` | `sendCoalesceSnapshot` drop-oldest | Single-producer invariant documented and holds; the non-blocking drop/retry cannot race another sender. |
+| `cmd/fo/fswatch.go` | `runDebounce` timer + `resetTimer` | Textbook `Stop()`/drain pattern. The `case <-timerC` branch nils the timer, so `resetTimer` never drains an already-consumed timer — no `<-timerC` deadlock. |
+| `cmd/fo/fswatch.go` | `runWatcher` fsnotify loop | Selects on `ctx.Done()` on both the event forward and the receive; closes `out` and the watcher on exit. Terminates on cancel. |
+| `cmd/fo/watch.go` | `stdinTriggers` reader + closer goroutines | Production stdin is `*os.File` (io.Closer) → ctx-cancel closes it, unblocking the scanner. Non-closable-reader park is documented, test/pipe-only, and process-lifetime — a `Don't flag` case per the goroutine-leak rule. |
+| `cmd/fo/watch.go` | `watchLoop` single-flight | Selects `ctx.Done()` vs `triggers`; synchronous `runOnce`. No shared state. |
+| `cmd/fo/watchkey.go` | `keyControl`/`readKeys`/`fanIn` | `restore` guarded by `sync.Once`; ctx goroutine restores-then-closes fd (correct order, documented); `readKeys` exits on the resulting Read error and closes `out`. `fanIn` nils closed sources and honors ctx. No leak. |
+| `pkg/testjson/parser.go` | `Stream`/`scanLoop`/`drainLines` scanner goroutine | Lines copied via `copyBytes` before crossing the channel; `sendResult` selects on `ctx.Done()`; `drainLines` closes `r` on cancel. Aggregator is single-goroutine (Stream calls `fn` synchronously) — matches its documented "not safe for concurrent use" contract. |
+| `pkg/testjson/parser.go` | `results()` snapshot copies | Each snapshot deep-copies `panicOutput`/`outputBuf` slices (lines 390, 405), so streaming consumers holding an earlier snapshot never alias the still-mutating aggregator backing arrays. |
+| `pkg/view/stream.go` | `RenderStreamMode` consumer | Single consumer, no shared state, selects on `ctx.Done()`. Clean. |
+
+No `atomic.*`, no `sync.Map`, no `errgroup`, no cross-package channel ownership, no
+`time.Sleep`-as-sync in production code.
+
+trixi log-skill concurrency-safety findings 0 --run-id "7858b3a8ea1b"

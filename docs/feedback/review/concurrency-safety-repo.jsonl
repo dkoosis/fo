@@ -4,3 +4,4 @@
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:32:11Z","finding_id":"F3","outcome":"valid-not-applied","note":"stdinTriggers (watch.go:150-164) verified; bufio.Scan blocks past ctx cancel. Bounded by process exit.","status":"assessed"}
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:32:11Z","finding_id":"F4","outcome":"wrong","note":"parseErrCh + default-select no longer exist; refactored to single streamResult on resultCh (main.go:921-987). Fixed.","status":"assessed"}
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:32:11Z","finding_id":"F5","outcome":"not-worth-it","note":"Verified at watch.go:170-185; author's own fix says 'None required'. Render is CPU-bound and short.","status":"assessed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T03:58:23Z","linter":"concurrency-safety","scope":"project","target":"repo","target_slug":"repo","report_path":"docs/feedback/review/concurrency-safety-repo.md","n_findings":0,"status":"reviewed"}

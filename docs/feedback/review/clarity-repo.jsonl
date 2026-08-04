@@ -1,0 +1,5 @@
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T04:41:59Z","linter":"clarity","scope":"pkg","target":"repo","target_slug":"repo","report_path":"docs/feedback/review/clarity-repo.md","n_findings":4,"status":"reviewed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F1","verdict":"worth-it","reason":"SupportedFormats + delimiterRe two unlinked sources of truth","cite":"pkg/multiplex/multiplex.go:36-47","status":"assessed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F2","verdict":"worth-it","reason":"three sibling helpers thread same w,t,width,mode quad","cite":"pkg/view/stream.go:82-121","status":"assessed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F3","verdict":"worth-it","reason":"run() ~200 lines dozens of branches, real hotspot","cite":"cmd/fo/main.go:183-217","status":"assessed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F4","verdict":"not-worth-it","reason":"7 orthogonal required Result fields on chainable builder, no concrete fix","cite":"pkg/sarif/builder.go:51-58","status":"assessed"}

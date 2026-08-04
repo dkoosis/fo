@@ -1,1 +1,2 @@
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T19:59:30Z","linter":"ctx-value","scope":"project","target":"repo","target_slug":"repo","report_path":"docs/feedback/review/ctx-value-repo.md","n_findings":0,"status":"reviewed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T03:12:34Z","linter":"ctx-value","scope":"project","n_findings":0,"status":"skipped","reason":"applies_when-no-match"}

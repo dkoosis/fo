@@ -1,66 +1,58 @@
 # test-tables — repo review
 
-**Run:** `bd775e303d86-test-tables`
-**Date:** 2026-05-17
-**Scope:** repo (30 table-test literals across 21 files)
-**Go version:** `go 1.24.0` (per `go.mod`)
+Scope: whole repo (project). Reviewed every table-test literal (`tests := []struct` /
+`cases := []struct`, plus map-keyed variants) across 24 test files spanning
+`pkg/scene`, `pkg/multiplex`, `pkg/view`, `pkg/fingerprint`, `pkg/suppress`,
+`pkg/sarif`, `pkg/cluster`, `pkg/score`, `pkg/tally`, `pkg/wrapper/wrapdiag`,
+`pkg/hygiene`, `pkg/state`, `pkg/testjson`, `pkg/wrapper/wrapcoverprofile`,
+`pkg/paint`, `pkg/metrics`, `pkg/status`, `cmd/fo`, `internal/kvtok`.
 
-## Tier roll-up
+Overall: the table-tests in this repo are clean. Every table has ≥3 rows sharing
+one shape, no unused struct fields, no one-row tables, `go.mod` is on 1.24 with
+no stale `tt := tt` rescoping anywhere, and style is consistent (named-struct-slice
++ `t.Run(tc.name, ...)`) within each package. One borderline case below.
 
-| Rule | Status |
-|---|---|
-| `table-per-case-branching` | 🟢 0 |
-| `table-one-row` | 🟢 0 |
-| `table-unused-field` | 🟡 1 |
-| `table-tt-rescope-go-1-22` | 🟢 0 |
-| `table-style-inconsistent` | 🟢 0 (intra-pkg) |
-| `table-name-field-missing` | 🟢 0 (recognizable inputs exempt) |
+### 1. [F1] `cmd/fo/watch_test.go:32-48` — table-per-case-branching
 
-Overall: 🟢 — the test-table surface is healthy. One unused-field finding, one info nit.
+**Diagnosis:** `TestParseWatchArgs`'s loop body branches on `tt.wantErr`, doing a
+structurally different check (assert error, return early) in one arm and a
+different check (assert no error, then assert `wantCmd` equality) in the other —
+the shape the rule catalog's own canonical "Bad" example describes.
 
-## Findings
+**Why:** The rule (`test-tables.rules.md` → `table-per-case-branching`) flags
+tables whose branches "do structurally different assertions" because the cases
+don't actually share a shape. Splitting would let each table carry only the
+fields its shape needs (error-case rows never populate `wantCmd`; success-case
+rows never read `wantErr`).
 
-### 1. [F1] `pkg/testjson/parser_test.go:20` — table-unused-field
+**Evidence** (`cmd/fo/watch_test.go:32-48`, verbatim):
+```go
+for _, tt := range tests {
+    t.Run(tt.name, func(t *testing.T) {
+        got, err := parseWatchArgs(tt.args)
+        if tt.wantErr {
+            if err == nil {
+                t.Fatalf("parseWatchArgs(%v): want error, got nil (cmd=%v)", tt.args, got)
+            }
+            return
+        }
+        if err != nil {
+            t.Fatalf("parseWatchArgs(%v): unexpected error %v", tt.args, err)
+        }
+        if !equalSlice(got, tt.wantCmd) {
+            t.Fatalf("parseWatchArgs(%v): got %v, want %v", tt.args, got, tt.wantCmd)
+        }
+    })
+}
+```
 
-**Diagnosis.** `TestParseStream_Behavior` declares `wantSkipped int` on the row struct and asserts it (`got.Skipped != tt.wantSkipped`), but no row in the table ever sets it to a non-zero value. Every assertion compares `got.Skipped` against `0` — a zero-value assertion that hides the field's real purpose.
+**Fix:** Split into `TestParseWatchArgs_Errors` (fields: `name`, `args`; 3 rows —
+empty, no separator, separator only) and `TestParseWatchArgs_Success` (fields:
+`name`, `args`, `wantCmd`; 2 rows — basic, flag before separator). Each table then
+carries only the fields its shape uses.
 
-**Why.** Either a deliberate "passes today, will trip if regression" guard (in which case it should be exercised by at least one row), or vestigial from a removed test case. Today it's neither a real constraint nor documentation.
-
-**Evidence (Read-verified).** `pkg/testjson/parser_test.go:20` declares the field; rows at L26–94 (5 cases) never reference `wantSkipped`; assertion at L124–125 always fires against zero. `rg -n 'wantSkipped' pkg/testjson/parser_test.go` returns only the declaration + the two assertion lines — no row populates it.
-
-**Fix.** Pick one:
-- Add a row that exercises a `skip` outcome and sets `wantSkipped: 1`. The skip-handling code path is already real (one of the existing rows could be extended).
-- Or drop the field and the assertion. Skip behavior is already covered by `TestProcessEvent_FreesOutputOnPassAndSkip` in the same package.
-
-**Tier.** 🟡 (P2 unused field, count = 1).
-
----
-
-### 2. [F2] `pkg/wrapper/wrapdiag/diag_test.go:177,198` — table-name-field-missing (info)
-
-**Diagnosis.** `TestFixCommandFor` (L176–195) and `TestParseDiagLine` (L197–220) iterate tables without `t.Run(...)`. Failures print the inputs (rule/file/tool/raw line) which are unique and recognizable, so this falls under the "don't flag" carve-out in the rule.
-
-**Why.** Logged as info, not a defect — the inputs themselves serve as case labels. If these tables grow past ~8 rows or start sharing inputs across cases, add `name string` + `t.Run`.
-
-**Evidence (Read-verified).** Tables at L177–188 and L198–212 use positional struct fields with `tool`, `rule`, `file`, `input` — each combination is uniquely identifiable in `t.Errorf` output (verified by inspecting the error format strings at L191 and L215).
-
-**Fix.** No action required. Note for future growth.
-
-**Tier.** 🟢 info.
-
----
-
-## Notes (audited, no finding)
-
-- **No per-case branching.** Scanned every table body — none switch on a row field. The `if tt.wantErr { ... } else { ... }` anti-pattern is absent.
-- **No one-row tables.** Smallest table found is 2 rows (e.g. `pkg/metrics/metrics_test.go:46` has 4 rows; `pkg/scene/scene_test.go:10` has 6).
-- **No legacy `tt := tt` rescopes** — `rg 'tt := tt|tc := tc'` returns empty. Already adapted to go 1.22+.
-- **Intra-package style is consistent.** Naming convention (`cases :=` vs `tests :=`) varies between packages but is uniform within each. `pkg/testjson/` uses `tests` across all 3 test files; `pkg/report/` uses `cases` across all 4 in `multiplex_test.go`. No `table-style-inconsistent` triggers.
-- **`pkg/scene/scene_test.go:10` `TestIsHeader`**, **`pkg/suppress/match_test.go:6` `TestMatchGlob`**, **`pkg/status/status_test.go:10`**, **`pkg/tally/tally_test.go:11`** all use no `name` field. In each case the literal inputs are short and self-describing — exempt per rule's "trivial tests where the inputs themselves are recognizable" clause.
-- **`pkg/score/score_test.go:9` `TestSeverityWeight_MapsKnownLevels`** uses a `map[string]int` rather than a struct slice. The map key is the label; appropriate for the shape (one input → one output).
-
-## Audit envelope
-
-- Tables scanned: 30
-- Rule firings: 1 (P2 unused-field)
-- Info notes: 1 (name-field-missing, exempt)
+**Tier:** borderline — this is a near-exact match for the rule's textbook example,
+but the branch is 3 lines, touches a 5-row table for a small arg-parsing helper,
+and the `wantErr`-then-return idiom is common, low-cost Go. Splitting buys
+marginal clarity for a two-case function; not worth a bead on its own, but worth
+a human's eyes if this file is touched again.

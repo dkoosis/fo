@@ -1,141 +1,155 @@
-# goroutine-lifecycle — repo
+# goroutine-lifecycle — fo (project scope)
 
-run_id: bd775e303d86-goroutine-lifecycle
-target: repo
-go.mod: `go 1.24.0` (loop-var capture rule downgraded)
+Run: `7858b3a8ea1b` · reviewer: goroutine-lifecycle · scope: project · `go.mod`: `go 1.24.0`
+
+## Summary
+
+fo's production concurrency is carefully owned. Every `go` launch in non-test
+code is ctx-scoped: `runWatcher`, `runDebounce`, `fanInLoop`, `readKeys`, the
+`scanLoop` reader, and the `stream.go` producer each close their output channel
+on `ctx.Done()` or are unblocked by a paired closer goroutine. Ownership is real
+(channel-close handshake + a bounded 2s grace wait in `runStreamCtx`), context is
+honored, and shared-state hand-offs copy slices before publishing
+(`aggregator.results()`, pkg/testjson/parser.go:390,405). The hard paths carry
+prior-bug-audit refs (#262–#267, fo-op6, fo-u2w, fo-4qh). `go 1.24.0` moots
+pre-1.22 loop-variable capture.
+
+`time.Sleep` appears only in `_test.go` files. All production buffered channels
+are size 1 with justifying comments except one (`snapshots`, N=8). No lock-reentry
+or `context.Background()` substitution in spawned goroutines was found.
+
+Three borderline findings below. No action-tier smell survived verification.
+Note: the prior run's vendor-ignore negative-assertion sleep is now **fixed** — a
+positive control was added (fo-u60, fswatch_test.go:151–162), so it is not
+re-filed.
 
 ## Scorecard
 
 | Phase | Tier | Notes |
 |---|---|---|
-| P1 ownership | 🟢 | every prod goroutine has owner via ctx + close/resultCh/WaitGroup |
-| P1 ctx honoring | 🟢 | all long-lived loops select on `ctx.Done()` |
-| P1 shared state | 🟢 | no captured-pointer aliasing found; 1.24 loop-var safe |
+| P1 ownership | 🟢 | every prod goroutine owned via ctx + channel-close / resultCh |
+| P1 ctx honoring | 🟢 | long-lived loops select on `ctx.Done()`; blocked Reads unblocked via Close |
+| P1 shared state | 🟢 | slices copied before publish; 1.24 loop-var safe |
 | P2 magic buffers | 🟡 | one undocumented buffer (`snapshots`, N=8) |
-| P2 time.Sleep as sync | 🟡 | 4 test sites use Sleep to wait for goroutine readiness |
+| P2 sleep-as-sync | 🟡 | 2 test readiness-sleeps (generous bounds) |
 | P2 lock reentry | 🟢 | not observed |
 | P3 idiom inversions | 🟢 | WaitGroup / chan choices defensible |
 
-5 findings.
-
 ---
 
-### 1. [F1] `cmd/fo/main.go:920` — chan-magic-buffer
+### 1. [F1] `cmd/fo/stream.go:72` — chan-magic-buffer
 
-**Site:** `snapshots := make(chan report.Report, 8)`
-**Owner:** producer goroutine at `main.go:933` closes `snapshots` on exit; consumer is `view.RenderStream` (line 959).
-**Issue:** magic-buffer
-**Evidence (Read-verified):** No comment near line 920 explains why 8. Adjacent comments justify `resultCh` (buffered=1, for race #267) and the streaming ruleset, but the choice between 0/1/4/8/16 for `snapshots` is silent. The coalescing test (`stream_coalesce_test.go`) demonstrates the channel must not block the parser under a slow renderer — implying the buffer is sized to swallow short bursts while `sendCoalesceSnapshot` drops duplicates. That design rationale belongs in a comment at the buffer.
-**Code:**
+**Diagnosis.** The streaming-snapshot channel is buffered at a bare literal `8`
+with no comment explaining that depth.
+
+**Why.** `sendCoalesceSnapshot` (stream.go:151–171) drops the oldest queued
+snapshot when the channel is full rather than blocking the parser, so the buffer
+depth is a real tuning knob — it sets how many stale per-package snapshots may
+queue before the coalescer starts dropping. `8` is neither the synchronous handoff
+(`0`) nor the single-shot signal (`1`) the rule treats as self-justifying, and no
+comment says why 8 rather than 4 or 32. Mild: a wrong value degrades
+latency/freshness, not correctness. The `resultCh` one line down is the contrasting
+good pattern — size 1 with an inline rationale.
+
+**Evidence.** cmd/fo/stream.go:72 (verbatim):
+
 ```go
-snapshots := make(chan report.Report, 8)
-// resultCh carries the producer goroutine's terminal state. Using a
-// single struct + blocking receive (a) ensures the producer is fully
-// finished before main inspects parseErr (#267 race), and (b) lets
-// main bound the wait via ctx + grace timeout so a wedged
-// attachDiff/state.Save doesn't deadlock fo (#266).
-type streamResult struct { ... }
-resultCh := make(chan streamResult, 1)
+	snapshots := make(chan report.Report, 8)
 ```
-**Fix:** Add a comment naming the design intent, e.g. `// 8 = burst tolerance for package-finish events; coalescer drops duplicates when renderer is slow.` Or reduce to 1 if the coalescer makes additional slots dead capacity.
-**Tier:** 🟡 P2
 
----
+cmd/fo/stream.go:83 (verbatim) — justified sibling:
 
-### 2. [F2] `cmd/fo/stream_cancel_test.go:81` — time-sleep-as-sync
-
-**Site:** `time.Sleep(50 * time.Millisecond)` between starting `runStreamCtx` goroutine and calling `cancel()`.
-**Owner:** test goroutine via `done := make(chan int, 1)`.
-**Issue:** time-sleep-as-sync
-**Evidence (Read-verified):** Comment says `// Give the streamer a moment to consume the initial events.` Classic shape — wait for the other goroutine to reach a state. The test then asserts cancel honored within 500ms, so the sleep value is racing with the assertion bound. A deterministic signal (e.g. wait for first stdout write, or expose a `ready` channel from `runStreamCtx`) would be flake-proof.
-**Code:**
 ```go
-done := make(chan int, 1)
-go func() {
-    done <- runStreamCtx(ctx, prod, br, &stdout, theme.Mono(), "", true, false, &stderr)
-}()
-// Give the streamer a moment to consume the initial events.
-time.Sleep(50 * time.Millisecond)
-start := time.Now()
-cancel()
+	resultCh := make(chan streamResult, 1)
 ```
-**Fix:** Inject a signal — e.g., a `progressWriter` like `pkg/view/stream_test.go` uses; wait on the first signal, then cancel. Or accept the generous bound and tag with `//lintbrush:disable=goroutine-lifecycle:time-sleep-as-sync` + rationale.
-**Tier:** 🟡 P2 (borderline — assertion has 500ms upper bound)
+
+**Fix.** Add a one-line comment tying `8` to the coalescing burst-tolerance intent,
+or reduce toward 1 if the drop-oldest coalescer makes extra slots dead capacity.
+
+**Tier.** borderline
 
 ---
 
-### 3. [F3] `cmd/fo/fswatch_test.go:125` — time-sleep-as-sync
+### 2. [F2] `cmd/fo/fswatch_test.go:125` — time-sleep-as-sync
 
-**Site:** `time.Sleep(50 * time.Millisecond)` after `watchTree(ctx, dir)` and before writing the trigger file.
-**Owner:** `watchTree` goroutine owned by ctx (timeout 3s); cleanup via `defer cancel()`.
-**Issue:** time-sleep-as-sync
-**Evidence (Read-verified):** Comment: `// Give the watcher a moment to start.` `fsnotify.NewWatcher` returns before its internal kqueue/inotify thread is fully armed; the test assumes 50ms is enough. Real flakes here are a well-known fsnotify pattern.
-**Code:**
+**Diagnosis.** `TestWatchTree_DetectsFileWrite` sleeps a fixed 50ms to wait for the
+fsnotify watcher to arm before writing the trigger file.
+
+**Why.** `fsnotify.NewWatcher` returns before its kqueue/inotify thread is fully
+registered; the test assumes 50ms covers that gap. This is the classic fsnotify
+readiness-race — under load or a slow CI box the write can land before the watcher
+is armed, and the event is missed. The sibling test `TestWatchTree_IgnoresVendorDir`
+already solved exactly this by writing a control file and waiting for its event
+(fo-u60); this positive-path test still uses the blind sleep. The 2s assertion
+ceiling absorbs current slop, so this is borderline, not action.
+
+**Evidence.** cmd/fo/fswatch_test.go:124–128 (verbatim):
+
 ```go
-events, err := watchTree(ctx, dir)
-if err != nil { t.Fatalf(...) }
-// Give the watcher a moment to start.
-time.Sleep(50 * time.Millisecond)
-if err := os.WriteFile(filepath.Join(dir, "x.go"), ...); err != nil { ... }
+	// Give the watcher a moment to start.
+	time.Sleep(50 * time.Millisecond)
+	if err := os.WriteFile(filepath.Join(dir, "x.go"), []byte("package x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 ```
-**Fix:** Either retry the file-write in a small loop until an event lands (bounded by the 3s ctx), or have `watchTree` return a `ready` channel closed after the first `addRecursive` succeeds. The 2s outer bound absorbs current 50ms slop, so this is borderline.
-**Tier:** 🟡 P2 (borderline — outer assertion has 2s bound)
+
+**Fix.** Apply the fo-u60 pattern: write a sentinel file and wait for its event to
+confirm the watcher is armed, then run the real assertion — or retry the write in a
+loop bounded by the 3s ctx.
+
+**Tier.** borderline
 
 ---
 
-### 4. [F4] `cmd/fo/fswatch_test.go:150` — time-sleep-as-sync
+### 3. [F3] `cmd/fo/stream_cancel_test.go:84` — time-sleep-as-sync
 
-**Site:** Same pattern as F3, in `TestWatchTree_IgnoresVendorDir`.
-**Owner:** same as F3.
-**Issue:** time-sleep-as-sync
-**Evidence (Read-verified):** Identical shape and comment intent — the negative assertion ("should not emit") only has a 400ms ceiling. If watcher startup ever drifts past 400ms, this test silently passes for the wrong reason (event was never observable, not because vendor was filtered).
-**Code:**
+**Diagnosis.** The cancel test sleeps a fixed 50ms so the streamer "consumes the
+initial events" before it calls `cancel()`.
+
+**Why.** The sleep waits for the producer goroutine (launched at line 76) to reach
+a state, then races against a 500ms upper-bound assertion on cancel latency. If the
+consume takes longer than 50ms the test measures cancel from the wrong start point;
+if it's much faster the sleep is wasted wall-clock. A deterministic ready signal
+(first stdout write, or an exposed ready channel) removes both the flake and the
+delay. Borderline — the 500ms/2s bounds make current failure unlikely.
+
+**Evidence.** cmd/fo/stream_cancel_test.go:83–86 (verbatim):
+
 ```go
-events, err := watchTree(ctx, dir)
-if err != nil { ... }
-time.Sleep(50 * time.Millisecond)
-if err := os.WriteFile(filepath.Join(vendor, "ignored.go"), ...); err != nil { ... }
-select {
-case <-events:
-    t.Fatal("watchTree: should not emit for files under vendor/")
-case <-time.After(400 * time.Millisecond):
+	// Give the streamer a moment to consume the initial events.
+	time.Sleep(50 * time.Millisecond)
+	start := time.Now()
+	cancel()
 ```
-**Fix:** Write a *non-ignored* sentinel file first, wait for its event to confirm the watcher is armed, then write the ignored file and assert no event. That actually tests "ignored", not "happened to race".
-**Tier:** 🟡 P2 (negative-assertion flake risk is higher than F3)
+
+**Fix.** Inject a signal — e.g. a `progressWriter` like `pkg/view/stream_test.go`
+uses — wait on the first render signal, then `cancel()`. Or accept the generous
+bound and annotate with `//lintbrush:disable=goroutine-lifecycle:time-sleep-as-sync`
+plus a one-line reason.
+
+**Tier.** borderline
 
 ---
 
-### 5. [F5] `cmd/fo/watch_test.go:86` — time-sleep-as-sync
+## Verified clean (no finding)
 
-**Site:** `time.Sleep(time.Millisecond)` inside polling loop waiting for first invocation.
-**Owner:** `watchLoop` goroutine via `done := make(chan struct{})`.
-**Issue:** time-sleep-as-sync
-**Evidence (Read-verified):**
-```go
-deadline := time.After(time.Second)
-for calls.Load() == 0 {
-    select {
-    case <-deadline:
-        t.Fatal("watchLoop: initial call never observed")
-    default:
-        time.Sleep(time.Millisecond)
-    }
-}
-```
-A busy-poll with 1ms sleep ticks; cheap and bounded by 1s deadline. Functionally fine but a `chan struct{}` close from the first call site would be both faster and deterministic.
-**Fix:** Test wraps the callback: `firstCall := make(chan struct{}); fn := func() { calls.Add(1); select { case firstCall <- struct{}{}: default: } }`; then `<-firstCall`.
-**Tier:** 🟡 P2 (borderline — bounded busy-poll is acceptable; flagged for principle)
-
----
-
-## Notes (not findings)
-
-- **`cmd/fo/watchkey.go:58` ctx-watcher goroutine** — fire-and-forget but ownership is precise: parks on `<-ctx.Done()`, then `restore()` (idempotent via `sync.Once`) and `_ = f.Close()`. Sibling `readKeys` goroutine unblocks via fd Close. No leak on cancel.
-- **`pkg/testjson/parser.go:92` `scanLoop`** — fire-and-forget but owner is `Stream`, which calls `r.Close()` on ctx cancel; comment at line 78 explicitly calls out the leak hazard if a non-closable reader is passed. Design-aware.
-- **`cmd/fo/main.go:933` producer goroutine** — owner is `runStreamCtx` via blocking `<-resultCh` with 2s grace after ctx cancel. Race #267 documented inline.
-- **Loop-var capture** — `go.mod` declares `go 1.24.0`, so the rule is not actionable.
-- **No `context.Background()` substitution** found in handler-spawned goroutines.
+- **Ownership.** `watchTree`/`debounce`/`fanIn`/`keyControl` goroutines close their
+  output channel on `ctx.Done()` (fswatch.go:152,214; watchkey.go:70,122);
+  `keyControl`'s reader (watchkey.go:63) is unblocked by the paired ctx-watch
+  goroutine (watchkey.go:58) closing the fd. `runStreamCtx` bounds the producer wait
+  with a 2s grace window (stream.go:119–129). No unowned fire-and-forget.
+- **Context honoring.** `scanLoop` (parser.go:96) and the `stdinTriggers` scanner
+  (watch.go:190) can't be interrupted mid-`Read` by ctx alone; both are documented
+  (fo-u2w; watch.go:170–174) and unblocked in production via `Close()` on the real
+  `*os.File` stdin.
+- **Shared state.** `aggregator.results()` copies `panicOutput` and per-test output
+  slices before returning (parser.go:390,405); the `stream.go` producer publishes to
+  `resultCh` before any concurrent read of `*r`. No unsynchronized pointer share.
+- **watch_test.go:86 busy-poll** — not flagged: the loop polls the real condition
+  (`calls.Load() == 0`) bounded by a 1s deadline, not a blind fixed wait.
+- **Loop-var capture** — `go.mod` `go 1.24.0`; rule not actionable.
 
 ## Cap
 
-5 findings (cap 10). Repo is already well-disciplined; remaining items are test-suite Sleep usage and one undocumented buffer constant.
+3 findings (cap 10). Repo is well-disciplined; remaining items are two bounded
+test-suite readiness-sleeps and one undocumented buffer constant.

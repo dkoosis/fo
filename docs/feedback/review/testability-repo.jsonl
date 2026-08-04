@@ -1,0 +1,5 @@
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T04:53:22Z","linter":"testability","scope":"pkg","target":"repo","target_slug":"repo","report_path":"docs/feedback/review/testability-repo.md","n_findings":4,"status":"reviewed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F1","verdict":"worth-it","reason":"hardcoded os.Stderr in hygiene+wrapleaderboard, wrapdiag sibling injectable","cite":"pkg/hygiene/hygiene.go:69-98","status":"assessed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F2","verdict":"worth-it","reason":"package-level mutable syncDir var forces non-parallel tests","cite":"pkg/state/state.go:197-211","status":"assessed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F3","verdict":"worth-it","reason":"both ToReport hardcode time.Now, downstream has inject-or-fallback convention","cite":"pkg/sarif/toreport.go:21-27","status":"assessed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F4","verdict":"worth-it","reason":"ten free funcs re-derive Dir()/env, no struct, tests pay via global swap","cite":"pkg/state/state.go:49-57","status":"assessed"}
