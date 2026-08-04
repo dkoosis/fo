@@ -9,3 +9,5 @@
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:32:45Z","finding_id":"F8","outcome":"valid-not-applied","note":"TallyPipeline LLM branch uses strings.Contains for digits/labels; row layout (rank/count) not pinned.","status":"assessed"}
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:32:45Z","finding_id":"F9","outcome":"valid-not-applied","note":"Color tests assert escape substring presence anywhere; not anchored to the labeled item.","status":"assessed"}
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:32:45Z","finding_id":"F10","outcome":"valid-not-applied","note":"cmd/fo/state_test.go and pure watch tests omit t.Parallel(); spot-checked TestRunWatch_* + state tests.","status":"assessed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T04:30:38Z","linter":"test-effectiveness","scope":"project","target":"repo","target_slug":"repo","report_path":"docs/feedback/review/test-effectiveness-repo.md","n_findings":1,"status":"reviewed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F1","verdict":"not-worth-it","reason":"doc comments already state design intent, finding concedes leave-it","cite":"pkg/sarif/builder.go:15-16,89-94","status":"assessed"}

@@ -1,135 +1,160 @@
-# truthful-names — repo
+# truthful-names — repo review
 
-run: `bd775e303d86-truthful-names` · date: 2026-05-17 · scope: whole repo · mode: report
-
-Overall: 🟢 — names are largely honest. Three small contracts to tighten, all P2.
-
-## Summary
-
-| Tier | Pattern | Count |
-|---|---|---|
-| 🟢 P1 mismatch | receiver / function-body | 0 |
-| 🟢 P1 package | generic basename / drift | 0 |
-| 🟡 P2 type/field | terminology-drift | 1 |
-| 🟡 P2 function | imprecise-function-name | 1 |
-| 🟡 P2 type | imprecise-type-name | 1 |
-| 🟢 P2 file/module | — | 0 |
-| 🟢 P2 test | — | 0 |
-
-Package basenames (`fingerprint`, `score`, `suppress`, `cluster`, `scene`, `tally`, `status`, `metrics`, `paint`, `theme`, `state`, `report`, `sarif`, `testjson`, `view`) all sit inside the package's exported vocabulary. No `util`/`common`/`helpers`. Module `github.com/dkoosis/fo` — trailing segment is the binary name; honest.
+RUN_ID: 7858b3a8ea1b
+Scope: project (whole fo repo, HEAD `28a52d1`)
+Linter: `truthful-names` (lens: clarity)
 
 ## Findings
 
 ### 1. [F1] `pkg/suppress/match.go:7-13` — terminology-drift
 
-- **Symbol:** `suppress.Ruleset`, field `Ruleset.Rules`
-- **Pattern:** `terminology-drift`
-- **Predicted from name:** A `Ruleset` is a set of rules; `.Rules` returns rules.
-- **Actual from body:** The element type is `Suppression`, not `Rule`. The package itself is named `suppress`, the file format is `.fo/ignore`, the parsed type is `Suppression`, and the only entry point is `Parse() []Suppression`. Then a single wrapper introduces a new term — "rule" — that has no other surface in the package.
+- **Diagnosis:** `suppress.Ruleset` and its field `.Rules` name a concept ("rule")
+  that has no other surface anywhere in the package or its callers.
+- **Why:** The package is `suppress`, the on-disk format is `.fo/ignore`, the
+  parsed unit returned by `Parse` is `Suppression`, and the only other exported
+  symbols are `Suppression.Expired`/`.Matches`/`.Format`. `Ruleset`/`Rules`
+  introduces a second vocabulary for the same thing a reader has to privately
+  translate ("a Ruleset holds Rules, but a Rule here is actually a
+  Suppression"). The caller side reinforces the drift instead of correcting it:
+  `cmd/fo/suppress.go` names its own loader `loadSuppressRuleset`, propagating
+  "rule" language one layer further from the one real noun, `Suppression`.
 - **Evidence:**
   ```go
-  // pkg/suppress/match.go
+  // pkg/suppress/match.go:5-14
+  // Ruleset is an ordered list of suppressions loaded from .fo/ignore.
+  // The zero value is empty and matches nothing.
   type Ruleset struct {
-      Rules []Suppression
+  	Rules []Suppression
   }
+
+  // NewRuleset wraps parsed suppressions into a Ruleset.
   func NewRuleset(rs []Suppression) *Ruleset {
-      return &Ruleset{Rules: rs}
+  	return &Ruleset{Rules: rs}
   }
-  func (rs *Ruleset) Match(ruleID, path string) int { ... }
   ```
-  Caller side (`pkg/report/filter.go:ApplyFilter`) takes `*suppress.Ruleset` and iterates suppressions through it. Two readers — the one inside `suppress` (sees `Suppression`) and the one outside (sees `Ruleset.Rules`) — speak different dialects for one concept.
-- **Fix:** Rename type and field to match the package's existing vocabulary.
-  ```
-  suppress.Ruleset                 → suppress.Set            (or suppress.Suppressions)
-  Ruleset.Rules                    → Set.Items               (or .List)
-  NewRuleset(rs)                   → NewSet(rs)
-  *suppress.Ruleset (caller types) → *suppress.Set
-  ```
-  Grep map:
-  ```
-  rg -l 'suppress\.Ruleset|NewRuleset' --type go
-  # pkg/report/filter.go, pkg/report/filter_test.go, pkg/suppress/match*.go, cmd/fo/main.go (if wired)
-  ```
-- **Tier:** 🟡 P2
-
----
-
-### 2. [F2] `pkg/state/metrics_history.go:94` — imprecise-function-name
-
-- **Symbol:** `state.AppendMetrics`
-- **Pattern:** `imprecise-function-name`
-- **Predicted from name:** "Append" reads as a pure append — open file, write samples at the end.
-- **Actual from body:** Load full history → prepend new run → trim to `MaxMetricsHistory` → re-serialize the whole envelope → atomic write. Three concerns the name doesn't carry: (a) prepend, not append; (b) trimming/eviction with a configurable bound; (c) full read-modify-write of the on-disk envelope, not an incremental write. The doc comment even calls out that it replaces "the prior overwrite-only `SaveMetrics`" — but the new name swung past "rotate" or "record" all the way to a verb that means the opposite of what the function does at the slice level.
-- **Evidence:**
   ```go
-  // pkg/state/metrics_history.go:94
-  func AppendMetrics(path string, samples []MetricSample) error {
-      hist, err := LoadMetricsHistory(path)
+  // cmd/fo/suppress.go:45,67
+  func loadSuppressRuleset(r *report.Report, path string, stderr io.Writer) *suppress.Ruleset {
       ...
-      hist.Runs = append([]MetricsRun{{GeneratedAt: time.Now().UTC(), Samples: samples}}, hist.Runs...)
-      if len(hist.Runs) > MaxMetricsHistory {
-          hist.Runs = hist.Runs[:MaxMetricsHistory]
-      }
-      // ... atomic write
+      return suppress.NewRuleset(rules)
   }
   ```
-- **Fix:** Rename to a verb that names the actual operation. Preferred: `RecordMetricsRun` (mirrors `RunFromReport` vocabulary, names the unit being captured, doesn't lie about insertion order).
+- **Fix:** Rename the type/field/constructor to the package's own noun.
+  `Ruleset` → `Set` (or `Suppressions`); `.Rules` → `.Items` (or `.List`);
+  `NewRuleset` → `NewSet`. Call-site fan-out is small and contained:
+  `pkg/report/filter.go` (`ApplyFilter`, `classifyFinding` both take
+  `*suppress.Ruleset`) and `cmd/fo/suppress.go` (`loadSuppressRuleset`).
   ```
-  state.AppendMetrics       → state.RecordMetricsRun
+  rg -l 'suppress\.Ruleset|NewRuleset|SuppressRuleset' --type go
   ```
-  Alternatives if a shorter name is desired: `state.RotateMetrics` (foregrounds the eviction), `state.PrependMetricsRun` (literal-but-ugly).
-  Grep map:
-  ```
-  rg -l 'state\.AppendMetrics|AppendMetrics\(' --type go
-  # pkg/state/metrics_history*.go, plus whichever cmd/wrapper calls it (likely cmd/fo + a wrap* package)
-  ```
-- **Tier:** 🟡 P2
+- **Tier:** borderline — cosmetic, single-package blast radius, but the name
+  has now propagated into a second file (`cmd/fo/suppress.go`) since it was
+  first flagged; left alone it keeps spreading.
 
 ---
 
-### 3. [F3] `pkg/sarif/aggregates.go:9` — imprecise-type-name
+### 2. [F2] `pkg/state/metrics_history.go:101` — imprecise-function-name
 
-- **Symbol:** `sarif.FileIssue`
-- **Pattern:** `imprecise-type-name` (close cousin of `terminology-drift`)
-- **Predicted from name:** A `FileIssue` is one issue in a file — the SARIF `Result` projected to its file location. Reader expects `len(TopFiles(doc, 10)) == 10 single issues`.
-- **Actual from body:** It's an aggregate row: `{File, IssueCount, ErrorCount, WarnCount}`. There is no single issue here — it's the "per-file rollup" shape used to feed a leaderboard render. `TopFiles` returns up to `limit` *files* (each carrying counts), not up to `limit` issues.
+- **Diagnosis:** `AppendMetrics` reads as "add samples at the end of the
+  file"; the body prepends, evicts, and rewrites the whole envelope.
+- **Why:** A reader calling `state.AppendMetrics(path, samples)` from
+  `cmd/fo/render.go:196` reasonably expects an incremental write. What
+  actually happens: load the full `MetricsFile`, prepend a new `MetricsRun`
+  to the front of `hist.Runs` (newest-first, per the type's own doc comment),
+  truncate anything past `MaxMetricsHistory`, then atomically rewrite the
+  entire file. That's three concerns ("prepend", "evict", "full read-modify-
+  write") that "Append" doesn't carry, and "prepend" is the literal opposite
+  of what "append" means for a slice.
 - **Evidence:**
   ```go
-  // pkg/sarif/aggregates.go
-  type FileIssue struct {
-      File       string
-      IssueCount int
-      ErrorCount int
-      WarnCount  int
-  }
-  func TopFiles(doc *Document, limit int) []FileIssue { ... }
+  // pkg/state/metrics_history.go:98-109
+  // AppendMetrics loads existing history, prepends a new run with the
+  // current samples, trims to MaxMetricsHistory, and writes the envelope
+  // back. Replaces the prior overwrite-only SaveMetrics (#258).
+  func AppendMetrics(path string, samples []MetricSample) error {
+  	hist, err := LoadMetricsHistory(path)
+  	if err != nil {
+  		return err
+  	}
+  	hist.Version = MetricsSchemaVersion
+  	hist.Runs = append([]MetricsRun{{GeneratedAt: time.Now().UTC(), Samples: samples}}, hist.Runs...)
+  	if len(hist.Runs) > MaxMetricsHistory {
+  		hist.Runs = hist.Runs[:MaxMetricsHistory]
+  	}
   ```
-  Reinforced by the field name: a struct whose own field is `IssueCount` is obviously not "one issue". And `ErrorCount + WarnCount` need not equal `IssueCount` (note-level results count toward `IssueCount` only), which is another sign the singular framing has slipped.
-- **Fix:** Rename to the aggregate it represents. Preferred: `FileIssueCounts` (plural + role-tagged). Acceptable: `FileSummary`, `FileStats`. Avoid `FileIssues` alone — still reads as "the issues for the file" (a slice), not a counts struct.
+  The function's own doc comment already spells out "prepends... trims...
+  writes back" — the name just never caught up to that description.
+- **Fix:** Rename to a verb that matches the doc comment, e.g.
+  `RecordMetricsRun` (mirrors the existing `RunFromReport` vocabulary) or
+  `RotateMetrics` (foregrounds the eviction). Single production call site:
+  `cmd/fo/render.go:196`.
   ```
-  sarif.FileIssue          → sarif.FileIssueCounts
-  // call sites: TopFiles return type, any iteration variables
+  rg -l 'AppendMetrics' --type go
+  # pkg/state/metrics_history.go, pkg/state/metrics_history_test.go, cmd/fo/render.go
   ```
-  Grep map:
-  ```
-  rg -l 'sarif\.FileIssue|\[\]FileIssue|TopFiles' --type go
-  # pkg/sarif/aggregates*.go, pkg/sarif/*_test.go, likely pkg/view/leaderboard.go or pkg/view/pickview.go
-  ```
-- **Tier:** 🟡 P2
+- **Tier:** borderline — one call site, mechanical rename, but the doc
+  comment vs. name gap is the kind of thing that misleads a skim-reader
+  specifically because the comment sounds authoritative and correct.
 
 ---
+
+### 3. [F3] `pkg/sarif/aggregates.go:9` — terminology-drift
+
+- **Diagnosis:** `FileIssue` names a per-file count aggregate, not an issue.
+- **Why:** Everywhere else in `pkg/sarif`, "issue" (via `Result`) denotes one
+  finding at one location. `FileIssue` breaks that convention inside the same
+  package: it's `{File, IssueCount, ErrorCount, WarnCount}` — a rollup row for
+  a leaderboard, with zero fields describing an individual issue. A reader who
+  has just seen `sarif.Result` (one issue) then sees `[]FileIssue` returned by
+  `TopFiles` and reasonably expects a list of individual issues grouped by
+  file, not one row per file with counts.
+- **Evidence:**
+  ```go
+  // pkg/sarif/aggregates.go:8-17
+  // FileIssue represents an issue in a specific file for leaderboard rendering.
+  type FileIssue struct {
+  	File       string
+  	IssueCount int
+  	ErrorCount int
+  	WarnCount  int
+  }
+
+  // TopFiles returns files sorted by issue count (descending).
+  func TopFiles(doc *Document, limit int) []FileIssue {
+  ```
+  The struct's own field `IssueCount` on a type called `FileIssue` is the
+  tell: a genuine single issue wouldn't need to count issues.
+- **Fix:** Rename to name the aggregate: `FileIssueCounts` or `FileSummary`.
+  Low-risk: `TopFiles`/`FileIssue` currently has no production caller —
+  `rg` finds it only in `pkg/sarif/aggregates.go` and
+  `pkg/sarif/aggregates_external_test.go`, so the rename's blast radius is one
+  package plus its own test file (worth flagging to a human separately as a
+  possible dead-code candidate, but out of scope for this linter).
+  ```
+  rg -l 'FileIssue|TopFiles' --type go
+  # pkg/sarif/aggregates.go, pkg/sarif/aggregates_external_test.go — no other hits
+  ```
+- **Tier:** borderline — same drift class as F1, contained blast radius,
+  arguably moot if the type is genuinely unused in production and gets
+  removed instead of renamed.
 
 ## Looked at, not flagged
 
-- **`state.Headline` (func returning string) vs `view.Headline` (struct)** — different packages, different domains (one is a sentence about the diff; the other is a renderable section). Acceptable polysemy at the package boundary.
-- **`sarif.Run` vs `state.Run`** — same word, very different referents, but each is unambiguous inside its package and the cross-package call sites disambiguate via the `pkg.` prefix.
-- **`pkg/cluster.Run([]Input) []Cluster`** — `Run` here is a verb (execute the clusterer); the function's body matches. Not a noun collision in callers (`cluster.Run(...)` reads correctly).
-- **`internal/lineread.Read`** — `lineread.Read(br)` predicts "read a line from `br`", body reads exactly that.
-- **`pkg/state/state.go` containing `Dir/Path/Load/Save/Reset/Append/RunFromReport`** — file basename matches package lifecycle; not a dumping ground.
-- **Hygiene packages (`status`, `metrics`, `tally`, `scene`)** — each package's basename matches its `# fo:<name>` header sentinel and the parsed root type. Strong self-documenting structure.
-- **Tests** — all sampled `Test<Foo>` names target real `Foo` symbols (`TestExtractTopUserFrame_*`, `TestClassify*`, `TestHeadline_*`, `TestMakeClusterID_*`).
-- **Wrappers (`pkg/wrapper/wrap*`)** — file/package basenames match the tool they adapt (cover, jscpd, gobench, archlint, diag, leaderboard). Honest.
+Swept the top-PageRank symbols (`internal/lineread.Read` 0.104, `pkg/suppress`
+0.070, `pkg/report` 0.064, `pkg/sarif` 0.048), all 24 exported receiver methods
+repo-wide, every package basename under `pkg/`/`internal/` (none generic), the
+newest branch code (`pkg/state/fulllog.go`, `cmd/fo/state.go`'s
+`recordFullLog`/`attachDiff`, fo-w1f tee-to-log), `pkg/multiplex` (post-move
+from `pkg/report`), `pkg/scene`, `pkg/cluster`, `pkg/view/pickview.go`, and
+test names across the packages touched by the last 20 commits
+(`pkg/state/{fulllog,runlog,snapshot}_test.go`, `cmd/fo/{trend,explain}_test.go`).
+All matched their bodies. `wrapdiag`'s two `Convert` symbols (package-level
+wrapper + `(*diag).Convert` method) are a deliberate delegation, not a
+collision — documented in `DiagOpts`'s comment as bypassing `*flag.FlagSet`
+plumbing for the v2 CLI path.
 
-## Verdict
+## Note on prior run
 
-3 findings, all P2 cosmetic. Repo's naming hygiene is high. The two highest-impact renames are F1 (`Ruleset` → `Set`, propagates to one caller package) and F3 (`FileIssue` → `FileIssueCounts`, propagates to the leaderboard view). F2 is single-call-site if `AppendMetrics` is only invoked from `cmd/fo` and one wrapper.
+A prior pass (2026-05-17, `bd775e303d86`) flagged these same three symbols.
+All three are still unfixed in the current tree — re-verified against HEAD
+rather than assumed carried-forward. No new findings surfaced beyond these.

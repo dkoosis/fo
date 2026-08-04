@@ -1,0 +1,5 @@
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T04:53:22Z","linter":"fix-security","scope":"pkg","target":"repo","target_slug":"repo","report_path":"docs/feedback/review/fix-security-repo.md","n_findings":4,"status":"reviewed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F1","verdict":"worth-it","reason":"0o755 outlier vs sibling state.Dir() sites using 0o750","cite":"cmd/fo/render.go:192","status":"assessed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F2","verdict":"worth-it","reason":"private .fo dir needlessly world-readable, safe 0o700 fix","cite":"cmd/fo/suppress_cmd.go:226-232","status":"assessed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F3","verdict":"not-worth-it","reason":"read-only os.Open handle, Close failure loses nothing, lint churn","cite":"pkg/state/metrics_history.go:56-65","status":"assessed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F4","verdict":"not-worth-it","reason":"test-only golden write gated by *update, never runtime path","cite":"pkg/view/pipeline_golden_test.go:95-103","status":"assessed"}

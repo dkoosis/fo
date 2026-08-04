@@ -1,103 +1,197 @@
-# errors-design — repo
+# errors-design — fo repo (project scope)
 
-run: `bd775e303d86-errors-design` · target: repo · mode: report
+RUN_ID: 7858b3a8ea1b
 
-Semantic review of error shape, wrap quality, handle-once, recover. Mechanical idiom checks (errname/wrapcheck) deferred to those linters.
+Error design in fo is clean on the mechanical axes: no `fmt.Errorf("%w", err)` no-ops,
+no `%!s(MISSING)` missing-arg wraps, no log-and-return double-handling (the code uses
+no `log` package at all — errors surface as `Notices` or `Fprintf(stderr, …)`), and
+zero `recover()` sites. Wrap prefixes carry real context (format name, line number,
+stage). The one recurring smell is **API-surface honesty**: several exported error
+sentinels that no production code branches on via `errors.Is` — only the defining
+package's own tests reference them. In an application repo (single `cmd/fo` binary over
+internal `pkg/*`), an exported sentinel with no in-tree consumer is dead API surface.
 
-## Summary
+Findings ranked most-severe first: 1 action, 4 borderline.
 
-- 3 exported sentinels with **zero production consumers** (only same-package tests `errors.Is`). API surface honesty problem.
-- 2 wrappers tag their package name in the inner error while the caller in `cmd/fo/main.go` tags it again — double-prefix in user-visible output.
-- No `recover()`, no `log+return`, no typed-nil-as-interface, no HTTP boundary leaks. Those phases come up clean.
+### 1. [F1] `pkg/state/state.go:95` — sentinel-without-callers
 
-Total findings: **5** (cap 10).
+**Diagnosis:** `ErrVersionSkew` is exported and returned from three load paths
+(`state.go:121`, `snapshot.go:117`, `runlog.go:106`) but no production caller branches
+on it. The sole consumer collapses every load error into one generic path.
 
----
+**Why:** The asymmetry is the tell. Its sibling `ErrDurabilityDegraded` is branched on
+in five production sites (`cmd/fo/state.go:39,64,97,118`, `pkg/state/fulllog.go:27`),
+so the sentinel-as-contract convention is real here — yet `ErrVersionSkew` is checked
+only in `state_test.go`. `Load`'s caller treats a schema-version mismatch identically
+to file corruption ("starting fresh"), silently discarding accumulated diff history on
+a version bump. Either the sentinel earns a distinct handling (a clearer notice than
+generic corruption) or it should be unexported.
 
-### 1. [F1] `pkg/sarif/reader.go:12` — sentinel-without-callers
+**Evidence:** `pkg/state/state.go:95`
 
-**Diagnosis.** `ErrMissingSARIFVersion` is exported but has **zero callers anywhere**, including tests. The only reference is the producer at line 25.
+```go
+var ErrVersionSkew = errors.New("state: schema version skew")
+```
 
-**Why.** Sentinel exports are an API commitment: callers may `errors.Is` on them. Exporting one nobody uses both pretends a contract exists and prevents you from changing the message later without a fake breaking change. `sarif.Read` / `sarif.ReadBytes` callers in `cmd/fo/main.go:609,826` and the three `sarif/toreport_test.go` sites never branch on this value — they treat the error as opaque.
+The only production consumer, `cmd/fo/state.go:22`, does not distinguish it:
 
-**Evidence (read-verified).** `rg -n 'sarif\.ErrMissing|ErrMissingSARIFVersion'` returns only the declaration site and the single producer in the same file. `pkg/sarif/reader.go:11-26` confirmed via Read.
+```go
+	prev, err := state.Load(statePath)
+	if err != nil {
+		fmt.Fprintf(stderr, "fo: state: %v (starting fresh)\n", err)
+		prev = nil
+	}
+```
 
-**Fix.** Unexport to `errMissingSARIFVersion` (still satisfies err113), or fold into `fmt.Errorf("decode sarif: missing version")` with no sentinel at all. If a future caller actually needs to branch on missing-version, re-export with intent.
+Contrast the same file's sibling handling at `cmd/fo/state.go:39`:
 
-**Tier:** P1 / 🟡
+```go
+			if errors.Is(err, state.ErrDurabilityDegraded) {
+```
 
----
+**Fix:** Either add an `errors.Is(err, state.ErrVersionSkew)` branch at the `Load`
+call site (e.g. a distinct "state schema changed — diff history reset" notice, since
+version skew is expected on upgrade and semantically different from corruption), or
+unexport it to `errVersionSkew` since nothing outside the package acts on it.
 
-### 2. [F2] `pkg/tally/tally.go:60,64,69` — sentinel-without-callers
+**Tier:** action
 
-**Diagnosis.** `tally.ErrNoHeader`, `tally.ErrNoRows`, `tally.ErrMalformedRow` are exported sentinels with **zero out-of-package consumers**. Production callers don't import `tally.Err*`.
+### 2. [F2] `pkg/tally/tally.go:56` — sentinel-without-callers (hygiene-format cluster)
 
-**Why.** Same shape as F1, but a cluster. The package comment on `ErrMalformedRow` actually says the sentinel exists "to keep err113 happy and let callers `errors.Is` on a single root" — but no external caller does. The `tally` package consumers (rendering in `pkg/view/*`, dispatch in `cmd/fo/main.go`) treat parse failures as opaque and just propagate.
+**Diagnosis:** The hygiene-format parse packages export a family of error sentinels —
+`tally.ErrNoHeader` / `ErrNoRows` / `ErrMalformedRow` (`tally.go:56,60,65`),
+`status.ErrNoRows` / `ErrMalformedRow` / `ErrBadState` (`status.go:54,55,56`),
+`wrapleaderboard.ErrNoRows` / `ErrMalformedRow` (`wrapleaderboard.go:37,40`) — none of
+which any production caller distinguishes. Every `cmd/fo` consumer collapses all parse
+errors into one generic message + exit 2.
 
-**Evidence (read-verified).** `rg -n 'tally\.Err' --type go` returns zero hits. Same-package tests `pkg/tally/tally_test.go:90,98,106,114` use them but that's not a public contract — internal tests can use unexported names.
+**Why:** `errors.Is` on these sentinels appears only in each package's own `_test.go`.
+The render entry points prove the collapse: `renderTally`/`renderStatus` print
+`fo: parsing tally/status: %v` and return 2 for any error, never branching. The
+sentinels add public API weight (each is a documented exported var) that buys nothing
+callers use. This is one cluster finding, not eight — the same shape repeats across
+three packages.
 
-**Fix.** Unexport (`errNoHeader`, `errNoRows`, `errMalformedRow`); tests in the same package keep working. If a `fo`-external consumer (e.g., a future plugin) needs to branch, re-export then.
+**Evidence:** `cmd/fo/render.go:79`
 
-**Tier:** P1 / 🔴 (≥3 sentinels with no callers in one package)
+```go
+	t, err := tally.Parse(bytes.NewReader(input))
+	if err != nil {
+		fmt.Fprintf(stderr, "fo: parsing tally: %v\n", err)
+		return 2
+	}
+```
 
----
+Same pattern at `cmd/fo/render.go:141` for status. Defining site, `pkg/tally/tally.go:56`:
 
-### 3. [F3] `pkg/wrapper/wrapleaderboard/wrapleaderboard.go:37,40` — sentinel-without-callers
+```go
+var ErrNoHeader = errors.New("tally: missing '# fo:tally' header")
+```
 
-**Diagnosis.** `wrapleaderboard.ErrNoRows` and `wrapleaderboard.ErrMalformedRow` exported; **only same-package tests** use them. The three production call sites in `cmd/fo/main.go:308,454,1287` invoke `wrapleaderboard.Convert(...)` and treat the error as opaque (print + exit).
+**Fix:** These are defensible as a deliberate public parse-error API if external reuse
+of `pkg/tally`/`pkg/status` is intended. If not, unexport the row-level ones
+(`errMalformedRow`, `errBadState`) that carry no cross-package contract, keeping only
+the header/no-rows distinction if a caller ever needs to treat "empty input" as clean
+vs. exit 2. At minimum, document the intent so the exported-but-unbranched surface
+reads as chosen, not accidental.
 
-**Why.** Same drift as F2. The wrapper packages all share this pattern — a private-by-intent error is exported because the lint tool flags "use a sentinel," but no caller ever branches on it. The lint advice was misapplied: err113's intent is "don't allocate the same error string repeatedly," not "every distinct error must be exported."
+**Tier:** borderline
 
-**Evidence (read-verified).** `rg -n 'wrapleaderboard\.Err' --type go` shows declarations + tests only; `cmd/fo/main.go:308,454,1287` confirmed not to use `errors.Is`.
+### 3. [F3] `pkg/multiplex/multiplex.go:52` — typed-error-fields-unread
 
-**Fix.** Unexport both. The lint rule is about identity (no repeat allocation), not visibility.
+**Diagnosis:** `UnknownFormatError` is a 4-field struct
+(`SectionIndex`, `Line`, `Tool`, `Format`) whose fields are consumed only by its own
+`Error()` method. The single `errors.As` caller uses the type as a discriminator to
+attach a hint and never reads a field — it re-wraps the original `err`.
 
-**Tier:** P1 / 🟡
+**Why:** The typed-error ceremony (struct + `Error()`) pays off only when a caller
+pulls fields out via `errors.As`. Here the caller wants "is this an unknown-format
+error?" — a boolean — not `ufe.Format`. A sentinel + `fmt.Errorf` would carry the same
+message and support the same branch with less surface.
 
----
+**Evidence:** `cmd/fo/parse.go:295` — `errors.As` result `ufe` is bound but no field is read:
 
-### 4. [F4] `pkg/wrapper/wraparchlint/archlint.go:32` — wrap-redundant
+```go
+		var ufe *multiplex.UnknownFormatError
+		if errors.As(err, &ufe) {
+			return nil, fmt.Errorf(
+				"%w\nhint: for raw line-diagnostic text (e.g. 'go vet', 'gofmt'), pipe through 'fo wrap diag --tool <name>' to produce SARIF",
+				err,
+			)
+		}
+```
 
-**Diagnosis.** `Convert` returns `fmt.Errorf("archlint: %w", err)` on the JSON-unmarshal failure. The sole caller in `cmd/fo/main.go:1184` then prints `fmt.Fprintf(stderr, "fo wrap archlint: %v\n", err)`. End-user sees `fo wrap archlint: archlint: invalid character ...` — the second "archlint:" is noise.
+The fields exist only to format `Error()` (`pkg/multiplex/multiplex.go:59-63`).
 
-**Why.** Cmd-layer already owns the subcommand name as the user-visible context. The library prefix duplicates it. The reading-input wrap at `archlint.go:19` (`"reading input: %w"`) is fine — adds genuinely new info about *which* step failed.
+**Fix:** Replace the struct with `var ErrUnknownFormat = errors.New("unknown section format")`
+and build the detail at the return site via `fmt.Errorf("section %d: %w: format %q for
+tool %q", …, ErrUnknownFormat, …)`. The `errors.As` caller becomes `errors.Is`. Keep
+the struct only if a caller will genuinely read `Format`/`SectionIndex`.
 
-**Evidence (read-verified).** `archlint.go:30-33` + `cmd/fo/main.go:1183-1186` both confirmed via Read.
+**Tier:** borderline
 
-**Fix.** Drop the prefix: `return fmt.Errorf("unmarshal: %w", err)` (which stage), or just `return err`. Same pattern, same fix in `pkg/wrapper/wrapjscpd/jscpd.go:81` (`fmt.Errorf("jscpd: %w", err)`) — caller already prefixes "fo wrap jscpd:".
+### 4. [F4] `pkg/sarif/reader.go:20` — sentinel-without-callers
 
-**Tier:** P2 / 🟡 (2 sites)
+**Diagnosis:** `ErrNestingTooDeep` (the SARIF depth-bomb guard) is exported and returned
+wrapped (`reader.go:72`), but the production caller wraps it generically and never
+branches on it.
 
----
+**Why:** `errors.Is(_, ErrNestingTooDeep)` appears only in `sarif/reader_test.go`.
+`cmd/fo/parse.go:154` folds it into `fmt.Errorf("parsing SARIF: %w", err)` alongside
+every other parse failure, so the export currently distinguishes nothing at any call
+site. A depth-limit rejection and a syntactically broken document produce the same
+caller behavior.
 
-### 5. [F5] `pkg/scene/scene.go:224,231,240,265,269,279,284,294,299,303` — wrap-redundant (mild)
+**Evidence:** `pkg/sarif/reader.go:20`
 
-**Diagnosis.** Errors like
+```go
+var ErrNestingTooDeep = errors.New("sarif nesting too deep")
+```
 
-    return fmt.Errorf("scene: line %d: %w: narration before any act", p.lineNo, errMalformedAct)
+Consumer at `cmd/fo/parse.go:154-156` does not distinguish it:
 
-triple-tag: outer `"scene:"` + inner `errMalformedAct` whose message is `"scene: malformed act header"` (line 112). Output: `scene: line 5: scene: malformed act header: narration before any act` — "scene:" appears twice.
+```go
+		doc, err := sarif.ReadBytes(input)
+		if err != nil {
+			return nil, fmt.Errorf("parsing SARIF: %w", err)
+```
 
-**Why.** The package-name prefix on the `errMalformed*` sentinels (`scene.go:112-114`) collides with the package-name prefix on the wrap. One should drop it. Tier 3 because it's only mild noise — the line number is the load-bearing context.
+**Fix:** Keep exported only if callers should treat "hostile/oversized input" distinctly
+from "malformed SARIF" (plausible for a security guard — a different exit path or
+message). Otherwise unexport to `errNestingTooDeep`.
 
-**Evidence (read-verified).** `pkg/scene/scene.go:112-114, 224, 231, 240, 265, 269, 279, 284, 294, 299, 303` — every wrap of `errMalformed*` produces a doubled "scene:".
+**Tier:** borderline
 
-**Fix.** Drop the `"scene: "` prefix from the three sentinel messages:
+### 5. [F5] `pkg/multiplex/multiplex.go:34` — sentinel-without-callers
 
-    errMalformedAct   = errors.New("malformed act header")
-    errMalformedActor = errors.New("malformed actor line")
-    errMalformedExit  = errors.New("malformed exit trailer")
+**Diagnosis:** `ErrNoSections` is exported and returned (`multiplex.go:161`) but the sole
+production caller of `ParseSections` branches only on `UnknownFormatError`, folding
+`ErrNoSections` into a generic wrap.
 
-Outer wrap retains the package tag and line number. Cleaner output, no signal lost.
+**Why:** `errors.Is(_, ErrNoSections)` is test-only (`multiplex_test.go`).
+`parseMultiplex` is reached only after `HasDelimiter` is true, so "no sections found"
+is an unusual path; when it fires the caller cannot tell it apart from other section
+errors. Exported, unbranched.
 
-**Tier:** P2 / 🟢
+**Evidence:** `pkg/multiplex/multiplex.go:34`
 
----
+```go
+var ErrNoSections = errors.New("no sections found in report input")
+```
 
-## Phases not findings-bearing
+Consumer at `cmd/fo/parse.go:293,302` branches on the sibling typed error but collapses this one:
 
-- **handle-once (P1).** No `log.X(err); return err` sites — fo has no logger; errors propagate to `cmd/fo/main.go` which prints and exits. ✓
-- **typed-nil-as-error / interface-and-nil (P2).** No `*MyErr` return-variable patterns. The one typed error (`UnknownFormatError`, `pkg/report/multiplex.go:50`) is returned as a value through normal error chains; callers use `errors.As` correctly (`cmd/fo/main.go:751`, `pkg/report/multiplex_test.go:181,202`). Fields are actually read. ✓
-- **boundary-leak-to-client (P2).** fo is a CLI; no HTTP/RPC handlers. n/a.
-- **silent-recover / recover-without-stack (P3).** Zero `recover()` calls in the repo. ✓
-- **typed-error-fields-unread (P1).** `UnknownFormatError` fields `SectionIndex`, `Tool`, `Format` are read by tests (`multiplex_test.go:184-188, 205-207`). Caller in `cmd/fo/main.go:751` uses `errors.As`. Borderline — tests use fields, production reads `Error()` only — but the typed shape is justified by the test-level contract. ✓
+```go
+	sections, prelude, err := multiplex.ParseSections(input)
+	if err != nil {
+		var ufe *multiplex.UnknownFormatError
+		if errors.As(err, &ufe) {
+			...
+		}
+		return nil, fmt.Errorf("parsing report sections: %w", err)
+```
+
+**Fix:** Unexport to `errNoSections` unless an external consumer of `pkg/multiplex` is
+intended to branch on the empty-input case.
+
+**Tier:** borderline

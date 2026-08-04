@@ -1,0 +1,5 @@
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T04:53:22Z","linter":"domain-model","scope":"pkg","target":"repo","target_slug":"repo","report_path":"docs/feedback/review/domain-model-repo.md","n_findings":4,"status":"reviewed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F1","verdict":"worth-it","reason":"DiffItem discards typed Severity+Class enums for zero benefit, cheap fix","cite":"pkg/report/report.go:109-118","status":"assessed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F2","verdict":"worth-it","reason":"score.go re-hardcodes level literals instead of sarif constants","cite":"pkg/sarif/types.go:13-19","status":"assessed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F3","verdict":"not-worth-it","reason":"progressive-overload family deliberate two-field pair, exported-API churn","cite":"pkg/view/stream.go:12-25","status":"assessed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F4","verdict":"worth-it","reason":"untyped action literals vs file's own Status pattern, typo-safety gap","cite":"pkg/testjson/types.go:17-33","status":"assessed"}

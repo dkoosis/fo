@@ -4,3 +4,6 @@
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:31:59Z","finding_id":"F3","outcome":"valid-not-applied","note":"Internal lineread helpers carry oversize bool through 3 funcs; low-pressure, valid; not applied","status":"assessed"}
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:31:59Z","finding_id":"F4","outcome":"valid-not-applied","note":"Bare 1 literal repeats 3x as occurrenceCount in testjson/toreport.go; named constant fix sound, not applied","status":"assessed"}
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:31:59Z","finding_id":"F5","outcome":"not-worth-it","note":"Preventive note only, no current violation at pkg/view/leaderboard.go:41","status":"assessed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T04:07:52Z","linter":"domain-vocab","scope":"project","target":"repo","target_slug":"repo","report_path":"docs/feedback/review/domain-vocab-repo.md","n_findings":2,"status":"reviewed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F1","verdict":"worth-it","reason":"identical func(Signals) string shape at both sigs, cheap alias","cite":"pkg/cluster/cluster.go:180,233","status":"assessed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F2","verdict":"not-worth-it","reason":"first *bool vs rendered bool different types, no swap risk, private one-call helper","cite":"pkg/view/stream.go:59-104","status":"assessed"}

@@ -4,3 +4,5 @@
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:31:22Z","finding_id":"F3","outcome":"valid-not-applied","note":"PickView convenience wrapper has zero non-test callers; all real sites use PickViewMode","status":"assessed"}
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:31:22Z","finding_id":"F4","outcome":"valid-not-applied","note":"IsDelimiterShape only used internally by HasDelimiter; rename to isDelimiterShape","status":"assessed"}
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:31:23Z","finding_id":"F5","outcome":"valid-not-applied","note":"FuncResults + FuncKey/FuncResult/FuncPass/FuncFail/FuncSkip have no external callers; unexport","status":"assessed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T03:58:22Z","linter":"api-surface","scope":"project","target":"repo","target_slug":"repo","report_path":"docs/feedback/review/api-surface-repo.md","n_findings":1,"status":"reviewed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F1","verdict":"worth-it","reason":"FuncResults zero production callers repo-wide","cite":"pkg/testjson/funcresults.go:5-53","status":"assessed"}

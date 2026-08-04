@@ -9,3 +9,5 @@
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:33:10Z","finding_id":"F8","outcome":"valid-not-applied","note":"real missed-prealloc; len(sections) known; ~3-4 reallocs avoidable with bounded approx","status":"assessed"}
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:33:10Z","finding_id":"F9","outcome":"not-worth-it","note":"positive control; sortedKeys correctly preallocated; no action","status":"assessed"}
 {"run_id":"f62c7fc3af14","ts":"2026-05-16T20:33:10Z","finding_id":"F10","outcome":"not-worth-it","note":"positive control; bytes-cap not slot-cap; single-writer per test-name, no aliasing","status":"assessed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T04:30:38Z","linter":"slice-map","scope":"project","target":"repo","target_slug":"repo","report_path":"docs/feedback/review/slice-map-repo.md","n_findings":1,"status":"reviewed"}
+{"run_id":"7858b3a8ea1b","ts":"2026-07-27T11:51:45Z","finding_id":"F1","verdict":"not-worth-it","reason":"older only read within Classify frame, defensive copy guards nonexistent misuse","cite":"pkg/state/diff.go:63-160","status":"assessed"}
