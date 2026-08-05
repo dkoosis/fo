@@ -36,3 +36,10 @@ jobs:
 
       - name: build
         run: go build ./...
+
+      # bugclasses pack drift (ccp-sbp): fail if .golangci-rules/bugclasses.go
+      # has drifted from upstream. Network-soft — skips cleanly when upstream is
+      # unreachable (cc-plugins is private; activates once a token or public URL
+      # is wired via PACK_UPSTREAM_URL).
+      - name: pack-drift
+        run: make pack-drift

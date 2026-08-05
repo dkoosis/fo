@@ -11,7 +11,7 @@
 .DEFAULT_GOAL := check
 
 .PHONY: help scan check audit audit-human audit-llm report deploy install build doctor cross \
-        vet lint test race fmt fmt-fix dupl vuln \
+        vet lint test race fmt fmt-fix dupl vuln pack-drift \
         qa-goldens qa-goldens-update \
         snipe-index baseline \
         cross-amd64 cross-arm64 \
@@ -56,7 +56,7 @@ help: ## Show this help
 		/^## [^-]/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 4) } \
 		/^[a-zA-Z0-9_-]+:.*?## / { printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
-check: vet lint test build ## Full repo: vet + lint + test + build
+check: vet lint test build pack-drift ## Full repo: vet + lint + test + build + pack-drift
 	@echo "=== check pass ==="
 
 audit: snipe-index ## Exhaustive stream through fo (auto: human@TTY, llm piped)
@@ -138,6 +138,9 @@ dupl: ## Check for code duplication (jscpd)
 
 vuln: ## Scan for known vulnerabilities
 	govulncheck ./...
+
+pack-drift: ## Fail if the copied bugclasses rules drifted from upstream (network-soft)
+	@.golangci-rules/check-pack-drift.sh .golangci-rules/bugclasses.go
 
 lint-sarif: vet ## Run linters with SARIF output
 	golangci-lint run --output.sarif.path=stdout ./...

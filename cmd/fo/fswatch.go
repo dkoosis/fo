@@ -42,6 +42,7 @@ func loadGitignorePatterns(root string) []string {
 	}
 	defer func() { _ = f.Close() }()
 	var pats []string
+	//nolint:gocritic // bugclasses rule 1: .gitignore lines are short patterns, never near the 64KB default token cap; no Buffer() cap needed.
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
