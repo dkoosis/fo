@@ -53,4 +53,5 @@
 # - github.org
 # - github.repo
 
-# sync.remote: "git+https://github.com/dkoosis/fo.git"
+sync:
+    remote: "git+https://github.com/dkoosis/fo.git"
