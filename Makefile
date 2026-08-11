@@ -106,6 +106,23 @@ doctor: ## Validate required toolchain
 cross: cross-amd64 ## Cross-compile sandbox tools (default: amd64)
 
 ## ---------------------------------------------------------------------
+## Git hooks
+## ---------------------------------------------------------------------
+
+hooks: ## Route git hooks to the tracked .githooks/ dir (bd + repo gates, ccp-th5.2). Local-only, per-clone; run once after cloning.
+	@missing=""; \
+	for h in pre-commit post-merge pre-push post-checkout prepare-commit-msg; do \
+		if [ ! -x ".githooks/$$h" ]; then missing="$$missing $$h"; fi; \
+	done; \
+	if [ -n "$$missing" ]; then \
+		echo "make hooks: missing or non-executable dispatcher(s):$$missing" >&2; \
+		exit 1; \
+	fi
+	git config core.hooksPath .githooks
+	@echo "git hooks enabled (.githooks): pre-commit (bd + issue-sync + doc-governance), pre-push/post-merge/post-checkout/prepare-commit-msg (bd)."
+	@bd hooks list 2>/dev/null || true
+
+## ---------------------------------------------------------------------
 ## Checks
 ## ---------------------------------------------------------------------
 
