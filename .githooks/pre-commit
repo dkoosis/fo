@@ -1,0 +1,239 @@
+#!/bin/bash
+# pre-commit — dispatcher: beads integration + repo gates (ccp-th5.2).
+#
+# core.hooksPath is .githooks (shape B) — this file is the single pre-commit
+# git runs. bd's own shim in .beads/hooks/ is NOT invoked by git and is left
+# in place unused (removing it is a separate decision). Section 1 calls bd's
+# public entry point directly; sections 2-3 are this repo's own gates
+# (GitHub issue sync + doc governance), migrated byte-for-byte from the old
+# .beads/hooks/pre-commit body. Those gates previously sat AFTER a stray
+# `exit 0`, so the beads leg (then embedded via bd's marker system) never ran.
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# ============================================================================
+# 1. beads integration — call bd's public entry point directly (best-effort;
+#    mirrors bd 1.1.2's own shim timeout/exit-3 contract).
+# ============================================================================
+
+if command -v bd >/dev/null 2>&1; then
+  export BD_GIT_HOOK=1
+  _bd_timeout=${BEADS_HOOK_TIMEOUT:-300}
+  _bd_used_perl=0
+  # set +e around the bd call: this file runs under `set -e` (for the repo
+  # gates below), and a bare non-zero exit here — timeout, exit 3, anything —
+  # would abort the script before the exit-124/142/3 remap runs, defeating
+  # the whole best-effort contract.
+  set +e
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$_bd_timeout" bd hooks run pre-commit "$@"
+    _bd_exit=$?
+  elif command -v gtimeout >/dev/null 2>&1; then
+    gtimeout "$_bd_timeout" bd hooks run pre-commit "$@"
+    _bd_exit=$?
+  elif command -v perl >/dev/null 2>&1; then
+    _bd_used_perl=1
+    perl -e 'alarm shift; exec @ARGV' "$_bd_timeout" bd hooks run pre-commit "$@"
+    _bd_exit=$?
+  else
+    echo "pre-commit: beads hook running without timeout; install coreutils or perl to enable BEADS_HOOK_TIMEOUT" >&2
+    bd hooks run pre-commit "$@"
+    _bd_exit=$?
+  fi
+  set -e
+  if [ "$_bd_exit" -eq 124 ] || { [ "$_bd_used_perl" -eq 1 ] && [ "$_bd_exit" -eq 142 ]; }; then
+    echo "pre-commit: beads hook timed out after ${_bd_timeout}s — continuing without beads" >&2
+    _bd_exit=0
+  fi
+  if [ "$_bd_exit" -eq 3 ]; then
+    echo "pre-commit: beads database not initialized — skipping" >&2
+    _bd_exit=0
+  fi
+  if [ "$_bd_exit" -ne 0 ]; then exit "$_bd_exit"; fi
+fi
+
+# ============================================================================
+# 2. Sync GitHub Issues to docs/issues.json
+# ============================================================================
+
+ISSUES_FILE="docs/issues.json"
+
+if command -v gh &> /dev/null; then
+    echo -e "${BLUE}Syncing open GitHub issues...${NC}"
+
+    # Fetch open issues with full data
+    if gh issue list --state open --json number,title,body,state,labels,assignees,createdAt,updatedAt,closedAt > "$ISSUES_FILE.tmp" 2>/dev/null; then
+        # Check if content changed
+        if ! cmp -s "$ISSUES_FILE.tmp" "$ISSUES_FILE" 2>/dev/null; then
+            mv "$ISSUES_FILE.tmp" "$ISSUES_FILE"
+            git add "$ISSUES_FILE"
+            ISSUE_COUNT=$(jq length "$ISSUES_FILE" 2>/dev/null || echo "?")
+            echo -e "${GREEN}✓ Synced $ISSUE_COUNT open issues to $ISSUES_FILE${NC}"
+        else
+            rm -f "$ISSUES_FILE.tmp"
+            echo -e "${GREEN}✓ Issues unchanged${NC}"
+        fi
+    else
+        rm -f "$ISSUES_FILE.tmp"
+        echo -e "${YELLOW}⚠ Could not fetch issues (gh auth or network issue)${NC}"
+    fi
+else
+    echo -e "${YELLOW}⚠ gh CLI not found, skipping issue sync${NC}"
+fi
+
+# ============================================================================
+# 3. Block Temporary/Backup File Patterns
+# ============================================================================
+
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=A || true)
+BLOCKED_TEMP_FILES=()
+
+if [ -n "$STAGED_FILES" ]; then
+    while IFS= read -r file; do
+        filename=$(basename "$file")
+
+        # Check for temporary/backup naming patterns
+        if [[ "$filename" =~ \.bak || "$filename" =~ \.bac || \
+              "$filename" =~ fixed || "$filename" =~ final || \
+              "$filename" =~ enhanced || "$filename" =~ \.backup || \
+              "$filename" =~ v[0-9] ]]; then
+            BLOCKED_TEMP_FILES+=("$file")
+        fi
+    done <<< "$STAGED_FILES"
+fi
+
+if [ ${#BLOCKED_TEMP_FILES[@]} -gt 0 ]; then
+    echo ""
+    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${RED}❌ COMMIT BLOCKED - Temporary/Backup Files Detected${NC}"
+    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo -e "${YELLOW}The following files have temporary/backup naming patterns:${NC}"
+    echo ""
+    for file in "${BLOCKED_TEMP_FILES[@]}"; do
+        echo -e "  ${RED}✗${NC} $file"
+    done
+    echo ""
+    echo -e "${BLUE}Blocked patterns:${NC}"
+    echo -e "  ${RED}✗${NC} *.bak* (e.g., file.bak, file.bak1)"
+    echo -e "  ${RED}✗${NC} *.bac* (e.g., file.backup)"
+    echo -e "  ${RED}✗${NC} *fixed* (e.g., file-fixed.go)"
+    echo -e "  ${RED}✗${NC} *final* (e.g., final-version.md)"
+    echo -e "  ${RED}✗${NC} *enhanced* (e.g., enhanced-output.txt)"
+    echo -e "  ${RED}✗${NC} *v[0-9]* (e.g., script-v2.sh, file-v10.go)"
+    echo ""
+    echo -e "${YELLOW}Action required:${NC}"
+    echo -e "  1. Remove these files from staging: ${BLUE}git restore --staged <file>${NC}"
+    echo -e "  2. Delete the temporary files: ${BLUE}rm <file>${NC}"
+    echo -e "  3. Commit your actual changes"
+    echo ""
+    echo -e "${RED}To override (not recommended):${NC}"
+    echo -e "  git commit --no-verify"
+    echo ""
+    exit 1
+fi
+
+# ============================================================================
+# 4. Documentation Governance Check
+# ============================================================================
+
+# Get list of staged .md files (new files only)
+STAGED_MD_FILES=$(git diff --cached --name-only --diff-filter=A | grep '\.md$' || true)
+
+if [ -z "$STAGED_MD_FILES" ]; then
+    exit 0
+fi
+
+echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${YELLOW}⚠️  Documentation Governance Check${NC}"
+echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+echo -e "${RED}You are attempting to add new markdown file(s):${NC}"
+echo ""
+
+BLOCKED_FILES=()
+WARNED_FILES=()
+
+while IFS= read -r file; do
+    # Check against allowed patterns
+    if [[ "$file" =~ ^[^/]+/README\.md$ ]]; then
+        # Module README (e.g., mageconsole/README.md)
+        echo -e "  ${GREEN}✓${NC} $file"
+        continue
+    elif [[ "$file" =~ ^internal/[^/]+/README\.md$ ]]; then
+        # Internal module README
+        echo -e "  ${GREEN}✓${NC} $file"
+        continue
+    elif [[ "$file" =~ ^cmd/README\.md$ ]]; then
+        # Binary documentation
+        echo -e "  ${GREEN}✓${NC} $file"
+        continue
+    elif [[ "$file" =~ ^docs/adr/ADR-[0-9]{3}-[a-z0-9-]+\.md$ ]]; then
+        # ADRs with new naming (ADR-001, ADR-002, etc.)
+        echo -e "  ${GREEN}✓${NC} $file"
+        continue
+    elif [[ "$file" =~ ^docs/adr/README\.md$ ]]; then
+        # ADR index/template
+        echo -e "  ${GREEN}✓${NC} $file"
+        continue
+    elif [[ "$file" =~ ^docs/(PATTERNS|MIGRATION|VISION_REVIEW|README|DOCUMENTATION_POLICY)\.md$ ]]; then
+        # Core top-level docs
+        echo -e "  ${GREEN}✓${NC} $file"
+        continue
+    elif [[ "$file" =~ ^CLAUDE\.md$ ]] || [[ "$file" =~ ^AGENTS\.md$ ]]; then
+        # Claude Code / Codex project guidance
+        echo -e "  ${GREEN}✓${NC} $file"
+        continue
+    elif [[ "$file" =~ ^README\.md$ ]] || [[ "$file" =~ ^decisions\.log$ ]]; then
+        # Root README and decisions log
+        echo -e "  ${GREEN}✓${NC} $file"
+        continue
+    elif [[ "$file" =~ ^docs/ ]]; then
+        # Other docs/** files - warn but allow
+        echo -e "  ${YELLOW}⚠${NC} $file"
+        WARNED_FILES+=("$file")
+    else
+        # Everything else is blocked
+        echo -e "  ${RED}✗${NC} $file"
+        BLOCKED_FILES+=("$file")
+    fi
+done <<< "$STAGED_MD_FILES"
+
+if [ ${#WARNED_FILES[@]} -gt 0 ]; then
+    echo ""
+    echo -e "${YELLOW}Files in docs/** are allowed but discouraged.${NC}"
+    echo -e "${GREEN}Proceeding with commit...${NC}"
+    echo ""
+fi
+
+if [ ${#BLOCKED_FILES[@]} -gt 0 ]; then
+    echo ""
+    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${RED}❌ COMMIT BLOCKED${NC}"
+    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo -e "${YELLOW}Markdown files outside allowed locations violate documentation policy.${NC}"
+    echo ""
+    echo -e "${YELLOW}Allowed .md locations:${NC}"
+    echo -e "  ${GREEN}✓${NC} [module]/README.md (e.g., mageconsole/README.md)"
+    echo -e "  ${GREEN}✓${NC} internal/[module]/README.md"
+    echo -e "  ${GREEN}✓${NC} cmd/README.md"
+    echo -e "  ${GREEN}✓${NC} docs/adr/ADR-NNN-title.md (e.g., ADR-001-pattern-based-architecture.md)"
+    echo -e "  ${GREEN}✓${NC} docs/{PATTERNS,MIGRATION,VISION_REVIEW,README,DOCUMENTATION_POLICY}.md"
+    echo -e "  ${GREEN}✓${NC} README.md, decisions.log (root)"
+    echo -e "  ${YELLOW}⚠${NC} docs/** (other locations allowed with warning)"
+    echo ""
+    echo -e "${RED}To override:${NC} git commit --no-verify"
+    echo ""
+    exit 1
+fi
+
+echo -e "${GREEN}✓ All new markdown files follow documentation policy${NC}"
+echo ""
+exit 0
