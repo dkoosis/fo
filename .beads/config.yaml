@@ -53,5 +53,10 @@
 # - github.org
 # - github.repo
 
+# Fleet contract (conform bd-config rule): tracked declaration checked by
+# `conform`; `conform --local` verifies the live bd config matches.
+issue-prefix: "fo"
+custom.plan_dir: /Users/vcto/Projects/dk/Project/fo/plans
+
 sync:
     remote: "git+https://github.com/dkoosis/fo.git"

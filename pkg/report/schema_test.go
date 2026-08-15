@@ -47,8 +47,8 @@ func TestSchemaCoversReportFields(t *testing.T) {
 		{reflect.TypeFor[DiffItem](), doc.Defs["DiffItem"].Properties, "DiffItem"},
 	}
 	for _, c := range checks {
-		for i := range c.typ.NumField() {
-			tag := c.typ.Field(i).Tag.Get("json")
+		for field := range c.typ.Fields() {
+			tag := field.Tag.Get("json")
 			if tag == "" || tag == "-" {
 				continue
 			}

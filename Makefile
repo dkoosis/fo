@@ -11,7 +11,7 @@
 .DEFAULT_GOAL := check
 
 .PHONY: help scan check audit audit-human audit-llm report deploy install build doctor cross \
-        vet lint test race fmt fmt-fix dupl vuln pack-drift \
+        vet lint test race fmt fmt-fix dupl vuln pack-drift selfcheck \
         qa-goldens qa-goldens-update \
         snipe-index baseline \
         cross-amd64 cross-arm64 \
@@ -20,7 +20,9 @@
 
 # ── Sandbox prebuilt versions ──
 # Keep in sync with what .sandbox/codex/setup.sh expects.
-GOLANGCI_LINT_VER ?= v2.11.3
+# golangci-lint: the ONE fleet pin lives in .sandbox/project.conf
+# (conform lint-pin rule) — read it, never write a second literal here.
+GOLANGCI_LINT_VER ?= $(shell . ./.sandbox/project.conf 2>/dev/null && echo $$GOLANGCI_LINT_VERSION)
 GOFUMPT_VER       ?= v0.9.2
 GOIMPORTS_VER     ?= v0.39.0
 BAT_VER           ?= v0.25.0
@@ -56,10 +58,15 @@ help: ## Show this help
 		/^## [^-]/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 4) } \
 		/^[a-zA-Z0-9_-]+:.*?## / { printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
-check: vet lint test build pack-drift ## Full repo: vet + lint + test + build + pack-drift
+check: vet lint test build pack-drift selfcheck ## Full repo: vet + lint + test + build + pack-drift + conform
 	@echo "=== check pass ==="
 
-audit: snipe-index ## Exhaustive stream through fo (auto: human@TTY, llm piped)
+# Dogfood the fleet gate (sd-th5.14): conform is pinned as a go.mod tool
+# dependency (go.sum-verified); bumping the pin is a deliberate PR.
+selfcheck: ## Run conform (fleet SDLC checker) against this repo
+	go tool conform
+
+audit: check snipe-index ## Exhaustive stream through fo (auto: human@TTY, llm piped)
 	@( $(REPORT_CMD) ) | fo || true
 
 audit-human: snipe-index ## Force human-formatted audit
@@ -233,7 +240,7 @@ clean: ## Remove build artifacts
 build: ## Compile the fo binary to ./fo (no install)
 	go build -ldflags "-X main.version=$(VERSION)" -o fo ./cmd/fo/
 
-install:
+install: ## Install the fo binary to GOPATH/bin
 	go install ./cmd/fo/
 
 ## ---------------------------------------------------------------------
@@ -248,7 +255,7 @@ cross-arm64: ## Cross-compile linux/arm64 sandbox tools
 	@echo "=== cross: linux/arm64 ==="
 	@$(MAKE) --no-print-directory _cross-build CROSS_ARCH=arm64
 
-_cross-build:
+_cross-build: ## Internal worker for cross-amd64/cross-arm64 (needs CROSS_ARCH)
 	@# Pre-flight: local Go must be >= go.mod target
 	@LOCAL_GO=$$(go version | sed 's/.*go\([0-9]*\.[0-9]*\).*/\1/'); \
 	MOD_MIN=$$(echo $(GOMOD_VER) | cut -d. -f1)$$(printf '%03d' $$(echo $(GOMOD_VER) | cut -d. -f2)); \
