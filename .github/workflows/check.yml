@@ -21,25 +21,23 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          # Keep in lockstep with the `go` directive in go.mod.
-          go-version: '1.24'
-          check-latest: true
+          go-version-file: go.mod
+          check-latest: false
 
-      - name: vet
-        run: go vet ./...
+      - name: golangci-lint (pinned in .sandbox/project.conf)
+        run: |
+          . ./.sandbox/project.conf
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh \
+            | sh -s -- -b "$(go env GOPATH)/bin" "$GOLANGCI_LINT_VERSION"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
-      # The -race gate (epic ccp-sbp.4): the race detector is the machine that
-      # catches the concurrency-lifecycle defect class. -count=1 bypasses the
-      # test cache so race runs on every push.
-      - name: test (race)
-        run: go test -race -count=1 ./...
+      # CI = the same gate a developer runs; no verb re-implemented in YAML
+      # (conform ci-gate rule). check runs vet + lint + test + build +
+      # pack-drift + conform. No fo install: this IS the fo repo — check
+      # builds fo from source and never pipes through a released binary.
+      - name: check
+        run: make check
 
-      - name: build
-        run: go build ./...
-
-      # bugclasses pack drift (ccp-sbp): fail if .golangci-rules/bugclasses.go
-      # has drifted from upstream. Network-soft — skips cleanly when upstream is
-      # unreachable (cc-plugins is private; activates once a token or public URL
-      # is wired via PACK_UPSTREAM_URL).
-      - name: pack-drift
-        run: make pack-drift
+      # The -race gate (epic ccp-sbp.4) survives as a make verb, not YAML.
+      - name: race
+        run: make race
