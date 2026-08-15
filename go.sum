@@ -14,6 +14,8 @@ github.com/clipperhouse/uax29/v2 v2.2.0 h1:ChwIKnQN3kcZteTXMgb1wztSgaU+ZemkgWdoh
 github.com/clipperhouse/uax29/v2 v2.2.0/go.mod h1:EFJ2TJMRUaplDxHKj1qAEhCtQPW2tJSwu5BF98AuoVM=
 github.com/dkoosis/conform v0.1.2 h1:HzE/E/yy94s5FRQyY/GWok9VTCjIvmqHl7v9gAJ5GrM=
 github.com/dkoosis/conform v0.1.2/go.mod h1:TP6zWp9VK7MlmHNCHri0EhqZmHY3jAqUrUvSNhnosOk=
+github.com/dkoosis/conform v0.2.0 h1:w8spzU4WwFIA37/qln8zSKJVHZ81afvpU9oplWkkzwY=
+github.com/dkoosis/conform v0.2.0/go.mod h1:Zq32Tf2c7K8O2MPAja+pJfOWmbika4Wn5qCZoUdcKEQ=
 github.com/fsnotify/fsnotify v1.10.1 h1:b0/UzAf9yR5rhf3RPm9gf3ehBPpf0oZKIjtpKrx59Ho=
 github.com/fsnotify/fsnotify v1.10.1/go.mod h1:TLheqan6HD6GBK6PrDWyDPBaEV8LspOxvPSjC+bVfgo=
 github.com/lucasb-eyer/go-colorful v1.2.0 h1:1nnpGOrhyZZuNyfu1QjKiUICQ74+3FNCN69Aj6K7nkY=
