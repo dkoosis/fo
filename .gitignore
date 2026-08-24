@@ -70,3 +70,6 @@ bin/
 *.db
 .beads-credential-key
 .beads/hooks.log
+
+# bd audit residue: passive re-export, Dolt is source of truth
+.beads/interactions.jsonl
