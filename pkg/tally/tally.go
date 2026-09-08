@@ -64,17 +64,19 @@ var ErrNoRows = errors.New("tally: no data rows")
 // err113 happy and lets callers errors.Is on a single root.
 var ErrMalformedRow = errors.New("tally: malformed row")
 
-// Parse reads tally input from r and returns the parsed Tally.
+// Parse reads tally input from r and returns the parsed Tally. Oversize
+// dropped-line warnings are written to stderr (nil silences them).
 // Malformed data lines (no count, non-numeric count) cause a parse
 // error pinned to the line number; tolerant to leading whitespace and
 // comment/blank lines.
-func Parse(r io.Reader) (Tally, error) {
+func Parse(r io.Reader, stderr io.Writer) (Tally, error) {
 	var t Tally
 	tool, err := hygiene.Scan(r, hygiene.Spec{
 		Prefix:      HeaderPrefix,
 		Name:        "tally",
 		ErrNoHeader: ErrNoHeader,
 		ErrNoRows:   ErrNoRows,
+		Stderr:      stderr,
 		OnRow: func(_ int, line string) error {
 			row, perr := parseRow(line)
 			if perr != nil {

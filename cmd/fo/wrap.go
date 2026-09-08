@@ -121,7 +121,7 @@ func runWrapDiag(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 func runWrapLeaderboard(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("fo wrap leaderboard", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	var opts wrapleaderboard.Opts
+	opts := wrapleaderboard.Opts{Stderr: stderr}
 	fs.StringVar(&opts.Tool, "tool", "", "Tool name (recorded in tally header)")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {

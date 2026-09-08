@@ -332,7 +332,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	if sniffBareTally(input) {
 		var buf bytes.Buffer
-		if err := wrapleaderboard.Convert(bytes.NewReader(input), &buf, wrapleaderboard.Opts{}); err != nil {
+		if err := wrapleaderboard.Convert(bytes.NewReader(input), &buf, wrapleaderboard.Opts{Stderr: stderr}); err != nil {
 			fmt.Fprintf(stderr, "fo: tally auto-detect: %v\n", err)
 			return 2
 		}

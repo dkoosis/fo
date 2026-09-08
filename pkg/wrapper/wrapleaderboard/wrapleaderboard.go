@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 
@@ -28,9 +27,12 @@ import (
 )
 
 // Opts carries wrapleaderboard flags as plain values, mirroring the
-// pattern of other wrap subcommands.
+// pattern of other wrap subcommands. Stderr, when non-nil, receives the
+// oversize-line-dropped warning; nil silences it — mirrors
+// wrapdiag.DiagOpts.Stderr.
 type Opts struct {
-	Tool string
+	Tool   string
+	Stderr io.Writer
 }
 
 // ErrNoRows is returned when stdin yields no parseable rows.
@@ -75,13 +77,21 @@ func Convert(r io.Reader, w io.Writer, opts Opts) error {
 		}
 		return fmt.Errorf("wrap leaderboard: read: %w", err)
 	}
-	if dropped > 0 {
-		fmt.Fprintf(os.Stderr, "wrap leaderboard: dropped %d line(s) exceeding %d bytes\n", dropped, lineread.MaxLineLen)
-	}
+	warnOversize(opts.Stderr, dropped)
 	if rows == 0 {
 		return ErrNoRows
 	}
 	return nil
+}
+
+// warnOversize writes the dropped-line warning to stderr when dropped is
+// nonzero and stderr is non-nil (nil silences it) — mirrors
+// wrapdiag.warnOversize.
+func warnOversize(stderr io.Writer, dropped int) {
+	if dropped == 0 || stderr == nil {
+		return
+	}
+	fmt.Fprintf(stderr, "wrap leaderboard: dropped %d line(s) exceeding %d bytes\n", dropped, lineread.MaxLineLen)
 }
 
 // writeRow parses a single input line and emits one tally row. Returns

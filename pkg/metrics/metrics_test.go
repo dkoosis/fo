@@ -17,7 +17,7 @@ func TestIsHeader(t *testing.T) {
 
 func TestParse_basic(t *testing.T) {
 	in := strings.NewReader("# fo:metrics tool=cover\npkg/x 87.3 %\npkg/y 100 %\n")
-	m, err := Parse(in)
+	m, err := Parse(in, nil)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -33,7 +33,7 @@ func TestParse_basic(t *testing.T) {
 }
 
 func TestParse_noUnit(t *testing.T) {
-	m, err := Parse(strings.NewReader("# fo:metrics\nbuild_time 2.3\n"))
+	m, err := Parse(strings.NewReader("# fo:metrics\nbuild_time 2.3\n"), nil)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestParse_errors(t *testing.T) {
 		{"# fo:metrics\nx not-a-number\n", ErrMalformedRow},
 	}
 	for _, c := range cases {
-		_, err := Parse(strings.NewReader(c.in))
+		_, err := Parse(strings.NewReader(c.in), nil)
 		if !errors.Is(err, c.want) {
 			t.Errorf("err = %v, want Is %v", err, c.want)
 		}

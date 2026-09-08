@@ -56,13 +56,16 @@ var (
 	ErrBadState     = errors.New("status: bad state token")
 )
 
-func Parse(r io.Reader) (Status, error) {
+// Parse reads status input from r and returns the parsed Status.
+// Oversize dropped-line warnings are written to stderr (nil silences them).
+func Parse(r io.Reader, stderr io.Writer) (Status, error) {
 	var s Status
 	tool, err := hygiene.Scan(r, hygiene.Spec{
 		Prefix:      HeaderPrefix,
 		Name:        "status",
 		ErrNoHeader: ErrNoHeader,
 		ErrNoRows:   ErrNoRows,
+		Stderr:      stderr,
 		OnRow: func(_ int, line string) error {
 			row, perr := parseRow(line)
 			if perr != nil {

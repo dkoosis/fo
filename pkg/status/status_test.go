@@ -27,7 +27,7 @@ func TestIsHeader(t *testing.T) {
 
 func TestParse_basic(t *testing.T) {
 	in := strings.NewReader("# fo:status tool=doctor\nok\tenv loaded\nfail\tdolt missing\t\tnot-installed\n")
-	s, err := Parse(in)
+	s, err := Parse(in, nil)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -47,7 +47,7 @@ func TestParse_basic(t *testing.T) {
 
 func TestParse_spaceOnly(t *testing.T) {
 	in := strings.NewReader("# fo:status\nok build green\n")
-	s, err := Parse(in)
+	s, err := Parse(in, nil)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestParse_spaceOnly(t *testing.T) {
 
 func TestParse_valueAndNote(t *testing.T) {
 	in := strings.NewReader("# fo:status\nok\tbuild\t2.3s\tgreen\n")
-	s, err := Parse(in)
+	s, err := Parse(in, nil)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestParse_errors(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			_, err := Parse(strings.NewReader(c.in))
+			_, err := Parse(strings.NewReader(c.in), nil)
 			if !errors.Is(err, c.want) {
 				t.Errorf("err = %v, want Is %v", err, c.want)
 			}

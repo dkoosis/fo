@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dkoosis/fo/internal/lineread"
 	"github.com/dkoosis/fo/pkg/tally"
 )
 
@@ -23,7 +24,7 @@ func TestConvert_basic(t *testing.T) {
 		t.Errorf("output not detected as tally")
 	}
 	// Round-trip through tally.Parse.
-	parsed, err := tally.Parse(strings.NewReader(got))
+	parsed, err := tally.Parse(strings.NewReader(got), nil)
 	if err != nil {
 		t.Fatalf("round-trip Parse: %v", err)
 	}
@@ -39,7 +40,7 @@ func TestConvert_uniqCFormat(t *testing.T) {
 	if err := Convert(strings.NewReader(in), &out, Opts{}); err != nil {
 		t.Fatalf("Convert: %v", err)
 	}
-	parsed, err := tally.Parse(strings.NewReader(out.String()))
+	parsed, err := tally.Parse(strings.NewReader(out.String()), nil)
 	if err != nil {
 		t.Fatalf("round-trip Parse: %v", err)
 	}
@@ -72,7 +73,7 @@ func TestConvert_commentsAndBlanks(t *testing.T) {
 	if err := Convert(strings.NewReader(in), &out, Opts{}); err != nil {
 		t.Fatalf("Convert: %v", err)
 	}
-	parsed, err := tally.Parse(strings.NewReader(out.String()))
+	parsed, err := tally.Parse(strings.NewReader(out.String()), nil)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -87,5 +88,40 @@ func TestConvert_malformed(t *testing.T) {
 	err := Convert(strings.NewReader(in), &out, Opts{})
 	if !errors.Is(err, ErrMalformedRow) || !strings.Contains(err.Error(), "non-numeric") {
 		t.Errorf("err = %v, want ErrMalformedRow with non-numeric detail", err)
+	}
+}
+
+// fo-n25.6: oversize-line drops must surface as a stderr warning written
+// to the injected Opts.Stderr, mirroring wrapdiag.DiagOpts.Stderr.
+func TestConvert_OversizeLineWarnsInjectedStderr(t *testing.T) {
+	huge := strings.Repeat("Z", lineread.MaxLineLen+1024)
+	in := huge + "\n5 kept\n"
+
+	var out, errBuf bytes.Buffer
+	if err := Convert(strings.NewReader(in), &out, Opts{Stderr: &errBuf}); err != nil {
+		t.Fatalf("Convert: %v", err)
+	}
+	parsed, err := tally.Parse(strings.NewReader(out.String()), nil)
+	if err != nil {
+		t.Fatalf("round-trip Parse: %v", err)
+	}
+	if len(parsed.Rows) != 1 || parsed.Rows[0].Label != "kept" {
+		t.Errorf("rows = %+v", parsed.Rows)
+	}
+	got := errBuf.String()
+	if !strings.Contains(got, "wrap leaderboard: dropped 1") {
+		t.Errorf("stderr missing oversize warning: %q", got)
+	}
+}
+
+// fo-n25.6: a nil Opts.Stderr silences the oversize warning instead of
+// falling back to the process's real stderr.
+func TestConvert_OversizeLineNilStderrSilent(t *testing.T) {
+	huge := strings.Repeat("Z", lineread.MaxLineLen+1024)
+	in := huge + "\n5 kept\n"
+
+	var out bytes.Buffer
+	if err := Convert(strings.NewReader(in), &out, Opts{}); err != nil {
+		t.Fatalf("Convert: %v", err)
 	}
 }

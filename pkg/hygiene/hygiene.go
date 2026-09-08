@@ -13,7 +13,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/dkoosis/fo/internal/lineread"
@@ -53,6 +52,9 @@ type Spec struct {
 	// with the 1-based source line number. A returned error is wrapped with
 	// the format name and line number before propagating.
 	OnRow func(lineNo int, line string) error
+	// Stderr, when non-nil, receives the oversize-line-dropped warning.
+	// nil silences it — mirrors wrapdiag.DiagOpts.Stderr.
+	Stderr io.Writer
 }
 
 type scanState struct {
@@ -65,7 +67,7 @@ type scanState struct {
 // Scan runs the shared hygiene parse loop over r and returns the value
 // of the header's `tool=` attribute. It enforces the header-present and
 // at-least-one-row invariants via spec's sentinels. Oversize lines are
-// dropped with a stderr warning, matching the per-format behavior.
+// dropped with a warning written to spec.Stderr (nil silences it).
 func Scan(r io.Reader, spec Spec) (string, error) {
 	br := bufio.NewReaderSize(r, 64*1024)
 
@@ -86,8 +88,8 @@ func Scan(r io.Reader, spec Spec) (string, error) {
 		}
 		return "", fmt.Errorf("%s: read: %w", spec.Name, err)
 	}
-	if dropped > 0 {
-		fmt.Fprintf(os.Stderr, "%s: dropped %d line(s) exceeding %d bytes\n", spec.Name, dropped, lineread.MaxLineLen)
+	if dropped > 0 && spec.Stderr != nil {
+		fmt.Fprintf(spec.Stderr, "%s: dropped %d line(s) exceeding %d bytes\n", spec.Name, dropped, lineread.MaxLineLen)
 	}
 	if !st.headerSeen {
 		return "", spec.ErrNoHeader
