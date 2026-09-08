@@ -68,17 +68,7 @@ func ToReport(results []TestPackageResult, generatedAt ...time.Time) *report.Rep
 			})
 		case pkg.Failed > 0:
 			for _, ft := range pkg.FailedTests {
-				out := strings.Join(ft.Output, "\n")
-				r.Tests = append(r.Tests, report.TestResult{
-					Package:        pkg.Name,
-					Test:           ft.Name,
-					Outcome:        report.OutcomeFail,
-					Output:         out,
-					FixCommand:     testFixCommand(pkg.Name, ft.Name),
-					Fingerprint:    fingerprint.Fingerprint(ft.Name, pkg.Name, out),
-					Score:          score.Score(score.SeverityWeightError, 1, pkg.Name),
-					StructuralDiff: detectStructuralDiff(out),
-				})
+				r.Tests = append(r.Tests, failedTestResult(pkg.Name, ft))
 			}
 		default:
 			outcome := report.OutcomePass
@@ -105,6 +95,31 @@ func ToReport(results []TestPackageResult, generatedAt ...time.Time) *report.Rep
 
 	attachClusters(r)
 	return r
+}
+
+// failedTestResult builds the TestResult for one failed test. It reuses
+// the aggregator's cached structural-diff detection when present (see
+// handleFail in parser.go, which computes it once at the test's terminal
+// fail event rather than leaving ToReport to redetect it on every
+// streaming tick); a FailedTest built directly rather than through the
+// aggregator (e.g. in tests) arrives with StructuralDiff nil, so this
+// detects it on demand — unchanged from before that cache existed.
+func failedTestResult(pkgName string, ft FailedTest) report.TestResult {
+	out := strings.Join(ft.Output, "\n")
+	sd := ft.StructuralDiff
+	if sd == nil {
+		sd = detectStructuralDiff(out)
+	}
+	return report.TestResult{
+		Package:        pkgName,
+		Test:           ft.Name,
+		Outcome:        report.OutcomeFail,
+		Output:         out,
+		FixCommand:     testFixCommand(pkgName, ft.Name),
+		Fingerprint:    fingerprint.Fingerprint(ft.Name, pkgName, out),
+		Score:          score.Score(score.SeverityWeightError, 1, pkgName),
+		StructuralDiff: sd,
+	}
 }
 
 // attachClusters runs the failure clusterer over failing tests in r and

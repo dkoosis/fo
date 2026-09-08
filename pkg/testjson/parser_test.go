@@ -387,6 +387,71 @@ func TestPanicOutput_Bounded(t *testing.T) {
 	}
 }
 
+// TestAggregatorResults_MemoizesStructuralDiff is the fo-d84 review fix
+// for the streaming path: detectStructuralDiff used to run inside
+// ToReport, and cmd/fo's stream pipeline calls ToReport(agg.Results())
+// fresh on every package-finish tick over the WHOLE accumulated result
+// set — so an already-processed failure got its (non-trivial: string
+// splits, multiple linear scans, a parse pass) diff detection redone on
+// every later tick. Detection now happens once, in the aggregator, at the
+// test's terminal fail event (handleFail), and every later results() call
+// carries the cached pointer through unchanged.
+//
+// detectStructuralDiff allocates a new *report.StructuralDiff on every
+// call (`return &report.StructuralDiff{...}`), so pointer identity across
+// two results() snapshots is a direct, non-invasive spy: if detection had
+// been redone, the second snapshot would carry a different pointer.
+func TestAggregatorResults_MemoizesStructuralDiff(t *testing.T) {
+	t.Parallel()
+
+	agg := NewAggregator()
+	const pkg = "example.com/pkg"
+	events := []TestEvent{
+		{Action: ActionRun, Package: pkg, Test: "TestFoo"},
+		{Action: ActionOutput, Package: pkg, Test: "TestFoo", Output: "  pkg.MyStruct{\n"},
+		{Action: ActionOutput, Package: pkg, Test: "TestFoo", Output: "- \tField: 1,\n"},
+		{Action: ActionOutput, Package: pkg, Test: "TestFoo", Output: "+ \tField: 2,\n"},
+		{Action: ActionOutput, Package: pkg, Test: "TestFoo", Output: "  }\n"},
+		{Action: ActionFail, Package: pkg, Test: "TestFoo", Elapsed: 0.1},
+		{Action: ActionFail, Package: pkg, Elapsed: 0.2}, // package-terminal event
+	}
+	for _, e := range events {
+		agg.ProcessEvent(e)
+	}
+
+	// Simulate two later streaming ticks: cmd/fo/stream.go's pipeline
+	// re-derives a Report from agg.Results() on every package-finish
+	// event, including ticks after this failure was already processed.
+	first := agg.Results()
+	if len(first) != 1 || len(first[0].FailedTests) != 1 {
+		t.Fatalf("unexpected results shape: %+v", first)
+	}
+	sd1 := first[0].FailedTests[0].StructuralDiff
+	if sd1 == nil {
+		t.Fatal("StructuralDiff = nil, want populated (go-cmp shape in Output)")
+	}
+
+	second := agg.Results()
+	sd2 := second[0].FailedTests[0].StructuralDiff
+	if sd2 == nil {
+		t.Fatal("second results() call: StructuralDiff = nil, want populated")
+	}
+	if sd1 != sd2 {
+		t.Errorf("StructuralDiff pointer changed across results() calls (%p vs %p) — detection was redone instead of reused from the aggregator's cache", sd1, sd2)
+	}
+
+	// And through ToReport, which is what the streaming pipeline actually
+	// renders from each tick.
+	r1 := ToReport(first)
+	r2 := ToReport(second)
+	if len(r1.Tests) != 1 || len(r2.Tests) != 1 {
+		t.Fatalf("unexpected report shape: r1=%+v r2=%+v", r1.Tests, r2.Tests)
+	}
+	if r1.Tests[0].StructuralDiff != r2.Tests[0].StructuralDiff {
+		t.Errorf("ToReport's StructuralDiff pointer changed across ticks (%p vs %p) — detection was redone", r1.Tests[0].StructuralDiff, r2.Tests[0].StructuralDiff)
+	}
+}
+
 func FuzzParseStream(f *testing.F) {
 	f.Add(`{"Action":"run","Package":"x","Test":"T"}` + "\n" + `{"Action":"pass","Package":"x","Test":"T","Elapsed":0.1}` + "\n")
 	f.Add(`not-json` + "\n" + `{"Action":"output","Package":"x","Output":"coverage: 80.0% of statements\n"}` + "\n")

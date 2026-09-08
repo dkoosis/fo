@@ -12,7 +12,11 @@
 // preserved as first-class outcomes, not collapsed into "fail".
 package testjson
 
-import "time"
+import (
+	"time"
+
+	"github.com/dkoosis/fo/pkg/report"
+)
 
 // Status represents the outcome of a test package.
 type Status string
@@ -73,6 +77,17 @@ type TestPackageResult struct {
 type FailedTest struct {
 	Name   string
 	Output []string
+
+	// StructuralDiff, when set, is the field-level decomposition detected
+	// for Output — computed once by the aggregator at the test's terminal
+	// fail event (see handleFail/results in parser.go) and carried through
+	// every later results() snapshot untouched, so a streaming run's
+	// repeated ToReport calls over the accumulated result set don't
+	// redetect it on every tick. nil means "not yet detected" (or, for a
+	// FailedTest built directly rather than through the aggregator,
+	// "caller didn't run detection") — ToReport computes it on demand in
+	// that case.
+	StructuralDiff *report.StructuralDiff
 }
 
 // TotalTests returns the total number of tests in this package.

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dkoosis/fo/internal/lineread"
+	"github.com/dkoosis/fo/pkg/report"
 )
 
 // ParseStream parses go test -json NDJSON from a reader, line by line.
@@ -211,10 +212,19 @@ type pkgState struct {
 	// retain one entry per failed test name for the life of the aggregator
 	// (fo-n25.7).
 	failedOutput [][]string
-	buildError   string
-	buildOutput  []string
-	panicked     bool
-	panicOutput  []string
+	// failedStructDiff holds each failed test's detected structural diff
+	// (same index as failedOrder/failedOutput), computed once in
+	// handleFail at the test's terminal fail event. results() copies the
+	// cached pointer into each snapshot's FailedTests instead of
+	// recomputing it — detection involves several linear scans plus a
+	// parse pass, and results() is called once per package-finish tick
+	// during streaming, so without this cache every already-processed
+	// failure would get it redone on every later tick.
+	failedStructDiff []*report.StructuralDiff
+	buildError       string
+	buildOutput      []string
+	panicked         bool
+	panicOutput      []string
 	// Track output per in-flight test (empty test name = package-level
 	// output). Entries are removed on every terminal action (pass/fail/skip)
 	// — see handlePass, handleFail, actionSkip.
@@ -338,7 +348,13 @@ func (*aggregator) handleFail(pkg *pkgState, e TestEvent) {
 		// failing test names doesn't leave unbounded map entries behind
 		// (fo-n25.7). The captured content is preserved; only the map
 		// bookkeeping is freed.
-		pkg.failedOutput = append(pkg.failedOutput, pkg.outputBuf[e.Test])
+		out := pkg.outputBuf[e.Test]
+		pkg.failedOutput = append(pkg.failedOutput, out)
+		// Detect the structural diff once, here, at the test's one
+		// terminal fail event — not in ToReport, which streaming mode
+		// re-invokes over the whole accumulated result set on every
+		// package-finish tick (see results() and fo's stream pipeline).
+		pkg.failedStructDiff = append(pkg.failedStructDiff, detectStructuralDiff(strings.Join(out, "\n")))
 		delete(pkg.outputBuf, e.Test)
 		delete(pkg.outputBufBytes, e.Test)
 		return
@@ -426,12 +442,14 @@ func (a *aggregator) results() []TestPackageResult {
 		}
 
 		// Build failed tests list in run order. Output was captured into
-		// failedOutput (same index) at fail time — see handleFail.
+		// failedOutput, and its structural diff into failedStructDiff
+		// (same index), at fail time — see handleFail.
 		for i, testName := range pkg.failedOrder {
 			outCopy := append([]string(nil), pkg.failedOutput[i]...)
 			r.FailedTests = append(r.FailedTests, FailedTest{
-				Name:   testName,
-				Output: outCopy,
+				Name:           testName,
+				Output:         outCopy,
+				StructuralDiff: pkg.failedStructDiff[i],
 			})
 		}
 
