@@ -151,7 +151,7 @@ func renderClusterBlock(cr *ClusterRender, t theme.Theme, llmMode bool) string {
 			b.WriteString("  ")
 			b.WriteString(m.Test)
 			b.WriteString(": ")
-			b.WriteString(m.Output)
+			b.WriteString(memberBody(m, t))
 			if i < len(cr.Members)-1 {
 				b.WriteByte('\n')
 			}
@@ -177,6 +177,26 @@ func renderClusterBlock(cr *ClusterRender, t theme.Theme, llmMode bool) string {
 		b.WriteByte('\n')
 	}
 	return strings.TrimRight(b.String(), "\n")
+}
+
+// memberBody is the text after "<test>: " for one LLM-mode cluster member
+// (Shape B). A structural diff renders as an indented path/removed/added
+// table so a clustered go-cmp/cupaloy failure gets the same field-level
+// legibility as a singleton; anything else falls back to the raw Output
+// unchanged, matching pre-fo-d84 behavior.
+func memberBody(m *report.TestResult, t theme.Theme) string {
+	if m.StructuralDiff == nil {
+		return m.Output
+	}
+	table := RenderStructuralDiff(m.StructuralDiff, t)
+	if table == "" {
+		return m.Output
+	}
+	lines := strings.Split(table, "\n")
+	for i := 1; i < len(lines); i++ {
+		lines[i] = "    " + lines[i]
+	}
+	return strings.Join(lines, "\n")
 }
 
 // membersAsItems wraps cluster members as BulletItems so they reuse the

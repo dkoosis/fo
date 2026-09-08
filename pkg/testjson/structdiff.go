@@ -1,0 +1,445 @@
+package testjson
+
+import (
+	"regexp"
+	"strconv"
+	"strings"
+
+	"github.com/dkoosis/fo/pkg/report"
+)
+
+// detectStructuralDiff inspects a failing test's raw output for a
+// recognizable structural-diff shape — go-cmp's indented struct/slice/map
+// report, or cupaloy's difflib-style unified diff — and decomposes it into
+// field-level changes. Returns nil when output matches neither shape;
+// callers keep the raw Output and pkg/view falls back to its existing
+// line-oriented rendering.
+//
+// Only these two shapes are recognized (fo-d84): go-cmp is fo's own test
+// style and the common case in Go generally; cupaloy is the other library
+// named by the bead. Anything else — plain assertion text, testify output,
+// etc. — is intentionally left alone rather than guessed at.
+//
+// detectStructuralDiff is a package var, not a plain func, so a test can
+// swap in a call-counting wrapper around detectStructuralDiffImpl and
+// prove a cached "no match" (nil) result is never redetected — a bare
+// pointer-identity check can't distinguish "not called again" from "called
+// again and got nil again", since nil == nil either way.
+var detectStructuralDiff = detectStructuralDiffImpl
+
+func detectStructuralDiffImpl(output string) *report.StructuralDiff {
+	if output == "" {
+		return nil
+	}
+	lines := strings.Split(output, "\n")
+	if isUnifiedDiff(lines) {
+		if fields := parseUnifiedDiff(lines); len(fields) > 0 {
+			return &report.StructuralDiff{Kind: "cupaloy", Fields: fields}
+		}
+		// Header looked coherent but didn't yield fields (e.g. a hunk shape
+		// this parser doesn't recognize) — don't commit to "not a diff";
+		// give go-cmp detection a chance below rather than returning nil.
+	}
+	if fields := parseGoCmpDiff(lines); len(fields) > 0 {
+		return &report.StructuralDiff{Kind: "go-cmp", Fields: fields}
+	}
+	return nil
+}
+
+// isUnifiedDiff reports whether lines carry a coherent difflib-style
+// unified diff header — cupaloy's shape: a "--- " line immediately
+// followed by a "+++ " line, then at least one "@@" hunk marker later in
+// the output. Requiring the two header lines adjacent (not merely present
+// somewhere in the output) keeps ordinary output that happens to contain
+// a "--- " line and, unrelated, a later "+++ " line and an "@@" line from
+// being misread as a unified diff. go-cmp's report never emits any of the
+// three.
+func isUnifiedDiff(lines []string) bool {
+	for i := 0; i+1 < len(lines); i++ {
+		if !strings.HasPrefix(lines[i], "--- ") || !strings.HasPrefix(lines[i+1], "+++ ") {
+			continue
+		}
+		for _, l := range lines[i+2:] {
+			if strings.HasPrefix(l, "@@") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// looksLikeGoCmpShape requires BOTH an actual paired removal-then-addition
+// (a "-"-marked line immediately followed, blank lines aside, by a
+// "+"-marked line) AND a recognizable go-cmp structural marker — a line
+// that opens or closes a struct/slice/map/paren wrapper. go-cmp's reporter
+// never emits a bare value change with no wrapper: even a plain scalar
+// mismatch is printed inside a type-named wrapper ("string(", "[]int{",
+// "pkg.Foo{", …) with a matching close on its own line. Requiring the
+// wrapper on top of the paired marker is what keeps ordinary output that
+// happens to contain one adjacent "-"/"+" pair — e.g. a log line pair like
+// "comparing environment:\n- DEBUG=false\n+ DEBUG=true\nsee above" — from
+// being misdetected as a go-cmp report and having a field fabricated out of
+// unrelated text. A single adjacent pair with no wrapper line anywhere in
+// the output is exactly that ambiguous case, and the safe default here is
+// false (fall back to plain-text rendering), per fo-d84's fail-closed rule:
+// a missed structural diff is a non-issue, a fabricated one is not.
+func looksLikeGoCmpShape(lines []string) bool {
+	return hasAdjacentDelAdd(lines) && hasStructuralWrapperLine(lines)
+}
+
+// hasAdjacentDelAdd reports whether some "-"-marked line is immediately
+// followed (blank lines aside) by a "+"-marked line.
+func hasAdjacentDelAdd(lines []string) bool {
+	var prevDel bool
+	for _, l := range lines {
+		if l == "" {
+			continue
+		}
+		switch l[0] {
+		case '-':
+			prevDel = true
+			continue
+		case '+':
+			if prevDel {
+				return true
+			}
+		}
+		prevDel = false
+	}
+	return false
+}
+
+// hasStructuralWrapperLine reports whether any line — marked or plain
+// context — opens or closes a go-cmp wrapper: ends with "{"/"[" or (after
+// stripping a leading marker/whitespace and trailing comma) is exactly
+// "}"/"]"/")", or ends with "(". This is the shape go-cmp always wraps a
+// diff in, however deep the nesting; incidental text built from "-"/"+"
+// prefixed lines has no reason to also contain one.
+func hasStructuralWrapperLine(lines []string) bool {
+	for _, l := range lines {
+		content := l
+		if content != "" && (content[0] == '-' || content[0] == '+') {
+			content = content[1:]
+		}
+		trimmed := strings.TrimRight(strings.TrimSpace(content), ",")
+		if trimmed == "" {
+			continue
+		}
+		switch {
+		case strings.HasSuffix(trimmed, "{"), strings.HasSuffix(trimmed, "["), strings.HasSuffix(trimmed, "("):
+			return true
+		case trimmed == "}", trimmed == "]", trimmed == ")":
+			return true
+		}
+	}
+	return false
+}
+
+// fieldKeyRe extracts a "key" from a changed diff line's content (marker
+// already stripped), matching JSON ("key": value), Go-identifier
+// (key: value), and spew-dump (Key: (type) value) shapes. The value group
+// is non-greedy with an optional trailing comma.
+var fieldKeyRe = regexp.MustCompile(`^\s*"?([A-Za-z_][\w.]*)"?:\s*(?:\([^)]*\)\s*)?(.*?),?\s*$`)
+
+// splitKeyValue extracts (key, value) from diff-line content. ok is false
+// when no key:value pattern matched; value is then the whole trimmed
+// content, with go-cmp's trailing item comma stripped the same way the
+// keyed path already strips it via fieldKeyRe, and callers fall back to
+// using it directly — a bare scalar line ("1,") must read as "1", not "1,".
+func splitKeyValue(content string) (key, value string, ok bool) {
+	m := fieldKeyRe.FindStringSubmatch(content)
+	if m == nil {
+		return "", strings.TrimSuffix(strings.TrimSpace(content), ","), false
+	}
+	return m[1], m[2], true
+}
+
+// fallbackPath names a field with no recoverable key: 1-based position
+// among the fields decomposed so far, so the reader still gets an anchor
+// ("line 3") instead of nothing.
+func fallbackPath(key string, idx int) string {
+	if key != "" {
+		return key
+	}
+	return "line " + strconv.Itoa(idx+1)
+}
+
+// parseUnifiedDiff decomposes a difflib-style unified diff (cupaloy's
+// shape) into field-level changes. Removed/added lines pair positionally
+// within one hunk — difflib emits a same-count removed-then-added block
+// for a pure value change. A hunk boundary or an unpaired context line
+// flushes any pending removed lines as removal-only fields so unrelated
+// hunks never cross-pair.
+func parseUnifiedDiff(lines []string) []report.DiffField {
+	var fields []report.DiffField
+	var pendingRemoved []string
+	flush := func() {
+		for _, r := range pendingRemoved {
+			key, val, _ := splitKeyValue(r)
+			fields = append(fields, report.DiffField{Path: fallbackPath(key, len(fields)), Removed: val})
+		}
+		pendingRemoved = pendingRemoved[:0]
+	}
+	for _, l := range lines {
+		switch {
+		case strings.HasPrefix(l, "--- "), strings.HasPrefix(l, "+++ "):
+			continue
+		case strings.HasPrefix(l, "@@"):
+			flush()
+		case strings.HasPrefix(l, "-"):
+			pendingRemoved = append(pendingRemoved, l[1:])
+		case strings.HasPrefix(l, "+"):
+			added := l[1:]
+			addKey, addVal, _ := splitKeyValue(added)
+			if len(pendingRemoved) > 0 {
+				rem := pendingRemoved[0]
+				pendingRemoved = pendingRemoved[1:]
+				remKey, remVal, _ := splitKeyValue(rem)
+				path := addKey
+				if path == "" {
+					path = remKey
+				}
+				fields = append(fields, report.DiffField{Path: fallbackPath(path, len(fields)), Removed: remVal, Added: addVal})
+				continue
+			}
+			fields = append(fields, report.DiffField{Path: fallbackPath(addKey, len(fields)), Added: addVal})
+		default:
+			flush() // context line — end the current pairing window
+		}
+	}
+	flush()
+	return fields
+}
+
+// parseGoCmpDiff decomposes go-cmp's indented struct/slice/map diff report
+// into field-level changes using a path stack keyed by nesting: a context
+// line ending in "{"/"[" pushes a path segment (the field name if the line
+// has one, else the bare type name); a lone "}"/"]" pops it. A "-" line
+// followed by a "+" line pairs into one DiffField; an unpaired "-" or "+"
+// records a removal- or addition-only field.
+func parseGoCmpDiff(lines []string) []report.DiffField {
+	if !looksLikeGoCmpShape(lines) {
+		return nil
+	}
+	p := &goCmpParser{}
+	for _, l := range lines {
+		p.step(l)
+	}
+	p.closeBlock() // resolve any still-open block (malformed/truncated input)
+	p.flushPendingBlk()
+	p.flushDels()
+	return p.fields
+}
+
+// goCmpParser walks a go-cmp report line by line, holding the nesting
+// stack, any not-yet-paired "-" lines, and any in-progress marked block
+// (see blockDir). Split out of parseGoCmpDiff to keep each step's
+// branching small.
+type goCmpParser struct {
+	fields []report.DiffField
+	stack  []string
+	// pendingDels queues consecutive unmarked "-" leaf lines (oldest
+	// first) awaiting their "+" mirrors. go-cmp emits a same-count run of
+	// "-" lines followed by a same-count run of "+" lines for a slice/map
+	// value change (e.g. []int{-1,-2,+10,+20}); a single *string slot here
+	// used to overwrite (and flush as spuriously removal-only) every del
+	// but the last, cross-pairing the survivor with the wrong "+". FIFO
+	// popping in handlePlus keeps each del paired with its corresponding
+	// add in emission order.
+	pendingDels []string
+
+	// blockDir, blockDepth and blockLines capture a marked line that opens
+	// a brace/bracket — e.g. "-\tSub: root.Sub{" — and everything nested
+	// inside it up to the matching marked close. go-cmp emits this shape
+	// when it replaces a nested struct/slice wholesale rather than diffing
+	// it field by field: both the open line and every line inside carry
+	// the SAME marker. Treating each such line as ordinary content (the
+	// old bug: a marked close-brace line forced any pending "-" to flush
+	// as removal-only before the mirrored "+" block ever arrived) split
+	// one wholesale change into two unpaired fields at the same path.
+	// Capturing the whole marked block and pairing it with its "+"/"-"
+	// mirror keeps it one field.
+	blockDir   byte
+	blockDepth int
+	blockLines []string
+	pendingBlk *blockValue
+}
+
+// blockValue holds one resolved side (removed or added) of a captured
+// marked block, keyed by its path, awaiting the mirrored side.
+type blockValue struct {
+	path string
+	val  string
+}
+
+// step processes one line of the report.
+func (p *goCmpParser) step(l string) {
+	if l == "" {
+		return
+	}
+	marker := l[0]
+	content := strings.TrimLeft(strings.TrimPrefix(l[1:], " "), "\t")
+	trimmed := strings.TrimRight(content, ",")
+
+	if p.blockDir != 0 {
+		if marker == p.blockDir {
+			p.extendBlock(content, trimmed)
+			return
+		}
+		// Marker changed mid-block: malformed/unexpected input. Close
+		// what was captured (best effort) and handle this line normally.
+		p.closeBlock()
+	}
+	p.handleLine(marker, content, trimmed)
+}
+
+// handleLine dispatches one non-block-continuation line: a marked line
+// opening a brace/bracket starts a block capture (see startBlock); an
+// unmarked one is ordinary stack bookkeeping; otherwise it's a plain
+// removed/added leaf line.
+func (p *goCmpParser) handleLine(marker byte, content, trimmed string) {
+	switch {
+	case (marker == '-' || marker == '+') && (strings.HasSuffix(trimmed, "{") || strings.HasSuffix(trimmed, "[")):
+		p.flushDels()
+		p.startBlock(marker, content)
+	case strings.HasSuffix(trimmed, "{"), strings.HasSuffix(trimmed, "["):
+		p.flushDels()
+		p.stack = append(p.stack, structName(trimmed))
+	case trimmed == "}" || trimmed == "]":
+		p.flushDels()
+		if len(p.stack) > 0 {
+			p.stack = p.stack[:len(p.stack)-1]
+		}
+	case marker == '-':
+		// Queue, don't flush-then-replace: a run of consecutive "-" lines
+		// (a slice/map value change) must all survive to be paired with
+		// their corresponding "+" lines in handlePlus.
+		p.pendingDels = append(p.pendingDels, content)
+	case marker == '+':
+		p.handlePlus(content)
+	default:
+		p.flushDels() // unchanged context line inside the struct body
+	}
+}
+
+// startBlock begins capturing a marked brace/bracket line and everything
+// nested inside it as one opaque value.
+func (p *goCmpParser) startBlock(marker byte, openLine string) {
+	p.blockDir = marker
+	p.blockDepth = 1
+	p.blockLines = []string{openLine}
+}
+
+// extendBlock consumes one line while a marked block is open, tracking
+// brace/bracket depth so a nested struct inside the block doesn't close
+// it early. Depth reaching zero resolves the block.
+func (p *goCmpParser) extendBlock(content, trimmed string) {
+	p.blockLines = append(p.blockLines, content)
+	switch {
+	case strings.HasSuffix(trimmed, "{"), strings.HasSuffix(trimmed, "["):
+		p.blockDepth++
+	case trimmed == "}" || trimmed == "]":
+		p.blockDepth--
+		if p.blockDepth == 0 {
+			p.closeBlock()
+		}
+	}
+}
+
+// closeBlock resolves a completed (or malformed/truncated) marked block
+// into a DiffField: a "-" block is held as pendingBlk awaiting its "+"
+// mirror; a "+" block pairs with a pending "-" block at the same path, or
+// stands alone as an addition-only field.
+func (p *goCmpParser) closeBlock() {
+	if p.blockDir == 0 {
+		return
+	}
+	key, firstVal, ok := splitKeyValue(p.blockLines[0])
+	if !ok {
+		firstVal = p.blockLines[0]
+	}
+	parts := append([]string{firstVal}, p.blockLines[1:]...)
+	val := strings.TrimSuffix(strings.Join(parts, " "), ",")
+	path := joinPath(p.stack, key)
+	dir := p.blockDir
+	p.blockDir = 0
+	p.blockDepth = 0
+	p.blockLines = nil
+
+	if dir == '-' {
+		p.flushPendingBlk()
+		p.pendingBlk = &blockValue{path: path, val: val}
+		return
+	}
+	if p.pendingBlk != nil && p.pendingBlk.path == path {
+		p.fields = append(p.fields, report.DiffField{Path: path, Removed: p.pendingBlk.val, Added: val})
+		p.pendingBlk = nil
+		return
+	}
+	p.flushPendingBlk()
+	p.fields = append(p.fields, report.DiffField{Path: path, Added: val})
+}
+
+// flushPendingBlk resolves a pending "-" block with no matching "+" block
+// as a removal-only field.
+func (p *goCmpParser) flushPendingBlk() {
+	if p.pendingBlk == nil {
+		return
+	}
+	p.fields = append(p.fields, report.DiffField{Path: p.pendingBlk.path, Removed: p.pendingBlk.val})
+	p.pendingBlk = nil
+}
+
+// handlePlus resolves a "+" line: paired with the oldest still-pending "-"
+// (FIFO — see pendingDels) it closes one DiffField; unpaired it's an
+// addition-only field.
+func (p *goCmpParser) handlePlus(content string) {
+	addKey, addVal, _ := splitKeyValue(content)
+	if len(p.pendingDels) == 0 {
+		p.fields = append(p.fields, report.DiffField{Path: joinPath(p.stack, addKey), Added: addVal})
+		return
+	}
+	del := p.pendingDels[0]
+	p.pendingDels = p.pendingDels[1:]
+	delKey, delVal, _ := splitKeyValue(del)
+	key := addKey
+	if key == "" {
+		key = delKey
+	}
+	p.fields = append(p.fields, report.DiffField{Path: joinPath(p.stack, key), Removed: delVal, Added: addVal})
+}
+
+// flushDels resolves every still-queued "-" line with no matching "+" as a
+// removal-only field, in the order they were seen.
+func (p *goCmpParser) flushDels() {
+	for _, del := range p.pendingDels {
+		key, val, _ := splitKeyValue(del)
+		p.fields = append(p.fields, report.DiffField{Path: joinPath(p.stack, key), Removed: val})
+	}
+	p.pendingDels = nil
+}
+
+// structName labels a pushed path segment from an opening line like
+// "Sub: root.Sub{" (→ "Sub", the field name) or a bare "MyStruct{" at the
+// diff's root (→ "MyStruct", the type name — no field name to prefer).
+func structName(opening string) string {
+	if key, _, ok := splitKeyValue(opening); ok {
+		return key
+	}
+	return strings.TrimSuffix(strings.TrimSuffix(opening, "{"), "[")
+}
+
+// joinPath dot-joins the current nesting stack and a leaf field name.
+// Falls back to "value" when both are empty (e.g. a scalar-only diff with
+// no struct wrapper at all).
+func joinPath(stack []string, key string) string {
+	parts := make([]string, 0, len(stack)+1)
+	parts = append(parts, stack...)
+	if key != "" {
+		parts = append(parts, key)
+	}
+	if len(parts) == 0 {
+		return "value"
+	}
+	return strings.Join(parts, ".")
+}

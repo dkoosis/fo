@@ -9,7 +9,8 @@ package paint
 import (
 	"math"
 	"strings"
-	"unicode/utf8"
+
+	"github.com/dkoosis/fo/internal/textwidth"
 )
 
 // Bar returns a `width`-cell horizontal bar filled in proportion to
@@ -87,21 +88,34 @@ func sparkIndex(v, minV, span float64) int {
 	return max(1, min(8, int(math.Round((v-minV)/span*7))+1))
 }
 
-// padRight left-aligns s within a column of `width` runes, padding
+// visibleWidth returns a cell's on-screen width: ANSI escapes (a lipgloss
+// style wrapping a rendered value) are invisible and cost no columns, so
+// they're excluded rather than counted as runes. A mix of styled and
+// unstyled cells in one column — the diff table renders non-empty sides
+// through a theme style but leaves the empty-placeholder side bare — must
+// still measure and pad by the same yardstick or rows misalign under
+// Color(). Shared with pkg/scene via internal/textwidth so the two
+// packages measure "visible width" the same way instead of each keeping
+// its own implementation.
+func visibleWidth(s string) int {
+	return textwidth.Visible(s)
+}
+
+// padRight left-aligns s within a column of `width` cells, padding
 // with ASCII spaces. If s is wider than width, returns s unchanged.
 // Internal helper for Columnize.
 func padRight(s string, width int) string {
-	w := utf8.RuneCountInString(s)
+	w := visibleWidth(s)
 	if w >= width {
 		return s
 	}
 	return s + strings.Repeat(" ", width-w)
 }
 
-// PadLeft right-aligns s within a column of `width` runes, padding with
+// PadLeft right-aligns s within a column of `width` cells, padding with
 // ASCII spaces. If s is wider than width, returns s unchanged.
 func PadLeft(s string, width int) string {
-	w := utf8.RuneCountInString(s)
+	w := visibleWidth(s)
 	if w >= width {
 		return s
 	}
@@ -133,7 +147,8 @@ func Columnize(rows [][]string, gap int) string {
 	return out.String()
 }
 
-// columnWidths returns the column count and per-column max rune widths for rows.
+// columnWidths returns the column count and per-column max visible widths
+// for rows (ANSI escapes excluded — see visibleWidth).
 func columnWidths(rows [][]string) (cols int, widths []int) {
 	for _, r := range rows {
 		if len(r) > cols {
@@ -143,7 +158,7 @@ func columnWidths(rows [][]string) (cols int, widths []int) {
 	widths = make([]int, cols)
 	for _, r := range rows {
 		for i, c := range r {
-			if w := utf8.RuneCountInString(c); w > widths[i] {
+			if w := visibleWidth(c); w > widths[i] {
 				widths[i] = w
 			}
 		}

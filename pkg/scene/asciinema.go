@@ -3,9 +3,10 @@ package scene
 import (
 	"encoding/json"
 	"io"
-	"regexp"
 	"strings"
 	"time"
+
+	"github.com/dkoosis/fo/internal/textwidth"
 )
 
 // clearHome resets the terminal before each frame: clear the whole screen
@@ -13,10 +14,6 @@ import (
 // stream (see Cast / docs/design/cast-rail-visual.md), so every frame
 // repaints from a clean slate rather than appending a delta.
 const clearHome = "\x1b[2J\x1b[H"
-
-// ansiSeq matches CSI escape sequences so visible width can be measured
-// without counting color codes.
-var ansiSeq = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
 // EncodeAsciicast writes frames to w as an asciinema v2 recording.
 //
@@ -68,18 +65,10 @@ func castDimensions(frames []Frame) (width, height int) {
 			height = n
 		}
 		for _, line := range lines {
-			if v := visibleWidth(line); v > width {
+			if v := textwidth.Visible(line); v > width {
 				width = v
 			}
 		}
 	}
 	return width, height
-}
-
-// visibleWidth is the rune count of line with ANSI escape sequences
-// removed. It is an approximation — it does not account for wide (CJK)
-// runes — but is exact for the ASCII-plus-color output the renderers
-// produce.
-func visibleWidth(line string) int {
-	return len([]rune(ansiSeq.ReplaceAllString(line, "")))
 }
