@@ -24,18 +24,30 @@ const (
 	StatusSkip Status = "skip"
 )
 
-// TestEvent.Action values from `go test -json`. Same string values as the
-// Status constants, but used for comparing untyped Action strings.
+// Action is a TestEvent.Action value from `go test -json`.
+type Action string
+
+// TestEvent.Action values from `go test -json`. pass/fail/skip share the
+// same string values as the Status constants above but are a distinct
+// type — an Action describes one event, a Status summarizes a package.
 const (
-	actionPass = "pass"
-	actionFail = "fail"
-	actionSkip = "skip"
+	ActionStart       Action = "start"
+	ActionRun         Action = "run"
+	ActionPass        Action = "pass"
+	ActionFail        Action = "fail"
+	ActionSkip        Action = "skip"
+	ActionOutput      Action = "output"
+	ActionBuildOutput Action = "build-output"
+	ActionBuildFail   Action = "build-fail"
+	ActionBench       Action = "bench"
+	ActionPause       Action = "pause"
+	ActionCont        Action = "cont"
 )
 
 // TestEvent represents a single event from go test -json output.
 type TestEvent struct {
 	Time       time.Time `json:"Time"`
-	Action     string    `json:"Action"` // start, run, pass, fail, skip, output, build-output, build-fail, bench, pause, cont
+	Action     Action    `json:"Action"`
 	Package    string    `json:"Package"`
 	Test       string    `json:"Test"`
 	Elapsed    float64   `json:"Elapsed"`
