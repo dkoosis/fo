@@ -42,13 +42,16 @@ var (
 	ErrMalformedRow = errors.New("metrics: malformed row")
 )
 
-func Parse(r io.Reader) (Metrics, error) {
+// Parse reads metrics input from r and returns the parsed Metrics.
+// Oversize dropped-line warnings are written to stderr (nil silences them).
+func Parse(r io.Reader, stderr io.Writer) (Metrics, error) {
 	var m Metrics
 	tool, err := hygiene.Scan(r, hygiene.Spec{
 		Prefix:      HeaderPrefix,
 		Name:        "metrics",
 		ErrNoHeader: ErrNoHeader,
 		ErrNoRows:   ErrNoRows,
+		Stderr:      stderr,
 		OnRow: func(_ int, line string) error {
 			row, perr := parseRow(line)
 			if perr != nil {

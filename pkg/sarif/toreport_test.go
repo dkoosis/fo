@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/dkoosis/fo/pkg/report"
 	"github.com/dkoosis/fo/pkg/sarif"
@@ -97,6 +98,31 @@ func TestToReportWithMeta_StampsDataHash(t *testing.T) {
 	r := sarif.ToReportWithMeta(doc, data)
 	if len(r.DataHash) != 64 {
 		t.Errorf("DataHash len = %d, want 64", len(r.DataHash))
+	}
+}
+
+// fo-n25.6: an injected generatedAt is stamped verbatim instead of the
+// wall clock, so output is deterministic under test.
+func TestToReport_InjectedGeneratedAt(t *testing.T) {
+	t.Parallel()
+
+	want := time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC)
+	r := sarif.ToReport(&sarif.Document{}, want)
+	if !r.GeneratedAt.Equal(want) {
+		t.Errorf("GeneratedAt = %v, want %v", r.GeneratedAt, want)
+	}
+}
+
+// fo-n25.6: omitting generatedAt falls back to the wall clock, matching
+// prior (non-injectable) behavior.
+func TestToReport_OmittedGeneratedAtUsesClock(t *testing.T) {
+	t.Parallel()
+
+	before := time.Now().UTC()
+	r := sarif.ToReport(&sarif.Document{})
+	after := time.Now().UTC()
+	if r.GeneratedAt.Before(before) || r.GeneratedAt.After(after) {
+		t.Errorf("GeneratedAt = %v, want between %v and %v", r.GeneratedAt, before, after)
 	}
 }
 

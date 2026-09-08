@@ -31,7 +31,7 @@ func TestParse_basic(t *testing.T) {
 2578 journal.day
 701 log.session
 `
-	got, err := Parse(strings.NewReader(in))
+	got, err := Parse(strings.NewReader(in), nil)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -49,7 +49,7 @@ func TestParse_basic(t *testing.T) {
 func TestParse_uniq_c_format(t *testing.T) {
 	// `sort | uniq -c` right-aligns counts; tally must accept leading ws.
 	in := "# fo:tally\n  14332 log.friction\n   2578 journal.day\n"
-	got, err := Parse(strings.NewReader(in))
+	got, err := Parse(strings.NewReader(in), nil)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestParse_uniq_c_format(t *testing.T) {
 
 func TestParse_labelWithSpaces(t *testing.T) {
 	in := "# fo:tally\n5 entity.person\n3 reference article\n"
-	got, err := Parse(strings.NewReader(in))
+	got, err := Parse(strings.NewReader(in), nil)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestParse_labelWithSpaces(t *testing.T) {
 
 func TestParse_blankAndComment(t *testing.T) {
 	in := "# fo:tally\n\n# a comment\n5 a\n\n3 b\n"
-	got, err := Parse(strings.NewReader(in))
+	got, err := Parse(strings.NewReader(in), nil)
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestParse_blankAndComment(t *testing.T) {
 
 func TestParse_missingHeader(t *testing.T) {
 	in := "5 a\n3 b\n"
-	_, err := Parse(strings.NewReader(in))
+	_, err := Parse(strings.NewReader(in), nil)
 	if !errors.Is(err, ErrNoHeader) {
 		t.Errorf("err = %v, want ErrNoHeader", err)
 	}
@@ -93,7 +93,7 @@ func TestParse_missingHeader(t *testing.T) {
 
 func TestParse_noRows(t *testing.T) {
 	in := "# fo:tally\n\n# nothing here\n"
-	_, err := Parse(strings.NewReader(in))
+	_, err := Parse(strings.NewReader(in), nil)
 	if !errors.Is(err, ErrNoRows) {
 		t.Errorf("err = %v, want ErrNoRows", err)
 	}
@@ -101,7 +101,7 @@ func TestParse_noRows(t *testing.T) {
 
 func TestParse_malformedRow(t *testing.T) {
 	in := "# fo:tally\nnotanumber a\n"
-	_, err := Parse(strings.NewReader(in))
+	_, err := Parse(strings.NewReader(in), nil)
 	if !errors.Is(err, ErrMalformedRow) || !strings.Contains(err.Error(), "non-numeric") {
 		t.Errorf("err = %v, want ErrMalformedRow with non-numeric detail", err)
 	}
@@ -109,7 +109,7 @@ func TestParse_malformedRow(t *testing.T) {
 
 func TestParse_missingLabel(t *testing.T) {
 	in := "# fo:tally\n5\n"
-	_, err := Parse(strings.NewReader(in))
+	_, err := Parse(strings.NewReader(in), nil)
 	if !errors.Is(err, ErrMalformedRow) || !strings.Contains(err.Error(), "expected '<count> <label>'") {
 		t.Errorf("err = %v, want ErrMalformedRow with shape detail", err)
 	}

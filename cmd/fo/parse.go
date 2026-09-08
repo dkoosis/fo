@@ -28,7 +28,7 @@ func coerceAs(kind string, input []byte, stderr io.Writer) ([]byte, int) {
 	switch kind {
 	case "tally":
 		var buf bytes.Buffer
-		if err := wrapleaderboard.Convert(bytes.NewReader(input), &buf, wrapleaderboard.Opts{}); err != nil {
+		if err := wrapleaderboard.Convert(bytes.NewReader(input), &buf, wrapleaderboard.Opts{Stderr: stderr}); err != nil {
 			fmt.Fprintf(stderr, "fo: --as tally: %v\n", err)
 			return nil, 2
 		}

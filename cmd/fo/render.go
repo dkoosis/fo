@@ -76,7 +76,7 @@ func renderHygiene(stdout, stderr io.Writer, mode string, jsonValue any, llmFn, 
 // severity-aggregated one. Always exits 0 on success: a tally is
 // informational, not pass/fail.
 func renderTally(input []byte, stdout io.Writer, stderr io.Writer, mode, themeName string) int {
-	t, err := tally.Parse(bytes.NewReader(input))
+	t, err := tally.Parse(bytes.NewReader(input), stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "fo: parsing tally: %v\n", err)
 		return 2
@@ -138,7 +138,7 @@ func renderScene(input []byte, stdout io.Writer, stderr io.Writer, mode string) 
 // callers decide pass/fail by inspecting the rows themselves (or via the
 // parsed json).
 func renderStatus(input []byte, stdout io.Writer, stderr io.Writer, mode string) int {
-	s, err := status.Parse(bytes.NewReader(input))
+	s, err := status.Parse(bytes.NewReader(input), stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "fo: parsing status: %v\n", err)
 		return 2
@@ -156,7 +156,7 @@ func renderStatus(input []byte, stdout io.Writer, stderr io.Writer, mode string)
 // the sidecar history, renders, and saves the new sample set. Always
 // exits 0 on success — metrics streams are informational rollups.
 func renderMetrics(input []byte, stdout io.Writer, stderr io.Writer, mode string) int {
-	m, err := metrics.Parse(bytes.NewReader(input))
+	m, err := metrics.Parse(bytes.NewReader(input), stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "fo: parsing metrics: %v\n", err)
 		return 2

@@ -109,6 +109,38 @@ func TestScan(t *testing.T) {
 		}
 	})
 
+	t.Run("oversize line warns to injected Stderr", func(t *testing.T) {
+		huge := strings.Repeat("Z", 16*1024*1024+1024)
+		in := testPrefix + "\n" + huge + "\na\n"
+		var rows []string
+		var errBuf strings.Builder
+		spec := collect(&rows)
+		spec.Stderr = &errBuf
+		tool, err := hygiene.Scan(strings.NewReader(in), spec)
+		if err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+		if tool != "" {
+			t.Errorf("tool = %q, want empty", tool)
+		}
+		if strings.Join(rows, ",") != "a" {
+			t.Errorf("rows = %v, want [a]", rows)
+		}
+		if !strings.Contains(errBuf.String(), "test: dropped 1 line(s)") {
+			t.Errorf("stderr = %q, want oversize warning", errBuf.String())
+		}
+	})
+
+	t.Run("oversize line silent when Stderr is nil", func(t *testing.T) {
+		huge := strings.Repeat("Z", 16*1024*1024+1024)
+		in := testPrefix + "\n" + huge + "\na\n"
+		var rows []string
+		spec := collect(&rows)
+		if _, err := hygiene.Scan(strings.NewReader(in), spec); err != nil {
+			t.Fatalf("unexpected err: %v", err)
+		}
+	})
+
 	t.Run("OnRow error wrapped with name and line number", func(t *testing.T) {
 		spec := hygiene.Spec{
 			Prefix:      testPrefix,
