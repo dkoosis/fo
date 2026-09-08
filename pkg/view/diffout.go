@@ -5,6 +5,8 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/dkoosis/fo/pkg/paint"
+	"github.com/dkoosis/fo/pkg/report"
 	"github.com/dkoosis/fo/pkg/theme"
 )
 
@@ -92,4 +94,41 @@ func RenderDiffOutput(output string, t theme.Theme) string {
 // view exists to make legible.
 func renderKeepTabs(s lipgloss.Style, line string) string {
 	return s.TabWidth(lipgloss.NoTabConversion).Render(line)
+}
+
+// diffPlaceholder marks the empty side of a one-sided field change (a
+// field only added or only removed) — a blank cell would read as a
+// misalignment rather than "nothing on this side".
+const diffPlaceholder = "·"
+
+// RenderStructuralDiff formats a field-structural diff (go-cmp/cupaloy,
+// decomposed by pkg/testjson) as an aligned path/removed/added table —
+// the reader sees which fields differ and their old/new values, not which
+// lines of text differ. Follows the same Tufte idiom as the rest of
+// pkg/view: paint.Columnize for alignment, theme colors for signal, no
+// box-drawing. The mono theme (LLM/piped) yields the same table with no
+// escapes. Returns "" for a nil diff or one with no fields.
+func RenderStructuralDiff(sd *report.StructuralDiff, t theme.Theme) string {
+	if sd == nil || len(sd.Fields) == 0 {
+		return ""
+	}
+	rows := make([][]string, 0, len(sd.Fields))
+	for _, f := range sd.Fields {
+		rows = append(rows, []string{
+			t.Muted.Render(f.Path),
+			diffSide(f.Removed, t.Error, "-"),
+			diffSide(f.Added, t.Pass, "+"),
+		})
+	}
+	return paint.Columnize(rows, 2)
+}
+
+// diffSide renders one side of a field's before/after value, prefixed
+// with its diff marker, or the placeholder glyph when that side is empty
+// (a field that was only added or only removed).
+func diffSide(value string, style lipgloss.Style, marker string) string {
+	if value == "" {
+		return diffPlaceholder
+	}
+	return style.Render(marker + " " + value)
 }

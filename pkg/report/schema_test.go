@@ -45,6 +45,8 @@ func TestSchemaCoversReportFields(t *testing.T) {
 		{reflect.TypeFor[TestResult](), doc.Defs["TestResult"].Properties, "TestResult"},
 		{reflect.TypeFor[DiffSummary](), doc.Defs["DiffSummary"].Properties, "DiffSummary"},
 		{reflect.TypeFor[DiffItem](), doc.Defs["DiffItem"].Properties, "DiffItem"},
+		{reflect.TypeFor[StructuralDiff](), doc.Defs["StructuralDiff"].Properties, "StructuralDiff"},
+		{reflect.TypeFor[DiffField](), doc.Defs["DiffField"].Properties, "DiffField"},
 	}
 	for _, c := range checks {
 		for field := range c.typ.Fields() {

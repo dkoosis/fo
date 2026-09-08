@@ -112,6 +112,51 @@ func TestToReport_FailedTestFixCommandAnchored(t *testing.T) {
 	}
 }
 
+// TestToReport_AttachesStructuralDiff is the fo-d84 wiring test: a failed
+// test whose Output carries a go-cmp-shaped diff gets StructuralDiff
+// populated on its TestResult; one with ordinary assertion text does not
+// (no regression for the common case).
+func TestToReport_AttachesStructuralDiff(t *testing.T) {
+	t.Parallel()
+
+	goCmpOutput := []string{
+		"  pkg.MyStruct{",
+		"- \tField: 1,",
+		"+ \tField: 2,",
+		"  }",
+	}
+	results := []testjson.TestPackageResult{{
+		Name:   "pkg/x",
+		Failed: 2,
+		FailedTests: []testjson.FailedTest{
+			{Name: "TestStructural", Output: goCmpOutput},
+			{Name: "TestPlain", Output: []string{"want bar, got baz"}},
+		},
+	}}
+
+	r := testjson.ToReport(results)
+	byTest := map[string]report.TestResult{}
+	for _, tr := range r.Tests {
+		byTest[tr.Test] = tr
+	}
+
+	structural := byTest["TestStructural"]
+	if structural.StructuralDiff == nil {
+		t.Fatal("TestStructural: StructuralDiff = nil, want populated")
+	}
+	if structural.StructuralDiff.Kind != "go-cmp" {
+		t.Errorf("Kind = %q, want go-cmp", structural.StructuralDiff.Kind)
+	}
+	if got := structural.Output; got != strings.Join(goCmpOutput, "\n") {
+		t.Errorf("Output changed: got %q", got)
+	}
+
+	plain := byTest["TestPlain"]
+	if plain.StructuralDiff != nil {
+		t.Errorf("TestPlain: StructuralDiff = %#v, want nil", plain.StructuralDiff)
+	}
+}
+
 func TestToReport_DeterministicFingerprint(t *testing.T) {
 	t.Parallel()
 

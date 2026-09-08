@@ -318,6 +318,41 @@ func TestRender_ClusterShapeB_LLM(t *testing.T) {
 	}
 }
 
+// TestRender_ClusterShapeB_LLM_StructuralDiff is the fo-d84 wiring test for
+// the cluster path: a member carrying a StructuralDiff renders its field
+// path and values (via RenderStructuralDiff), not its raw Output text —
+// same benefit singleton failures get through `fo explain`, extended to
+// clustered ones.
+func TestRender_ClusterShapeB_LLM_StructuralDiff(t *testing.T) {
+	structural := &report.StructuralDiff{
+		Kind:   "go-cmp",
+		Fields: []report.DiffField{{Path: "MyStruct.Field", Removed: "1", Added: "2"}},
+	}
+	r := report.Report{
+		Tests: []report.TestResult{
+			{
+				Test: "TA", Outcome: report.OutcomeFail, ClusterID: "cluster-a3f2c1",
+				Output:         "  MyStruct{\n- \tField: 1,\n+ \tField: 2,\n  }",
+				StructuralDiff: structural,
+			},
+			{Test: "TB", Outcome: report.OutcomeFail, ClusterID: "cluster-a3f2c1", Output: "got 0 rows"},
+		},
+		Clusters: []report.Cluster{
+			{ID: "cluster-a3f2c1", Signature: "sig", Members: []string{"TA", "TB"}},
+		},
+	}
+	spec := PickViewModeWithExpand(r, ModeLLM, newExpandSet(nil))
+	got := stripANSI(Render(spec, theme.Mono(), 0))
+	for _, want := range []string{"TA: MyStruct.Field", "- 1", "+ 2", "TB: got 0 rows"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "Field: 1,") {
+		t.Errorf("TA rendered raw diff text instead of field-structural:\n%s", got)
+	}
+}
+
 func TestRender_ClusterThemeParity(t *testing.T) {
 	r := report.Report{
 		Tests: []report.TestResult{

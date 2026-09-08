@@ -58,6 +58,42 @@ func TestRunExplain_ResolvesTest(t *testing.T) {
 	}
 }
 
+// TestRunExplain_ResolvesTest_StructuralDiff is the fo-d84 AC: a failing
+// test whose Output carries a go-cmp diff renders field-structurally
+// (the field path and both values are visible) rather than as the raw
+// "- \tField: 1,\n+ \tField: 2," lines.
+func TestRunExplain_ResolvesTest_StructuralDiff(t *testing.T) {
+	r := &report.Report{Tests: []report.TestResult{{
+		Fingerprint: "cccc3333",
+		Package:     "p",
+		Test:        "TestStructural",
+		Outcome:     report.OutcomeFail,
+		Output:      "  pkg.MyStruct{\n- \tField: 1,\n+ \tField: 2,\n  }",
+		StructuralDiff: &report.StructuralDiff{
+			Kind: "go-cmp",
+			Fields: []report.DiffField{
+				{Path: "pkg.MyStruct.Field", Removed: "1", Added: "2"},
+			},
+		},
+	}}}
+	seedSnapshot(t, r)
+	id := r.Tests[0].ID
+
+	var out, errBuf bytes.Buffer
+	if code := runExplain([]string{id}, &out, &errBuf); code != 0 {
+		t.Fatalf("exit=%d stderr=%s", code, errBuf.String())
+	}
+	got := out.String()
+	for _, want := range []string{"pkg.MyStruct.Field", "1", "2"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("explain output missing %q\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "Field: 1,") {
+		t.Errorf("explain output still line-oriented, want field-structural:\n%s", got)
+	}
+}
+
 func TestRunExplain_UnknownID(t *testing.T) {
 	seedSnapshot(t, &report.Report{Findings: []report.Finding{{Fingerprint: "aaaa1111", Message: "x"}}})
 	var out, errBuf bytes.Buffer

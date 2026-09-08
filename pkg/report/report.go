@@ -65,6 +65,34 @@ type TestResult struct {
 	Fingerprint string        `json:"fingerprint,omitempty"`
 	Score       float64       `json:"score"`
 	ClusterID   string        `json:"cluster_id,omitempty"`
+	// StructuralDiff, when non-nil, is a field-level decomposition of a
+	// go-cmp or cupaloy mismatch recovered from Output by pkg/testjson.
+	// Renderers prefer this over the raw text; nil means Output didn't
+	// match a known structural-diff shape, and renderers fall back to
+	// the line-oriented rendering of Output.
+	StructuralDiff *StructuralDiff `json:"structural_diff,omitempty"`
+}
+
+// DiffField is one field-level mismatch extracted from a structural diff
+// (go-cmp / cupaloy) embedded in a test's raw Output. Path is the best
+// field-path label the detector could recover — a dotted struct-field
+// path for go-cmp, a JSON/spew key or "line N" fallback for cupaloy.
+// Removed/Added mirror the "-"/"+" sides; either may be empty when a
+// field was only added or only removed.
+type DiffField struct {
+	Path    string `json:"path"`
+	Removed string `json:"removed,omitempty"`
+	Added   string `json:"added,omitempty"`
+}
+
+// StructuralDiff is a field-structural decomposition of a go-cmp or
+// cupaloy mismatch, produced when pkg/testjson recognizes the shape of a
+// failing test's raw Output. Kind names which library's shape matched
+// ("go-cmp" | "cupaloy") — informational only, renderers treat both the
+// same way.
+type StructuralDiff struct {
+	Kind   string      `json:"kind"`
+	Fields []DiffField `json:"fields"`
 }
 
 // Cluster groups failing tests that share a root cause — same topmost

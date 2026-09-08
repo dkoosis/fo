@@ -91,7 +91,14 @@
         "fix_command": { "type": "string" },
         "fingerprint": { "type": "string" },
         "score":       { "type": "number" },
-        "cluster_id":  { "type": "string", "description": "Failure cluster identifier (F-xxxxxx). Present only when this test belongs to a cluster of 2+ failures sharing a root cause." }
+        "cluster_id":  { "type": "string", "description": "Failure cluster identifier (F-xxxxxx). Present only when this test belongs to a cluster of 2+ failures sharing a root cause." },
+        "structural_diff": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/StructuralDiff" }
+          ],
+          "description": "Field-level decomposition of a go-cmp/cupaloy mismatch found in output; null when output didn't match a known structural-diff shape."
+        }
       }
     },
     "Cluster": {
@@ -116,6 +123,23 @@
         "severity":       { "type": "string" },
         "prior_severity": { "type": "string" },
         "class":          { "type": "string", "description": "Diff class: new, resolved, regressed, flaky, persistent." }
+      }
+    },
+    "DiffField": {
+      "type": "object",
+      "required": ["path"],
+      "properties": {
+        "path":    { "type": "string", "description": "Best-effort field-path label: dotted struct path (go-cmp) or a recovered key / 'line N' fallback (cupaloy)." },
+        "removed": { "type": "string", "description": "Value on the '-' side; empty when the field was only added." },
+        "added":   { "type": "string", "description": "Value on the '+' side; empty when the field was only removed." }
+      }
+    },
+    "StructuralDiff": {
+      "type": "object",
+      "required": ["kind", "fields"],
+      "properties": {
+        "kind":   { "type": "string", "enum": ["go-cmp", "cupaloy"], "description": "Which library's output shape was recognized." },
+        "fields": { "type": "array", "items": { "$ref": "#/$defs/DiffField" } }
       }
     },
     "DiffSummary": {

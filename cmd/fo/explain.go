@@ -92,6 +92,11 @@ func explainTest(tr *report.TestResult, t theme.Theme) string {
 	}
 	if out := strings.TrimRight(tr.Output, "\n"); out != "" {
 		rendered := view.RenderDiffOutput(out, t)
+		if tr.StructuralDiff != nil {
+			if structured := view.RenderStructuralDiff(tr.StructuralDiff, t); structured != "" {
+				rendered = structured
+			}
+		}
 		for line := range strings.SplitSeq(rendered, "\n") {
 			fmt.Fprintf(&b, "  %s\n", line)
 		}

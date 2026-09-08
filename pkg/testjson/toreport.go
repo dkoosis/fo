@@ -70,13 +70,14 @@ func ToReport(results []TestPackageResult, generatedAt ...time.Time) *report.Rep
 			for _, ft := range pkg.FailedTests {
 				out := strings.Join(ft.Output, "\n")
 				r.Tests = append(r.Tests, report.TestResult{
-					Package:     pkg.Name,
-					Test:        ft.Name,
-					Outcome:     report.OutcomeFail,
-					Output:      out,
-					FixCommand:  testFixCommand(pkg.Name, ft.Name),
-					Fingerprint: fingerprint.Fingerprint(ft.Name, pkg.Name, out),
-					Score:       score.Score(score.SeverityWeightError, 1, pkg.Name),
+					Package:        pkg.Name,
+					Test:           ft.Name,
+					Outcome:        report.OutcomeFail,
+					Output:         out,
+					FixCommand:     testFixCommand(pkg.Name, ft.Name),
+					Fingerprint:    fingerprint.Fingerprint(ft.Name, pkg.Name, out),
+					Score:          score.Score(score.SeverityWeightError, 1, pkg.Name),
+					StructuralDiff: detectStructuralDiff(out),
 				})
 			}
 		default:
