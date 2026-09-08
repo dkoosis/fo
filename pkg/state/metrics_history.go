@@ -18,7 +18,7 @@ import (
 const MaxMetricsHistory = 30
 
 // MetricsSchemaVersion identifies the on-disk envelope format. Bump when
-// MetricsFile/MetricsRun shape changes incompatibly.
+// the metricsFile/metricsRun shape changes incompatibly.
 const MetricsSchemaVersion = 1
 
 type MetricSample struct {
@@ -35,28 +35,28 @@ type MetricDelta struct {
 	New    bool         `json:"new"` // no prior sample matched
 }
 
-// MetricsRun is one captured set of samples at a point in time.
-type MetricsRun struct {
+// metricsRun is one captured set of samples at a point in time.
+type metricsRun struct {
 	GeneratedAt time.Time      `json:"generated_at"`
 	Samples     []MetricSample `json:"samples"`
 }
 
-// MetricsFile is the versioned envelope written to metrics-history.json.
+// metricsFile is the versioned envelope written to metrics-history.json.
 // Runs[0] is the newest; Runs[len-1] the oldest. Mirrors state.File.Runs
 // ordering so consumers can treat the two histories the same way.
-type MetricsFile struct {
+type metricsFile struct {
 	Version int          `json:"version"`
-	Runs    []MetricsRun `json:"runs"`
+	Runs    []metricsRun `json:"runs"`
 }
 
-// LoadMetricsHistory reads the versioned envelope from path. A missing
+// loadMetricsHistory reads the versioned envelope from path. A missing
 // file returns an empty file with no error. A pre-envelope flat
 // []MetricSample is read as a single-run envelope so users keep their
 // last sample after the format change.
-func LoadMetricsHistory(path string) (*MetricsFile, error) {
+func loadMetricsHistory(path string) (*metricsFile, error) {
 	f, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return &MetricsFile{Version: MetricsSchemaVersion}, nil
+		return &metricsFile{Version: MetricsSchemaVersion}, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("metrics: open %s: %w", path, err)
@@ -66,7 +66,7 @@ func LoadMetricsHistory(path string) (*MetricsFile, error) {
 	if err != nil {
 		return nil, fmt.Errorf("metrics: read %s: %w", path, err)
 	}
-	var envelope MetricsFile
+	var envelope metricsFile
 	if err := json.Unmarshal(data, &envelope); err == nil && envelope.Version > 0 {
 		return &envelope, nil
 	}
@@ -75,9 +75,9 @@ func LoadMetricsHistory(path string) (*MetricsFile, error) {
 	if err := json.Unmarshal(data, &legacy); err != nil {
 		return nil, fmt.Errorf("metrics: unmarshal: %w", err)
 	}
-	return &MetricsFile{
+	return &metricsFile{
 		Version: MetricsSchemaVersion,
-		Runs:    []MetricsRun{{GeneratedAt: time.Now().UTC(), Samples: legacy}},
+		Runs:    []metricsRun{{GeneratedAt: time.Now().UTC(), Samples: legacy}},
 	}, nil
 }
 
@@ -85,7 +85,7 @@ func LoadMetricsHistory(path string) (*MetricsFile, error) {
 // exists. Preserved for callers (DiffMetrics consumers) that only care
 // about the latest snapshot.
 func LoadMetrics(path string) ([]MetricSample, error) {
-	hist, err := LoadMetricsHistory(path)
+	hist, err := loadMetricsHistory(path)
 	if err != nil {
 		return nil, err
 	}
@@ -102,12 +102,12 @@ func LoadMetrics(path string) ([]MetricSample, error) {
 // adding to the end — the write below prepends. Replaces the prior
 // overwrite-only SaveMetrics (#258).
 func RecordMetrics(path string, samples []MetricSample) error {
-	hist, err := LoadMetricsHistory(path)
+	hist, err := loadMetricsHistory(path)
 	if err != nil {
 		return err
 	}
 	hist.Version = MetricsSchemaVersion
-	hist.Runs = append([]MetricsRun{{GeneratedAt: time.Now().UTC(), Samples: samples}}, hist.Runs...)
+	hist.Runs = append([]metricsRun{{GeneratedAt: time.Now().UTC(), Samples: samples}}, hist.Runs...)
 	if len(hist.Runs) > MaxMetricsHistory {
 		hist.Runs = hist.Runs[:MaxMetricsHistory]
 	}

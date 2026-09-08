@@ -33,15 +33,15 @@ const (
 // errNoSections is returned when ParseSections finds no delimiter lines.
 var errNoSections = errors.New("no sections found in report input")
 
-// SupportedFormats is the list of format values fo accepts in delimiter lines.
-var SupportedFormats = []string{"sarif", "testjson"}
+// supportedFormats is the list of format values fo accepts in delimiter lines.
+var supportedFormats = []string{"sarif", "testjson"}
 
-// delimiterRe's format group is derived from SupportedFormats so the two
+// delimiterRe's format group is derived from supportedFormats so the two
 // cannot desync: adding a format to one slice updates both what's accepted
 // and what the error message reports.
 var (
 	delimiterRe = regexp.MustCompile(
-		`^--- tool:(\w[\w-]*) format:(` + strings.Join(SupportedFormats, "|") + `)(?: status:(\w+))? ---$`,
+		`^--- tool:(\w[\w-]*) format:(` + strings.Join(supportedFormats, "|") + `)(?: status:(\w+))? ---$`,
 	)
 	// delimiterShapeRe matches the delimiter shape with any word for format,
 	// so we can distinguish "no delimiter" from "delimiter with unknown format".
@@ -51,7 +51,7 @@ var (
 )
 
 // UnknownFormatError is returned by ParseSections when a delimiter has the
-// expected shape but its format value is not in SupportedFormats.
+// expected shape but its format value is not in supportedFormats.
 type UnknownFormatError struct {
 	SectionIndex int // 1-based position of the offending section
 	Line         string
@@ -62,19 +62,19 @@ type UnknownFormatError struct {
 func (e *UnknownFormatError) Error() string {
 	return fmt.Sprintf(
 		"section %d: unknown format %q for tool %q in delimiter %q (supported: %s)",
-		e.SectionIndex, e.Format, e.Tool, e.Line, strings.Join(SupportedFormats, ", "),
+		e.SectionIndex, e.Format, e.Tool, e.Line, strings.Join(supportedFormats, ", "),
 	)
 }
 
-// IsDelimiter reports whether line is a valid section delimiter (recognized
+// isDelimiter reports whether line is a valid section delimiter (recognized
 // format value).
-func IsDelimiter(line []byte) bool {
+func isDelimiter(line []byte) bool {
 	return delimiterRe.Match(line)
 }
 
-// IsDelimiterShape reports whether line has the shape of a section delimiter,
+// isDelimiterShape reports whether line has the shape of a section delimiter,
 // regardless of whether the format value is recognized.
-func IsDelimiterShape(line []byte) bool {
+func isDelimiterShape(line []byte) bool {
 	return delimiterShapeRe.Match(line)
 }
 
@@ -93,7 +93,7 @@ func HasDelimiter(data []byte) bool {
 	if i := bytes.IndexAny(trimmed, "\r\n"); i >= 0 {
 		first = trimmed[:i]
 	}
-	return IsDelimiterShape(first)
+	return isDelimiterShape(first)
 }
 
 // Section is one tool's output within a multiplexed report.

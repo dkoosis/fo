@@ -20,8 +20,8 @@ func TestIsDelimiter(t *testing.T) {
 		{"", false},
 	}
 	for _, c := range cases {
-		if got := IsDelimiter([]byte(c.line)); got != c.want {
-			t.Errorf("IsDelimiter(%q) = %v, want %v", c.line, got, c.want)
+		if got := isDelimiter([]byte(c.line)); got != c.want {
+			t.Errorf("isDelimiter(%q) = %v, want %v", c.line, got, c.want)
 		}
 	}
 }
@@ -218,8 +218,8 @@ func TestIsDelimiter_WithStatus(t *testing.T) {
 		{"--- tool:vet format:sarif status: ---", false},
 	}
 	for _, c := range cases {
-		if got := IsDelimiter([]byte(c.line)); got != c.want {
-			t.Errorf("IsDelimiter(%q) = %v, want %v", c.line, got, c.want)
+		if got := isDelimiter([]byte(c.line)); got != c.want {
+			t.Errorf("isDelimiter(%q) = %v, want %v", c.line, got, c.want)
 		}
 	}
 }
