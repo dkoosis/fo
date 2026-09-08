@@ -2,8 +2,8 @@ package sarif_test
 
 import (
 	"bytes"
-	"errors"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/dkoosis/fo/pkg/sarif"
@@ -82,7 +82,11 @@ func TestReadBytes_OversizedNumericLiteral_ErrorsCleanly(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error for an out-of-range numeric literal, got nil")
 	}
-	if errors.Is(err, sarif.ErrNestingTooDeep) {
-		t.Fatalf("got ErrNestingTooDeep, want a decode error for the oversized literal: %v", err)
+	// The depth-guard sentinel is unexported (pkg/sarif keeps it internal —
+	// no caller outside the package branches on it); assert on the message
+	// instead of the sentinel to confirm this isn't misclassified as a
+	// depth-bomb rejection.
+	if strings.Contains(err.Error(), "nesting too deep") {
+		t.Fatalf("got a nesting-too-deep error, want a decode error for the oversized literal: %v", err)
 	}
 }
