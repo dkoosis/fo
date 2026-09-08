@@ -90,7 +90,7 @@ func TestBuilder_InvalidLevelError(t *testing.T) {
 }
 
 func TestBuilder_ValidLevels(t *testing.T) {
-	for _, level := range []string{"error", LevelWarning, "note", "none"} {
+	for _, level := range []Level{"error", LevelWarning, "note", "none"} {
 		b := NewBuilder("tool", "1.0")
 		b.AddResult("r1", level, "msg", "f.go", 1, 0)
 

@@ -38,6 +38,8 @@ func TopFiles(doc *Document, limit int) []FileSummary {
 				fi.ErrorCount++
 			case LevelWarning:
 				fi.WarnCount++
+			case LevelNote, LevelNone:
+				// not tracked separately in FileIssue counts
 			}
 		}
 	}

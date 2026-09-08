@@ -47,7 +47,7 @@ func (d *diag) Convert(r io.Reader, w io.Writer) error {
 	if d.toolName == "" {
 		return errToolRequired
 	}
-	switch d.level {
+	switch sarif.Level(d.level) {
 	case sarif.LevelError, sarif.LevelWarning, sarif.LevelNote, sarif.LevelNone:
 	default:
 		return fmt.Errorf("%w: %q", errInvalidLevel, d.level)
@@ -104,7 +104,7 @@ func (d *diag) addLine(b *sarif.Builder, line []byte) {
 		return
 	}
 	fixCmd := fixCommandFor(d.toolName, d.ruleID, file)
-	b.AddResultWithFix(d.ruleID, d.level, msg, file, ln, col, fixCmd)
+	b.AddResultWithFix(d.ruleID, sarif.Level(d.level), msg, file, ln, col, fixCmd)
 }
 
 // fixCommandFor returns a best-effort shell command the user can run to

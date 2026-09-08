@@ -39,16 +39,17 @@ func ToReport(doc *Document) *report.Report {
 			if n == 0 {
 				n = 1
 			}
+			sev := mapSeverity(res.Level)
 			r.Findings = append(r.Findings, report.Finding{
 				RuleID:      res.RuleID,
 				File:        file,
 				Line:        res.Line(),
 				Col:         res.Col(),
-				Severity:    mapSeverity(res.Level),
+				Severity:    sev,
 				Message:     res.Message.Text,
 				FixCommand:  res.FixCommand(),
 				Fingerprint: fingerprint.Fingerprint(res.RuleID, file, res.Message.Text),
-				Score:       score.Score(score.SeverityWeight(res.Level), n, file),
+				Score:       score.Score(score.SeverityWeight(sev), n, file),
 			})
 		}
 	}
@@ -88,7 +89,7 @@ func occurrenceCounts(doc *Document) map[string]int {
 	return counts
 }
 
-func mapSeverity(level string) report.Severity {
+func mapSeverity(level Level) report.Severity {
 	switch level {
 	case LevelError:
 		return report.SeverityError

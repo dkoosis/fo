@@ -22,7 +22,7 @@ const ruleID = "arch-lint/forbidden-import"
 var headerRe = regexp.MustCompile(`^\[(Warning|Error)\] Component "([^"]+)" shouldn't import component "([^"]+)"`)
 
 type pending struct {
-	level string
+	level sarif.Level
 	msg   string
 	file  string
 }
@@ -32,9 +32,9 @@ func parseHeader(line string) *pending {
 	if m == nil {
 		return nil
 	}
-	level := "warning"
+	level := sarif.LevelWarning
 	if m[1] == "Error" {
-		level = "error"
+		level = sarif.LevelError
 	}
 	return &pending{level: level, msg: fmt.Sprintf("%s shouldn't import %s", m[2], m[3])}
 }

@@ -7,7 +7,11 @@
 // package, not configuring fo.
 package score
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/dkoosis/fo/pkg/report"
+)
 
 // Severity weights used by Score. Tunable as constants — no runtime flag.
 const (
@@ -25,15 +29,19 @@ const (
 	CentralityDefault  = 1.0  // anything else (treat as root-equivalent)
 )
 
-// SeverityWeight maps a SARIF level string to its score weight.
-// Unknown levels (including empty and "none") get the note weight.
-func SeverityWeight(level string) int {
-	switch level {
-	case "error":
+// SeverityWeight maps a finding severity to its score weight. Unknown
+// severities (including empty) get the note weight. Takes report.Severity
+// rather than a SARIF level string so the mapping has one typed source of
+// truth; pkg/sarif already converts its own Level into report.Severity
+// (mapSeverity) before scoring, and pkg/sarif cannot be imported here
+// without an import cycle (sarif already depends on score).
+func SeverityWeight(sev report.Severity) int {
+	switch sev {
+	case report.SeverityError:
 		return SeverityWeightError
-	case "warning":
+	case report.SeverityWarning:
 		return SeverityWeightWarning
-	case "note":
+	case report.SeverityNote:
 		return SeverityWeightNote
 	default:
 		return SeverityWeightNote
