@@ -31,6 +31,40 @@ func TestParseToReport_TolerantTestJSONPrelude(t *testing.T) {
 	}
 }
 
+// TestParseToReport_MalformedLinesSurfacedInNotices verifies that when go
+// test -json input mixes valid events with malformed/truncated lines, the
+// drop is visible on the Report itself (Notices), not just in a stderr
+// warning a JSON consumer never sees. Regression class for #222/#239
+// (fo-s38): a machine reading --format json output must not see a
+// falsely-clean report when lines were silently skipped.
+func TestParseToReport_MalformedLinesSurfacedInNotices(t *testing.T) {
+	events := strings.Join([]string{
+		`{"Time":"2026-04-27T12:00:00Z","Action":"run","Package":"foo","Test":"TestA"}`,
+		`{"Time":"2026-04-27T12:00:01Z","Action":"pass","Package":"foo","Test":"TestA","Elapsed":0.01}`,
+		`not-json-garbage`,
+		`{"Time":"2026-04-27T12:00:01Z","Action":"pass","Package":"foo","Elapsed":0.01}`,
+	}, "\n") + "\n"
+	input := []byte(events)
+
+	var stderr bytes.Buffer
+	r, err := parseToReport(input, &stderr)
+	if err != nil {
+		t.Fatalf("parseToReport: %v", err)
+	}
+	if len(r.Notices) == 0 {
+		t.Fatal("expected Report.Notices to record the malformed-line drop, got none")
+	}
+	found := false
+	for _, n := range r.Notices {
+		if strings.Contains(n, "malformed") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("Notices %v should mention the malformed line drop", r.Notices)
+	}
+}
+
 // TestParseToReport_GarbageStillRejected verifies that input which is neither
 // SARIF, multiplex, nor go test -json (even tolerantly) still returns an error.
 func TestParseToReport_GarbageStillRejected(t *testing.T) {
