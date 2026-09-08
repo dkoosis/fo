@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
-# Shared helpers for sandbox doctor scripts (setup.sh, maintenance.sh).
-# Sourced, not executed directly.
-# Requires: REPO_DIR, PREBUILT_DIR, INSTALL_DIR set before sourcing.
+# go-sandbox lib-doctor.sh — diagnostics only
+# Answers "is the environment correct?" Does not install or download.
+# Sourced, not executed. Requires: REPO_DIR, PREBUILT_DIR, INSTALL_DIR, SANDBOX_DIR.
 
-REPORT_FILE="$REPO_DIR/.sandbox/setup-report.json"
+# Derive REQUIRED_TOOLS from project.conf lists
+# shellcheck source=/dev/null
+source "$SANDBOX_DIR/project.conf"
+REQUIRED_TOOLS=($BASE_IMAGE_TOOLS $PREBUILT_TOOLS)
+OPTIONAL_TOOLS=($OPTIONAL_TOOLS)
+
+REPORT_FILE="$SANDBOX_DIR/setup-report.json"
 FATALS=()
 WARNINGS=()
 REPAIRED_ISSUES=()
 REPAIRED_ACTIONS=()
 REPAIRED_SUCCESS=()
-
-# Canonical tool lists — single source of truth
-REQUIRED_TOOLS=(go golangci-lint snipe jq rg fd bat gofumpt goimports dtree)
-OPTIONAL_TOOLS=(jscpd govulncheck)
 
 have() {
   command -v "$1" >/dev/null 2>&1
@@ -39,13 +41,28 @@ version_to_int() {
   echo $((major * 1000 + minor))
 }
 
-download_go_modules() {
-  local label="${1:-downloaded}"
-  cd "$REPO_DIR"
-  go mod download && echo "  go modules $label"
+# Check Go toolchain version against go.mod requirement.
+# Sets ACTUAL_GO_VER as a side-effect.
+check_go_version() {
+  REPO_GO_VER=$(grep '^go ' "$REPO_DIR/go.mod" | awk '{print $2}')
+  ACTUAL_GO_VER=$(go version 2>/dev/null | grep -oP 'go\K[0-9]+\.[0-9]+' | head -1 || true)
+  if [ -n "$REPO_GO_VER" ] && [ -n "$ACTUAL_GO_VER" ]; then
+    local repo_minor repo_num actual_num
+    repo_minor=$(echo "$REPO_GO_VER" | cut -d. -f1-2)
+    repo_num=$(version_to_int "$repo_minor")
+    actual_num=$(version_to_int "$ACTUAL_GO_VER")
+    if [ "$actual_num" -lt "$repo_num" ]; then
+      fatal "Go version mismatch: sandbox has go$ACTUAL_GO_VER but go.mod requires go$REPO_GO_VER"
+    fi
+  fi
 }
 
-restore_prebuilt_tools() {
+golangci_lint_go_version() {
+  golangci-lint version 2>&1 | grep -oP 'go\K[0-9]+\.[0-9]+' | head -1 || true
+}
+
+# Repair: restore missing sandbox binaries (tools + project binaries) from .sandbox/bin/
+restore_sandbox_binaries() {
   [ -d "$PREBUILT_DIR" ] || return 0
   for tool in "$PREBUILT_DIR"/*; do
     [ -f "$tool" ] || continue
@@ -54,7 +71,6 @@ restore_prebuilt_tools() {
     if ! have "$toolname"; then
       cp "$tool" "$INSTALL_DIR/$toolname"
       chmod +x "$INSTALL_DIR/$toolname"
-      # Validate the binary actually runs
       if "$INSTALL_DIR/$toolname" --version >/dev/null 2>&1 || "$INSTALL_DIR/$toolname" version >/dev/null 2>&1; then
         repaired "missing $toolname" "restored from prebuilt" "true"
         echo "  restored $toolname from prebuilts"
@@ -68,33 +84,30 @@ restore_prebuilt_tools() {
   return 0
 }
 
-install_golangci_lint() {
-  timeout 300s go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest 2>&1
-}
-
-golangci_lint_go_version() {
-  golangci-lint version 2>&1 | grep -oP 'go\K[0-9]+\.[0-9]+' | head -1 || true
-}
-
-# Check Go toolchain version against go.mod requirement.
-# Sets ACTUAL_GO_VER as a side-effect (used by golangci-lint check).
-check_go_version() {
-  REPO_GO_VER=$(grep '^go ' "$REPO_DIR/go.mod" | awk '{print $2}')
-  ACTUAL_GO_VER=$(go version 2>/dev/null | grep -oP 'go\K[0-9]+\.[0-9]+' | head -1 || true)
-  if [ -n "$REPO_GO_VER" ] && [ -n "$ACTUAL_GO_VER" ]; then
-    local repo_minor
-    repo_minor=$(echo "$REPO_GO_VER" | cut -d. -f1-2)
-    local repo_num actual_num
-    repo_num=$(version_to_int "$repo_minor")
-    actual_num=$(version_to_int "$ACTUAL_GO_VER")
-    if [ "$actual_num" -lt "$repo_num" ]; then
-      fatal "Go version mismatch: sandbox has go$ACTUAL_GO_VER but go.mod requires go$REPO_GO_VER"
+# Verify required and optional tools, recording fatals/warnings
+check_required_tools() {
+  for tool in "${REQUIRED_TOOLS[@]}"; do
+    if have "$tool"; then
+      printf "  ok  %s\n" "$tool"
+    else
+      printf "  MISSING  %s\n" "$tool"
+      fatal "MISSING required tool: $tool"
     fi
-  fi
+  done
 }
 
-# JSON report writer — uses jq to guarantee valid JSON regardless of
-# special characters in diagnostic messages.
+check_optional_tools() {
+  for tool in "${OPTIONAL_TOOLS[@]}"; do
+    if have "$tool"; then
+      printf "  ok  %s (optional)\n" "$tool"
+    else
+      printf "  skip  %s (optional)\n" "$tool"
+      warn "optional tool $tool not available"
+    fi
+  done
+}
+
+# JSON report writer
 write_json_report() {
   local phase="${1:-setup}"
   local status="healthy"
@@ -104,7 +117,6 @@ write_json_report() {
     status="degraded"
   fi
 
-  # Build repaired array as JSON
   local repaired_json="[]"
   if [ ${#REPAIRED_ISSUES[@]} -gt 0 ]; then
     repaired_json="["
@@ -119,7 +131,6 @@ write_json_report() {
     repaired_json+="]"
   fi
 
-  # Build tools object — cross-reference REPAIRED_ISSUES to set repaired flag
   local tools_json="{}"
   local tool_entries=""
   for tool in "${REQUIRED_TOOLS[@]}" "${OPTIONAL_TOOLS[@]}"; do
@@ -132,7 +143,7 @@ write_json_report() {
     done
     if have "$tool"; then
       local ver
-      ver=$("$tool" --version 2>/dev/null | head -1 | grep -oP '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 || true)
+      ver=$(timeout 5 "$tool" --version 2>/dev/null | head -1 | grep -oP '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 || true)
       [ -z "$ver" ] && ver="unknown"
       tool_entries+=$(jq -n \
         --arg name "$tool" --arg ver "$ver" --argjson rep "$was_repaired" \
@@ -143,10 +154,8 @@ write_json_report() {
         '{($name): {ok:false, version:"", repaired:$rep}}')
     fi
   done
-  # Merge tool entries
   tools_json=$(echo "${tool_entries}" | jq -s 'add')
 
-  # Assemble final report
   jq -n \
     --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     --arg status "$status" \
@@ -180,7 +189,6 @@ doctor_exit() {
     echo "=== DEGRADED: ${#WARNINGS[@]} warning(s), ${#REPAIRED_ISSUES[@]} repaired ==="
     echo "  Report: $REPORT_FILE"
   else
-    rm -f "$REPO_DIR/.sandbox/setup-issues.txt"
     echo ""
     echo "=== $phase complete (healthy) ==="
   fi
