@@ -53,7 +53,7 @@ func TestRecordMetrics_AccumulatesAndTrims(t *testing.T) {
 			t.Fatalf("record %d: %v", i, err)
 		}
 	}
-	hist, err := LoadMetricsHistory(path)
+	hist, err := loadMetricsHistory(path)
 	if err != nil {
 		t.Fatalf("load history: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestLoadMetricsHistory_LegacyFlatFile(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
-	hist, err := LoadMetricsHistory(path)
+	hist, err := loadMetricsHistory(path)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}

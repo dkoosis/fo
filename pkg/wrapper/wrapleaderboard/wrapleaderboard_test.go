@@ -62,8 +62,8 @@ func TestConvert_noTool(t *testing.T) {
 func TestConvert_emptyInput(t *testing.T) {
 	var out bytes.Buffer
 	err := Convert(strings.NewReader(""), &out, Opts{})
-	if !errors.Is(err, ErrNoRows) {
-		t.Errorf("err = %v, want ErrNoRows", err)
+	if !errors.Is(err, errNoRows) {
+		t.Errorf("err = %v, want errNoRows", err)
 	}
 }
 
@@ -86,8 +86,8 @@ func TestConvert_malformed(t *testing.T) {
 	in := "abc def\n"
 	var out bytes.Buffer
 	err := Convert(strings.NewReader(in), &out, Opts{})
-	if !errors.Is(err, ErrMalformedRow) || !strings.Contains(err.Error(), "non-numeric") {
-		t.Errorf("err = %v, want ErrMalformedRow with non-numeric detail", err)
+	if !errors.Is(err, errMalformedRow) || !strings.Contains(err.Error(), "non-numeric") {
+		t.Errorf("err = %v, want errMalformedRow with non-numeric detail", err)
 	}
 }
 

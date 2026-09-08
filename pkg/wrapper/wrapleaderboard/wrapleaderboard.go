@@ -35,11 +35,11 @@ type Opts struct {
 	Stderr io.Writer
 }
 
-// ErrNoRows is returned when stdin yields no parseable rows.
-var ErrNoRows = errors.New("wrap leaderboard: no rows on stdin")
+// errNoRows is returned when stdin yields no parseable rows.
+var errNoRows = errors.New("wrap leaderboard: no rows on stdin")
 
-// ErrMalformedRow wraps row-level shape/parse failures.
-var ErrMalformedRow = errors.New("wrap leaderboard: malformed row")
+// errMalformedRow wraps row-level shape/parse failures.
+var errMalformedRow = errors.New("wrap leaderboard: malformed row")
 
 // Convert reads tally input from r and writes the canonical tally
 // format (with header) to w. Returns an error if no rows parse — a
@@ -79,7 +79,7 @@ func Convert(r io.Reader, w io.Writer, opts Opts) error {
 	}
 	warnOversize(opts.Stderr, dropped)
 	if rows == 0 {
-		return ErrNoRows
+		return errNoRows
 	}
 	return nil
 }
@@ -123,15 +123,15 @@ func writeHeader(w io.Writer, tool string) error {
 func splitCountLabel(line string) (count, label string, err error) {
 	idx := strings.IndexAny(line, " \t")
 	if idx < 0 {
-		return "", "", fmt.Errorf("%w: expected '<count> <label>', got %q", ErrMalformedRow, line)
+		return "", "", fmt.Errorf("%w: expected '<count> <label>', got %q", errMalformedRow, line)
 	}
 	count = line[:idx]
 	label = strings.TrimSpace(line[idx+1:])
 	if label == "" {
-		return "", "", fmt.Errorf("%w: missing label after count %q", ErrMalformedRow, count)
+		return "", "", fmt.Errorf("%w: missing label after count %q", errMalformedRow, count)
 	}
 	if _, perr := strconv.ParseFloat(count, 64); perr != nil {
-		return "", "", fmt.Errorf("%w: non-numeric count %q", ErrMalformedRow, count)
+		return "", "", fmt.Errorf("%w: non-numeric count %q", errMalformedRow, count)
 	}
 	return count, label, nil
 }
