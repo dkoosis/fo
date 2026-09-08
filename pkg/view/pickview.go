@@ -467,9 +467,9 @@ func testItem(t report.TestResult) BulletItem {
 func deltaBuckets(cur report.Report, d *report.DiffSummary) []DeltaBucket {
 	curE, curW, curN := severityCounts(cur.Findings)
 	curF := failCount(cur.Tests)
-	dE := severityDelta(d, string(report.SeverityError))
-	dW := severityDelta(d, string(report.SeverityWarning))
-	dN := severityDelta(d, string(report.SeverityNote))
+	dE := severityDelta(d, report.SeverityError)
+	dW := severityDelta(d, report.SeverityWarning)
+	dN := severityDelta(d, report.SeverityNote)
 	return []DeltaBucket{
 		{Label: labelErr, Count: curE, Direction: sign(dE)},
 		{Label: labelWarn, Count: curW, Direction: sign(dW)},
@@ -478,7 +478,7 @@ func deltaBuckets(cur report.Report, d *report.DiffSummary) []DeltaBucket {
 	}
 }
 
-func severityDelta(d *report.DiffSummary, sev string) int {
+func severityDelta(d *report.DiffSummary, sev report.Severity) int {
 	delta := 0
 	for _, it := range d.New {
 		if it.Severity == sev {

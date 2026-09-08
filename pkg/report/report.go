@@ -106,15 +106,28 @@ type Report struct {
 	Suppressed int `json:"suppressed"`
 }
 
+// DiffClass is the diff classification of a single DiffItem versus prior
+// runs. Mirrors state.Class's value set without importing pkg/state
+// (state already depends on report; this preserves the one-way edge).
+type DiffClass string
+
+const (
+	DiffClassNew        DiffClass = "new"
+	DiffClassPersistent DiffClass = "persistent"
+	DiffClassResolved   DiffClass = "resolved"
+	DiffClassRegressed  DiffClass = "regressed"
+	DiffClassFlaky      DiffClass = "flaky"
+)
+
 // DiffItem mirrors the shape of state.Item without importing pkg/state
 // (state already depends on report; this preserves the one-way edge).
 type DiffItem struct {
-	Fingerprint   string `json:"fingerprint"`
-	RuleID        string `json:"rule_id,omitempty"`
-	File          string `json:"file,omitempty"`
-	Severity      string `json:"severity"`
-	PriorSeverity string `json:"prior_severity,omitempty"`
-	Class         string `json:"class"`
+	Fingerprint   string    `json:"fingerprint"`
+	RuleID        string    `json:"rule_id,omitempty"`
+	File          string    `json:"file,omitempty"`
+	Severity      Severity  `json:"severity"`
+	PriorSeverity Severity  `json:"prior_severity,omitempty"`
+	Class         DiffClass `json:"class"`
 }
 
 // DiffSummary mirrors state.Envelope. Owned by pkg/report so the JSON
