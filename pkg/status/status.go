@@ -50,10 +50,10 @@ func IsHeader(data []byte) bool {
 }
 
 var (
-	ErrNoHeader     = errors.New("status: missing '# fo:status' header")
-	ErrNoRows       = errors.New("status: no data rows")
-	ErrMalformedRow = errors.New("status: malformed row")
-	ErrBadState     = errors.New("status: bad state token")
+	errNoHeader     = errors.New("status: missing '# fo:status' header")
+	errNoRows       = errors.New("status: no data rows")
+	errMalformedRow = errors.New("status: malformed row")
+	errBadState     = errors.New("status: bad state token")
 )
 
 // Parse reads status input from r and returns the parsed Status.
@@ -63,8 +63,8 @@ func Parse(r io.Reader, stderr io.Writer) (Status, error) {
 	tool, err := hygiene.Scan(r, hygiene.Spec{
 		Prefix:      HeaderPrefix,
 		Name:        "status",
-		ErrNoHeader: ErrNoHeader,
-		ErrNoRows:   ErrNoRows,
+		ErrNoHeader: errNoHeader,
+		ErrNoRows:   errNoRows,
 		Stderr:      stderr,
 		OnRow: func(_ int, line string) error {
 			row, perr := parseRow(line)
@@ -85,7 +85,7 @@ func Parse(r io.Reader, stderr io.Writer) (Status, error) {
 func parseRow(line string) (Row, error) {
 	idx := strings.IndexAny(line, " \t")
 	if idx <= 0 {
-		return Row{}, fmt.Errorf("%w: expected '<state> <label> ...', got %q", ErrMalformedRow, line)
+		return Row{}, fmt.Errorf("%w: expected '<state> <label> ...', got %q", errMalformedRow, line)
 	}
 	st, err := parseState(line[:idx])
 	if err != nil {
@@ -93,7 +93,7 @@ func parseRow(line string) (Row, error) {
 	}
 	rest := strings.TrimLeft(line[idx:], " \t")
 	if rest == "" {
-		return Row{}, fmt.Errorf("%w: missing label, got %q", ErrMalformedRow, line)
+		return Row{}, fmt.Errorf("%w: missing label, got %q", errMalformedRow, line)
 	}
 	row := Row{State: st}
 	if strings.ContainsRune(rest, '\t') {
@@ -109,7 +109,7 @@ func parseRow(line string) (Row, error) {
 		row.Label = strings.TrimSpace(rest)
 	}
 	if row.Label == "" {
-		return Row{}, fmt.Errorf("%w: missing label, got %q", ErrMalformedRow, line)
+		return Row{}, fmt.Errorf("%w: missing label, got %q", errMalformedRow, line)
 	}
 	return row, nil
 }
@@ -125,5 +125,5 @@ func parseState(tok string) (State, error) {
 	case "skip":
 		return StateSkip, nil
 	}
-	return "", fmt.Errorf("%w: %q", ErrBadState, tok)
+	return "", fmt.Errorf("%w: %q", errBadState, tok)
 }

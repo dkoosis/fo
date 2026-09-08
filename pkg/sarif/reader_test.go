@@ -123,8 +123,8 @@ func TestReadBytes_DepthBomb(t *testing.T) {
 	depth := maxNestingDepth + 50
 	bomb := strings.Repeat("[", depth) + strings.Repeat("]", depth)
 	_, err := ReadBytes([]byte(bomb))
-	if !errors.Is(err, ErrNestingTooDeep) {
-		t.Fatalf("expected ErrNestingTooDeep, got %v", err)
+	if !errors.Is(err, errNestingTooDeep) {
+		t.Fatalf("expected errNestingTooDeep, got %v", err)
 	}
 }
 
@@ -138,8 +138,8 @@ func TestRead_DepthBomb(t *testing.T) {
 	depth := maxNestingDepth + 50
 	bomb := strings.Repeat("[", depth) + strings.Repeat("]", depth)
 	_, err := Read(strings.NewReader(bomb))
-	if !errors.Is(err, ErrNestingTooDeep) {
-		t.Fatalf("expected ErrNestingTooDeep, got %v", err)
+	if !errors.Is(err, errNestingTooDeep) {
+		t.Fatalf("expected errNestingTooDeep, got %v", err)
 	}
 }
 

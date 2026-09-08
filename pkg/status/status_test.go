@@ -73,10 +73,10 @@ func TestParse_errors(t *testing.T) {
 		in   string
 		want error
 	}{
-		{"no header", "ok foo\n", ErrNoHeader},
-		{"no rows", "# fo:status\n", ErrNoRows},
-		{"bad state", "# fo:status\nbogus foo\n", ErrBadState},
-		{"missing label", "# fo:status\nok\n", ErrMalformedRow},
+		{"no header", "ok foo\n", errNoHeader},
+		{"no rows", "# fo:status\n", errNoRows},
+		{"bad state", "# fo:status\nbogus foo\n", errBadState},
+		{"missing label", "# fo:status\nok\n", errMalformedRow},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

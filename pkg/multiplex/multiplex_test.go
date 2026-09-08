@@ -87,8 +87,8 @@ func TestParseSectionsCRLF(t *testing.T) {
 }
 
 func TestParseSectionsEmpty(t *testing.T) {
-	if _, _, err := ParseSections([]byte("no delimiters here\nat all\n")); !errors.Is(err, ErrNoSections) {
-		t.Errorf("err = %v, want ErrNoSections", err)
+	if _, _, err := ParseSections([]byte("no delimiters here\nat all\n")); !errors.Is(err, errNoSections) {
+		t.Errorf("err = %v, want errNoSections", err)
 	}
 }
 

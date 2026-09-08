@@ -37,9 +37,9 @@ func IsHeader(data []byte) bool {
 }
 
 var (
-	ErrNoHeader     = errors.New("metrics: missing '# fo:metrics' header")
-	ErrNoRows       = errors.New("metrics: no data rows")
-	ErrMalformedRow = errors.New("metrics: malformed row")
+	errNoHeader     = errors.New("metrics: missing '# fo:metrics' header")
+	errNoRows       = errors.New("metrics: no data rows")
+	errMalformedRow = errors.New("metrics: malformed row")
 )
 
 // Parse reads metrics input from r and returns the parsed Metrics.
@@ -49,8 +49,8 @@ func Parse(r io.Reader, stderr io.Writer) (Metrics, error) {
 	tool, err := hygiene.Scan(r, hygiene.Spec{
 		Prefix:      HeaderPrefix,
 		Name:        "metrics",
-		ErrNoHeader: ErrNoHeader,
-		ErrNoRows:   ErrNoRows,
+		ErrNoHeader: errNoHeader,
+		ErrNoRows:   errNoRows,
 		Stderr:      stderr,
 		OnRow: func(_ int, line string) error {
 			row, perr := parseRow(line)
@@ -71,11 +71,11 @@ func Parse(r io.Reader, stderr io.Writer) (Metrics, error) {
 func parseRow(line string) (Row, error) {
 	fields := strings.Fields(line)
 	if len(fields) < 2 {
-		return Row{}, fmt.Errorf("%w: expected '<key> <value> [unit]', got %q", ErrMalformedRow, line)
+		return Row{}, fmt.Errorf("%w: expected '<key> <value> [unit]', got %q", errMalformedRow, line)
 	}
 	v, err := strconv.ParseFloat(fields[1], 64)
 	if err != nil {
-		return Row{}, fmt.Errorf("%w: non-numeric value %q", ErrMalformedRow, fields[1])
+		return Row{}, fmt.Errorf("%w: non-numeric value %q", errMalformedRow, fields[1])
 	}
 	row := Row{Key: fields[0], Value: v}
 	if len(fields) >= 3 {
