@@ -128,6 +128,21 @@ func TestReadBytes_DepthBomb(t *testing.T) {
 	}
 }
 
+// TestRead_DepthBomb is the fo-n25.7 regression: Read (the exported
+// io.Reader entry point) previously called json.Decoder.Decode directly
+// with no depth guard, unlike ReadBytes. Any future streaming caller of
+// Read would have inherited the #269 depth-bomb stack-overflow exposure.
+// Verifies Read now rejects the same pathological nesting ReadBytes does,
+// instead of recursing into Decode.
+func TestRead_DepthBomb(t *testing.T) {
+	depth := maxNestingDepth + 50
+	bomb := strings.Repeat("[", depth) + strings.Repeat("]", depth)
+	_, err := Read(strings.NewReader(bomb))
+	if !errors.Is(err, ErrNestingTooDeep) {
+		t.Fatalf("expected ErrNestingTooDeep, got %v", err)
+	}
+}
+
 // TestReadBytes_DeepButBounded confirms the guard does not reject documents
 // nested below the limit — only the depth-bomb is rejected, not valid SARIF.
 func TestReadBytes_DeepButBounded(t *testing.T) {

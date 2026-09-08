@@ -204,12 +204,20 @@ type pkgState struct {
 	duration    time.Duration
 	coverage    float64
 	failedOrder []string // failed test names in run order
-	buildError  string
-	buildOutput []string
-	panicked    bool
-	panicOutput []string
-	// Track output per test (empty test name = package-level output).
-	// On failure, output is read directly from here via failedOrder keys.
+	// failedOutput holds each failed test's captured output, same index as
+	// failedOrder. handleFail moves the buffered output out of
+	// outputBuf/outputBufBytes into this slice at the terminal event —
+	// mirroring handlePass/actionSkip's eviction — so those maps don't
+	// retain one entry per failed test name for the life of the aggregator
+	// (fo-n25.7).
+	failedOutput [][]string
+	buildError   string
+	buildOutput  []string
+	panicked     bool
+	panicOutput  []string
+	// Track output per in-flight test (empty test name = package-level
+	// output). Entries are removed on every terminal action (pass/fail/skip)
+	// — see handlePass, handleFail, actionSkip.
 	outputBuf        map[string][]string
 	outputBufBytes   map[string]int // bytes accumulated per test name
 	panicOutputBytes int
@@ -316,6 +324,15 @@ func (*aggregator) handleFail(pkg *pkgState, e TestEvent) {
 	if e.Test != "" {
 		pkg.failed++
 		pkg.failedOrder = append(pkg.failedOrder, e.Test)
+		// Move the buffered output into failedOutput and evict it from
+		// outputBuf/outputBufBytes — same eviction handlePass/actionSkip do
+		// on their terminal events, so a stream with unbounded distinct
+		// failing test names doesn't leave unbounded map entries behind
+		// (fo-n25.7). The captured content is preserved; only the map
+		// bookkeeping is freed.
+		pkg.failedOutput = append(pkg.failedOutput, pkg.outputBuf[e.Test])
+		delete(pkg.outputBuf, e.Test)
+		delete(pkg.outputBufBytes, e.Test)
 		return
 	}
 	pkg.duration = time.Duration(e.Elapsed * float64(time.Second))
@@ -400,9 +417,10 @@ func (a *aggregator) results() []TestPackageResult {
 			PanicOutput: panicCopy,
 		}
 
-		// Build failed tests list in run order
-		for _, testName := range pkg.failedOrder {
-			outCopy := append([]string(nil), pkg.outputBuf[testName]...)
+		// Build failed tests list in run order. Output was captured into
+		// failedOutput (same index) at fail time — see handleFail.
+		for i, testName := range pkg.failedOrder {
+			outCopy := append([]string(nil), pkg.failedOutput[i]...)
 			r.FailedTests = append(r.FailedTests, FailedTest{
 				Name:   testName,
 				Output: outCopy,

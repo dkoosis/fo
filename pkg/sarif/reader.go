@@ -24,9 +24,31 @@ var ErrNestingTooDeep = errors.New("sarif nesting too deep")
 // 256 leaves generous headroom while still stopping a depth-bomb.
 const maxNestingDepth = 256
 
-// Read parses SARIF from an io.Reader.
+// Read parses SARIF from an io.Reader. It fully buffers r and routes
+// through the same depth guard ReadBytes runs (fo-n25.7) — without this,
+// any caller of the exported Reader-based API would inherit the
+// depth-bomb exposure ReadBytes was hardened against for #269.
 func Read(r io.Reader) (*Document, error) {
-	dec := json.NewDecoder(r)
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, fmt.Errorf("read sarif: %w", err)
+	}
+	return ReadBytes(data)
+}
+
+// ReadBytes parses SARIF from a byte slice. It runs a depth guard before
+// decoding so a depth-bomb cannot overflow the stack in Decode.
+func ReadBytes(data []byte) (*Document, error) {
+	if err := checkDepth(data); err != nil {
+		return nil, err
+	}
+	return decode(data)
+}
+
+// decode performs the actual JSON decode. Callers must run checkDepth
+// first — decode itself has no guard against pathological nesting.
+func decode(data []byte) (*Document, error) {
+	dec := json.NewDecoder(bytes.NewReader(data))
 	var doc Document
 	if err := dec.Decode(&doc); err != nil {
 		return nil, fmt.Errorf("decode sarif: %w", err)
@@ -38,15 +60,6 @@ func Read(r io.Reader) (*Document, error) {
 		return nil, errMissingSARIFVersion
 	}
 	return &doc, nil
-}
-
-// ReadBytes parses SARIF from a byte slice. It runs a depth guard before
-// decoding so a depth-bomb cannot overflow the stack in Decode.
-func ReadBytes(data []byte) (*Document, error) {
-	if err := checkDepth(data); err != nil {
-		return nil, err
-	}
-	return Read(bytes.NewReader(data))
 }
 
 // checkDepth walks the JSON token stream and returns ErrNestingTooDeep if
