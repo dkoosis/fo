@@ -119,6 +119,17 @@ const (
 	DiffClassFlaky      DiffClass = "flaky"
 )
 
+// GeneratedAtOrNow returns t when non-zero, else the current UTC time.
+// Mirrors pkg/state/runlog.go's inject-or-fallback convention: a
+// caller-supplied timestamp is honored (deterministic under test);
+// omitting it falls back to the wall clock.
+func GeneratedAtOrNow(t time.Time) time.Time {
+	if !t.IsZero() {
+		return t
+	}
+	return time.Now().UTC()
+}
+
 // DiffItem mirrors the shape of state.Item without importing pkg/state
 // (state already depends on report; this preserves the one-way edge).
 type DiffItem struct {

@@ -28,10 +28,18 @@ const maxClusterInputs = 5000
 //
 // Outcomes carry priority via Score: panics > build errors > test failures
 // > passes. Sorting is stable on (Score desc, Package, Test).
-func ToReport(results []TestPackageResult) *report.Report {
+//
+// generatedAt, when given and non-zero, stamps Report.GeneratedAt instead
+// of the wall clock — mirrors pkg/state/runlog.go's inject-or-fallback
+// convention so output is deterministic under test.
+func ToReport(results []TestPackageResult, generatedAt ...time.Time) *report.Report {
+	var seed time.Time
+	if len(generatedAt) > 0 {
+		seed = generatedAt[0]
+	}
 	r := &report.Report{
 		Tool:        "go test",
-		GeneratedAt: time.Now().UTC(),
+		GeneratedAt: report.GeneratedAtOrNow(seed),
 	}
 
 	for i := range results {
@@ -180,8 +188,8 @@ func isFailureOutcome(o report.TestOutcome) bool {
 
 // ToReportWithMeta stamps DataHash from raw input bytes the caller already
 // has.
-func ToReportWithMeta(results []TestPackageResult, rawInput []byte) *report.Report {
-	r := ToReport(results)
+func ToReportWithMeta(results []TestPackageResult, rawInput []byte, generatedAt ...time.Time) *report.Report {
+	r := ToReport(results, generatedAt...)
 	if len(rawInput) > 0 {
 		sum := sha256.Sum256(rawInput)
 		r.DataHash = hex.EncodeToString(sum[:])

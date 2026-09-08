@@ -18,9 +18,17 @@ import (
 // Findings carry per-finding Score and Fingerprint, with Score reflecting
 // occurrence count across the whole document so that widespread defects
 // rank above isolated ones.
-func ToReport(doc *Document) *report.Report {
+//
+// generatedAt, when given and non-zero, stamps Report.GeneratedAt instead
+// of the wall clock — mirrors pkg/state/runlog.go's inject-or-fallback
+// convention so output is deterministic under test.
+func ToReport(doc *Document, generatedAt ...time.Time) *report.Report {
+	var seed time.Time
+	if len(generatedAt) > 0 {
+		seed = generatedAt[0]
+	}
 	r := &report.Report{
-		GeneratedAt: time.Now().UTC(),
+		GeneratedAt: report.GeneratedAtOrNow(seed),
 	}
 	if len(doc.Runs) > 0 {
 		r.Tool = doc.Runs[0].Tool.Driver.Name
@@ -69,8 +77,8 @@ func ToReport(doc *Document) *report.Report {
 
 // ToReportWithMeta is ToReport but stamps DataHash from the raw input bytes
 // the caller already has, instead of recomputing from the parsed document.
-func ToReportWithMeta(doc *Document, rawInput []byte) *report.Report {
-	r := ToReport(doc)
+func ToReportWithMeta(doc *Document, rawInput []byte, generatedAt ...time.Time) *report.Report {
+	r := ToReport(doc, generatedAt...)
 	if len(rawInput) > 0 {
 		sum := sha256.Sum256(rawInput)
 		r.DataHash = hex.EncodeToString(sum[:])

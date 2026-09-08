@@ -128,3 +128,28 @@ func TestToReport_DeterministicFingerprint(t *testing.T) {
 			a.Tests[0].Fingerprint, b.Tests[0].Fingerprint)
 	}
 }
+
+// fo-n25.6: an injected generatedAt is stamped verbatim instead of the
+// wall clock, so output is deterministic under test.
+func TestToReport_InjectedGeneratedAt(t *testing.T) {
+	t.Parallel()
+
+	want := time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC)
+	r := testjson.ToReport(nil, want)
+	if !r.GeneratedAt.Equal(want) {
+		t.Errorf("GeneratedAt = %v, want %v", r.GeneratedAt, want)
+	}
+}
+
+// fo-n25.6: omitting generatedAt falls back to the wall clock, matching
+// prior (non-injectable) behavior.
+func TestToReport_OmittedGeneratedAtUsesClock(t *testing.T) {
+	t.Parallel()
+
+	before := time.Now().UTC()
+	r := testjson.ToReport(nil)
+	after := time.Now().UTC()
+	if r.GeneratedAt.Before(before) || r.GeneratedAt.After(after) {
+		t.Errorf("GeneratedAt = %v, want between %v and %v", r.GeneratedAt, before, after)
+	}
+}
