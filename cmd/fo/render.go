@@ -189,7 +189,7 @@ func renderMetrics(input []byte, stdout io.Writer, stderr io.Writer, mode string
 		return code
 	}
 
-	if err := os.MkdirAll(state.Dir(), 0o755); err != nil {
+	if err := os.MkdirAll(state.Dir(), 0o750); err != nil {
 		fmt.Fprintf(stderr, "fo: save metrics history: %v\n", err)
 		return 0
 	}
