@@ -180,86 +180,29 @@ EXIT CODES
   2   Usage error — bad flags, unrecognized input, stdin problems
 `
 
+// run is the top-level dispatcher: subcommand routing, flag parsing,
+// format sniffing, the hygiene-format dispatch chain, the general
+// SARIF/go-test parse path, diff classification, and rendering. Each
+// phase is a named helper below so it can be read and tested on its
+// own; run() itself is just the sequencing plus early-return plumbing.
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	if len(args) > 0 {
-		switch args[0] {
-		case subWrap:
-			return runWrap(args[1:], stdin, stdout, stderr)
-		case subState:
-			return runState(args[1:], stdout, stderr)
-		case subSuppress:
-			return runSuppress(args[1:], stdout, stderr)
-		case subWatch:
-			return runWatch(args[1:], stdin, stdout, stderr)
-		case subExplain:
-			return runExplain(args[1:], stdout, stderr)
-		case subTrend:
-			return runTrend(args[1:], stdout, stderr)
-		case subReplay:
-			return runReplay(args[1:], stdout, stderr)
-		case "help", "-h", flagHelp:
-			fmt.Fprint(stderr, usage)
-			return 0
-		case "version", "-version", "--version":
-			fmt.Fprintln(stdout, resolveVersion())
-			return 0
-		case "-print-schema", "--print-schema":
-			fmt.Fprint(stdout, report.Schema())
-			return 0
-		}
-		// Reject unknown non-flag positional args (e.g. typos like
-		// `fo nonsense`). Otherwise the flag parser stops at the arg,
-		// stdin is empty, and the user gets a misleading "no input" error.
-		if !strings.HasPrefix(args[0], "-") {
-			fmt.Fprintf(stderr, "fo: unknown subcommand %q\n\nRun 'fo --help' for usage.\n", args[0])
-			return 2
-		}
+	if code, handled := dispatchSubcommand(args, stdin, stdout, stderr); handled {
+		return code
 	}
 
-	fs := flag.NewFlagSet("fo", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	fs.Usage = func() { fmt.Fprint(stderr, usage) }
-	formatFlag := fs.String("format", "auto", "Output format: auto, human, llm, json, github")
-	themeFlag := fs.String("theme", "auto", "Theme: auto, color, mono")
-	stateFile := fs.String("state-file", state.Path(), "Sidecar state file path")
-	noStateFlag := fs.Bool("no-state", false, "Skip diff classification and sidecar I/O")
-	stateStrictFlag := fs.Bool("state-strict", false, "Exit non-zero if sidecar Save fails")
-	streamFlag := fs.Bool("stream", false, "Stream go test -json incrementally (avoids 256 MiB cap)")
-	asFlag := fs.String("as", "", "Hint format when auto-detection is ambiguous: tally|status|metrics|diag")
-	var expandValues []string
-	fs.Func("expand", "Reveal cluster members; value is a cluster ID or 'all'. Repeatable.", func(v string) error {
-		expandValues = append(expandValues, v)
-		return nil
-	})
-	if err := fs.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			return 0
-		}
-		return 2
+	rf, code, ok := parseRunFlags(args, stderr)
+	if !ok {
+		return code
 	}
 
-	// Short-circuit when stdin is a terminal: Peek would block waiting for
-	// EOF (Ctrl-D) and the user sees a hang. fo only consumes piped input.
-	if f, ok := stdin.(*os.File); ok && term.IsTerminal(int(f.Fd())) {
-		fmt.Fprintf(stderr, "fo: no input on stdin (pipe data in or run 'fo --help')\n")
-		return 2
+	br, peeked, code, ok := peekStdin(stdin, stderr)
+	if !ok {
+		return code
 	}
 
-	br := bufio.NewReaderSize(stdin, 8*1024)
-	peeked, peekErr := br.Peek(4096)
-	if len(peeked) == 0 {
-		if peekErr != nil && peekErr != io.EOF {
-			fmt.Fprintf(stderr, "fo: reading stdin: %v\n", peekErr)
-		} else {
-			fmt.Fprintf(stderr, "fo: no input on stdin\n")
-		}
-		return 2
-	}
-
-	mode, err := resolveFormat(*formatFlag, stdout)
-	if err != nil {
-		fmt.Fprintf(stderr, "fo: %v\n", err)
-		return 2
+	mode, policy, code, ok := resolveModeAndPolicy(rf, stdout, stderr)
+	if !ok {
+		return code
 	}
 
 	// Streaming dispatch: go test -json input only.
@@ -267,28 +210,188 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	//   - --stream (any format) → incremental parse, single batch render.
 	// Non-go-test input (SARIF, multiplex) ignores --stream and falls
 	// through to the batch path.
-	policy, perr := resolveStatePolicy(*noStateFlag, *stateStrictFlag)
+	if code, handled := dispatchGoTestStream(peeked, mode, rf, policy, stdin, br, stdout, stderr); handled {
+		return code
+	}
+
+	input, rawInput, code, ok := readInput(br, rf.as, stderr)
+	if !ok {
+		return code
+	}
+
+	if code, handled := dispatchHygieneFormat(input, mode, rf.theme, stdout, stderr); handled {
+		return code
+	}
+
+	r, code, ok := buildReport(input, stderr)
+	if !ok {
+		return code
+	}
+	saveErr := classifyAndRecord(r, rawInput, rf.stateFile, policy, stderr)
+
+	warnUnknownExpandIDs(mode, r, rf.expand, stderr)
+
+	return finishRender(mode, r, stdout, rf.theme, rf.expand, saveErr, policy, stderr)
+}
+
+// dispatchSubcommand handles the args that precede normal flag parsing:
+// known subcommands (wrap, state, suppress, watch, explain, trend,
+// replay), the help/version/schema shortcuts, and rejection of an
+// unknown non-flag positional arg. handled is false when args should
+// fall through to normal flag parsing (empty args, or args[0] is a flag).
+func dispatchSubcommand(args []string, stdin io.Reader, stdout, stderr io.Writer) (code int, handled bool) {
+	if len(args) == 0 {
+		return 0, false
+	}
+	switch args[0] {
+	case subWrap:
+		return runWrap(args[1:], stdin, stdout, stderr), true
+	case subState:
+		return runState(args[1:], stdout, stderr), true
+	case subSuppress:
+		return runSuppress(args[1:], stdout, stderr), true
+	case subWatch:
+		return runWatch(args[1:], stdin, stdout, stderr), true
+	case subExplain:
+		return runExplain(args[1:], stdout, stderr), true
+	case subTrend:
+		return runTrend(args[1:], stdout, stderr), true
+	case subReplay:
+		return runReplay(args[1:], stdout, stderr), true
+	case "help", "-h", flagHelp:
+		fmt.Fprint(stderr, usage)
+		return 0, true
+	case "version", "-version", "--version":
+		fmt.Fprintln(stdout, resolveVersion())
+		return 0, true
+	case "-print-schema", "--print-schema":
+		fmt.Fprint(stdout, report.Schema())
+		return 0, true
+	}
+	// Reject unknown non-flag positional args (e.g. typos like
+	// `fo nonsense`). Otherwise the flag parser stops at the arg,
+	// stdin is empty, and the user gets a misleading "no input" error.
+	if !strings.HasPrefix(args[0], "-") {
+		fmt.Fprintf(stderr, "fo: unknown subcommand %q\n\nRun 'fo --help' for usage.\n", args[0])
+		return 2, true
+	}
+	return 0, false
+}
+
+// runFlags holds the parsed flags for the default (non-subcommand) run
+// path, so the pipeline stages below can pass them around as a unit
+// instead of a long parameter list of pointers.
+type runFlags struct {
+	format      string
+	theme       string
+	stateFile   string
+	noState     bool
+	stateStrict bool
+	stream      bool
+	as          string
+	expand      []string
+}
+
+// parseRunFlags parses the default run flag set. ok is false when the
+// caller should return code directly (help was printed, or a parse
+// error occurred).
+func parseRunFlags(args []string, stderr io.Writer) (rf *runFlags, code int, ok bool) {
+	fs := flag.NewFlagSet("fo", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	fs.Usage = func() { fmt.Fprint(stderr, usage) }
+
+	rf = &runFlags{}
+	fs.StringVar(&rf.format, "format", "auto", "Output format: auto, human, llm, json, github")
+	fs.StringVar(&rf.theme, "theme", "auto", "Theme: auto, color, mono")
+	fs.StringVar(&rf.stateFile, "state-file", state.Path(), "Sidecar state file path")
+	fs.BoolVar(&rf.noState, "no-state", false, "Skip diff classification and sidecar I/O")
+	fs.BoolVar(&rf.stateStrict, "state-strict", false, "Exit non-zero if sidecar Save fails")
+	fs.BoolVar(&rf.stream, "stream", false, "Stream go test -json incrementally (avoids 256 MiB cap)")
+	fs.StringVar(&rf.as, "as", "", "Hint format when auto-detection is ambiguous: tally|status|metrics|diag")
+	fs.Func("expand", "Reveal cluster members; value is a cluster ID or 'all'. Repeatable.", func(v string) error {
+		rf.expand = append(rf.expand, v)
+		return nil
+	})
+
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return nil, 0, false
+		}
+		return nil, 2, false
+	}
+	return rf, 0, true
+}
+
+// peekStdin validates that stdin is piped rather than an interactive
+// terminal, then buffers it and peeks the bytes used for format
+// sniffing. ok is false when the caller should return code directly.
+func peekStdin(stdin io.Reader, stderr io.Writer) (br *bufio.Reader, peeked []byte, code int, ok bool) {
+	// Short-circuit when stdin is a terminal: Peek would block waiting for
+	// EOF (Ctrl-D) and the user sees a hang. fo only consumes piped input.
+	if f, isFile := stdin.(*os.File); isFile && term.IsTerminal(int(f.Fd())) {
+		fmt.Fprintf(stderr, "fo: no input on stdin (pipe data in or run 'fo --help')\n")
+		return nil, nil, 2, false
+	}
+
+	br = bufio.NewReaderSize(stdin, 8*1024)
+	peeked, peekErr := br.Peek(4096)
+	if len(peeked) == 0 {
+		if peekErr != nil && peekErr != io.EOF {
+			fmt.Fprintf(stderr, "fo: reading stdin: %v\n", peekErr)
+		} else {
+			fmt.Fprintf(stderr, "fo: no input on stdin\n")
+		}
+		return nil, nil, 2, false
+	}
+	return br, peeked, 0, true
+}
+
+// resolveModeAndPolicy resolves the output mode (auto→TTY-detected) and
+// the sidecar state policy from the parsed flags. ok is false when the
+// caller should return code directly.
+func resolveModeAndPolicy(rf *runFlags, stdout io.Writer, stderr io.Writer) (mode string, policy statePolicy, code int, ok bool) {
+	mode, err := resolveFormat(rf.format, stdout)
+	if err != nil {
+		fmt.Fprintf(stderr, "fo: %v\n", err)
+		return "", 0, 2, false
+	}
+	policy, perr := resolveStatePolicy(rf.noState, rf.stateStrict)
 	if perr != nil {
 		fmt.Fprintf(stderr, "fo: %v\n", perr)
-		return 2
+		return "", 0, 2, false
 	}
+	return mode, policy, 0, true
+}
 
-	if sniffGoTestJSON(peeked) {
-		ttyAuto := *formatFlag == "auto" && isTTYWriter(stdout)
-		switch {
-		case ttyAuto:
-			return runStream(streamOpts{
-				stdin: stdin, br: br, stdout: stdout, stderr: stderr,
-				theme: resolveTheme(*themeFlag, stdout), stateFile: *stateFile, policy: policy,
-			})
-		case *streamFlag:
-			return runStreamBatch(streamOpts{
-				stdin: stdin, br: br, stdout: stdout, stderr: stderr,
-				mode: mode, themeName: *themeFlag, stateFile: *stateFile, policy: policy,
-			})
-		}
+// dispatchGoTestStream handles the two streaming fast paths for
+// go test -json input: TTY+format=auto renders incrementally, and
+// --stream (any format) parses incrementally with a single batch
+// render. handled is false when input isn't go-test JSON, or is but
+// matches neither case (falls through to the batch parse path).
+func dispatchGoTestStream(peeked []byte, mode string, rf *runFlags, policy statePolicy, stdin io.Reader, br *bufio.Reader, stdout, stderr io.Writer) (code int, handled bool) {
+	if !sniffGoTestJSON(peeked) {
+		return 0, false
 	}
+	ttyAuto := rf.format == "auto" && isTTYWriter(stdout)
+	switch {
+	case ttyAuto:
+		return runStream(streamOpts{
+			stdin: stdin, br: br, stdout: stdout, stderr: stderr,
+			theme: resolveTheme(rf.theme, stdout), stateFile: rf.stateFile, policy: policy,
+		}), true
+	case rf.stream:
+		return runStreamBatch(streamOpts{
+			stdin: stdin, br: br, stdout: stdout, stderr: stderr,
+			mode: mode, themeName: rf.theme, stateFile: rf.stateFile, policy: policy,
+		}), true
+	}
+	return 0, false
+}
 
+// readInput reads the full bounded stdin body and applies the optional
+// --as coercion hint. ok is false when the caller should return code
+// directly.
+func readInput(br *bufio.Reader, as string, stderr io.Writer) (input, rawInput []byte, code int, ok bool) {
 	input, err := boundread.All(br, 0)
 	if err != nil {
 		if errors.Is(err, boundread.ErrInputTooLarge) {
@@ -296,81 +399,114 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		} else {
 			fmt.Fprintf(stderr, "fo: reading stdin: %v\n", err)
 		}
-		return 2
+		return nil, nil, 2, false
 	}
 
-	rawInput := input
-	if *asFlag != "" {
-		coerced, code := coerceAs(*asFlag, input, stderr)
+	rawInput = input
+	if as != "" {
+		coerced, code := coerceAs(as, input, stderr)
 		if code != 0 {
-			return code
+			return nil, nil, code, false
 		}
 		input = coerced
 	}
+	return input, rawInput, 0, true
+}
 
+// dispatchHygieneFormat renders the small structured "hygiene" formats
+// (tally, status, metrics, scene) and the cast/bare-tally special
+// cases — all of which bypass the general SARIF/go-test Report
+// pipeline. handled is false when input matches none of these and
+// should continue to the general parse path.
+func dispatchHygieneFormat(input []byte, mode string, themeFlag string, stdout, stderr io.Writer) (code int, handled bool) {
 	// cast animates a scene; nothing else has a time axis to record.
 	if mode == formatCast && !scene.IsHeader(input) {
 		fmt.Fprintln(stderr, "fo: --format cast requires # fo:scene input")
-		return 2
+		return 2, true
 	}
 
 	if tally.IsHeader(input) {
-		return renderTally(input, stdout, stderr, mode, *themeFlag)
+		return renderTally(input, stdout, stderr, mode, themeFlag), true
 	}
 
 	if status.IsHeader(input) {
-		return renderStatus(input, stdout, stderr, mode)
+		return renderStatus(input, stdout, stderr, mode), true
 	}
 
 	if metrics.IsHeader(input) {
-		return renderMetrics(input, stdout, stderr, mode)
+		return renderMetrics(input, stdout, stderr, mode), true
 	}
 
 	if scene.IsHeader(input) {
-		return renderScene(input, stdout, stderr, mode)
+		return renderScene(input, stdout, stderr, mode), true
 	}
 
 	if sniffBareTally(input) {
 		var buf bytes.Buffer
 		if err := wrapleaderboard.Convert(bytes.NewReader(input), &buf, wrapleaderboard.Opts{Stderr: stderr}); err != nil {
 			fmt.Fprintf(stderr, "fo: tally auto-detect: %v\n", err)
-			return 2
+			return 2, true
 		}
-		return renderTally(buf.Bytes(), stdout, stderr, mode, *themeFlag)
+		return renderTally(buf.Bytes(), stdout, stderr, mode, themeFlag), true
 	}
 
+	return 0, false
+}
+
+// buildReport parses input into a Report. ok is false when the caller
+// should return code directly.
+func buildReport(input []byte, stderr io.Writer) (r *report.Report, code int, ok bool) {
 	r, err := parseToReport(input, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "fo: %v\n", err)
-		return 2
+		return nil, 2, false
 	}
+	return r, 0, true
+}
 
+// classifyAndRecord runs the post-parse pipeline on r: suppression,
+// full-log recording, diff classification against the sidecar, and
+// handle assignment/run-log recording. Returns the sidecar's save
+// error, if any — surfaced to the caller for --state-strict handling
+// rather than treated as fatal here.
+func classifyAndRecord(r *report.Report, rawInput []byte, stateFile string, policy statePolicy, stderr io.Writer) error {
 	applySuppress(r, suppressPath(), stderr)
 	recordFullLog(r, rawInput, policy, stderr)
 
-	saveErr := attachDiff(r, *stateFile, policy, stderr)
+	saveErr := attachDiff(r, stateFile, policy, stderr)
 
 	assignAndPersistIDs(r, policy, stderr)
 	recordRun(r, policy, stderr)
 
-	// Warn on unknown --expand IDs in human mode; LLM mode ignores --expand
-	// (clusters always render fully there).
-	if mode != formatLLM && len(expandValues) > 0 {
-		known := map[string]struct{}{}
-		for _, c := range r.Clusters {
-			known[c.ID] = struct{}{}
+	return saveErr
+}
+
+// warnUnknownExpandIDs warns on --expand values that don't match any
+// cluster ID in the report. Human mode only; LLM mode ignores --expand
+// since clusters always render fully there.
+func warnUnknownExpandIDs(mode string, r *report.Report, expandValues []string, stderr io.Writer) {
+	if mode == formatLLM || len(expandValues) == 0 {
+		return
+	}
+	known := map[string]struct{}{}
+	for _, c := range r.Clusters {
+		known[c.ID] = struct{}{}
+	}
+	for _, v := range expandValues {
+		if v == "all" {
+			continue
 		}
-		for _, v := range expandValues {
-			if v == "all" {
-				continue
-			}
-			if _, ok := known[v]; !ok {
-				fmt.Fprintf(stderr, "fo: --expand=%s not found\n", v)
-			}
+		if _, ok := known[v]; !ok {
+			fmt.Fprintf(stderr, "fo: --expand=%s not found\n", v)
 		}
 	}
+}
 
-	if err := renderMode(mode, r, stdout, *themeFlag, expandValues); err != nil {
+// finishRender renders the report and computes the final exit code,
+// honoring --state-strict: a failed sidecar save escalates to exit 2
+// even when the report itself is clean.
+func finishRender(mode string, r *report.Report, stdout io.Writer, themeFlag string, expandValues []string, saveErr error, policy statePolicy, stderr io.Writer) int {
+	if err := renderMode(mode, r, stdout, themeFlag, expandValues); err != nil {
 		fmt.Fprintf(stderr, "fo: %v\n", err)
 		return 2
 	}
