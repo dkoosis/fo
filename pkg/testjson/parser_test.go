@@ -219,11 +219,85 @@ func TestProcessEvent_FreesOutputOnPassAndSkip(t *testing.T) {
 		agg.processEvent(event)
 	}
 	pkgState := agg.packages[pkg]
-	// Only the failed test and package-level ("") output should remain.
+	// Only package-level ("") output should remain — pass, skip, and now
+	// fail (fo-n25.7) all evict their per-test entry from outputBuf on the
+	// terminal event. The failed test's output survives via failedOutput,
+	// asserted above through FailedTests[0].Output.
 	for testName := range pkgState.outputBuf {
-		if testName != "" && testName != "TestFail" {
-			t.Errorf("outputBuf still contains %q — should have been freed on pass/skip", testName)
+		if testName != "" {
+			t.Errorf("outputBuf still contains %q — should have been freed on its terminal event", testName)
 		}
+	}
+	for testName := range pkgState.outputBufBytes {
+		if testName != "" {
+			t.Errorf("outputBufBytes still contains %q — should have been freed on its terminal event", testName)
+		}
+	}
+}
+
+// TestFail_EvictsOutputBufPerTest is a regression for fo-n25.7: a stream
+// with a large, attacker-influenced number of distinct FAILING test names
+// used to leave one permanent entry per name in outputBuf/outputBufBytes
+// (handleFail was the only terminal action that didn't evict), so
+// distinct-name cardinality drove unbounded map growth. Verifies that after
+// many sequential fail-terminated tests, outputBuf/outputBufBytes hold no
+// per-test entries — matching the eviction pass/skip already did — while
+// each failed test's output and count are still correctly reported.
+func TestFail_EvictsOutputBufPerTest(t *testing.T) {
+	t.Parallel()
+
+	const numFailingTests = 5000
+	pkg := "example.com/manyfail"
+
+	var b strings.Builder
+	for i := range numFailingTests {
+		name := fmt.Sprintf("TestFail%d", i)
+		fmt.Fprintf(&b, `{"Action":"run","Package":%q,"Test":%q}`+"\n", pkg, name)
+		fmt.Fprintf(&b, `{"Action":"output","Package":%q,"Test":%q,"Output":"boom %d\n"}`+"\n", pkg, name, i)
+		fmt.Fprintf(&b, `{"Action":"fail","Package":%q,"Test":%q,"Elapsed":0.01}`+"\n", pkg, name)
+	}
+	fmt.Fprintf(&b, `{"Action":"fail","Package":%q,"Elapsed":1.0}`+"\n", pkg)
+
+	results, malformed, err := ParseStream(strings.NewReader(b.String()))
+	if err != nil {
+		t.Fatalf("ParseStream() error = %v", err)
+	}
+	if malformed != 0 {
+		t.Fatalf("malformed = %d, want 0", malformed)
+	}
+	if len(results) != 1 {
+		t.Fatalf("packages = %d, want 1", len(results))
+	}
+	got := results[0]
+	if got.Failed != numFailingTests {
+		t.Fatalf("failed = %d, want %d", got.Failed, numFailingTests)
+	}
+	if len(got.FailedTests) != numFailingTests {
+		t.Fatalf("FailedTests = %d, want %d", len(got.FailedTests), numFailingTests)
+	}
+	for i, ft := range got.FailedTests {
+		if len(ft.Output) == 0 {
+			t.Fatalf("FailedTests[%d] (%s) has no output — captured output was lost", i, ft.Name)
+		}
+	}
+
+	// Inspect the aggregator directly: outputBuf/outputBufBytes must not
+	// have accumulated one entry per failed test name — each was evicted
+	// at its own fail event (handleFail), same as pass/skip already do.
+	agg := newAggregator()
+	for line := range strings.SplitSeq(strings.TrimSpace(b.String()), "\n") {
+		var event TestEvent
+		if err := json.Unmarshal([]byte(line), &event); err != nil {
+			continue
+		}
+		agg.processEvent(event)
+	}
+	pkgState := agg.packages[pkg]
+	if n := len(pkgState.outputBuf); n > 1 { // at most the "" package-level key
+		t.Errorf("outputBuf has %d entries after %d distinct failed tests, want ≤1 (unbounded growth)", n, numFailingTests)
+	}
+	if n := len(pkgState.outputBufBytes); n > 1 {
+		t.Errorf("outputBufBytes has %d entries after %d distinct failed tests, want ≤1 (unbounded growth)", n, numFailingTests)
 	}
 }
 
