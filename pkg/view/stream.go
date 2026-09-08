@@ -56,6 +56,7 @@ func RenderStream(ctx context.Context, w io.Writer, ch <-chan report.Report, t t
 // end-of-stream, only if no non-clean snapshot ever rendered. Any
 // non-clean snapshot discards a pending Clean heartbeat.
 func RenderStreamMode(ctx context.Context, w io.Writer, ch <-chan report.Report, t theme.Theme, width int, mode Mode) error {
+	out := snapshotOut{w: w, t: t, width: width, mode: mode}
 	first := true
 	var pendingClean *report.Report
 	rendered := false
@@ -65,9 +66,9 @@ func RenderStreamMode(ctx context.Context, w io.Writer, ch <-chan report.Report,
 			return ctx.Err()
 		case r, ok := <-ch:
 			if !ok {
-				return flushStream(w, pendingClean, t, width, &first, mode, rendered)
+				return flushStream(out, pendingClean, &first, rendered)
 			}
-			next, err := handleSnapshot(w, r, t, width, &first, mode, pendingClean)
+			next, err := handleSnapshot(out, r, &first, pendingClean)
 			if err != nil {
 				return err
 			}
@@ -79,43 +80,52 @@ func RenderStreamMode(ctx context.Context, w io.Writer, ch <-chan report.Report,
 	}
 }
 
+// snapshotOut bundles the render target and settings threaded by
+// handleSnapshot, flushStream and writeSnapshot.
+type snapshotOut struct {
+	w     io.Writer
+	t     theme.Theme
+	width int
+	mode  Mode
+}
+
 type streamStep struct {
 	pending  *report.Report
 	rendered bool
 }
 
-func handleSnapshot(w io.Writer, r report.Report, t theme.Theme, width int, first *bool, mode Mode, pending *report.Report) (streamStep, error) {
-	if _, isClean := PickViewMode(r, mode).(Clean); isClean {
+func handleSnapshot(out snapshotOut, r report.Report, first *bool, pending *report.Report) (streamStep, error) {
+	if _, isClean := PickViewMode(r, out.mode).(Clean); isClean {
 		snap := r
 		return streamStep{pending: &snap}, nil
 	}
 	_ = pending // drop pending Clean
-	if err := writeSnapshot(w, r, t, width, first, mode); err != nil {
+	if err := writeSnapshot(out, r, first); err != nil {
 		return streamStep{}, err
 	}
 	return streamStep{rendered: true}, nil
 }
 
-func flushStream(w io.Writer, pendingClean *report.Report, t theme.Theme, width int, first *bool, mode Mode, rendered bool) error {
+func flushStream(out snapshotOut, pendingClean *report.Report, first *bool, rendered bool) error {
 	if pendingClean != nil && !rendered {
-		return writeSnapshot(w, *pendingClean, t, width, first, mode)
+		return writeSnapshot(out, *pendingClean, first)
 	}
 	return nil
 }
 
-// writeSnapshot renders one report snapshot and writes it to w, prepending a
-// blank separator line for all but the first snapshot.
-func writeSnapshot(w io.Writer, r report.Report, t theme.Theme, width int, first *bool, mode Mode) error {
-	out := Render(PickViewMode(r, mode), t, width)
-	if out == "" {
+// writeSnapshot renders one report snapshot and writes it to out.w,
+// prepending a blank separator line for all but the first snapshot.
+func writeSnapshot(out snapshotOut, r report.Report, first *bool) error {
+	rendered := Render(PickViewMode(r, out.mode), out.t, out.width)
+	if rendered == "" {
 		return nil
 	}
 	if !*first {
-		if _, err := fmt.Fprintln(w); err != nil {
+		if _, err := fmt.Fprintln(out.w); err != nil {
 			return err
 		}
 	}
 	*first = false
-	_, err := fmt.Fprintln(w, out)
+	_, err := fmt.Fprintln(out.w, rendered)
 	return err
 }

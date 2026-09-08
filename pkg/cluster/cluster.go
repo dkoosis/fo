@@ -177,7 +177,12 @@ func extractWith(in Input, cfg Config) Signals {
 	}
 }
 
-func unionBy(uf *unionFind, recs []record, key func(Signals) string) {
+// signalKey extracts one string signal from a record's Signals, used to
+// group records by that signal (union-by-key) or pick the most common
+// value of it across a group.
+type signalKey func(Signals) string
+
+func unionBy(uf *unionFind, recs []record, key signalKey) {
 	groups := make(map[string]int)
 	for i := range recs {
 		k := key(recs[i].signals)
@@ -230,7 +235,7 @@ func buildCluster(members []int, recs []record, cfg Config, taken map[ClusterID]
 // mostCommon returns the most frequent non-empty value produced by
 // pick across members. Ties go to the lexicographically smallest
 // value so output is deterministic.
-func mostCommon(members []int, recs []record, pick func(Signals) string) string {
+func mostCommon(members []int, recs []record, pick signalKey) string {
 	counts := make(map[string]int)
 	for _, m := range members {
 		v := pick(recs[m].signals)

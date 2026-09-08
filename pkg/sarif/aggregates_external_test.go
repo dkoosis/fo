@@ -26,12 +26,12 @@ func TestTopFiles_ReturnsSortedLimitedCounts_When_DocumentIncludesMissingLocatio
 	tests := []struct {
 		name  string
 		limit int
-		want  []sarif.FileIssue
+		want  []sarif.FileSummary
 	}{
 		{
 			name:  "no limit returns all files sorted by issue count",
 			limit: 0,
-			want: []sarif.FileIssue{
+			want: []sarif.FileSummary{
 				{File: "alpha.go", IssueCount: 3, ErrorCount: 2, WarnCount: 1},
 				{File: "beta.go", IssueCount: 2, ErrorCount: 0, WarnCount: 1},
 			},
@@ -39,7 +39,7 @@ func TestTopFiles_ReturnsSortedLimitedCounts_When_DocumentIncludesMissingLocatio
 		{
 			name:  "positive limit truncates leaderboard",
 			limit: 1,
-			want: []sarif.FileIssue{
+			want: []sarif.FileSummary{
 				{File: "alpha.go", IssueCount: 3, ErrorCount: 2, WarnCount: 1},
 			},
 		},
@@ -51,7 +51,7 @@ func TestTopFiles_ReturnsSortedLimitedCounts_When_DocumentIncludesMissingLocatio
 
 			got := sarif.TopFiles(doc, tc.limit)
 
-			assertFileIssuesEqual(t, got, tc.want)
+			assertFileSummariesEqual(t, got, tc.want)
 			for i := 1; i < len(got); i++ {
 				if got[i-1].IssueCount < got[i].IssueCount {
 					t.Fatalf("invariant violated: top files are not sorted descending at %d", i)
@@ -143,7 +143,7 @@ func assertString(t *testing.T, got, want, field string) {
 	}
 }
 
-func assertFileIssuesEqual(t *testing.T, got, want []sarif.FileIssue) {
+func assertFileSummariesEqual(t *testing.T, got, want []sarif.FileSummary) {
 	t.Helper()
 	if len(got) != len(want) {
 		t.Fatalf("file issues length mismatch: got %d want %d", len(got), len(want))

@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+const testFooName = "TestFoo"
+
 func TestStream_EventDeliveryAndMalformedCounting(t *testing.T) {
 	t.Parallel()
 

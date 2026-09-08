@@ -5,12 +5,12 @@ import "strings"
 // Ruleset is an ordered list of suppressions loaded from .fo/ignore.
 // The zero value is empty and matches nothing.
 type Ruleset struct {
-	Rules []Suppression
+	Suppressions []Suppression
 }
 
 // NewRuleset wraps parsed suppressions into a Ruleset.
 func NewRuleset(rs []Suppression) *Ruleset {
-	return &Ruleset{Rules: rs}
+	return &Ruleset{Suppressions: rs}
 }
 
 // Match returns the index of the first suppression in rs that matches
@@ -19,8 +19,8 @@ func (rs *Ruleset) Match(ruleID, path string) int {
 	if rs == nil {
 		return -1
 	}
-	for i := range rs.Rules {
-		if matchSuppression(rs.Rules[i], ruleID, path) {
+	for i := range rs.Suppressions {
+		if matchSuppression(rs.Suppressions[i], ruleID, path) {
 			return i
 		}
 	}

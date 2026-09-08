@@ -21,7 +21,7 @@ type FilterStats struct {
 // at least one match). A nil/empty ruleset is a no-op.
 func ApplyFilter(r *Report, rs *suppress.Ruleset, now time.Time) FilterStats {
 	stats := FilterStats{PerRule: map[int]int{}}
-	if r == nil || rs == nil || len(rs.Rules) == 0 || len(r.Findings) == 0 {
+	if r == nil || rs == nil || len(rs.Suppressions) == 0 || len(r.Findings) == 0 {
 		return stats
 	}
 	// Zero now would silently invert every expiry check (year-0001 is
@@ -45,7 +45,7 @@ func ApplyFilter(r *Report, rs *suppress.Ruleset, now time.Time) FilterStats {
 		kept = append(kept, *f)
 		if expiredIdx >= 0 && !expiredNotified[expiredIdx] {
 			expiredNotified[expiredIdx] = true
-			r.Notices = append(r.Notices, expiredNotice(rs.Rules[expiredIdx]))
+			r.Notices = append(r.Notices, expiredNotice(rs.Suppressions[expiredIdx]))
 		}
 	}
 	// Zero the dropped tail so suppressed Finding structs (and their
@@ -62,11 +62,11 @@ func ApplyFilter(r *Report, rs *suppress.Ruleset, now time.Time) FilterStats {
 // Active match short-circuits the scan.
 func classifyFinding(rs *suppress.Ruleset, ruleID, file string, now time.Time) (activeIdx, expiredIdx int) {
 	activeIdx, expiredIdx = -1, -1
-	for i := range rs.Rules {
-		if !rs.Rules[i].Matches(ruleID, file) {
+	for i := range rs.Suppressions {
+		if !rs.Suppressions[i].Matches(ruleID, file) {
 			continue
 		}
-		if rs.Rules[i].Expired(now) {
+		if rs.Suppressions[i].Expired(now) {
 			if expiredIdx < 0 {
 				expiredIdx = i
 			}
