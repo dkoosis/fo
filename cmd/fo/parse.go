@@ -279,10 +279,17 @@ func parseTestJSONTolerant(input []byte, stderr io.Writer) (*report.Report, erro
 		}
 		return nil, unrecognizedInputErr(input)
 	}
+	r := testjson.ToReportWithMeta(results, input)
 	if malformed > 0 {
 		fmt.Fprintf(stderr, "fo: warning: %d malformed line(s) skipped\n", malformed)
+		// Notices carries the drop into the machine-readable contract
+		// (--format json) too — the stderr warning alone is invisible to
+		// a JSON consumer, which would otherwise see a "clean" Report
+		// with no trace that lines were silently skipped. Regression
+		// class for #222/#239 (fo-s38).
+		r.Notices = append(r.Notices, fmt.Sprintf("%d malformed go test -json line(s) skipped", malformed))
 	}
-	return testjson.ToReportWithMeta(results, input), nil
+	return r, nil
 }
 
 // parseMultiplex parses a multi-tool delimited stream and merges every
@@ -377,10 +384,12 @@ func parseSection(sec multiplex.Section, body []byte, stderr io.Writer) (*report
 		if err != nil {
 			return nil, fmt.Errorf("parsing go test -json: %w", err)
 		}
+		sub := testjson.ToReportWithMeta(results, body)
 		if malformed > 0 {
 			fmt.Fprintf(stderr, "fo: warning: tool=%s %d malformed line(s) skipped\n", sec.Tool, malformed)
+			sub.Notices = append(sub.Notices, fmt.Sprintf("tool=%s: %d malformed go test -json line(s) skipped", sec.Tool, malformed))
 		}
-		return testjson.ToReportWithMeta(results, body), nil
+		return sub, nil
 	default:
 		return nil, fmt.Errorf("%w: %q", errUnknownSectionFormat, sec.Format)
 	}

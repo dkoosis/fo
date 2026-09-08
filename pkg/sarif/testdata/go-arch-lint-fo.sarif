@@ -1,0 +1,153 @@
+{
+  "version": "2.1.0",
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "go-arch-lint"
+        }
+      },
+      "results": [
+        {
+          "ruleId": "dependency-violation",
+          "level": "error",
+          "message": {
+            "text": "cmd → github.com/dkoosis/fo/pkg/multiplex"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/cmd/fo/parse.go"
+                }
+              }
+            }
+          ],
+          "fixes": [
+            {
+              "description": {
+                "text": "go-arch-lint check --arch-file .go-arch-lint.yml"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "dependency-violation",
+          "level": "error",
+          "message": {
+            "text": "metrics → github.com/dkoosis/fo/pkg/hygiene"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/pkg/metrics/metrics.go"
+                }
+              }
+            }
+          ],
+          "fixes": [
+            {
+              "description": {
+                "text": "go-arch-lint check --arch-file .go-arch-lint.yml"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "dependency-violation",
+          "level": "error",
+          "message": {
+            "text": "score → github.com/dkoosis/fo/pkg/report"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/pkg/score/score.go"
+                }
+              }
+            }
+          ],
+          "fixes": [
+            {
+              "description": {
+                "text": "go-arch-lint check --arch-file .go-arch-lint.yml"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "dependency-violation",
+          "level": "error",
+          "message": {
+            "text": "status → github.com/dkoosis/fo/pkg/hygiene"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/pkg/status/status.go"
+                }
+              }
+            }
+          ],
+          "fixes": [
+            {
+              "description": {
+                "text": "go-arch-lint check --arch-file .go-arch-lint.yml"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "dependency-violation",
+          "level": "error",
+          "message": {
+            "text": "tally → github.com/dkoosis/fo/pkg/hygiene"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/pkg/tally/tally.go"
+                }
+              }
+            }
+          ],
+          "fixes": [
+            {
+              "description": {
+                "text": "go-arch-lint check --arch-file .go-arch-lint.yml"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "dependency-violation",
+          "level": "error",
+          "message": {
+            "text": "tally → github.com/dkoosis/fo/pkg/view"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/pkg/tally/tally.go"
+                }
+              }
+            }
+          ],
+          "fixes": [
+            {
+              "description": {
+                "text": "go-arch-lint check --arch-file .go-arch-lint.yml"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
