@@ -52,7 +52,7 @@ func TestSchemaCoversReportFields(t *testing.T) {
 			if tag == "" || tag == "-" {
 				continue
 			}
-			name := strings.SplitN(tag, ",", 2)[0]
+			name, _, _ := strings.Cut(tag, ",")
 			if name == "" {
 				continue
 			}

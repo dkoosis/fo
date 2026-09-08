@@ -78,7 +78,7 @@ audit-llm: snipe-index ## Force llm-formatted audit (agents/CI)
 report: audit-llm ## Alias for audit-llm (back-compat)
 
 deploy: install ## Build and install binary
-	@echo "=== deployed ($$(which fo)) ==="
+	@echo "deployed /usr/local/bin/fo ($$(/usr/local/bin/fo 2>&1 | head -1))"
 
 doctor: ## Validate required toolchain
 	@echo "=== doctor ==="
@@ -240,8 +240,11 @@ clean: ## Remove build artifacts
 build: ## Compile the fo binary to ./fo (no install)
 	go build -ldflags "-X main.version=$(VERSION)" -o fo ./cmd/fo/
 
-install: ## Install the fo binary to GOPATH/bin
-	go install ./cmd/fo/
+install: ## Install the fo binary to /usr/local/bin
+	@mkdir -p /usr/local/bin 2>/dev/null || true
+	@go build -ldflags "-X main.version=$(VERSION)" -o /usr/local/bin/fo ./cmd/fo/
+	@gp="$$(go env GOPATH)"; [ -n "$$gp" ] && rm -f "$$gp/bin/fo" || true
+	@echo "installed /usr/local/bin/fo ($$(/usr/local/bin/fo 2>&1 | head -1))"
 
 ## ---------------------------------------------------------------------
 ## Cross-compilation
