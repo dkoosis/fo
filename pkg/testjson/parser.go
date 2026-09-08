@@ -261,25 +261,29 @@ func (a *aggregator) getOrCreate(name string) *pkgState {
 }
 
 func (a *aggregator) processEvent(e TestEvent) {
-	if e.Action == "build-output" || e.Action == "build-fail" {
+	if e.Action == ActionBuildOutput || e.Action == ActionBuildFail {
 		a.handleBuildEvent(e)
 		return
 	}
 	pkg := a.getOrCreate(e.Package)
 
 	switch e.Action {
-	case actionPass:
+	case ActionPass:
 		a.handlePass(pkg, e)
-	case actionFail:
+	case ActionFail:
 		a.handleFail(pkg, e)
-	case actionSkip:
+	case ActionSkip:
 		if e.Test != "" {
 			pkg.skipped++
 			delete(pkg.outputBuf, e.Test)
 			delete(pkg.outputBufBytes, e.Test)
 		}
-	case "output":
+	case ActionOutput:
 		a.handleOutput(pkg, e)
+	case ActionStart, ActionRun, ActionBuildOutput, ActionBuildFail,
+		ActionBench, ActionPause, ActionCont:
+		// build-output/build-fail are routed to handleBuildEvent above;
+		// start/run/bench/pause/cont carry no aggregator-relevant state.
 	}
 }
 
@@ -297,16 +301,20 @@ func (a *aggregator) handleBuildEvent(e TestEvent) {
 	}
 	pkg := a.getOrCreate(name)
 	switch e.Action {
-	case "build-output":
+	case ActionBuildOutput:
 		out := strings.TrimRight(e.Output, "\n")
 		if out == "" || strings.HasPrefix(out, "# ") {
 			return
 		}
 		pkg.buildOutput, pkg.buildOutputBytes = appendCapped(pkg.buildOutput, pkg.buildOutputBytes, out)
-	case "build-fail":
+	case ActionBuildFail:
 		if pkg.buildError == "" {
 			pkg.buildError = strings.Join(pkg.buildOutput, "\n")
 		}
+	case ActionStart, ActionRun, ActionPass, ActionFail, ActionSkip, ActionOutput,
+		ActionBench, ActionPause, ActionCont:
+		// handleBuildEvent is only invoked for build-output/build-fail events;
+		// unreachable in practice, listed for exhaustiveness.
 	}
 }
 

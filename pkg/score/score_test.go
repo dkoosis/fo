@@ -1,21 +1,25 @@
 package score
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/dkoosis/fo/pkg/report"
+)
 
 const pkgXFile = "pkg/x/x.go"
 
 func TestSeverityWeight_MapsKnownLevels(t *testing.T) {
 	t.Parallel()
-	cases := map[string]int{
-		"error":   SeverityWeightError,
-		"warning": SeverityWeightWarning,
-		"note":    SeverityWeightNote,
-		"none":    SeverityWeightNote, // unknown falls back to note
-		"":        SeverityWeightNote,
+	cases := map[report.Severity]int{
+		report.SeverityError:   SeverityWeightError,
+		report.SeverityWarning: SeverityWeightWarning,
+		report.SeverityNote:    SeverityWeightNote,
+		"none":                 SeverityWeightNote, // unknown falls back to note
+		"":                     SeverityWeightNote,
 	}
-	for level, want := range cases {
-		if got := SeverityWeight(level); got != want {
-			t.Errorf("SeverityWeight(%q) = %d, want %d", level, got, want)
+	for sev, want := range cases {
+		if got := SeverityWeight(sev); got != want {
+			t.Errorf("SeverityWeight(%q) = %d, want %d", sev, got, want)
 		}
 	}
 }

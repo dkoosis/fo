@@ -114,7 +114,7 @@ func TestResultLineAndCol_ReturnsPrimaryLocationCoordinates_When_MultipleLocatio
 	assertInt(t, r.Col(), 7, "col from primary location")
 }
 
-func result(ruleID, level, file string, line, col int) sarif.Result {
+func result(ruleID string, level sarif.Level, file string, line, col int) sarif.Result {
 	r := sarif.Result{RuleID: ruleID, Level: level}
 	if file != "" {
 		r.Locations = []sarif.Location{location(file, line, col)}

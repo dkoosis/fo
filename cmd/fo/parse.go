@@ -39,7 +39,7 @@ func coerceAs(kind string, input []byte, stderr io.Writer) ([]byte, int) {
 		return append([]byte("# fo:metrics\n"), input...), 0
 	case subDiag:
 		var buf bytes.Buffer
-		if err := wrapdiag.Convert(bytes.NewReader(input), &buf, wrapdiag.DiagOpts{Tool: subDiag, Rule: "finding", Level: sarif.LevelWarning}); err != nil {
+		if err := wrapdiag.Convert(bytes.NewReader(input), &buf, wrapdiag.DiagOpts{Tool: subDiag, Rule: "finding", Level: string(sarif.LevelWarning)}); err != nil {
 			fmt.Fprintf(stderr, "fo: --as diag: %v\n", err)
 			return nil, 2
 		}

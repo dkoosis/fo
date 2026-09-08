@@ -195,8 +195,8 @@ func TestPickView_Delta_WrapsInner(t *testing.T) {
 		Findings: mkFindings(2, report.SeverityWarning, "a"),
 		Diff: &report.DiffSummary{
 			New: []report.DiffItem{
-				{Severity: string(report.SeverityWarning)},
-				{Severity: string(report.SeverityWarning)},
+				{Severity: report.SeverityWarning},
+				{Severity: report.SeverityWarning},
 			},
 		},
 	}

@@ -39,7 +39,7 @@ func NewBuilder(toolName, toolVersion string) *Builder {
 
 // checkLevel returns nil if level is a valid SARIF result level,
 // or a descriptive error otherwise.
-func checkLevel(level string) error {
+func checkLevel(level Level) error {
 	switch level {
 	case LevelError, LevelWarning, LevelNote, LevelNone:
 		return nil
@@ -48,14 +48,14 @@ func checkLevel(level string) error {
 }
 
 // AddResult adds a diagnostic result to the current run.
-func (b *Builder) AddResult(ruleID, level, message, file string, line, col int) *Builder {
+func (b *Builder) AddResult(ruleID string, level Level, message, file string, line, col int) *Builder {
 	return b.AddResultWithFix(ruleID, level, message, file, line, col, "")
 }
 
 // AddResultWithFix is like AddResult but attaches a fix whose description
 // text is the shell command (or grep-ready hint) to resolve the finding.
 // An empty fixCommand is equivalent to AddResult (no fix attached).
-func (b *Builder) AddResultWithFix(ruleID, level, message, file string, line, col int, fixCommand string) *Builder {
+func (b *Builder) AddResultWithFix(ruleID string, level Level, message, file string, line, col int, fixCommand string) *Builder {
 	if b.err != nil {
 		return b
 	}

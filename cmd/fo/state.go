@@ -141,9 +141,9 @@ func convertItems(items []state.Item) []report.DiffItem {
 			Fingerprint:   it.Fingerprint,
 			RuleID:        it.RuleID,
 			File:          it.File,
-			Severity:      string(it.Severity),
-			PriorSeverity: string(it.PriorSeverity),
-			Class:         string(it.Class),
+			Severity:      report.Severity(it.Severity),
+			PriorSeverity: report.Severity(it.PriorSeverity),
+			Class:         report.DiffClass(it.Class),
 		}
 	}
 	return out

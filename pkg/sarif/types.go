@@ -10,12 +10,16 @@
 // Spec: https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html
 package sarif
 
+// Level is a SARIF 2.1.0 result severity level. The set is closed to the
+// four values the spec defines.
+type Level string
+
 // SARIF result levels per the 2.1.0 spec.
 const (
-	LevelError   = "error"
-	LevelWarning = "warning"
-	LevelNote    = "note"
-	LevelNone    = "none"
+	LevelError   Level = "error"
+	LevelWarning Level = "warning"
+	LevelNote    Level = "note"
+	LevelNone    Level = "none"
 )
 
 // Document represents a SARIF 2.1.0 document.
@@ -46,7 +50,7 @@ type Driver struct {
 // Result represents a single issue found by the tool.
 type Result struct {
 	RuleID    string     `json:"ruleId"`
-	Level     string     `json:"level"` // "error", "warning", "note", "none"
+	Level     Level      `json:"level"` // "error", "warning", "note", "none"
 	Message   Message    `json:"message"`
 	Locations []Location `json:"locations,omitempty"`
 	Fixes     []Fix      `json:"fixes,omitempty"`

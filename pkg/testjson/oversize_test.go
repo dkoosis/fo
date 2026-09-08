@@ -39,7 +39,7 @@ func TestStream_OversizeLineDoesNotAbort(t *testing.T) {
 
 	var got []string
 	malformed, err := Stream(context.Background(), io.NopCloser(bytes.NewReader([]byte(input))), func(ev TestEvent) {
-		got = append(got, ev.Package+":"+ev.Action)
+		got = append(got, ev.Package+":"+string(ev.Action))
 	})
 	if err != nil {
 		t.Fatalf("Stream err = %v", err)
