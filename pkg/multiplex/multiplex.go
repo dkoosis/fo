@@ -36,9 +36,12 @@ var ErrNoSections = errors.New("no sections found in report input")
 // SupportedFormats is the list of format values fo accepts in delimiter lines.
 var SupportedFormats = []string{"sarif", "testjson"}
 
+// delimiterRe's format group is derived from SupportedFormats so the two
+// cannot desync: adding a format to one slice updates both what's accepted
+// and what the error message reports.
 var (
 	delimiterRe = regexp.MustCompile(
-		`^--- tool:(\w[\w-]*) format:(sarif|testjson)(?: status:(\w+))? ---$`,
+		`^--- tool:(\w[\w-]*) format:(` + strings.Join(SupportedFormats, "|") + `)(?: status:(\w+))? ---$`,
 	)
 	// delimiterShapeRe matches the delimiter shape with any word for format,
 	// so we can distinguish "no delimiter" from "delimiter with unknown format".
