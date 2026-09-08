@@ -5,8 +5,10 @@ import (
 	"slices"
 )
 
-// FileIssue represents an issue in a specific file for leaderboard rendering.
-type FileIssue struct {
+// FileSummary is a per-file rollup of issue counts, for leaderboard
+// rendering. Named apart from Result (sarif's per-finding type) since a
+// FileSummary aggregates many results, it isn't one.
+type FileSummary struct {
 	File       string
 	IssueCount int
 	ErrorCount int
@@ -14,8 +16,8 @@ type FileIssue struct {
 }
 
 // TopFiles returns files sorted by issue count (descending).
-func TopFiles(doc *Document, limit int) []FileIssue {
-	byFile := make(map[string]*FileIssue)
+func TopFiles(doc *Document, limit int) []FileSummary {
+	byFile := make(map[string]*FileSummary)
 
 	for _, run := range doc.Runs {
 		for _, result := range run.Results {
@@ -26,7 +28,7 @@ func TopFiles(doc *Document, limit int) []FileIssue {
 
 			fi, ok := byFile[file]
 			if !ok {
-				fi = &FileIssue{File: file}
+				fi = &FileSummary{File: file}
 				byFile[file] = fi
 			}
 
@@ -41,11 +43,11 @@ func TopFiles(doc *Document, limit int) []FileIssue {
 	}
 
 	// Convert to slice and sort by issue count descending
-	files := make([]FileIssue, 0, len(byFile))
+	files := make([]FileSummary, 0, len(byFile))
 	for _, fi := range byFile {
 		files = append(files, *fi)
 	}
-	slices.SortFunc(files, func(a, b FileIssue) int {
+	slices.SortFunc(files, func(a, b FileSummary) int {
 		return cmp.Compare(b.IssueCount, a.IssueCount)
 	})
 
