@@ -447,9 +447,10 @@ func (a *aggregator) results() []TestPackageResult {
 		for i, testName := range pkg.failedOrder {
 			outCopy := append([]string(nil), pkg.failedOutput[i]...)
 			r.FailedTests = append(r.FailedTests, FailedTest{
-				Name:           testName,
-				Output:         outCopy,
-				StructuralDiff: pkg.failedStructDiff[i],
+				Name:                  testName,
+				Output:                outCopy,
+				StructuralDiff:        pkg.failedStructDiff[i],
+				StructuralDiffChecked: true,
 			})
 		}
 

@@ -101,13 +101,18 @@ func ToReport(results []TestPackageResult, generatedAt ...time.Time) *report.Rep
 // the aggregator's cached structural-diff detection when present (see
 // handleFail in parser.go, which computes it once at the test's terminal
 // fail event rather than leaving ToReport to redetect it on every
-// streaming tick); a FailedTest built directly rather than through the
-// aggregator (e.g. in tests) arrives with StructuralDiff nil, so this
-// detects it on demand — unchanged from before that cache existed.
+// streaming tick). StructuralDiffChecked is what makes that cache trusted
+// even when the cached result is nil — a plain nil StructuralDiff can't
+// tell "already tried, no match" from "never tried", and treating both the
+// same way (redetect) defeated the memoization for the common case, an
+// ordinary failure with no structural shape. A FailedTest built directly
+// rather than through the aggregator (e.g. in tests) arrives with
+// StructuralDiffChecked false, so this detects it on demand — unchanged
+// from before that cache existed.
 func failedTestResult(pkgName string, ft FailedTest) report.TestResult {
 	out := strings.Join(ft.Output, "\n")
 	sd := ft.StructuralDiff
-	if sd == nil {
+	if !ft.StructuralDiffChecked {
 		sd = detectStructuralDiff(out)
 	}
 	return report.TestResult{

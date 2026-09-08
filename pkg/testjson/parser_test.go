@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/dkoosis/fo/pkg/report"
 )
 
 func TestParseStream_Behavior(t *testing.T) {
@@ -449,6 +451,63 @@ func TestAggregatorResults_MemoizesStructuralDiff(t *testing.T) {
 	}
 	if r1.Tests[0].StructuralDiff != r2.Tests[0].StructuralDiff {
 		t.Errorf("ToReport's StructuralDiff pointer changed across ticks (%p vs %p) — detection was redone", r1.Tests[0].StructuralDiff, r2.Tests[0].StructuralDiff)
+	}
+}
+
+// TestToReport_NonMatchingFailureDetectionNotRedone is the fo-d84
+// second-review fix for failedTestResult (toreport.go): a nil
+// StructuralDiff is ambiguous between "not yet attempted" and "attempted,
+// genuinely no structural shape" — pointer identity can't tell those apart
+// (nil == nil either way, unlike TestAggregatorResults_MemoizesStructuralDiff
+// above, whose fixture DOES match and so has a distinct pointer to compare).
+// A call counter around detectStructuralDiff is the only way to observe
+// whether detection actually ran a second time. Before the
+// StructuralDiffChecked fix, an ordinary failure (the common case: no
+// go-cmp/cupaloy shape at all) got detection rerun on every ToReport call
+// over the same accumulated results — exactly what streaming mode does on
+// every package-finish tick.
+func TestToReport_NonMatchingFailureDetectionNotRedone(t *testing.T) {
+	var calls int
+	orig := detectStructuralDiff
+	detectStructuralDiff = func(output string) *report.StructuralDiff {
+		calls++
+		return detectStructuralDiffImpl(output)
+	}
+	t.Cleanup(func() { detectStructuralDiff = orig })
+
+	agg := NewAggregator()
+	const pkg = "example.com/pkg"
+	events := []TestEvent{
+		{Action: ActionRun, Package: pkg, Test: "TestPlain"},
+		{Action: ActionOutput, Package: pkg, Test: "TestPlain", Output: "assertion failed: wanted truthy, got falsy\n"},
+		{Action: ActionFail, Package: pkg, Test: "TestPlain", Elapsed: 0.1},
+		{Action: ActionFail, Package: pkg, Elapsed: 0.2}, // package-terminal event
+	}
+	for _, e := range events {
+		agg.ProcessEvent(e)
+	}
+	if calls != 1 {
+		t.Fatalf("detectStructuralDiff called %d times during ProcessEvent, want 1 (handleFail's one terminal-event call)", calls)
+	}
+
+	// Simulate several later streaming ticks over the same accumulated
+	// results — cmd/fo's stream pipeline calls ToReport(agg.Results()) on
+	// every package-finish event.
+	for i := range 3 {
+		results := agg.Results()
+		if len(results) != 1 || len(results[0].FailedTests) != 1 {
+			t.Fatalf("tick %d: unexpected results shape: %+v", i, results)
+		}
+		if results[0].FailedTests[0].StructuralDiff != nil {
+			t.Fatalf("tick %d: StructuralDiff = %#v, want nil (plain failure, no structural shape)", i, results[0].FailedTests[0].StructuralDiff)
+		}
+		r := ToReport(results)
+		if len(r.Tests) != 1 || r.Tests[0].StructuralDiff != nil {
+			t.Fatalf("tick %d: ToReport StructuralDiff = %#v, want nil", i, r.Tests[0].StructuralDiff)
+		}
+	}
+	if calls != 1 {
+		t.Errorf("detectStructuralDiff called %d times total, want 1 — a cached \"no match\" result was redetected on a later ToReport call", calls)
 	}
 }
 

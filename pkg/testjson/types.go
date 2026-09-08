@@ -83,11 +83,20 @@ type FailedTest struct {
 	// fail event (see handleFail/results in parser.go) and carried through
 	// every later results() snapshot untouched, so a streaming run's
 	// repeated ToReport calls over the accumulated result set don't
-	// redetect it on every tick. nil means "not yet detected" (or, for a
-	// FailedTest built directly rather than through the aggregator,
-	// "caller didn't run detection") — ToReport computes it on demand in
-	// that case.
+	// redetect it on every tick.
 	StructuralDiff *report.StructuralDiff
+
+	// StructuralDiffChecked disambiguates the two things a nil
+	// StructuralDiff can mean: true means detection already ran (in
+	// handleFail) and genuinely found no structural shape — StructuralDiff
+	// stays nil and ToReport must NOT redetect it (that was the bug: nil
+	// was read as "not yet attempted", so every ordinary failure — the
+	// common case — got detectStructuralDiff rerun on every ToReport call
+	// / streaming tick, silently defeating the memoization above). false
+	// means no detection has been attempted at all — true for a FailedTest
+	// built directly rather than through the aggregator (e.g. in tests) —
+	// and ToReport computes it on demand in that case.
+	StructuralDiffChecked bool
 }
 
 // TotalTests returns the total number of tests in this package.
