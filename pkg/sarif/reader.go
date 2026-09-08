@@ -11,13 +11,13 @@ import (
 // errMissingSARIFVersion is returned when a decoded document has no version field.
 var errMissingSARIFVersion = errors.New("missing sarif version")
 
-// ErrNestingTooDeep is returned when a SARIF document nests objects/arrays
+// errNestingTooDeep is returned when a SARIF document nests objects/arrays
 // past maxNestingDepth. encoding/json's Decode is recursive and a
 // pathological input (e.g. a 1 MiB run of "[[[[…") can overflow the stack
 // before any useful work happens. The guard runs first via a token walk
 // (json.Decoder.Token is iterative, so it measures depth without
 // recursing) and aborts before Decode is reached.
-var ErrNestingTooDeep = errors.New("sarif nesting too deep")
+var errNestingTooDeep = errors.New("sarif nesting too deep")
 
 // maxNestingDepth bounds object/array nesting. Real SARIF is shallow — the
 // deepest path (run → results → locations → … → region) is well under 20.
@@ -62,7 +62,7 @@ func decode(data []byte) (*Document, error) {
 	return &doc, nil
 }
 
-// checkDepth walks the JSON token stream and returns ErrNestingTooDeep if
+// checkDepth walks the JSON token stream and returns errNestingTooDeep if
 // object/array nesting exceeds maxNestingDepth. Token() is iterative, so it
 // is itself safe on pathologically deep input. It returns nil on any token
 // error (EOF, malformed) — the real Decode then surfaces the actual parse
@@ -82,7 +82,7 @@ func checkDepth(data []byte) error {
 			entered = true
 			depth++
 			if depth > maxNestingDepth {
-				return fmt.Errorf("%w: exceeds %d", ErrNestingTooDeep, maxNestingDepth)
+				return fmt.Errorf("%w: exceeds %d", errNestingTooDeep, maxNestingDepth)
 			}
 		case json.Delim('}'), json.Delim(']'):
 			depth--

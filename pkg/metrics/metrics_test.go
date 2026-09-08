@@ -47,10 +47,10 @@ func TestParse_errors(t *testing.T) {
 		in   string
 		want error
 	}{
-		{"x 1\n", ErrNoHeader},
-		{"# fo:metrics\n", ErrNoRows},
-		{"# fo:metrics\nbad\n", ErrMalformedRow},
-		{"# fo:metrics\nx not-a-number\n", ErrMalformedRow},
+		{"x 1\n", errNoHeader},
+		{"# fo:metrics\n", errNoRows},
+		{"# fo:metrics\nbad\n", errMalformedRow},
+		{"# fo:metrics\nx not-a-number\n", errMalformedRow},
 	}
 	for _, c := range cases {
 		_, err := Parse(strings.NewReader(c.in), nil)

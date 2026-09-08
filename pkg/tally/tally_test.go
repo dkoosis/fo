@@ -86,32 +86,32 @@ func TestParse_blankAndComment(t *testing.T) {
 func TestParse_missingHeader(t *testing.T) {
 	in := "5 a\n3 b\n"
 	_, err := Parse(strings.NewReader(in), nil)
-	if !errors.Is(err, ErrNoHeader) {
-		t.Errorf("err = %v, want ErrNoHeader", err)
+	if !errors.Is(err, errNoHeader) {
+		t.Errorf("err = %v, want errNoHeader", err)
 	}
 }
 
 func TestParse_noRows(t *testing.T) {
 	in := "# fo:tally\n\n# nothing here\n"
 	_, err := Parse(strings.NewReader(in), nil)
-	if !errors.Is(err, ErrNoRows) {
-		t.Errorf("err = %v, want ErrNoRows", err)
+	if !errors.Is(err, errNoRows) {
+		t.Errorf("err = %v, want errNoRows", err)
 	}
 }
 
 func TestParse_malformedRow(t *testing.T) {
 	in := "# fo:tally\nnotanumber a\n"
 	_, err := Parse(strings.NewReader(in), nil)
-	if !errors.Is(err, ErrMalformedRow) || !strings.Contains(err.Error(), "non-numeric") {
-		t.Errorf("err = %v, want ErrMalformedRow with non-numeric detail", err)
+	if !errors.Is(err, errMalformedRow) || !strings.Contains(err.Error(), "non-numeric") {
+		t.Errorf("err = %v, want errMalformedRow with non-numeric detail", err)
 	}
 }
 
 func TestParse_missingLabel(t *testing.T) {
 	in := "# fo:tally\n5\n"
 	_, err := Parse(strings.NewReader(in), nil)
-	if !errors.Is(err, ErrMalformedRow) || !strings.Contains(err.Error(), "expected '<count> <label>'") {
-		t.Errorf("err = %v, want ErrMalformedRow with shape detail", err)
+	if !errors.Is(err, errMalformedRow) || !strings.Contains(err.Error(), "expected '<count> <label>'") {
+		t.Errorf("err = %v, want errMalformedRow with shape detail", err)
 	}
 }
 

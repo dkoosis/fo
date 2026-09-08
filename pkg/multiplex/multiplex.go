@@ -30,8 +30,8 @@ const (
 	StatusError   = "error"
 )
 
-// ErrNoSections is returned when ParseSections finds no delimiter lines.
-var ErrNoSections = errors.New("no sections found in report input")
+// errNoSections is returned when ParseSections finds no delimiter lines.
+var errNoSections = errors.New("no sections found in report input")
 
 // SupportedFormats is the list of format values fo accepts in delimiter lines.
 var SupportedFormats = []string{"sarif", "testjson"}
@@ -161,7 +161,7 @@ func ParseSections(data []byte) (sections []Section, prelude []byte, err error) 
 	}
 
 	if len(sections) == 0 {
-		return nil, prelude, ErrNoSections
+		return nil, prelude, errNoSections
 	}
 	return sections, prelude, nil
 }

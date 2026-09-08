@@ -52,17 +52,17 @@ func IsHeader(data []byte) bool {
 	return hygiene.HasHeader(data, HeaderPrefix)
 }
 
-// ErrNoHeader is returned when input lacks the tally header line.
-var ErrNoHeader = errors.New("tally: missing '# fo:tally' header")
+// errNoHeader is returned when input lacks the tally header line.
+var errNoHeader = errors.New("tally: missing '# fo:tally' header")
 
-// ErrNoRows is returned when the header is present but no data rows
+// errNoRows is returned when the header is present but no data rows
 // followed.
-var ErrNoRows = errors.New("tally: no data rows")
+var errNoRows = errors.New("tally: no data rows")
 
-// ErrMalformedRow wraps row-level shape and parse failures. Wrapped via
-// fmt.Errorf("...: %w", ErrMalformedRow) at call sites — sentinel keeps
+// errMalformedRow wraps row-level shape and parse failures. Wrapped via
+// fmt.Errorf("...: %w", errMalformedRow) at call sites — sentinel keeps
 // err113 happy and lets callers errors.Is on a single root.
-var ErrMalformedRow = errors.New("tally: malformed row")
+var errMalformedRow = errors.New("tally: malformed row")
 
 // Parse reads tally input from r and returns the parsed Tally. Oversize
 // dropped-line warnings are written to stderr (nil silences them).
@@ -74,8 +74,8 @@ func Parse(r io.Reader, stderr io.Writer) (Tally, error) {
 	tool, err := hygiene.Scan(r, hygiene.Spec{
 		Prefix:      HeaderPrefix,
 		Name:        "tally",
-		ErrNoHeader: ErrNoHeader,
-		ErrNoRows:   ErrNoRows,
+		ErrNoHeader: errNoHeader,
+		ErrNoRows:   errNoRows,
 		Stderr:      stderr,
 		OnRow: func(_ int, line string) error {
 			row, perr := parseRow(line)
@@ -98,16 +98,16 @@ func Parse(r io.Reader, stderr io.Writer) (Tally, error) {
 func parseRow(line string) (Row, error) {
 	idx := strings.IndexAny(line, " \t")
 	if idx < 0 {
-		return Row{}, fmt.Errorf("%w: expected '<count> <label>', got %q", ErrMalformedRow, line)
+		return Row{}, fmt.Errorf("%w: expected '<count> <label>', got %q", errMalformedRow, line)
 	}
 	countTok := line[:idx]
 	label := strings.TrimSpace(line[idx+1:])
 	if label == "" {
-		return Row{}, fmt.Errorf("%w: missing label after count %q", ErrMalformedRow, countTok)
+		return Row{}, fmt.Errorf("%w: missing label after count %q", errMalformedRow, countTok)
 	}
 	v, err := strconv.ParseFloat(countTok, 64)
 	if err != nil {
-		return Row{}, fmt.Errorf("%w: non-numeric count %q", ErrMalformedRow, countTok)
+		return Row{}, fmt.Errorf("%w: non-numeric count %q", errMalformedRow, countTok)
 	}
 	return Row{Label: label, Value: v}, nil
 }
