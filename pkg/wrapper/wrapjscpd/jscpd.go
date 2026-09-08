@@ -23,12 +23,12 @@ type clone struct {
 // jscpd converts jscpd JSON to SARIF.
 type jscpd struct{}
 
-func newJscpd() *jscpd { return &jscpd{} }
+func newJscpd() jscpd { return jscpd{} }
 
 // Convert reads jscpd JSON from r and writes SARIF to w.
 // Reads entire input into memory — fine for jscpd reports (typically <1MB).
 // Bounded by boundread.DefaultMax to prevent OOM on pathological input (fo-s5x).
-func (j *jscpd) Convert(r io.Reader, w io.Writer) error {
+func (j jscpd) Convert(r io.Reader, w io.Writer) error {
 	data, err := boundread.All(r, 0)
 	if err != nil {
 		return fmt.Errorf("reading input: %w", err)
