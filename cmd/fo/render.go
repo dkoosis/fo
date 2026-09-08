@@ -193,7 +193,7 @@ func renderMetrics(input []byte, stdout io.Writer, stderr io.Writer, mode string
 		fmt.Fprintf(stderr, "fo: save metrics history: %v\n", err)
 		return 0
 	}
-	if err := state.AppendMetrics(histPath, curr); err != nil {
+	if err := state.RecordMetrics(histPath, curr); err != nil {
 		fmt.Fprintf(stderr, "fo: save metrics history: %v\n", err)
 	}
 	return 0

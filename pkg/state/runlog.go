@@ -21,9 +21,11 @@ const RunLogVersion = 1
 // that the file stays trivially cheap to read and rewrite.
 const MaxRunLog = 100
 
+func (s stateStore) runLogPath() string { return filepath.Join(s.dir, "run-log.json") }
+
 // RunLogPath returns the resolved run-log path. The log is an append-only
 // (bounded) history of run summaries powering `fo replay` and `fo trend`.
-func RunLogPath() string { return filepath.Join(Dir(), "run-log.json") }
+func RunLogPath() string { return newStateStore().runLogPath() }
 
 // RunLogEntry is one run's summary: enough to chart a rule's trend or list
 // recent runs, but not the full findings (those are the snapshot's job).
@@ -103,7 +105,7 @@ func LoadRunLog(path string) (*RunLog, error) {
 		return nil, fmt.Errorf("state: parse %s: %w", path, err)
 	}
 	if rl.Version != RunLogVersion {
-		return nil, ErrVersionSkew
+		return nil, errVersionSkew
 	}
 	return &rl, nil
 }
@@ -124,7 +126,7 @@ func AppendRunLog(prev *RunLog, entry RunLogEntry) *RunLog {
 
 // SaveRunLog writes rl atomically, mirroring Save's durability contract.
 func SaveRunLog(path string, rl *RunLog) error {
-	return writeAtomic(path, ".run-log.*.tmp", rl)
+	return newStateStore().writeAtomic(path, ".run-log.*.tmp", rl)
 }
 
 // RuleSeries returns the per-run count of ruleID across the log, oldest
