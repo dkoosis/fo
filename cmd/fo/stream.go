@@ -69,6 +69,9 @@ func runStreamCtx(ctx context.Context, opts streamOpts) int {
 	// the final report via applySuppress below.
 	streamRuleset := loadSuppressRuleset(nil, suppressPath(), stderr)
 
+	// Buffer of 8: enough slack that a normal package-by-package cadence
+	// never blocks the parser goroutine before sendCoalesceSnapshot's
+	// drop-oldest logic below has to kick in; not load-bearing beyond that.
 	snapshots := make(chan report.Report, 8)
 	// resultCh carries the producer goroutine's terminal state. Using a
 	// single struct + blocking receive (a) ensures the producer is fully
