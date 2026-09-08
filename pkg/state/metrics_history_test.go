@@ -29,8 +29,8 @@ func TestMetricsHistory_roundtrip(t *testing.T) {
 		{Tool: coverName, Key: pkgXKey, Value: 87.3, Unit: "%"},
 		{Tool: coverName, Key: "pkg/y", Value: 100, Unit: "%"},
 	}
-	if err := AppendMetrics(path, curr); err != nil {
-		t.Fatalf("append: %v", err)
+	if err := RecordMetrics(path, curr); err != nil {
+		t.Fatalf("record: %v", err)
 	}
 	prev, err := LoadMetrics(path)
 	if err != nil {
@@ -41,16 +41,16 @@ func TestMetricsHistory_roundtrip(t *testing.T) {
 	}
 }
 
-// TestAppendMetrics_AccumulatesAndTrims verifies multi-run history retention
+// TestRecordMetrics_AccumulatesAndTrims verifies multi-run history retention
 // (regression for #258 / fo-2nj — file used to overwrite, never append).
-func TestAppendMetrics_AccumulatesAndTrims(t *testing.T) {
+func TestRecordMetrics_AccumulatesAndTrims(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "history.json")
 
 	for i := range MaxMetricsHistory + 5 {
 		samples := []MetricSample{{Tool: coverName, Key: pkgXKey, Value: float64(i)}}
-		if err := AppendMetrics(path, samples); err != nil {
-			t.Fatalf("append %d: %v", i, err)
+		if err := RecordMetrics(path, samples); err != nil {
+			t.Fatalf("record %d: %v", i, err)
 		}
 	}
 	hist, err := LoadMetricsHistory(path)

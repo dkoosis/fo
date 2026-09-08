@@ -95,10 +95,13 @@ func LoadMetrics(path string) ([]MetricSample, error) {
 	return hist.Runs[0].Samples, nil
 }
 
-// AppendMetrics loads existing history, prepends a new run with the
+// RecordMetrics loads existing history, prepends a new run with the
 // current samples, trims to MaxMetricsHistory, and writes the envelope
-// back. Replaces the prior overwrite-only SaveMetrics (#258).
-func AppendMetrics(path string, samples []MetricSample) error {
+// back. Named for what it does to the history (records the latest run,
+// evicting the oldest past the cap) rather than "append", which reads as
+// adding to the end — the write below prepends. Replaces the prior
+// overwrite-only SaveMetrics (#258).
+func RecordMetrics(path string, samples []MetricSample) error {
 	hist, err := LoadMetricsHistory(path)
 	if err != nil {
 		return err
