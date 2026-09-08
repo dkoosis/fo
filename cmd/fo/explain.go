@@ -91,11 +91,12 @@ func explainTest(tr *report.TestResult, t theme.Theme) string {
 		fmt.Fprintf(&b, "  %s\n", t.Muted.Render("fix: "+tr.FixCommand))
 	}
 	if out := strings.TrimRight(tr.Output, "\n"); out != "" {
-		rendered := view.RenderDiffOutput(out, t)
+		var rendered string
 		if tr.StructuralDiff != nil {
-			if structured := view.RenderStructuralDiff(tr.StructuralDiff, t); structured != "" {
-				rendered = structured
-			}
+			rendered = view.RenderStructuralDiff(tr.StructuralDiff, t)
+		}
+		if rendered == "" {
+			rendered = view.RenderDiffOutput(out, t)
 		}
 		for line := range strings.SplitSeq(rendered, "\n") {
 			fmt.Fprintf(&b, "  %s\n", line)
