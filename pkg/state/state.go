@@ -53,11 +53,37 @@ func Dir() string {
 	return ".fo"
 }
 
+// stateStore groups the resolved state directory with the
+// parent-directory fsync hook used by durable (atomic) writes. Before
+// this type existed, that hook was a package-level var (`syncDir`) that
+// tests mutated directly to inject a fake, which forced those tests to
+// run serially (a parallel test could observe another test's fake).
+// Every path-deriving free function (Path, MetricsHistoryPath,
+// RunLogPath, SnapshotPath, FullLogPath) and every durable-write free
+// function (Save, SaveRunLog, SaveSnapshot, SaveFullLog) is a thin
+// wrapper over a stateStore method, so a caller that needs to inject
+// behavior — tests, mainly — builds its own stateStore value instead of
+// swapping package state.
+type stateStore struct {
+	dir     string
+	syncDir func(dir string) error
+}
+
+// newStateStore builds the default stateStore: dir honors FO_STATE_DIR
+// exactly like Dir(), and syncDir performs a real parent-directory
+// fsync via fsyncDir.
+func newStateStore() stateStore {
+	return stateStore{dir: Dir(), syncDir: fsyncDir}
+}
+
+func (s stateStore) path() string               { return filepath.Join(s.dir, "last-run.json") }
+func (s stateStore) metricsHistoryPath() string { return filepath.Join(s.dir, "metrics-history.json") }
+
 // Path returns the resolved last-run sidecar path.
-func Path() string { return filepath.Join(Dir(), "last-run.json") }
+func Path() string { return newStateStore().path() }
 
 // MetricsHistoryPath returns the resolved metrics-history sidecar path.
-func MetricsHistoryPath() string { return filepath.Join(Dir(), "metrics-history.json") }
+func MetricsHistoryPath() string { return newStateStore().metricsHistoryPath() }
 
 // File is the top-level on-disk envelope. Versioned so a future
 // breaking change can refuse to read old files cleanly rather than
@@ -89,10 +115,13 @@ const (
 	SevNote    Severity = "note"
 )
 
-// ErrVersionSkew is returned by Load when the file's version does not
+// errVersionSkew is returned by Load when the file's version does not
 // match SchemaVersion. Callers treat this like a missing file and start
-// fresh — there is no migration code by design.
-var ErrVersionSkew = errors.New("state: schema version skew")
+// fresh — there is no migration code by design. Unexported: no caller
+// branches on it via errors.Is (unlike the sibling ErrDurabilityDegraded,
+// which callers do check); it exists to distinguish "start fresh" logging
+// from a parse failure inside this package's own tests.
+var errVersionSkew = errors.New("state: schema version skew")
 
 // Load reads the sidecar at path. Missing file returns (nil, nil) so
 // the first run produces no diff. Malformed JSON or version skew
@@ -118,7 +147,7 @@ func Load(path string) (*File, error) {
 		return nil, fmt.Errorf("state: parse %s: %w", path, err)
 	}
 	if file.Version != SchemaVersion {
-		return nil, ErrVersionSkew
+		return nil, errVersionSkew
 	}
 	return &file, nil
 }
@@ -142,12 +171,19 @@ var ErrDurabilityDegraded = errors.New("state: durability degraded (parent dir n
 // disk, but durability is reduced. Callers should treat this as a
 // warning rather than a hard failure (fo-1x0).
 func Save(path string, f *File) error {
-	return writeAtomic(path, ".last-run.*.tmp", f)
+	return newStateStore().save(path, f)
+}
+
+// save encodes f as indented JSON via writeAtomic, using s's stateStore
+// (dir is unused here since path is caller-supplied; syncDir is what a
+// test overrides).
+func (s stateStore) save(path string, f *File) error {
+	return s.writeAtomic(path, ".last-run.*.tmp", f)
 }
 
 // writeAtomic encodes v as indented JSON via writeAtomicTo.
-func writeAtomic(path, tmpPattern string, v any) error {
-	return writeAtomicTo(path, tmpPattern, func(w io.Writer) error {
+func (s stateStore) writeAtomic(path, tmpPattern string, v any) error {
+	return s.writeAtomicTo(path, tmpPattern, func(w io.Writer) error {
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
 		return enc.Encode(v)
@@ -158,7 +194,7 @@ func writeAtomic(path, tmpPattern string, v any) error {
 // write, fsyncs it, then renames over path. tmpPattern is passed to
 // os.CreateTemp. On parent-directory fsync failure it returns an error
 // wrapping ErrDurabilityDegraded (data is on disk; durability reduced).
-func writeAtomicTo(path, tmpPattern string, write func(io.Writer) error) error {
+func (s stateStore) writeAtomicTo(path, tmpPattern string, write func(io.Writer) error) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("state: mkdir %s: %w", dir, err)
@@ -188,17 +224,18 @@ func writeAtomicTo(path, tmpPattern string, write func(io.Writer) error) error {
 		cleanup()
 		return fmt.Errorf("state: rename: %w", err)
 	}
-	if err := syncDir(filepath.Dir(path)); err != nil {
+	if err := s.syncDir(filepath.Dir(path)); err != nil {
 		return fmt.Errorf("%w: %w", ErrDurabilityDegraded, err)
 	}
 	return nil
 }
 
-// syncDir opens dir and calls Sync so the parent directory's metadata
-// (including the rename above) is flushed to disk. Indirected through a
-// package var so tests can assert it's invoked with the right path
-// without requiring real fault injection.
-var syncDir = func(dir string) error {
+// fsyncDir opens dir and calls Sync so the parent directory's metadata
+// (including the rename above) is flushed to disk. This is the real
+// implementation stateStore.syncDir points to outside tests; a test
+// builds its own stateStore with a fake syncDir instead of swapping this
+// out, so tests asserting fsync behavior stay parallel-safe.
+func fsyncDir(dir string) error {
 	d, err := os.Open(dir) // dir is the parent of a caller-provided sidecar path
 	if err != nil {
 		return err

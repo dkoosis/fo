@@ -41,8 +41,8 @@ func TestLoad_VersionSkew(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err := Load(p)
-	if !errors.Is(err, ErrVersionSkew) {
-		t.Fatalf("want ErrVersionSkew, got %v", err)
+	if !errors.Is(err, errVersionSkew) {
+		t.Fatalf("want errVersionSkew, got %v", err)
 	}
 }
 
@@ -102,23 +102,20 @@ func TestSave_NoTmpLeak(t *testing.T) {
 }
 
 func TestSave_FsyncsParentDir(t *testing.T) {
-	// Not parallel: mutates package-level syncDir.
+	t.Parallel()
 	dir := t.TempDir()
 	p := filepath.Join(dir, "sub", "last.json")
 	wantDir := filepath.Join(dir, "sub")
 
-	orig := syncDir
-	t.Cleanup(func() { syncDir = orig })
-
 	var gotDir string
 	var called int
-	syncDir = func(d string) error {
+	store := stateStore{syncDir: func(d string) error {
 		called++
 		gotDir = d
 		return nil
-	}
+	}}
 
-	if err := Save(p, &File{Version: SchemaVersion}); err != nil {
+	if err := store.save(p, &File{Version: SchemaVersion}); err != nil {
 		t.Fatalf("save: %v", err)
 	}
 	if called != 1 {
@@ -134,16 +131,13 @@ func TestSave_FsyncsParentDir(t *testing.T) {
 // callers can distinguish "data on disk but durability reduced" from
 // a true save failure. Regression for fo-1x0.
 func TestSave_SyncDirFailure_SurfacesDurabilityWarning(t *testing.T) {
-	// Not parallel: mutates package-level syncDir.
+	t.Parallel()
 	dir := t.TempDir()
 	p := filepath.Join(dir, "last.json")
 
-	orig := syncDir
-	t.Cleanup(func() { syncDir = orig })
+	store := stateStore{syncDir: func(string) error { return errSimulatedSyncFail }}
 
-	syncDir = func(string) error { return errSimulatedSyncFail }
-
-	err := Save(p, &File{Version: SchemaVersion})
+	err := store.save(p, &File{Version: SchemaVersion})
 	if err == nil {
 		t.Fatal("expected ErrDurabilityDegraded, got nil")
 	}

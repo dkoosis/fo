@@ -15,12 +15,14 @@ import (
 // independent of SchemaVersion (the diff sidecar) so the two evolve apart.
 const SnapshotVersion = 1
 
+func (s stateStore) snapshotPath() string { return filepath.Join(s.dir, "findings.json") }
+
 // SnapshotPath returns the resolved findings-snapshot path. The snapshot
 // holds the last run's findings and failing tests with their assigned
 // short IDs, powering `fo explain <id>` and cross-run ID stability. It is
 // distinct from last-run.json, whose Run shape is deliberately lossy for
 // diff classification.
-func SnapshotPath() string { return filepath.Join(Dir(), "findings.json") }
+func SnapshotPath() string { return newStateStore().snapshotPath() }
 
 // Snapshot is the persisted record of one run's addressable items. Unlike
 // Run (the diff sidecar), it keeps full Finding/TestResult detail so a
@@ -114,7 +116,7 @@ func LoadSnapshot(path string) (*Snapshot, error) {
 		return nil, fmt.Errorf("state: parse %s: %w", path, err)
 	}
 	if s.Version != SnapshotVersion {
-		return nil, ErrVersionSkew
+		return nil, errVersionSkew
 	}
 	return &s, nil
 }
@@ -123,5 +125,5 @@ func LoadSnapshot(path string) (*Snapshot, error) {
 // Save's durability contract. Like Save it may wrap ErrDurabilityDegraded
 // when the parent-directory fsync fails but the data is on disk.
 func SaveSnapshot(path string, s *Snapshot) error {
-	return writeAtomic(path, ".findings.*.tmp", s)
+	return newStateStore().writeAtomic(path, ".findings.*.tmp", s)
 }
