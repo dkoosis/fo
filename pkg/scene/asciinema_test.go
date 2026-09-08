@@ -124,6 +124,27 @@ func TestEncodeAsciicast_stripsANSIForWidth(t *testing.T) {
 	}
 }
 
+// TestEncodeAsciicast_wideRunesCountDouble is the fo-d84 review fix: scene
+// used to keep its own visibleWidth (a regex-strip-plus-rune-count that
+// explicitly did NOT account for wide runes — see its prior doc comment)
+// separate from pkg/paint's lipgloss.Width-based, CJK-aware one — same
+// name, two disagreeing implementations. Now consolidated on
+// internal/textwidth.Visible, so a frame with wide (CJK) runes measures
+// its true on-screen width, not a rune count that under-reports it.
+func TestEncodeAsciicast_wideRunesCountDouble(t *testing.T) {
+	frames := []scene.Frame{
+		{Content: "你好"}, // two wide runes: 4 on-screen columns, 2 runes
+	}
+	var b strings.Builder
+	if err := scene.EncodeAsciicast(&b, frames); err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+	header, _ := decodeCast(t, b.String())
+	if header["width"] != float64(4) {
+		t.Errorf("width: want 4 (2 wide runes × 2 columns), got %v", header["width"])
+	}
+}
+
 // TestEncodeAsciicast_empty yields a valid header with floor geometry and
 // no events.
 func TestEncodeAsciicast_empty(t *testing.T) {

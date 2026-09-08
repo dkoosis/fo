@@ -10,7 +10,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"github.com/dkoosis/fo/internal/textwidth"
 )
 
 // Bar returns a `width`-cell horizontal bar filled in proportion to
@@ -94,9 +94,11 @@ func sparkIndex(v, minV, span float64) int {
 // unstyled cells in one column — the diff table renders non-empty sides
 // through a theme style but leaves the empty-placeholder side bare — must
 // still measure and pad by the same yardstick or rows misalign under
-// Color().
+// Color(). Shared with pkg/scene via internal/textwidth so the two
+// packages measure "visible width" the same way instead of each keeping
+// its own implementation.
 func visibleWidth(s string) int {
-	return lipgloss.Width(s)
+	return textwidth.Visible(s)
 }
 
 // padRight left-aligns s within a column of `width` cells, padding
