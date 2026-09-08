@@ -6,8 +6,24 @@ import (
 	"strconv"
 
 	"github.com/dkoosis/fo/pkg/paint"
+	"github.com/dkoosis/fo/pkg/tally"
 	"github.com/dkoosis/fo/pkg/theme"
 )
+
+// LeaderboardFromTally builds a Leaderboard from a parsed tally stream.
+// Lives here, not in pkg/tally, so tally stays a pure parser that returns
+// report-level data — view, the sole renderer-facing package, decides how
+// to shape it into a ViewSpec (fo-n25.2). Rows are emitted in input order;
+// Total is the sum of all values (used by the renderer to scale bars).
+func LeaderboardFromTally(t tally.Tally) Leaderboard {
+	rows := make([]LbRow, len(t.Rows))
+	var total float64
+	for i, r := range t.Rows {
+		rows[i] = LbRow{Label: r.Label, Value: r.Value}
+		total += r.Value
+	}
+	return Leaderboard{Rows: rows, Total: total}
+}
 
 // RenderLeaderboardLLM emits a terse plain-text ranking. Used when fo's
 // output mode is llm — bar charts are useless to AI consumers; a sorted

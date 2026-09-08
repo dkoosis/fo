@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/dkoosis/fo/pkg/hygiene"
-	"github.com/dkoosis/fo/pkg/view"
 )
 
 // HeaderPrefix is the sentinel that marks tally input. Used by fo's
@@ -110,17 +109,4 @@ func parseRow(line string) (Row, error) {
 		return Row{}, fmt.Errorf("%w: non-numeric count %q", ErrMalformedRow, countTok)
 	}
 	return Row{Label: label, Value: v}, nil
-}
-
-// ToLeaderboard builds a view.Leaderboard from t. Rows are emitted in
-// input order; Total is the sum of all values (used by the renderer to
-// scale bars).
-func (t Tally) ToLeaderboard() view.Leaderboard {
-	rows := make([]view.LbRow, len(t.Rows))
-	var total float64
-	for i, r := range t.Rows {
-		rows[i] = view.LbRow{Label: r.Label, Value: r.Value}
-		total += r.Value
-	}
-	return view.Leaderboard{Rows: rows, Total: total}
 }
