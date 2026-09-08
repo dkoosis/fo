@@ -114,18 +114,3 @@ func TestParse_missingLabel(t *testing.T) {
 		t.Errorf("err = %v, want ErrMalformedRow with shape detail", err)
 	}
 }
-
-func TestToLeaderboard(t *testing.T) {
-	tly := Tally{Rows: []Row{
-		{Label: "a", Value: 10},
-		{Label: "b", Value: 5},
-		{Label: "c", Value: 1},
-	}}
-	lb := tly.ToLeaderboard()
-	if lb.Total != 16 {
-		t.Errorf("Total = %v, want 16", lb.Total)
-	}
-	if len(lb.Rows) != 3 || lb.Rows[0].Label != "a" {
-		t.Errorf("rows = %+v", lb.Rows)
-	}
-}

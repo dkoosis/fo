@@ -21,7 +21,9 @@ excludeFiles:
 #   pkg/theme     → leaf style table
 #   pkg/cluster   → groups failing tests (→ pkg/report)
 #   pkg/fingerprint, pkg/score, pkg/suppress → leaves
-#   pkg/status, pkg/metrics, pkg/tally     → hygiene formats (→ pkg/report)
+#   pkg/status, pkg/metrics, pkg/tally     → hygiene formats (→ pkg/report, pkg/hygiene)
+#   pkg/hygiene   → shared hygiene-format parse scaffolding (leaf)
+#   pkg/multiplex → multi-tool delimiter protocol, consumed by cmd/fo (leaf)
 #   pkg/wrapper/* → independent adapters (→ pkg/sarif or hygiene formats)
 
 allow:
@@ -46,6 +48,8 @@ components:
   status:        { in: pkg/status }
   metrics:       { in: pkg/metrics }
   tally:         { in: pkg/tally }
+  hygiene:       { in: pkg/hygiene }
+  multiplex:     { in: pkg/multiplex }
   wrapper-root:  { in: pkg/wrapper }
   wrappers:      { in: pkg/wrapper/** }
 
@@ -72,6 +76,8 @@ deps:
       - status
       - metrics
       - tally
+      - hygiene
+      - multiplex
       - wrapper-root
       - wrappers
 
@@ -86,11 +92,11 @@ deps:
   cluster:
     mayDependOn: [report]
   status:
-    mayDependOn: [report]
+    mayDependOn: [report, hygiene]
   metrics:
-    mayDependOn: [report]
+    mayDependOn: [report, hygiene]
   tally:
-    mayDependOn: [report]
+    mayDependOn: [report, hygiene]
 
   state:
     mayDependOn: [report]
