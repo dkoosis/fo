@@ -120,15 +120,30 @@ func TestRenderStructuralDiff_FieldStructural(t *testing.T) {
 }
 
 // TestRenderStructuralDiff_OneSidedPlaceholder covers an added-only field:
-// the empty side must render as the placeholder glyph, not a blank cell
-// that would misalign with paired rows.
+// the empty side must render as the theme's Same icon — the same "nothing
+// here" glyph Delta/bullet/leaderboard use — not a blank cell that would
+// misalign with paired rows.
 func TestRenderStructuralDiff_OneSidedPlaceholder(t *testing.T) {
 	got := RenderStructuralDiff(structuralFixture, theme.Mono())
 	lines := strings.Split(got, "\n")
 	if len(lines) != 2 {
 		t.Fatalf("got %d lines, want 2:\n%s", len(lines), got)
 	}
-	if !strings.Contains(lines[1], diffPlaceholder) {
-		t.Errorf("added-only row missing placeholder %q: %q", diffPlaceholder, lines[1])
+	placeholder := theme.Mono().Icons.Same
+	if !strings.Contains(lines[1], placeholder) {
+		t.Errorf("added-only row missing placeholder %q: %q", placeholder, lines[1])
+	}
+}
+
+// TestRenderStructuralDiff_MonoUsesASCIIPlaceholder is the fo-d84 review
+// fix: the empty side must come from the active theme's Icons.Same, not a
+// hardcoded glyph — Mono/llm output gets the ASCII "=", not "·".
+func TestRenderStructuralDiff_MonoUsesASCIIPlaceholder(t *testing.T) {
+	got := RenderStructuralDiff(structuralFixture, theme.Mono())
+	if strings.Contains(got, "·") {
+		t.Errorf("Mono render contains non-ASCII placeholder %q:\n%s", "·", got)
+	}
+	if !strings.Contains(got, "=") {
+		t.Errorf("Mono render missing ASCII placeholder %q:\n%s", "=", got)
 	}
 }

@@ -96,11 +96,6 @@ func renderKeepTabs(s lipgloss.Style, line string) string {
 	return s.TabWidth(lipgloss.NoTabConversion).Render(line)
 }
 
-// diffPlaceholder marks the empty side of a one-sided field change (a
-// field only added or only removed) — a blank cell would read as a
-// misalignment rather than "nothing on this side".
-const diffPlaceholder = "·"
-
 // RenderStructuralDiff formats a field-structural diff (go-cmp/cupaloy,
 // decomposed by pkg/testjson) as an aligned path/removed/added table —
 // the reader sees which fields differ and their old/new values, not which
@@ -116,19 +111,21 @@ func RenderStructuralDiff(sd *report.StructuralDiff, t theme.Theme) string {
 	for _, f := range sd.Fields {
 		rows = append(rows, []string{
 			t.Muted.Render(f.Path),
-			diffSide(f.Removed, t.Error, "-"),
-			diffSide(f.Added, t.Pass, "+"),
+			diffSide(f.Removed, t.Error, "-", t),
+			diffSide(f.Added, t.Pass, "+", t),
 		})
 	}
 	return paint.Columnize(rows, 2)
 }
 
 // diffSide renders one side of a field's before/after value, prefixed
-// with its diff marker, or the placeholder glyph when that side is empty
-// (a field that was only added or only removed).
-func diffSide(value string, style lipgloss.Style, marker string) string {
+// with its diff marker, or the theme's Same icon when that side is empty
+// (a field that was only added or only removed) — the same "nothing to
+// show here" glyph Delta/bullet/leaderboard use, so Mono/llm output gets
+// the ASCII "=" instead of a hardcoded non-ASCII placeholder.
+func diffSide(value string, style lipgloss.Style, marker string, t theme.Theme) string {
 	if value == "" {
-		return diffPlaceholder
+		return t.Icons.Same
 	}
 	return style.Render(marker + " " + value)
 }
