@@ -177,10 +177,30 @@ func TestWriteDiffDetail_FingerprintMiss_Fallback(t *testing.T) {
 	}
 }
 
+func TestRecordFullLog_CleanRunWritesLogWithoutNotice(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("FO_STATE_DIR", dir)
+
+	r := &report.Report{}
+	var stderr bytes.Buffer
+	recordFullLog(r, []byte("clean output"), stateOn, &stderr)
+
+	if len(r.Notices) != 0 {
+		t.Errorf("clean run should carry no notice, got %v", r.Notices)
+	}
+	got, err := os.ReadFile(filepath.Join(dir, "full.log"))
+	if err != nil {
+		t.Fatalf("ReadFile(full.log): %v", err)
+	}
+	if string(got) != "clean output" {
+		t.Errorf("full.log = %q, want the input even on a clean run", got)
+	}
+}
+
 func TestRecordFullLog_AppendsFullNotice(t *testing.T) {
 	t.Setenv("FO_STATE_DIR", t.TempDir())
 
-	r := &report.Report{}
+	r := &report.Report{Findings: []report.Finding{{RuleID: "unused", Message: "x"}}}
 	var stderr bytes.Buffer
 	recordFullLog(r, []byte("the complete original output"), stateOn, &stderr)
 
