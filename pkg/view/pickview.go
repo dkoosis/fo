@@ -68,7 +68,7 @@ func PickViewModeWithExpand(r report.Report, mode Mode, expand expandSet) ViewSp
 }
 
 func pickInner(r report.Report, mode Mode, expand expandSet) ViewSpec {
-	if isClean(r) {
+	if IsClean(r) {
 		return Clean{Message: "no findings"}
 	}
 	if h, ok := pickHeadline(r); ok {
@@ -91,7 +91,9 @@ func pickInner(r report.Report, mode Mode, expand expandSet) ViewSpec {
 	return pickBullet(r, mode, expand)
 }
 
-func isClean(r report.Report) bool {
+// IsClean reports whether r has no findings and no test outside pass or
+// skip — the report the renderer shows as "no findings".
+func IsClean(r report.Report) bool {
 	if len(r.Findings) > 0 {
 		return false
 	}

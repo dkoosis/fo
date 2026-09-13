@@ -8,6 +8,7 @@ import (
 
 	"github.com/dkoosis/fo/pkg/report"
 	"github.com/dkoosis/fo/pkg/state"
+	"github.com/dkoosis/fo/pkg/view"
 )
 
 // attachDiff loads prior state, classifies the current report, sets
@@ -50,20 +51,27 @@ func attachDiff(r *report.Report, statePath string, policy statePolicy, stderr i
 	return nil
 }
 
-// recordFullLog tees the complete, unfiltered input to a sidecar log and
-// notes its path on r.Notices as "full: <path>" — so a reader looking at
-// fo's (possibly truncated) output can recover the original in one
-// command, per the rtk pattern. Best-effort: a write failure degrades to
-// a Notice, not a run failure, matching attachDiff/assignAndPersistIDs.
+// recordFullLog tees the complete, unfiltered input to a sidecar log and,
+// when the run has findings or failures, notes its path on r.Notices as
+// "full: <path>" — so a reader looking at fo's (possibly truncated) output
+// can recover the original in one command, per the rtk pattern. A clean
+// run still writes the log but gets no pointer: "no findings" has nothing
+// to recover, and a notice on every passing gate is noise. Must run after
+// suppression so the clean check sees the final findings. Best-effort: a
+// write failure degrades to a Notice, not a run failure, matching
+// attachDiff/assignAndPersistIDs.
 func recordFullLog(r *report.Report, input []byte, policy statePolicy, stderr io.Writer) {
 	if policy == stateOff || r == nil {
 		return
 	}
 	path, err := state.SaveFullLog(input)
+	pointer := !view.IsClean(*r)
 	if err != nil {
 		if errors.Is(err, state.ErrDurabilityDegraded) {
 			fmt.Fprintf(stderr, "fo: state: full log: warning: %v\n", err)
-			r.Notices = append(r.Notices, "full: "+path)
+			if pointer {
+				r.Notices = append(r.Notices, "full: "+path)
+			}
 			r.Notices = append(r.Notices,
 				fmt.Sprintf("full log: durability degraded (%v) — sidecar may revert under crash", err))
 			return
@@ -72,7 +80,9 @@ func recordFullLog(r *report.Report, input []byte, policy statePolicy, stderr io
 		r.Notices = append(r.Notices, fmt.Sprintf("full log: save failed (%v)", err))
 		return
 	}
-	r.Notices = append(r.Notices, "full: "+path)
+	if pointer {
+		r.Notices = append(r.Notices, "full: "+path)
+	}
 }
 
 // assignAndPersistIDs assigns short handles (F-/T-) to the report and,
