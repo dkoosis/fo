@@ -7,6 +7,36 @@ Workspace: /Users/vcto/Projects/fo
 
 ‡ Go symbol questions → `snipe` (def/refs/callers/pack/impact/tests) before rg/Grep. rg = non-symbol text only.
 
+## Environment Setup
+
+Setup is handled by `.sandbox/codex/setup.sh` (auto-discovered by Codex on container creation).
+Fallback: `source .sandbox/activate.sh` (auto-detects platform, links prebuilt binaries from `.sandbox/bin/linux-{amd64,arm64}/`).
+
+### Required tools
+
+| Tool | Purpose | Example |
+|------|---------|---------|
+| `snipe` | Go symbol navigation (AST-indexed) | `snipe def Render`, `snipe callers ParseSARIF` |
+| `golangci-lint` | Go linting (v2) | `golangci-lint run --output.text.path=stdout ./...` |
+| `gofumpt` | Strict Go formatting | `gofumpt -w file.go` |
+| `goimports` | Fix imports | `goimports -w file.go` |
+| `jq` | JSON processing | `jq '.runs' sarif.json` |
+
+### Optional tools
+
+| Tool | Purpose | Example |
+|------|---------|---------|
+| `govulncheck` | Vulnerability scanning (not in CI) | `govulncheck ./...` |
+
+### Orientation workflow
+```bash
+snipe def <Symbol>            # jump to any definition
+snipe callers <Symbol>        # find who calls a function
+snipe search "pattern"        # text search
+make help                     # show available targets
+make qa                       # full QA pass (build + test + lint)
+```
+
 ## Architecture
 
 ```
