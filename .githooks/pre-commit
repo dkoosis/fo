@@ -186,6 +186,10 @@ while IFS= read -r file; do
         # Core top-level docs
         echo -e "  ${GREEN}✓${NC} $file"
         continue
+    elif [[ "$file" =~ ^\.claude/rules/[^/]+\.md$ ]]; then
+        # Project rules — the fleet standard home (conform-to-sdlc vocabulary-file)
+        echo -e "  ${GREEN}✓${NC} $file"
+        continue
     elif [[ "$file" =~ ^CLAUDE\.md$ ]] || [[ "$file" =~ ^AGENTS\.md$ ]]; then
         # Claude Code / Codex project guidance
         echo -e "  ${GREEN}✓${NC} $file"
@@ -227,6 +231,7 @@ if [ ${#BLOCKED_FILES[@]} -gt 0 ]; then
     echo -e "  ${GREEN}✓${NC} docs/adr/ADR-NNN-title.md (e.g., ADR-001-pattern-based-architecture.md)"
     echo -e "  ${GREEN}✓${NC} docs/{PATTERNS,MIGRATION,VISION_REVIEW,README,DOCUMENTATION_POLICY}.md"
     echo -e "  ${GREEN}✓${NC} README.md, decisions.log (root)"
+    echo -e "  ${GREEN}✓${NC} .claude/rules/*.md"
     echo -e "  ${YELLOW}⚠${NC} docs/** (other locations allowed with warning)"
     echo ""
     echo -e "${RED}To override:${NC} git commit --no-verify"
