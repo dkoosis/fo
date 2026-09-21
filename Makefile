@@ -21,7 +21,7 @@
 # ── Sandbox prebuilt versions ──
 # Keep in sync with what .sandbox/codex/setup.sh expects.
 # golangci-lint: the ONE fleet pin lives in .sandbox/project.conf
-# (conform lint-pin rule) — read it, never write a second literal here.
+# (conform-to-sdlc lint-pin rule) — read it, never write a second literal here.
 GOLANGCI_LINT_VER ?= $(shell . ./.sandbox/project.conf 2>/dev/null && echo $$GOLANGCI_LINT_VERSION)
 GOFUMPT_VER       ?= v0.9.2
 GOIMPORTS_VER     ?= v0.39.0
@@ -58,13 +58,13 @@ help: ## Show this help
 		/^## [^-]/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 4) } \
 		/^[a-zA-Z0-9_-]+:.*?## / { printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
-check: vet lint test build pack-drift selfcheck ## Full repo: vet + lint + test + build + pack-drift + conform
+check: vet lint test build pack-drift selfcheck ## Full repo: vet + lint + test + build + pack-drift + conform-to-sdlc
 	@echo "=== check pass ==="
 
-# Dogfood the fleet gate (sd-th5.14): conform is pinned as a go.mod tool
+# Dogfood the fleet gate (sd-th5.14): conform-to-sdlc is pinned as a go.mod tool
 # dependency (go.sum-verified); bumping the pin is a deliberate PR.
-selfcheck: ## Run conform (fleet SDLC checker) against this repo
-	go tool conform
+selfcheck: ## Run conform-to-sdlc (fleet SDLC checker) against this repo
+	go tool conform-to-sdlc
 
 audit: check snipe-index ## Exhaustive stream through fo (auto: human@TTY, llm piped)
 	@( $(REPORT_CMD) ) | fo || true
