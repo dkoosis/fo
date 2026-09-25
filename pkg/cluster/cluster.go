@@ -1,6 +1,10 @@
 package cluster
 
-import "sort"
+import (
+	"cmp"
+	"maps"
+	"slices"
+)
 
 // Input is the per-failure data the clusterer needs. Callers build a
 // slice of Input from their own failure shape. Key is opaque to the
@@ -111,11 +115,7 @@ func RunWith(inputs []Input, cfg Config) []Cluster {
 		}
 		byKey[in.Key] = in
 	}
-	keys := make([]string, 0, len(byKey))
-	for k := range byKey {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(byKey))
 
 	recs := make([]record, len(keys))
 	for i, k := range keys {
@@ -159,11 +159,11 @@ func RunWith(inputs []Input, cfg Config) []Cluster {
 	}
 
 	// Stable final order: member count desc, ID asc.
-	sort.SliceStable(clusters, func(i, j int) bool {
-		if len(clusters[i].Members) != len(clusters[j].Members) {
-			return len(clusters[i].Members) > len(clusters[j].Members)
-		}
-		return clusters[i].ID < clusters[j].ID
+	slices.SortStableFunc(clusters, func(a, b Cluster) int {
+		return cmp.Or(
+			cmp.Compare(len(b.Members), len(a.Members)),
+			cmp.Compare(a.ID, b.ID),
+		)
 	})
 	return clusters
 }
@@ -220,7 +220,7 @@ func buildCluster(members []int, recs []record, cfg Config, taken map[ClusterID]
 	for i, m := range members {
 		keys[i] = recs[m].input.Key
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 
 	return Cluster{
 		ID:            id,
@@ -255,11 +255,8 @@ func mostCommon(members []int, recs []record, pick signalKey) string {
 	for k, n := range counts {
 		all = append(all, kv{k, n})
 	}
-	sort.Slice(all, func(i, j int) bool {
-		if all[i].n != all[j].n {
-			return all[i].n > all[j].n
-		}
-		return all[i].k < all[j].k
+	slices.SortFunc(all, func(a, b kv) int {
+		return cmp.Or(cmp.Compare(b.n, a.n), cmp.Compare(a.k, b.k))
 	})
 	return all[0].k
 }

@@ -55,7 +55,7 @@ func TestWatchLoop_RunsInitiallyAndPerTrigger(t *testing.T) {
 	close(triggers)
 
 	var calls, betweens int
-	watchLoop(context.Background(), func() { calls++ }, func() { betweens++ }, triggers)
+	watchLoop(t.Context(), func() { calls++ }, func() { betweens++ }, triggers)
 
 	if calls != 3 {
 		t.Fatalf("watchLoop: want 3 calls (initial + 2 triggers), got %d", calls)
@@ -66,7 +66,7 @@ func TestWatchLoop_RunsInitiallyAndPerTrigger(t *testing.T) {
 }
 
 func TestWatchLoop_ExitsOnCtxCancel(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	triggers := make(chan struct{})
 
 	var calls atomic.Int64
@@ -135,7 +135,7 @@ func TestRunChildAndRender_RendersChildStdout(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	cmd := []string{"sh", "-c", "printf '%s' " + shellQuote(event)}
 
-	code := runChildAndRender(context.Background(), cmd, &stdout, &stderr)
+	code := runChildAndRender(t.Context(), cmd, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("runChildAndRender: want exit 0 (all PASS), got %d (stderr=%q)", code, stderr.String())
@@ -152,7 +152,7 @@ func TestRunChildAndRender_FailingTestExitsNonZero(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	cmd := []string{"sh", "-c", "printf '%s' " + shellQuote(event) + "; exit 1"}
 
-	code := runChildAndRender(context.Background(), cmd, &stdout, &stderr)
+	code := runChildAndRender(t.Context(), cmd, &stdout, &stderr)
 	if code == 0 {
 		t.Fatalf("runChildAndRender: want non-zero exit on test failure, got 0 (stdout=%q stderr=%q)", stdout.String(), stderr.String())
 	}
@@ -161,7 +161,7 @@ func TestRunChildAndRender_FailingTestExitsNonZero(t *testing.T) {
 func TestRunChildAndRender_EmptyChildOutputIsClean(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	cmd := []string{"sh", "-c", "true"}
-	code := runChildAndRender(context.Background(), cmd, &stdout, &stderr)
+	code := runChildAndRender(t.Context(), cmd, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runChildAndRender: empty child output should exit 0, got %d", code)
 	}
@@ -234,7 +234,7 @@ func (b *blockingCloser) Close() error {
 }
 
 func TestStdinTriggers_CancelClosesCloser(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	r := newBlockingCloser()
 	ch := stdinTriggers(ctx, r)
 
@@ -257,7 +257,7 @@ func TestStdinTriggers_BoundedBufferRejectsHugeLine(t *testing.T) {
 	// 2 MiB line with no newline → exceeds 1 MiB max; scanner should stop
 	// (returning false from Scan) without panicking or growing unboundedly.
 	big := strings.Repeat("x", 2<<20)
-	ctx := context.Background()
+	ctx := t.Context()
 	ch := stdinTriggers(ctx, strings.NewReader(big))
 
 	// Channel should close (no trigger emitted, no panic).

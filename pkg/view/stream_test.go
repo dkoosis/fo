@@ -43,7 +43,7 @@ func TestRenderStream_FinalEqualsBatch(t *testing.T) {
 	ch := make(chan report.Report, 1)
 	ch <- r
 	close(ch)
-	if err := view.RenderStream(context.Background(), &streamBuf, ch, tm, 80); err != nil {
+	if err := view.RenderStream(t.Context(), &streamBuf, ch, tm, 80); err != nil {
 		t.Fatalf("stream: %v", err)
 	}
 
@@ -91,7 +91,7 @@ func TestRenderStream_IncrementalEmission(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		done <- view.RenderStream(context.Background(), pw, ch, theme.Mono(), 80)
+		done <- view.RenderStream(t.Context(), pw, ch, theme.Mono(), 80)
 	}()
 
 	// First snapshot
@@ -136,7 +136,7 @@ func TestRenderStream_EmptyClose(t *testing.T) {
 	ch := make(chan report.Report)
 	close(ch)
 	var buf bytes.Buffer
-	if err := view.RenderStream(context.Background(), &buf, ch, theme.Mono(), 80); err != nil {
+	if err := view.RenderStream(t.Context(), &buf, ch, theme.Mono(), 80); err != nil {
 		t.Fatalf("stream: %v", err)
 	}
 	if buf.Len() != 0 {
@@ -159,7 +159,7 @@ func TestRenderStream_CleanReport(t *testing.T) {
 	ch <- r
 	close(ch)
 	var streamBuf bytes.Buffer
-	if err := view.RenderStream(context.Background(), &streamBuf, ch, tm, 80); err != nil {
+	if err := view.RenderStream(t.Context(), &streamBuf, ch, tm, 80); err != nil {
 		t.Fatalf("stream: %v", err)
 	}
 	if batch.String() != streamBuf.String() {
@@ -181,7 +181,7 @@ func TestRenderStream_CleanHeartbeatsCoalesce(t *testing.T) {
 	}
 	close(ch)
 	var buf bytes.Buffer
-	if err := view.RenderStream(context.Background(), &buf, ch, theme.Mono(), 80); err != nil {
+	if err := view.RenderStream(t.Context(), &buf, ch, theme.Mono(), 80); err != nil {
 		t.Fatalf("stream: %v", err)
 	}
 	out := buf.String()
@@ -202,7 +202,7 @@ func TestRenderStream_CleanHeartbeatsSuppressedAroundFailure(t *testing.T) {
 	ch <- sampleReport()                // final accumulated
 	close(ch)
 	var buf bytes.Buffer
-	if err := view.RenderStream(context.Background(), &buf, ch, theme.Mono(), 80); err != nil {
+	if err := view.RenderStream(t.Context(), &buf, ch, theme.Mono(), 80); err != nil {
 		t.Fatalf("stream: %v", err)
 	}
 	out := buf.String()
@@ -214,7 +214,7 @@ func TestRenderStream_CleanHeartbeatsSuppressedAroundFailure(t *testing.T) {
 // TestRenderStream_ContextCancel — cancelling ctx returns ctx.Err()
 // without leaking the goroutine.
 func TestRenderStream_ContextCancel(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	ch := make(chan report.Report) // never sent on
 	done := make(chan error, 1)
 	go func() {

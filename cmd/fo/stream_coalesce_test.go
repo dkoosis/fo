@@ -55,7 +55,7 @@ func TestSendCoalesceSnapshot_DoesNotBlock(t *testing.T) {
 // TestSendCoalesceSnapshot_RespectsCancel verifies that a cancelled context
 // stops the helper even when the channel is permanently full.
 func TestSendCoalesceSnapshot_RespectsCancel(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	ch := make(chan report.Report, 1)
 	ch <- report.Report{} // pre-fill
 
@@ -98,7 +98,7 @@ func TestRunStreamCtx_SlowWriterDoesNotStallParser(t *testing.T) {
 	stdout := &slowWriter{delay: writeDelay}
 	var stderr bytes.Buffer
 
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 4*time.Second)
 	defer cancel()
 
 	start := time.Now()

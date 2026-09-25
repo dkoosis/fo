@@ -1,10 +1,11 @@
 package testjson
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -83,14 +84,12 @@ func ToReport(results []TestPackageResult, generatedAt ...time.Time) *report.Rep
 		}
 	}
 
-	sort.SliceStable(r.Tests, func(i, j int) bool {
-		if r.Tests[i].Score != r.Tests[j].Score {
-			return r.Tests[i].Score > r.Tests[j].Score
-		}
-		if r.Tests[i].Package != r.Tests[j].Package {
-			return r.Tests[i].Package < r.Tests[j].Package
-		}
-		return r.Tests[i].Test < r.Tests[j].Test
+	slices.SortStableFunc(r.Tests, func(a, b report.TestResult) int {
+		return cmp.Or(
+			cmp.Compare(b.Score, a.Score),
+			cmp.Compare(a.Package, b.Package),
+			cmp.Compare(a.Test, b.Test),
+		)
 	})
 
 	attachClusters(r)

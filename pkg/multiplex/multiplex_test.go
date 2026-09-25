@@ -177,8 +177,8 @@ func TestParseSections_UnknownFormat(t *testing.T) {
 	input := "--- tool:vet format:sarif ---\nok body\n" +
 		"--- tool:build format:text ---\nbuild error here\n"
 	_, _, err := ParseSections([]byte(input))
-	var ufe *UnknownFormatError
-	if !errors.As(err, &ufe) {
+	ufe, ok := errors.AsType[*UnknownFormatError](err)
+	if !ok {
 		t.Fatalf("err = %v, want UnknownFormatError", err)
 	}
 	if ufe.SectionIndex != 2 {
@@ -198,8 +198,8 @@ func TestParseSections_UnknownFormat(t *testing.T) {
 
 func TestParseSections_UnknownFormatFirstSection(t *testing.T) {
 	_, _, err := ParseSections([]byte("--- tool:build format:text ---\nbody\n"))
-	var ufe *UnknownFormatError
-	if !errors.As(err, &ufe) {
+	ufe, ok := errors.AsType[*UnknownFormatError](err)
+	if !ok {
 		t.Fatalf("err = %v, want UnknownFormatError", err)
 	}
 	if ufe.SectionIndex != 1 {

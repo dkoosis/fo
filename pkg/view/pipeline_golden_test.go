@@ -86,8 +86,7 @@ func TestPipelineGoldens(t *testing.T) {
 				// Exit 0 (clean) and 1 (findings present) are expected;
 				// any other code is a real failure.
 				if err := cmd.Run(); err != nil {
-					var ee *exec.ExitError
-					if !errors.As(err, &ee) || ee.ExitCode() > 1 {
+					if ee, ok := errors.AsType[*exec.ExitError](err); !ok || ee.ExitCode() > 1 {
 						t.Fatalf("fo crashed on %s: %v\n%s", in, err, out.String())
 					}
 				}

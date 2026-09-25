@@ -1,6 +1,6 @@
 package report
 
-import "sort"
+import "slices"
 
 // Prior carries the previous run's fingerprint→handle maps so a handle can
 // keep pointing at the same defect across runs even as the surrounding set
@@ -114,7 +114,7 @@ func mintHandles(distinct map[string]struct{}, prefix string, out map[string]str
 			fresh = append(fresh, fp)
 		}
 	}
-	sort.Strings(fresh)
+	slices.Sort(fresh)
 	for _, fp := range fresh {
 		hex := mintHex(distinct, fp, used)
 		out[fp] = prefix + hex

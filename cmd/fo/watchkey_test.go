@@ -9,7 +9,7 @@ import (
 
 func TestKeyControl_NonTTYReturnsNoop(t *testing.T) {
 	// strings.Reader is not an *os.File → must fall back cleanly.
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	ch, restore := keyControl(ctx, strings.NewReader(""), cancel)
@@ -29,7 +29,7 @@ func TestFanIn_BothClose(t *testing.T) {
 	b := make(chan struct{})
 	close(a)
 	close(b)
-	out := fanIn(context.Background(), a, b)
+	out := fanIn(t.Context(), a, b)
 	// Drain — should close promptly.
 	select {
 	case _, ok := <-out:
@@ -46,7 +46,7 @@ func TestFanIn_NilPassthrough(t *testing.T) {
 	a <- struct{}{}
 	close(a)
 
-	out := fanIn(context.Background(), a, nil)
+	out := fanIn(t.Context(), a, nil)
 	// fanIn(a, nil) is just a (no goroutine, same channel).
 	got := 0
 	for range out {
@@ -66,7 +66,7 @@ func TestFanIn_MergesValues(t *testing.T) {
 	close(a)
 	close(b)
 
-	out := fanIn(context.Background(), a, b)
+	out := fanIn(t.Context(), a, b)
 	got := 0
 	deadline := time.After(time.Second)
 	for {
@@ -86,7 +86,7 @@ func TestFanIn_MergesValues(t *testing.T) {
 }
 
 func TestFanIn_CtxCancel(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	a := make(chan struct{})
 	b := make(chan struct{})
 	out := fanIn(ctx, a, b)
