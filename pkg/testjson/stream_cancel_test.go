@@ -36,7 +36,7 @@ func (b *blockingCloser) Close() error {
 // r.Close(), which is the only mechanism that can unblock a Read that is
 // stuck inside the scanner goroutine. Regression for fo-u2w.
 func TestStream_CancelClosesReader(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	r := newBlockingCloser()
 
 	done := make(chan error, 1)

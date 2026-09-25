@@ -74,7 +74,7 @@ func TestDebounce_CoalescesBurst(t *testing.T) {
 	}
 	close(in)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
 	out := debounce(ctx, in, 30*time.Millisecond)
 
@@ -89,7 +89,7 @@ func TestDebounce_CoalescesBurst(t *testing.T) {
 
 func TestDebounce_SeparateBurstsEmitSeparately(t *testing.T) {
 	in := make(chan struct{}, 4)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 	out := debounce(ctx, in, 30*time.Millisecond)
 
@@ -113,7 +113,7 @@ func TestDebounce_SeparateBurstsEmitSeparately(t *testing.T) {
 
 func TestWatchTree_DetectsFileWrite(t *testing.T) {
 	dir := t.TempDir()
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 	defer cancel()
 
 	events, err := watchTree(ctx, dir)
@@ -140,7 +140,7 @@ func TestWatchTree_IgnoresVendorDir(t *testing.T) {
 	if err := os.Mkdir(vendor, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
 
 	events, err := watchTree(ctx, dir)

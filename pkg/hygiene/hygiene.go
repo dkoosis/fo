@@ -107,10 +107,11 @@ func absorb(raw []byte, spec Spec, st *scanState) error {
 		return nil
 	}
 	if !st.headerSeen {
-		if !strings.HasPrefix(line, spec.Prefix) {
+		rest, ok := strings.CutPrefix(line, spec.Prefix)
+		if !ok {
 			return spec.ErrNoHeader
 		}
-		rest := strings.TrimSpace(strings.TrimPrefix(line, spec.Prefix))
+		rest = strings.TrimSpace(rest)
 		st.tool = ParseAttr(rest, "tool")
 		st.headerSeen = true
 		return nil

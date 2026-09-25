@@ -65,7 +65,7 @@ func TestRunStream_PromptCancel(t *testing.T) {
 		`{"Time":"2026-04-27T12:00:01Z","Action":"pass","Package":"foo","Elapsed":0.01}`,
 	}, "\n") + "\n"
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	prod := newSlowProducer(ctx, []byte(events))
 

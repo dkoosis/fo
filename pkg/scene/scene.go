@@ -182,10 +182,11 @@ func (p *parser) feedHeader(raw string) error {
 	if trimmed == "" {
 		return nil
 	}
-	if !strings.HasPrefix(trimmed, HeaderPrefix) {
+	rest, ok := strings.CutPrefix(trimmed, HeaderPrefix)
+	if !ok {
 		return errNoHeader
 	}
-	rest := strings.TrimSpace(strings.TrimPrefix(trimmed, HeaderPrefix))
+	rest = strings.TrimSpace(rest)
 	if err := parseHeaderAttrs(rest, &p.s); err != nil {
 		return fmt.Errorf("scene: line %d: %w", p.lineNo, err)
 	}
@@ -256,10 +257,14 @@ func isOutputLine(raw string) bool {
 
 func parseExitTrailer(body string) (int, bool, error) {
 	t := strings.TrimSpace(body)
-	if !strings.HasPrefix(t, "(exit") || !strings.HasSuffix(t, ")") {
+	inner, ok := strings.CutPrefix(t, "(exit")
+	if !ok {
 		return 0, false, nil
 	}
-	inner := strings.TrimSuffix(strings.TrimPrefix(t, "(exit"), ")")
+	inner, ok = strings.CutSuffix(inner, ")")
+	if !ok {
+		return 0, false, nil
+	}
 	inner = strings.TrimSpace(inner)
 	if inner == "" {
 		return 0, false, fmt.Errorf("%w: missing exit code in %q", errMalformedExit, body)
@@ -295,10 +300,11 @@ func parseActorLine(line string) (Command, error) {
 	}
 	actor := rest[:sp]
 	tail := strings.TrimLeft(rest[sp:], " \t")
-	if !strings.HasPrefix(tail, "$") {
+	afterDollar, ok := strings.CutPrefix(tail, "$")
+	if !ok {
 		return Command{}, fmt.Errorf("%w: missing '$' after actor in %q", errMalformedActor, line)
 	}
-	cmd := strings.TrimLeft(strings.TrimPrefix(tail, "$"), " \t")
+	cmd := strings.TrimLeft(afterDollar, " \t")
 	if cmd == "" {
 		return Command{}, fmt.Errorf("%w: empty command in %q", errMalformedActor, line)
 	}

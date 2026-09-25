@@ -1,9 +1,10 @@
 package sarif
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/dkoosis/fo/pkg/fingerprint"
@@ -62,14 +63,12 @@ func ToReport(doc *Document, generatedAt ...time.Time) *report.Report {
 		}
 	}
 
-	sort.SliceStable(r.Findings, func(i, j int) bool {
-		if r.Findings[i].Score != r.Findings[j].Score {
-			return r.Findings[i].Score > r.Findings[j].Score
-		}
-		if r.Findings[i].File != r.Findings[j].File {
-			return r.Findings[i].File < r.Findings[j].File
-		}
-		return r.Findings[i].Line < r.Findings[j].Line
+	slices.SortStableFunc(r.Findings, func(a, b report.Finding) int {
+		return cmp.Or(
+			cmp.Compare(b.Score, a.Score),
+			cmp.Compare(a.File, b.File),
+			cmp.Compare(a.Line, b.Line),
+		)
 	})
 
 	return r

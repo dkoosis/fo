@@ -1,7 +1,8 @@
 package state
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 
 	"github.com/dkoosis/fo/pkg/report"
 )
@@ -216,13 +217,11 @@ func makeItem(fp string, sev, prior Severity, c Class, f *report.Finding) Item {
 }
 
 func sortItems(items []Item) {
-	sort.SliceStable(items, func(i, j int) bool {
-		if items[i].RuleID != items[j].RuleID {
-			return items[i].RuleID < items[j].RuleID
-		}
-		if items[i].File != items[j].File {
-			return items[i].File < items[j].File
-		}
-		return items[i].Fingerprint < items[j].Fingerprint
+	slices.SortStableFunc(items, func(a, b Item) int {
+		return cmp.Or(
+			cmp.Compare(a.RuleID, b.RuleID),
+			cmp.Compare(a.File, b.File),
+			cmp.Compare(a.Fingerprint, b.Fingerprint),
+		)
 	})
 }

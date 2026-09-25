@@ -1,8 +1,10 @@
 package view
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/dkoosis/fo/pkg/report"
@@ -287,7 +289,7 @@ func pickLeaderboard(r report.Report) (Leaderboard, bool) {
 	for _, label := range order {
 		rows = append(rows, LbRow{Label: label, Value: agg[label]})
 	}
-	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Value > rows[j].Value })
+	slices.SortStableFunc(rows, func(a, b LbRow) int { return cmp.Compare(b.Value, a.Value) })
 
 	head := min(3, len(rows))
 	var headSum float64
@@ -349,12 +351,7 @@ func packageOf(path string) string {
 }
 
 func sortedKeys(m map[string][]report.Finding) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
+	return slices.Sorted(maps.Keys(m))
 }
 
 func severityCounters(fs []report.Finding) []Counter {

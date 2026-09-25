@@ -39,8 +39,8 @@ type Finding struct {
 	ID          string   `json:"id,omitempty"`
 	RuleID      string   `json:"rule_id,omitempty"`
 	File        string   `json:"file,omitempty"`
-	Line        int      `json:"line,omitempty"`
-	Col         int      `json:"col,omitempty"`
+	Line        int      `json:"line,omitzero"`
+	Col         int      `json:"col,omitzero"`
 	Severity    Severity `json:"severity"`
 	Message     string   `json:"message"`
 	FixCommand  string   `json:"fix_command,omitempty"`
@@ -59,7 +59,7 @@ type TestResult struct {
 	Package     string        `json:"package"`
 	Test        string        `json:"test,omitempty"`
 	Outcome     TestOutcome   `json:"outcome"`
-	Duration    time.Duration `json:"duration_ns,omitempty"`
+	Duration    time.Duration `json:"duration_ns,omitzero"`
 	Output      string        `json:"output,omitempty"`
 	FixCommand  string        `json:"fix_command,omitempty"`
 	Fingerprint string        `json:"fingerprint,omitempty"`

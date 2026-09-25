@@ -87,10 +87,10 @@ type ArtifactLocation struct {
 
 // Region identifies the specific location within the file.
 type Region struct {
-	StartLine   int `json:"startLine,omitempty"`
-	StartColumn int `json:"startColumn,omitempty"`
-	EndLine     int `json:"endLine,omitempty"`
-	EndColumn   int `json:"endColumn,omitempty"`
+	StartLine   int `json:"startLine,omitzero"`
+	StartColumn int `json:"startColumn,omitzero"`
+	EndLine     int `json:"endLine,omitzero"`
+	EndColumn   int `json:"endColumn,omitzero"`
 }
 
 // Line returns the start line from a result's primary location.

@@ -68,7 +68,7 @@ also not json
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var events []TestEvent
-			malformed, err := Stream(context.Background(), io.NopCloser(strings.NewReader(tt.input)), func(e TestEvent) {
+			malformed, err := Stream(t.Context(), io.NopCloser(strings.NewReader(tt.input)), func(e TestEvent) {
 				events = append(events, e)
 			})
 			if err != nil {
@@ -90,7 +90,7 @@ also not json
 func TestStream_RespectsContextCancellation(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	var count int
 	_, err := Stream(ctx, io.NopCloser(strings.NewReader(`{"Action":"start","Package":"example.com/pkg"}`+"\n")), func(_ TestEvent) {
 		count++
@@ -107,7 +107,7 @@ func TestStream_RespectsContextCancellation(t *testing.T) {
 func TestStream_PreCancelledContext(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	var count int
@@ -129,7 +129,7 @@ var errStreamReaderBoom = errors.New("stream reader boom")
 func TestStream_PropagatesReaderError(t *testing.T) {
 	t.Parallel()
 
-	_, err := Stream(context.Background(), &errReader{err: errStreamReaderBoom}, func(_ TestEvent) {})
+	_, err := Stream(t.Context(), &errReader{err: errStreamReaderBoom}, func(_ TestEvent) {})
 	if !errors.Is(err, errStreamReaderBoom) {
 		t.Fatalf("err = %v, want errors.Is(errStreamReaderBoom)", err)
 	}
@@ -139,7 +139,7 @@ func TestStream_EmptyInputIsNoop(t *testing.T) {
 	t.Parallel()
 
 	var count int
-	malformed, err := Stream(context.Background(), io.NopCloser(strings.NewReader("")), func(_ TestEvent) {
+	malformed, err := Stream(t.Context(), io.NopCloser(strings.NewReader("")), func(_ TestEvent) {
 		count++
 	})
 	if err != nil {
@@ -173,7 +173,7 @@ func TestStream_CancelUnblocksBlockedReader(t *testing.T) {
 	t.Parallel()
 
 	br := &blockingReader{done: make(chan struct{})}
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
 	defer cancel()
 
 	done := make(chan error, 1)

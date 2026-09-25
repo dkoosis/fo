@@ -43,12 +43,9 @@ func keyControl(ctx context.Context, in io.Reader, cancel context.CancelFunc) (<
 	// ctx-cancel goroutine restores before closing the fd, and the caller's
 	// defer is a safety net for early-exit paths where the goroutine hasn't
 	// fired yet.
-	var once sync.Once
-	restore := func() {
-		once.Do(func() {
-			_ = term.Restore(fd, oldState)
-		})
-	}
+	restore := sync.OnceFunc(func() {
+		_ = term.Restore(fd, oldState)
+	})
 
 	out := make(chan struct{}, 1)
 	// Best-effort: a blocking Read on the raw TTY can't be interrupted by ctx
