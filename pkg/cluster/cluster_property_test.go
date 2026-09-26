@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -36,7 +37,7 @@ func TestProperty_Deterministic_OnShuffle(t *testing.T) {
 	for _, base := range loadAllFixtureInputs(t) {
 		want := mustJSON(t, Run(base))
 		for trial := range 8 {
-			shuffled := append([]Input(nil), base...)
+			shuffled := slices.Clone(base)
 			rng.Shuffle(len(shuffled), func(i, j int) {
 				shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
 			})

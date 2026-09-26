@@ -164,7 +164,7 @@ vuln: ## Scan for known vulnerabilities
 	govulncheck ./...
 
 pack-drift: ## Fail if the copied bugclasses rules drifted from upstream (network-soft)
-	@.golangci-rules/check-pack-drift.sh .golangci-rules/bugclasses.go
+	@.golangci-rules/check-pack-drift.sh
 
 lint-sarif: vet ## Run linters with SARIF output
 	golangci-lint run --output.sarif.path=stdout ./...

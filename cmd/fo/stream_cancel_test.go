@@ -17,17 +17,21 @@ import (
 // on Read until ctx is cancelled or its Close is called. Models a long
 // `go test -json` stream that the user interrupts with Ctrl-C.
 type slowProducer struct {
-	ctx       context.Context //nolint:containedctx // test-only fixture
-	prefix    *bytes.Reader
-	closed    chan struct{}
-	closeOnce sync.Once
+	ctx     context.Context //nolint:containedctx // test-only fixture
+	prefix  *bytes.Reader
+	closed  chan struct{}
+	closeFn func()
 }
 
 func newSlowProducer(ctx context.Context, prefix []byte) *slowProducer {
+	closed := make(chan struct{})
 	return &slowProducer{
 		ctx:    ctx,
 		prefix: bytes.NewReader(prefix),
-		closed: make(chan struct{}),
+		closed: closed,
+		// Close may be called concurrently (test defer + pipeline cleanup
+		// AfterFunc), so guard the channel close against a double-close panic.
+		closeFn: sync.OnceFunc(func() { close(closed) }),
 	}
 }
 
@@ -45,9 +49,7 @@ func (s *slowProducer) Read(p []byte) (int, error) {
 }
 
 func (s *slowProducer) Close() error {
-	// Close may be called concurrently (test defer + pipeline cleanup
-	// AfterFunc), so guard the channel close against a double-close panic.
-	s.closeOnce.Do(func() { close(s.closed) })
+	s.closeFn()
 	return nil
 }
 
