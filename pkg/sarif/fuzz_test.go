@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -89,7 +90,7 @@ func seedReadBytesCorpus(f *testing.F) {
 		// Trailing garbage after the SARIF document (golangci-lint v2
 		// itself appends a text summary — Read already tolerates this,
 		// fuzz to keep it that way).
-		f.Add(append(append([]byte(nil), data...), []byte("\ngarbage not json\x00\x01")...))
+		f.Add(slices.Concat(data, []byte("\ngarbage not json\x00\x01")))
 	}
 
 	// Depth-bomb: confirm the #269 guard holds under fuzzing, not just the

@@ -196,7 +196,7 @@ func materializeClusters(tests []report.TestResult, keyToTestIdx map[string]int,
 			SignatureKind: g.SignatureKind,
 			TopUserFrame:  g.TopUserFrame,
 			NormSig:       g.NormSig,
-			Members:       append([]string(nil), g.Members...),
+			Members:       slices.Clone(g.Members),
 		})
 	}
 	return out

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -77,7 +78,7 @@ func seedParseBytesCorpus(f *testing.F) {
 		f.Add(bytes.ReplaceAll(data, []byte("\n"), []byte("\r\n")))
 
 		// Trailing garbage after the last valid NDJSON line.
-		f.Add(append(append([]byte(nil), data...), []byte("garbage-not-json\x00\x01")...))
+		f.Add(slices.Concat(data, []byte("garbage-not-json\x00\x01")))
 	}
 
 	// NaN/Inf-poisoning attempt on Elapsed. Neither is valid JSON syntax

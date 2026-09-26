@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"time"
 
@@ -124,7 +125,7 @@ func copyBytes(b []byte) []byte {
 	if len(b) == 0 {
 		return nil
 	}
-	return append([]byte(nil), b...)
+	return slices.Clone(b)
 }
 
 // drainLines reads from lines, dispatching parsed events to fn. Returns when
@@ -428,7 +429,7 @@ func (a *aggregator) results() []TestPackageResult {
 		// Copy slices: appendCapped continues to mutate the backing
 		// arrays after this snapshot returns, so streaming consumers
 		// who hold a reference must see a stable view.
-		panicCopy := append([]string(nil), pkg.panicOutput...)
+		panicCopy := slices.Clone(pkg.panicOutput)
 		r := TestPackageResult{
 			Name:        pkg.name,
 			Passed:      pkg.passed,
@@ -445,7 +446,7 @@ func (a *aggregator) results() []TestPackageResult {
 		// failedOutput, and its structural diff into failedStructDiff
 		// (same index), at fail time — see handleFail.
 		for i, testName := range pkg.failedOrder {
-			outCopy := append([]string(nil), pkg.failedOutput[i]...)
+			outCopy := slices.Clone(pkg.failedOutput[i])
 			r.FailedTests = append(r.FailedTests, FailedTest{
 				Name:                  testName,
 				Output:                outCopy,

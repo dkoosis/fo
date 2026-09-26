@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -80,7 +81,7 @@ func TestParseBytes_TrailingGarbageAfterValidStream_CountsAsMalformed(t *testing
 		t.Fatalf("baseline ParseBytes: %v", err)
 	}
 
-	withGarbage := append(append([]byte(nil), data...), []byte("garbage-not-json\n")...)
+	withGarbage := slices.Concat(data, []byte("garbage-not-json\n"))
 	results, malformed, err := ParseBytes(withGarbage)
 	if err != nil {
 		t.Fatalf("ParseBytes with trailing garbage: %v", err)

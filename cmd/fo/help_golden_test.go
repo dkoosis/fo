@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -37,7 +38,7 @@ func walkVisibleHelp(nodes []helpNode, visit func(name string, args []string)) {
 	walk = func(prefixName string, n helpNode) {
 		fullName := strings.TrimSpace(prefixName + " " + n.name)
 		if n.visible {
-			path := append(append([]string{}, n.args...), "--help")
+			path := slices.Concat(n.args, []string{"--help"})
 			visit(fullName, path)
 		}
 		for _, ch := range n.children {
