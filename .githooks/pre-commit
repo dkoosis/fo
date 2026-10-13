@@ -187,7 +187,7 @@ while IFS= read -r file; do
         echo -e "  ${GREEN}✓${NC} $file"
         continue
     elif [[ "$file" =~ ^\.claude/rules/[^/]+\.md$ ]]; then
-        # Project rules — the fleet standard home (conform-to-sdlc vocabulary-file)
+        # Project rules — the fleet standard home for .claude/rules
         echo -e "  ${GREEN}✓${NC} $file"
         continue
     elif [[ "$file" =~ ^CLAUDE\.md$ ]] || [[ "$file" =~ ^AGENTS\.md$ ]]; then
