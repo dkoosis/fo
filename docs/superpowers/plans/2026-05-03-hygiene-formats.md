@@ -15,7 +15,7 @@
 
 **TDD discipline (applies to every task that adds tests + code).** Even when a task collapses "write tests" and "implement" into adjacent steps to keep the plan readable, the executor must keep the red→green discipline: write the test, run it, observe the compile/run failure, *then* write the implementation. Tasks 4, 6, 9, 10, 11 list these as adjacent steps; do not skip the failing-run between them. Task 1 spells the cycle out explicitly — use it as the template.
 
-**Audit reference:** Tool census across trixi/snipe/next Makefiles in agent run from 2026-05-03. Captured tools: govet, golangci-lint, go test, go build, jscpd, govulncheck, nilaway, go-arch-lint, benchstat, jq, snipe, gh, gomarkdoc, awk-formatted status tables. Of these, only benchstat, go-arch-lint text, govulncheck text, coverage, and dk's printf-table outputs are not yet routed through fo.
+**Audit reference:** Tool inventory across trixi/snipe/next Makefiles in agent run from 2026-05-03. Captured tools: govet, golangci-lint, go test, go build, jscpd, govulncheck, nilaway, go-arch-lint, benchstat, jq, snipe, gh, gomarkdoc, awk-formatted status tables. Of these, only benchstat, go-arch-lint text, govulncheck text, coverage, and dk's printf-table outputs are not yet routed through fo.
 
 ---
 
