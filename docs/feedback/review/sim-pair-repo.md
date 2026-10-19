@@ -30,11 +30,11 @@ Batch batch-7vsqB8z1RhPTFyXfAM7vxHEuMDnj2SLv8BFkt: status=failed, completed=0/78
 ```
 
 No batch has ever completed (`completed=0/789`); the last embed job is marked
-`status=failed`. Confirmed directly against `snipe sim`, which is the primitive
+`status=failed`. Confirmed directly against `snipe search --semantic`, which is the primitive
 every candidate pair in this linter depends on:
 
 ```
-$ snipe sim "func ParseBytes(data []byte) (*report.Report, error)" --threshold 0.9 --limit 5 --format json
+$ snipe search --semantic "func ParseBytes(data []byte) (*report.Report, error)" --threshold 0.9 --limit 5 --format json
 {"ok":false,"results":[],"error":{"code":"INTERNAL_ERROR","message":"no embeddings found. Run 'snipe index --embed' first", ...}}
 ```
 

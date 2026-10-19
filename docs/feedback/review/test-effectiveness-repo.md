@@ -20,7 +20,7 @@ over-broad shortcut. One finding survives verification.
 ## 1. [F1] `pkg/sarif/builder.go:92` `Builder.Document` — exported-for-testing-same-package
 
 **Diagnosis:** `Document()` has zero callers outside `pkg/sarif`'s own test files.
-Every one of its 7 call sites is a `_test.go` file; `snipe importers sarif.Document`
+Every one of its 7 call sites is a `_test.go` file; `snipe deps --importers sarif.Document`
 returns no results, and no production package that imports `pkg/sarif` (archlint,
 wraparchlinttext, wrapdiag, wrapjscpd, wrapcoverprofile, `cmd/fo/parse.go`) calls it —
 they all go through `WriteTo`.
