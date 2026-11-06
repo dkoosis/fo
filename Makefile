@@ -10,11 +10,10 @@
 
 .DEFAULT_GOAL := check
 
-.PHONY: help scan check audit audit-human audit-llm report deploy install build doctor cross \
+.PHONY: help scan check audit audit-human audit-llm report deploy install build doctor \
         vet lint test race fmt fmt-fix dupl vuln pack-drift selfcheck \
         qa-goldens qa-goldens-update \
         snipe-index baseline \
-        cross-amd64 cross-arm64 \
         lint-sarif clean issues \
         demo demo-llm demo-live
 
@@ -27,8 +26,13 @@ GOFUMPT_VER       ?= v0.9.2
 GOIMPORTS_VER     ?= v0.39.0
 BAT_VER           ?= v0.25.0
 SNIPE_SRC         ?= $(HOME)/Projects/snipe
-GOMOD_VER         := $(shell awk '/^go /{print $$2}' go.mod)
 VERSION           ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+
+# cross, cross-amd64, cross-arm64: the fleet's vendored recipes (conform owns the file).
+# They build every tool with go build -o, so a set GOBIN cannot refuse them.
+# The pins above come first, so the include's ?= defaults yield to them.
+# What gets built comes from PROJECT_BINS and PREBUILT_TOOLS in .sandbox/project.conf.
+include .sandbox/lib/Makefile.cross.mk
 
 # Report stream — fo eats its own dog food.
 # Race tests subsume plain tests (-race -json is a superset).
@@ -109,8 +113,6 @@ doctor: ## Validate required toolchain
 		exit 1; \
 	fi; \
 	echo "=== doctor pass ==="
-
-cross: cross-amd64 ## Cross-compile sandbox tools (default: amd64)
 
 ## ---------------------------------------------------------------------
 ## Git hooks
@@ -245,77 +247,3 @@ install: ## Install the fo binary to /usr/local/bin
 	@go build -ldflags "-X main.version=$(VERSION)" -o /usr/local/bin/fo ./cmd/fo/
 	@gp="$$(go env GOPATH)"; [ -n "$$gp" ] && rm -f "$$gp/bin/fo" || true
 	@echo "installed /usr/local/bin/fo ($$(/usr/local/bin/fo 2>&1 | head -1))"
-
-## ---------------------------------------------------------------------
-## Cross-compilation
-## ---------------------------------------------------------------------
-
-cross-amd64: ## Cross-compile linux/amd64 sandbox tools
-	@echo "=== cross: linux/amd64 ==="
-	@$(MAKE) --no-print-directory _cross-build CROSS_ARCH=amd64
-
-cross-arm64: ## Cross-compile linux/arm64 sandbox tools
-	@echo "=== cross: linux/arm64 ==="
-	@$(MAKE) --no-print-directory _cross-build CROSS_ARCH=arm64
-
-_cross-build: ## Internal worker for cross-amd64/cross-arm64 (needs CROSS_ARCH)
-	@# Pre-flight: local Go must be >= go.mod target
-	@LOCAL_GO=$$(go version | sed 's/.*go\([0-9]*\.[0-9]*\).*/\1/'); \
-	MOD_MIN=$$(echo $(GOMOD_VER) | cut -d. -f1)$$(printf '%03d' $$(echo $(GOMOD_VER) | cut -d. -f2)); \
-	LOC_MIN=$$(echo $$LOCAL_GO | cut -d. -f1)$$(printf '%03d' $$(echo $$LOCAL_GO | cut -d. -f2)); \
-	if [ "$$LOC_MIN" -lt "$$MOD_MIN" ]; then \
-		echo "FATAL: local go$$LOCAL_GO < go.mod go$(GOMOD_VER)"; \
-		exit 1; \
-	fi; \
-	echo "  local go$$LOCAL_GO >= go.mod go$(GOMOD_VER) — ok"
-	@mkdir -p .sandbox/bin/linux-$(CROSS_ARCH)
-	$(eval XBIN := $(shell go env GOPATH)/bin/linux_$(CROSS_ARCH))
-	@echo "-- golangci-lint $(GOLANGCI_LINT_VER)"
-	@CGO_ENABLED=0 GOOS=linux GOARCH=$(CROSS_ARCH) go install -trimpath -ldflags='-s -w' github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VER)
-	@cp $(XBIN)/golangci-lint .sandbox/bin/linux-$(CROSS_ARCH)/
-	@echo "-- gofumpt $(GOFUMPT_VER)"
-	@CGO_ENABLED=0 GOOS=linux GOARCH=$(CROSS_ARCH) go install -trimpath -ldflags='-s -w' mvdan.cc/gofumpt@$(GOFUMPT_VER)
-	@cp $(XBIN)/gofumpt .sandbox/bin/linux-$(CROSS_ARCH)/
-	@echo "-- goimports $(GOIMPORTS_VER)"
-	@CGO_ENABLED=0 GOOS=linux GOARCH=$(CROSS_ARCH) go install -trimpath -ldflags='-s -w' golang.org/x/tools/cmd/goimports@$(GOIMPORTS_VER)
-	@cp $(XBIN)/goimports .sandbox/bin/linux-$(CROSS_ARCH)/
-	@echo "-- snipe"
-	@if [ -d "$(SNIPE_SRC)" ]; then \
-		echo "  (from $(SNIPE_SRC))"; \
-		cd "$(SNIPE_SRC)" && CGO_ENABLED=0 GOOS=linux GOARCH=$(CROSS_ARCH) \
-			go build -trimpath -ldflags='-s -w' -o "$(CURDIR)/.sandbox/bin/linux-$(CROSS_ARCH)/snipe" .; \
-	else \
-		CGO_ENABLED=0 GOOS=linux GOARCH=$(CROSS_ARCH) go install -trimpath -ldflags='-s -w' github.com/dkoosis/snipe@latest && \
-			cp $(XBIN)/snipe .sandbox/bin/linux-$(CROSS_ARCH)/; \
-	fi
-	@echo "-- bat $(BAT_VER)"
-	@if [ -f ".sandbox/bin/linux-$(CROSS_ARCH)/bat" ]; then \
-		echo "  (exists, skipping download)"; \
-	else \
-		case "$(CROSS_ARCH)" in \
-			amd64) BAT_TRIPLE="x86_64-unknown-linux-musl" ;; \
-			arm64) BAT_TRIPLE="aarch64-unknown-linux-gnu" ;; \
-		esac; \
-		TMP=$$(mktemp -d); \
-		echo "  downloading bat-$(BAT_VER)-$$BAT_TRIPLE"; \
-		curl -fsSL "https://github.com/sharkdp/bat/releases/download/$(BAT_VER)/bat-$(BAT_VER)-$$BAT_TRIPLE.tar.gz" \
-			| tar xz -C "$$TMP" && \
-		cp "$$TMP"/bat-*/bat .sandbox/bin/linux-$(CROSS_ARCH)/bat && \
-		rm -rf "$$TMP"; \
-	fi
-	@echo "-- dtree"
-	@cp .sandbox/codex/dtree .sandbox/bin/linux-$(CROSS_ARCH)/dtree
-	@# UPX compress all ELF binaries (skip shell scripts)
-	@if command -v upx >/dev/null 2>&1; then \
-		echo "-- upx compressing"; \
-		for f in .sandbox/bin/linux-$(CROSS_ARCH)/*; do \
-			case "$$(file -b "$$f")" in *ELF*) \
-				upx -q --best "$$f" 2>/dev/null || true; \
-			esac; \
-		done; \
-	else \
-		echo "-- upx not found, skipping compression"; \
-	fi
-	@echo ""
-	@echo "=== prebuilts ready ==="
-	@ls -lh .sandbox/bin/linux-$(CROSS_ARCH)/
