@@ -150,4 +150,3 @@ Verbatim line 99:
 
 ---
 
-trixi log-skill fix-security findings 4 --run-id "7858b3a8ea1b"

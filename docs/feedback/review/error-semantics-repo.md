@@ -177,4 +177,3 @@ by whether the differentiated user-facing hint is worth writing.
   `boundread.ErrInputTooLarge` (branched in `cmd/fo/main.go:294`),
   `multiplex.UnknownFormatError` (`errors.As` in `cmd/fo/parse.go:295`).
 
-trixi log-skill error-semantics findings 3 --run-id "7858b3a8ea1b"

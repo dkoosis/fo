@@ -44,4 +44,3 @@ packages above cover the entire production goroutine surface.
 No `atomic.*`, no `sync.Map`, no `errgroup`, no cross-package channel ownership, no
 `time.Sleep`-as-sync in production code.
 
-trixi log-skill concurrency-safety findings 0 --run-id "7858b3a8ea1b"

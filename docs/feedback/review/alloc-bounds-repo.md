@@ -183,4 +183,3 @@ public API, forcing every caller to bound upstream by construction.
   buffer — a local repo file, not the untrusted-tool-output boundary this
   linter targets; silent truncation on a pathological line is benign here.
 
-trixi log-skill alloc-bounds findings 2 --run-id "7858b3a8ea1b"

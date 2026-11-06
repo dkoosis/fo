@@ -119,4 +119,3 @@ not a defect.
 
 ---
 
-trixi log-skill cohesion findings 2 --run-id "7858b3a8ea1b"

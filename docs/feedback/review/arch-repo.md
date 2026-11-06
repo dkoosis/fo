@@ -82,4 +82,3 @@ state.go:           type File, Run, Severity; func Dir, Path, MetricsHistoryPath
 
 ---
 
-trixi log-skill arch findings 3 --run-id "7858b3a8ea1b"

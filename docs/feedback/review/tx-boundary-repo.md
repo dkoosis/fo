@@ -33,4 +33,4 @@ Skip tx-boundary on this repo until a transactional store is introduced. The bun
 
 ## Run telemetry
 
-`trixi log-skill` invocation failed (command not registered in this trixi build). Findings count of 0 logged here for the audit trail under run-id `bd775e303d86-tx-boundary`.
+The skill-log call was skipped. Findings count of 0 logged here for the audit trail under run-id `bd775e303d86-tx-boundary`.

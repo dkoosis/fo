@@ -5,7 +5,7 @@
   "Findings": null,
   "Tests": [
     {
-      "Package": "github.com/dkoosis/trixi/cmd/trixi",
+      "Package": "github.com/dkoosis/quill/cmd/quill",
       "Test": "",
       "Outcome": "pass",
       "Duration": 5922000000,
@@ -15,7 +15,7 @@
       "Score": 0
     },
     {
-      "Package": "github.com/dkoosis/trixi/internal/embedder",
+      "Package": "github.com/dkoosis/quill/internal/embedder",
       "Test": "",
       "Outcome": "pass",
       "Duration": 2626000000,
@@ -25,7 +25,7 @@
       "Score": 0
     },
     {
-      "Package": "github.com/dkoosis/trixi/internal/eval",
+      "Package": "github.com/dkoosis/quill/internal/eval",
       "Test": "",
       "Outcome": "pass",
       "Duration": 8350999999,
@@ -35,7 +35,7 @@
       "Score": 0
     },
     {
-      "Package": "github.com/dkoosis/trixi/internal/graph",
+      "Package": "github.com/dkoosis/quill/internal/graph",
       "Test": "",
       "Outcome": "pass",
       "Duration": 2611000000,
@@ -45,7 +45,7 @@
       "Score": 0
     },
     {
-      "Package": "github.com/dkoosis/trixi/internal/index",
+      "Package": "github.com/dkoosis/quill/internal/index",
       "Test": "",
       "Outcome": "pass",
       "Duration": 12286000000,
@@ -55,7 +55,7 @@
       "Score": 0
     },
     {
-      "Package": "github.com/dkoosis/trixi/internal/mcp",
+      "Package": "github.com/dkoosis/quill/internal/mcp",
       "Test": "",
       "Outcome": "pass",
       "Duration": 4989000000,
@@ -65,7 +65,7 @@
       "Score": 0
     },
     {
-      "Package": "github.com/dkoosis/trixi/internal/registry",
+      "Package": "github.com/dkoosis/quill/internal/registry",
       "Test": "",
       "Outcome": "pass",
       "Duration": 2471000000,
@@ -75,7 +75,7 @@
       "Score": 0
     },
     {
-      "Package": "github.com/dkoosis/trixi/internal/search",
+      "Package": "github.com/dkoosis/quill/internal/search",
       "Test": "",
       "Outcome": "pass",
       "Duration": 4505000000,
@@ -85,7 +85,7 @@
       "Score": 0
     },
     {
-      "Package": "github.com/dkoosis/trixi/internal/store",
+      "Package": "github.com/dkoosis/quill/internal/store",
       "Test": "",
       "Outcome": "pass",
       "Duration": 4560000000,
