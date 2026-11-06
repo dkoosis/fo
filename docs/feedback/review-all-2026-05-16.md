@@ -63,4 +63,4 @@ Cite by linter:finding-id.
 /assess-feedback <linter> --run-id=f62c7fc3af14
 ```
 
-Run per-linter — six outcomes per finding written back to its sidecar, accept-ratio logged to trixi.
+Run per-linter — six outcomes per finding written back to its sidecar.

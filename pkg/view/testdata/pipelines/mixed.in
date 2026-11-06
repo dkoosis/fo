@@ -123,13 +123,13 @@
           "ruleId": "code-clone",
           "level": "warning",
           "message": {
-            "text": "16 lines duplicated with app/cmd/trixi/adapters.go:128-143"
+            "text": "16 lines duplicated with app/cmd/quill/adapters.go:128-143"
           },
           "locations": [
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "app/cmd/trixi/adapters.go"
+                  "uri": "app/cmd/quill/adapters.go"
                 },
                 "region": {
                   "startLine": 146
@@ -140,7 +140,7 @@
           "fixes": [
             {
               "description": {
-                "text": "# duplicate: app/cmd/trixi/adapters.go:146-161 ↔ app/cmd/trixi/adapters.go:128-143"
+                "text": "# duplicate: app/cmd/quill/adapters.go:146-161 ↔ app/cmd/quill/adapters.go:128-143"
               }
             }
           ]
@@ -149,13 +149,13 @@
           "ruleId": "code-clone",
           "level": "warning",
           "message": {
-            "text": "16 lines duplicated with app/cmd/trixi/adapters.go:128-143"
+            "text": "16 lines duplicated with app/cmd/quill/adapters.go:128-143"
           },
           "locations": [
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "app/cmd/trixi/adapters.go"
+                  "uri": "app/cmd/quill/adapters.go"
                 },
                 "region": {
                   "startLine": 175
@@ -166,7 +166,7 @@
           "fixes": [
             {
               "description": {
-                "text": "# duplicate: app/cmd/trixi/adapters.go:175-190 ↔ app/cmd/trixi/adapters.go:128-143"
+                "text": "# duplicate: app/cmd/quill/adapters.go:175-190 ↔ app/cmd/quill/adapters.go:128-143"
               }
             }
           ]
@@ -175,13 +175,13 @@
           "ruleId": "code-clone",
           "level": "warning",
           "message": {
-            "text": "16 lines duplicated with app/cmd/trixi/adapters.go:128-143"
+            "text": "16 lines duplicated with app/cmd/quill/adapters.go:128-143"
           },
           "locations": [
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "app/cmd/trixi/adapters.go"
+                  "uri": "app/cmd/quill/adapters.go"
                 },
                 "region": {
                   "startLine": 238
@@ -192,7 +192,7 @@
           "fixes": [
             {
               "description": {
-                "text": "# duplicate: app/cmd/trixi/adapters.go:238-253 ↔ app/cmd/trixi/adapters.go:128-143"
+                "text": "# duplicate: app/cmd/quill/adapters.go:238-253 ↔ app/cmd/quill/adapters.go:128-143"
               }
             }
           ]
@@ -201,13 +201,13 @@
           "ruleId": "code-clone",
           "level": "warning",
           "message": {
-            "text": "16 lines duplicated with app/cmd/trixi/adapters.go:128-143"
+            "text": "16 lines duplicated with app/cmd/quill/adapters.go:128-143"
           },
           "locations": [
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "app/cmd/trixi/adapters.go"
+                  "uri": "app/cmd/quill/adapters.go"
                 },
                 "region": {
                   "startLine": 291
@@ -218,7 +218,7 @@
           "fixes": [
             {
               "description": {
-                "text": "# duplicate: app/cmd/trixi/adapters.go:291-306 ↔ app/cmd/trixi/adapters.go:128-143"
+                "text": "# duplicate: app/cmd/quill/adapters.go:291-306 ↔ app/cmd/quill/adapters.go:128-143"
               }
             }
           ]

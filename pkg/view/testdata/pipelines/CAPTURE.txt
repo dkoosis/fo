@@ -6,7 +6,7 @@ small — a handful of findings each is enough.
 
 | File | Source | Notes |
 |------|--------|-------|
-| jscpd_only.in   | trixi repo (jscpd) via `fo wrap jscpd` | requires trixi checkout |
+| jscpd_only.in   | a Go repo with duplication (jscpd) via `fo wrap jscpd` | requires such a checkout |
 | vet_only.in     | hand-crafted diag text via `fo wrap diag --tool govet` | offline |
 | clean.in        | synthesized passing testjson module | needs go test |
 | panic.in        | synthesized panicking testjson module | needs go test |

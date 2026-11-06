@@ -1,14 +1,14 @@
 warning
 !  F-cfe  Printf format %d has arg "not-an-int" of wrong type string                                            fixture/main.go:4
 !  F-477  unreachable code                                                                                      fixture/util.go:7
-!  F-e26  16 lines duplicated with app/cmd/trixi/adapters.go:128-143                                            app/cmd/trixi/adapters.go:146
-  fix: # duplicate: app/cmd/trixi/adapters.go:146-161 ↔ app/cmd/trixi/adapters.go:128-143
-!  F-e26  16 lines duplicated with app/cmd/trixi/adapters.go:128-143                                            app/cmd/trixi/adapters.go:175
-  fix: # duplicate: app/cmd/trixi/adapters.go:175-190 ↔ app/cmd/trixi/adapters.go:128-143
-!  F-e26  16 lines duplicated with app/cmd/trixi/adapters.go:128-143                                            app/cmd/trixi/adapters.go:238
-  fix: # duplicate: app/cmd/trixi/adapters.go:238-253 ↔ app/cmd/trixi/adapters.go:128-143
-!  F-e26  16 lines duplicated with app/cmd/trixi/adapters.go:128-143                                            app/cmd/trixi/adapters.go:291
-  fix: # duplicate: app/cmd/trixi/adapters.go:291-306 ↔ app/cmd/trixi/adapters.go:128-143
+!  F-c4f  16 lines duplicated with app/cmd/quill/adapters.go:128-143                                            app/cmd/quill/adapters.go:146
+  fix: # duplicate: app/cmd/quill/adapters.go:146-161 ↔ app/cmd/quill/adapters.go:128-143
+!  F-c4f  16 lines duplicated with app/cmd/quill/adapters.go:128-143                                            app/cmd/quill/adapters.go:175
+  fix: # duplicate: app/cmd/quill/adapters.go:175-190 ↔ app/cmd/quill/adapters.go:128-143
+!  F-c4f  16 lines duplicated with app/cmd/quill/adapters.go:128-143                                            app/cmd/quill/adapters.go:238
+  fix: # duplicate: app/cmd/quill/adapters.go:238-253 ↔ app/cmd/quill/adapters.go:128-143
+!  F-c4f  16 lines duplicated with app/cmd/quill/adapters.go:128-143                                            app/cmd/quill/adapters.go:291
+  fix: # duplicate: app/cmd/quill/adapters.go:291-306 ↔ app/cmd/quill/adapters.go:128-143
 !  F-89b  46 lines duplicated with CLAUDE.md:6-51                                                               AGENTS.md:248
   fix: # duplicate: AGENTS.md:248-293 ↔ CLAUDE.md:6-51
 !  F-292  43 lines duplicated with metrics/store.go:46-88                                                       cclog/store.go:32

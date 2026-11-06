@@ -212,4 +212,3 @@ internal consistency and typo-safety at the comparison sites, not boundary valid
 
 ---
 
-trixi log-skill domain-model findings 4 --run-id "7858b3a8ea1b"
