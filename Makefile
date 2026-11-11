@@ -3,9 +3,9 @@
 # Primary: scan check audit deploy doctor cross
 #   scan          — changed pkgs only (fast inner loop)
 #   check         — full repo: vet + lint + test + build
-#   audit         — exhaustive stream through fo (auto: human@TTY, llm piped)
-#   audit-human   — force human format
-#   audit-llm     — force llm format (for agents/CI)
+#   audit         — check + race + fuzz + dupe + nilcheck + deadcode + omitempty + vuln
+#   audit-human   — stream through fo, forced human format (auto: human@TTY, llm piped)
+#   audit-llm     — stream through fo, forced llm format (for agents/CI)
 # Run `make help` for full target list.
 
 .DEFAULT_GOAL := check
