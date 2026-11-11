@@ -58,7 +58,10 @@ func (d *diag) Convert(r io.Reader, w io.Writer) error {
 		return err
 	}
 	_, err := b.WriteTo(w)
-	return err
+	if err != nil {
+		return fmt.Errorf("write diag sarif: %w", err)
+	}
+	return nil
 }
 
 // readAndAdd reads diagnostic lines from r and appends results to b.

@@ -46,7 +46,7 @@ func attachDiff(r *report.Report, statePath string, policy statePolicy, stderr i
 		fmt.Fprintf(stderr, "fo: state: save: %v\n", err)
 		r.Notices = append(r.Notices,
 			fmt.Sprintf("state: save failed (%v) — next run's diff classification may be stale", err))
-		return err
+		return fmt.Errorf("save state: %w", err)
 	}
 	return nil
 }

@@ -2,6 +2,7 @@ package scene
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -37,7 +38,7 @@ func EncodeAsciicast(w io.Writer, frames []Frame) error {
 
 	enc := json.NewEncoder(w)
 	if err := enc.Encode(header); err != nil {
-		return err
+		return fmt.Errorf("encode asciinema header: %w", err)
 	}
 
 	// Accumulate in integer nanoseconds (time.Duration) and convert to
@@ -48,7 +49,7 @@ func EncodeAsciicast(w io.Writer, frames []Frame) error {
 		elapsed += f.Delay
 		event := []any{elapsed.Seconds(), "o", clearHome + f.Content}
 		if err := enc.Encode(event); err != nil {
-			return err
+			return fmt.Errorf("encode asciinema event: %w", err)
 		}
 	}
 	return nil

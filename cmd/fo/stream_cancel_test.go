@@ -37,7 +37,7 @@ func newSlowProducer(ctx context.Context, prefix []byte) *slowProducer {
 
 func (s *slowProducer) Read(p []byte) (int, error) {
 	if s.prefix.Len() > 0 {
-		return s.prefix.Read(p)
+		return s.prefix.Read(p) //nolint:wrapcheck // io.Reader contract: io.EOF must pass through unwrapped
 	}
 	// Block until cancel or Close.
 	select {

@@ -86,7 +86,7 @@ func Parse(r io.Reader, stderr io.Writer) (Tally, error) {
 		},
 	})
 	if err != nil {
-		return Tally{}, err
+		return Tally{}, fmt.Errorf("scan tally: %w", err)
 	}
 	t.Tool = tool
 	return t, nil

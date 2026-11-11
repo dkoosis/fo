@@ -356,7 +356,7 @@ func tokenizeAttrs(line string) ([]string, error) {
 		case errors.Is(err, kvtok.ErrStrayQuote):
 			return nil, fmt.Errorf("%w: stray '\"' in header", errUnknownAttr)
 		}
-		return nil, err
+		return nil, fmt.Errorf("tokenize scene line: %w", err)
 	}
 	return toks, nil
 }

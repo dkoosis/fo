@@ -23,7 +23,10 @@ func renderMode(mode string, r *report.Report, stdout io.Writer, themeName strin
 		return writeReportJSON(stdout, r)
 	}
 	if mode == formatGitHub {
-		return view.RenderGitHub(stdout, *r)
+		if err := view.RenderGitHub(stdout, *r); err != nil {
+			return fmt.Errorf("render github: %w", err)
+		}
+		return nil
 	}
 	t := resolveTheme(themeName, stdout)
 	viewMode := view.ModeHuman
@@ -34,7 +37,7 @@ func renderMode(mode string, r *report.Report, stdout io.Writer, themeName strin
 	width := termSize(stdout)
 	expand := view.NewExpandSet(expandValues)
 	if err := view.RenderReportModeWithExpand(stdout, *r, t, width, viewMode, expand); err != nil {
-		return err
+		return fmt.Errorf("render report: %w", err)
 	}
 	if mode == formatLLM {
 		writeDiffDetail(stdout, r)
@@ -95,8 +98,10 @@ func renderTally(input []byte, stdout io.Writer, stderr io.Writer, mode, themeNa
 			th := resolveTheme(themeName, w)
 			width := termSize(w)
 			out := view.Render(view.LeaderboardFromTally(t), th, width)
-			_, werr := fmt.Fprintln(w, out)
-			return werr
+			if _, werr := fmt.Fprintln(w, out); werr != nil {
+				return fmt.Errorf("write leaderboard: %w", werr)
+			}
+			return nil
 		})
 }
 
@@ -201,5 +206,8 @@ func renderMetrics(input []byte, stdout io.Writer, stderr io.Writer, mode string
 func writeReportJSON(w io.Writer, r *report.Report) error {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
-	return enc.Encode(r)
+	if err := enc.Encode(r); err != nil {
+		return fmt.Errorf("encode report json: %w", err)
+	}
+	return nil
 }

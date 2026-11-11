@@ -216,7 +216,7 @@ func tokenize(line string) ([]string, error) {
 		case errors.Is(err, kvtok.ErrStrayQuote):
 			return nil, fmt.Errorf("%w: stray '\"' outside key=value", errMalformedLine)
 		}
-		return nil, err
+		return nil, fmt.Errorf("tokenize suppress line: %w", err)
 	}
 	return toks, nil
 }

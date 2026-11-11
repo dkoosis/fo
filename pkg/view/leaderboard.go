@@ -38,7 +38,7 @@ func RenderLeaderboardLLM(w io.Writer, v Leaderboard) error {
 	for _, r := range v.Rows {
 		val := strconv.FormatFloat(r.Value, 'f', -1, 64)
 		if _, err := fmt.Fprintf(w, "%-*s  %s\n", labelMax, r.Label, val); err != nil {
-			return err
+			return fmt.Errorf("write leaderboard row: %w", err)
 		}
 	}
 	return nil

@@ -72,9 +72,12 @@ func readGolden(t *testing.T, path string) string {
 
 func writeGolden(path, content string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
+		return fmt.Errorf("mkdir golden dir: %w", err)
 	}
-	return os.WriteFile(path, []byte(content), 0o644)
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		return fmt.Errorf("write golden: %w", err)
+	}
+	return nil
 }
 
 func goldenName(name string) string {

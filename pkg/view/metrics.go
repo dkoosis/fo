@@ -17,19 +17,19 @@ type MetricRow struct {
 func RenderMetricsLLM(w io.Writer, tool string, rows []MetricRow) error {
 	if tool != "" {
 		if _, err := fmt.Fprintf(w, "# %s\n", tool); err != nil {
-			return err
+			return fmt.Errorf("write metrics header: %w", err)
 		}
 	}
 	for _, r := range rows {
 		v := strconv.FormatFloat(r.Value, 'f', -1, 64)
 		if r.Unit != "" {
 			if _, err := fmt.Fprintf(w, "%s %s %s\n", r.Key, v, r.Unit); err != nil {
-				return err
+				return fmt.Errorf("write metric: %w", err)
 			}
 			continue
 		}
 		if _, err := fmt.Fprintf(w, "%s %s\n", r.Key, v); err != nil {
-			return err
+			return fmt.Errorf("write metric: %w", err)
 		}
 	}
 	return nil
@@ -38,7 +38,7 @@ func RenderMetricsLLM(w io.Writer, tool string, rows []MetricRow) error {
 func RenderMetricsHuman(w io.Writer, tool string, rows []MetricRow) error {
 	if tool != "" {
 		if _, err := fmt.Fprintf(w, "── %s ──\n", tool); err != nil {
-			return err
+			return fmt.Errorf("write metrics header: %w", err)
 		}
 	}
 	keyMax := maxKeyLen(rows)
@@ -47,7 +47,7 @@ func RenderMetricsHuman(w io.Writer, tool string, rows []MetricRow) error {
 		unit := formatUnit(r.Unit)
 		delta := formatDelta(r)
 		if _, err := fmt.Fprintf(w, "%-*s  %s%s%s\n", keyMax, r.Key, v, unit, delta); err != nil {
-			return err
+			return fmt.Errorf("write metric row: %w", err)
 		}
 	}
 	return nil

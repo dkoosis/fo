@@ -27,8 +27,10 @@ func RenderReportModeWithExpand(w io.Writer, r report.Report, t theme.Theme, wid
 	if out == "" {
 		return nil
 	}
-	_, err := fmt.Fprintln(w, out)
-	return err
+	if _, err := fmt.Fprintln(w, out); err != nil {
+		return fmt.Errorf("write stream frame: %w", err)
+	}
+	return nil
 }
 
 // RenderStream consumes successive Report snapshots from ch and emits a
@@ -63,7 +65,7 @@ func RenderStreamMode(ctx context.Context, w io.Writer, ch <-chan report.Report,
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return ctx.Err() //nolint:wrapcheck // callers compare against context.Canceled and DeadlineExceeded
 		case r, ok := <-ch:
 			if !ok {
 				return flushStream(out, pendingClean, &first, rendered)
@@ -122,10 +124,12 @@ func writeSnapshot(out snapshotOut, r report.Report, first *bool) error {
 	}
 	if !*first {
 		if _, err := fmt.Fprintln(out.w); err != nil {
-			return err
+			return fmt.Errorf("write stream separator: %w", err)
 		}
 	}
 	*first = false
-	_, err := fmt.Fprintln(out.w, rendered)
-	return err
+	if _, err := fmt.Fprintln(out.w, rendered); err != nil {
+		return fmt.Errorf("write stream section: %w", err)
+	}
+	return nil
 }

@@ -136,7 +136,7 @@ func drainLines(ctx context.Context, r io.ReadCloser, lines <-chan scanResult, f
 		select {
 		case <-ctx.Done():
 			_ = r.Close()
-			return malformed, ctx.Err()
+			return malformed, ctx.Err() //nolint:wrapcheck // callers compare against context.Canceled and DeadlineExceeded
 		case res, ok := <-lines:
 			if !ok {
 				return malformed, nil

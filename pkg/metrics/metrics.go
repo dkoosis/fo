@@ -62,7 +62,7 @@ func Parse(r io.Reader, stderr io.Writer) (Metrics, error) {
 		},
 	})
 	if err != nil {
-		return Metrics{}, err
+		return Metrics{}, fmt.Errorf("scan metrics: %w", err)
 	}
 	m.Tool = tool
 	return m, nil

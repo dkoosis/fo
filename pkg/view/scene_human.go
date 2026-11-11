@@ -54,14 +54,14 @@ func RenderSceneHumanString(s scene.Scene) string {
 func renderScene(w io.Writer, s scene.Scene, t theme.Theme) error {
 	if s.Title != "" {
 		if _, err := fmt.Fprintf(w, "%s\n\n", t.Heading.Render(s.Title)); err != nil {
-			return err
+			return fmt.Errorf("write scene title: %w", err)
 		}
 	}
 	rule := strings.Repeat("─", sceneRuleWidth)
 	for i, act := range s.Acts {
 		if i > 0 {
 			if _, err := fmt.Fprintln(w); err != nil {
-				return err
+				return fmt.Errorf("write scene separator: %w", err)
 			}
 		}
 		if err := renderAct(w, act, t, rule); err != nil {
@@ -74,7 +74,7 @@ func renderScene(w io.Writer, s scene.Scene, t theme.Theme) error {
 func renderAct(w io.Writer, act scene.Act, t theme.Theme, rule string) error {
 	if _, err := fmt.Fprintf(w, "%s\n%s\n\n", t.Muted.Render(rule),
 		t.Heading.Render(act.Number+" · "+act.Title)); err != nil {
-		return err
+		return fmt.Errorf("write scene act: %w", err)
 	}
 	for _, beat := range act.Beats {
 		switch beat.Kind {
@@ -92,25 +92,27 @@ func renderAct(w io.Writer, act scene.Act, t theme.Theme, rule string) error {
 }
 
 func renderNarration(w io.Writer, text string, t theme.Theme) error {
-	_, err := fmt.Fprintf(w, "  %s\n", t.Muted.Render(text))
-	return err
+	if _, err := fmt.Fprintf(w, "  %s\n", t.Muted.Render(text)); err != nil {
+		return fmt.Errorf("write narration: %w", err)
+	}
+	return nil
 }
 
 func renderCommand(w io.Writer, cmd scene.Command, t theme.Theme) error {
 	actor := actorStyle(cmd.Actor, t).Render(cmd.Actor)
 	prompt := t.Bold.Render("❯")
 	if _, err := fmt.Fprintf(w, "%s %s %s\n", actor, prompt, cmd.Cmd); err != nil {
-		return err
+		return fmt.Errorf("write command line: %w", err)
 	}
 	for _, line := range cmd.Output {
 		if _, err := fmt.Fprintf(w, "  %s\n", line); err != nil {
-			return err
+			return fmt.Errorf("write command output: %w", err)
 		}
 	}
 	if cmd.Exit != 0 {
 		exit := t.Fail.Render(fmt.Sprintf("(exit %d)", cmd.Exit))
 		if _, err := fmt.Fprintf(w, "  %s\n", exit); err != nil {
-			return err
+			return fmt.Errorf("write command exit: %w", err)
 		}
 	}
 	return nil

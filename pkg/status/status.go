@@ -76,7 +76,7 @@ func Parse(r io.Reader, stderr io.Writer) (Status, error) {
 		},
 	})
 	if err != nil {
-		return Status{}, err
+		return Status{}, fmt.Errorf("scan status: %w", err)
 	}
 	s.Tool = tool
 	return s, nil

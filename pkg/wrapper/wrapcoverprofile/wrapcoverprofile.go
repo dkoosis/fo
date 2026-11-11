@@ -52,7 +52,10 @@ func Convert(r io.Reader, w io.Writer) error {
 	}
 	_ = dropped // oversize coverprofile lines are malformed; silently skipped
 	_, err := b.WriteTo(w)
-	return err
+	if err != nil {
+		return fmt.Errorf("write coverprofile: %w", err)
+	}
+	return nil
 }
 
 // addBlock parses one coverprofile line and, when it describes an

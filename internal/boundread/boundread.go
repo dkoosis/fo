@@ -26,7 +26,7 @@ func All(r io.Reader, limit int64) ([]byte, error) {
 	lr := &io.LimitedReader{R: r, N: limit + 1}
 	data, err := io.ReadAll(lr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read bounded input: %w", err)
 	}
 	if int64(len(data)) > limit {
 		return nil, fmt.Errorf("%w: %d bytes", ErrInputTooLarge, limit)

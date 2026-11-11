@@ -17,7 +17,7 @@ import (
 
 func Convert(r io.Reader, w io.Writer) error {
 	if _, err := fmt.Fprintln(w, "# fo:metrics tool=cover"); err != nil {
-		return err
+		return fmt.Errorf("write cover header: %w", err)
 	}
 	br := bufio.NewReaderSize(r, 64*1024)
 	var dropped int
@@ -68,5 +68,8 @@ func emitCoverRow(w io.Writer, line string) error {
 		key = loc + ":" + fn
 	}
 	_, err = fmt.Fprintf(w, "%s %s %%\n", key, strconv.FormatFloat(v, 'f', -1, 64))
-	return err
+	if err != nil {
+		return fmt.Errorf("write cover metric: %w", err)
+	}
+	return nil
 }

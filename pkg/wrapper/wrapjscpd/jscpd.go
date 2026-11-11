@@ -49,7 +49,10 @@ func (j jscpd) Convert(r io.Reader, w io.Writer) error {
 	}
 
 	_, err = b.WriteTo(w)
-	return err
+	if err != nil {
+		return fmt.Errorf("write jscpd sarif: %w", err)
+	}
+	return nil
 }
 
 // parseClones decodes jscpd JSON report into a slice of clones.

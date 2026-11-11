@@ -31,7 +31,7 @@ func RenderGitHub(w io.Writer, r report.Report) error {
 			}
 		}
 		if _, err := fmt.Fprintln(w, ghAnnotation(f)); err != nil {
-			return err
+			return fmt.Errorf("write github annotation: %w", err)
 		}
 	}
 	return nil

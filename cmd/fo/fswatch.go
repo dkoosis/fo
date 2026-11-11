@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -96,7 +97,7 @@ func matchGitignore(rel string, patterns []string) bool {
 
 // addRecursive walks root and adds every non-ignored directory to w.
 func addRecursive(w *fsnotify.Watcher, root string) error {
-	return filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
+	return filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error { //nolint:wrapcheck // WalkDir errors are *PathError values that already name the path and operation
 		if walkErr != nil {
 			return nil //nolint:nilerr // skip unreadable subtrees rather than abort
 		}
@@ -135,7 +136,7 @@ func handleFsEvent(w *fsnotify.Watcher, ev fsnotify.Event, root string, gitignor
 func watchTree(ctx context.Context, root string) (<-chan struct{}, error) {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("watch: new watcher: %w", err)
 	}
 	if err := addRecursive(w, root); err != nil {
 		_ = w.Close()
