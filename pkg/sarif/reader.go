@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 )
 
 // errMissingSARIFVersion is returned when a decoded document has no version field.
@@ -23,18 +22,6 @@ var errNestingTooDeep = errors.New("sarif nesting too deep")
 // deepest path (run → results → locations → … → region) is well under 20.
 // 256 leaves generous headroom while still stopping a depth-bomb.
 const maxNestingDepth = 256
-
-// Read parses SARIF from an io.Reader. It fully buffers r and routes
-// through the same depth guard ReadBytes runs (fo-n25.7) — without this,
-// any caller of the exported Reader-based API would inherit the
-// depth-bomb exposure ReadBytes was hardened against for #269.
-func Read(r io.Reader) (*Document, error) {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return nil, fmt.Errorf("read sarif: %w", err)
-	}
-	return ReadBytes(data)
-}
 
 // ReadBytes parses SARIF from a byte slice. It runs a depth guard before
 // decoding so a depth-bomb cannot overflow the stack in Decode.

@@ -26,13 +26,6 @@ type watchOpts struct {
 	source   string // "fs" (default) or "stdin"
 }
 
-// parseWatchArgs splits watch args at the `--` separator. Flags before `--`
-// configure the watcher; the trailing argv is the child command.
-func parseWatchArgs(args []string) ([]string, error) {
-	cmd, _, err := parseWatchArgsWithOpts(args)
-	return cmd, err
-}
-
 // parseWatchArgsWithOpts is the form used by runWatch.
 func parseWatchArgsWithOpts(args []string) ([]string, watchOpts, error) {
 	sep := -1

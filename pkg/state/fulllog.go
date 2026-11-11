@@ -9,13 +9,6 @@ import (
 
 func (s stateStore) fullLogPath() string { return filepath.Join(s.dir, "full.log") }
 
-// FullLogPath returns the resolved path for the tee'd full-output log.
-// Single most-recent file, matching last-run.json's "one snapshot" shape
-// rather than run-log.json's append history — the log exists to make the
-// immediately preceding run's unfiltered output one command away, not to
-// build a history.
-func FullLogPath() string { return newStateStore().fullLogPath() }
-
 // SaveFullLog durably writes data (the complete, unfiltered original
 // input) to FullLogPath, overwriting any prior log. Returns the resolved
 // path so the caller can point the reader at it — even under

@@ -30,17 +30,6 @@ func RenderSceneLLM(w io.Writer, s scene.Scene) error {
 	return nil
 }
 
-// RenderSceneLLMString renders a Scene to its canonical `# fo:scene`
-// text form as a string. Companion to RenderSceneLLM for callers (the
-// cast rail) that need the rendered frame as a value. No error is
-// returned: the only writes go to a strings.Builder, whose Write never
-// fails. Result round-trips through scene.Parse.
-func RenderSceneLLMString(s scene.Scene) string {
-	var b strings.Builder
-	_ = RenderSceneLLM(&b, s) //nolint:errcheck // strings.Builder writes never fail
-	return b.String()
-}
-
 func writeSceneHeader(w io.Writer, s scene.Scene) error {
 	var b strings.Builder
 	b.WriteString(scene.HeaderPrefix)

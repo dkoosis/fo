@@ -86,13 +86,6 @@ func (b *Builder) AddResultWithFix(ruleID string, level Level, message, file str
 	return b
 }
 
-// Document returns the constructed SARIF document without validation.
-// Use WriteTo for production output — it validates driver name and levels.
-// This method is the "I know what I'm doing" escape hatch for tests and inspection.
-func (b *Builder) Document() *Document {
-	return b.doc
-}
-
 // WriteTo writes the SARIF document as JSON to w.
 // Returns an error if the driver name is empty or any result has an invalid level.
 func (b *Builder) WriteTo(w io.Writer) (int64, error) {

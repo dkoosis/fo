@@ -43,14 +43,6 @@ const (
 	labelFail = "fail"
 )
 
-// PickView selects a ViewSpec from a Report. Pure and deterministic:
-// branches are evaluated in fixed priority order so the same Report
-// always yields the same shape. Delta wraps the inner pick when Diff
-// is present and at least one severity bucket moved.
-func PickView(r report.Report) ViewSpec {
-	return PickViewMode(r, ModeHuman)
-}
-
 // PickViewMode is PickView with an explicit audience mode.
 func PickViewMode(r report.Report, mode Mode) ViewSpec {
 	return PickViewModeWithExpand(r, mode, expandSet{})
