@@ -410,7 +410,7 @@ func (*aggregator) handleOutput(pkg *pkgState, e TestEvent) {
 
 	if strings.Contains(output, "coverage:") && strings.Contains(output, "% of statements") {
 		var cov float64
-		_, _ = fmt.Sscanf(output, "coverage: %f%% of statements", &cov)
+		_, _ = fmt.Sscanf(output, "coverage: %f%% of statements", &cov) //nolint:errcheck // a non-matching line leaves cov at 0, which the next check skips
 		if cov > 0 {
 			pkg.coverage = cov
 		}

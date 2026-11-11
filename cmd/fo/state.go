@@ -198,7 +198,7 @@ func writeDiffDetail(w io.Writer, r *report.Report) {
 			writeDiffLine(&sb, item, byFP)
 		}
 	}
-	_, _ = io.WriteString(w, sb.String())
+	_, _ = io.WriteString(w, sb.String()) //nolint:errcheck // write to the caller output stream is best-effort, as with fmt.Fprintf above
 	writeNotices(w, r)
 }
 
@@ -214,7 +214,7 @@ func writeNotices(w io.Writer, r *report.Report) {
 	for _, n := range r.Notices {
 		fmt.Fprintf(&sb, "  %s\n", n)
 	}
-	_, _ = io.WriteString(w, sb.String())
+	_, _ = io.WriteString(w, sb.String()) //nolint:errcheck // write to the caller output stream is best-effort, as with fmt.Fprintf above
 }
 
 func writeDiffLine(sb *strings.Builder, item report.DiffItem, byFP map[string]report.Finding) {

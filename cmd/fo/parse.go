@@ -299,7 +299,7 @@ func parseTestJSONTolerant(input []byte, stderr io.Writer) (*report.Report, erro
 func parseMultiplex(input []byte, stderr io.Writer) (*report.Report, error) {
 	sections, prelude, err := multiplex.ParseSections(input)
 	if err != nil {
-		if _, ok := errors.AsType[*multiplex.UnknownFormatError](err); ok {
+		if _, ok := errors.AsType[*multiplex.UnknownFormatError](err); ok { //nolint:errcheck // only the type match matters, not the matched value
 			return nil, fmt.Errorf(
 				"%w\nhint: for raw line-diagnostic text (e.g. 'go vet', 'gofmt'), pipe through 'fo wrap diag --tool <name>' to produce SARIF",
 				err,

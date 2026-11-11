@@ -44,7 +44,7 @@ func keyControl(ctx context.Context, in io.Reader, cancel context.CancelFunc) (<
 	// defer is a safety net for early-exit paths where the goroutine hasn't
 	// fired yet.
 	restore := sync.OnceFunc(func() {
-		_ = term.Restore(fd, oldState)
+		_ = term.Restore(fd, oldState) //nolint:errcheck // terminal restore on exit; nothing left to do if it fails
 	})
 
 	out := make(chan struct{}, 1)

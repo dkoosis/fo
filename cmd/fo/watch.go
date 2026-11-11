@@ -217,7 +217,7 @@ func runChildAndRender(ctx context.Context, cmd []string, stdout, stderr io.Writ
 	c := exec.CommandContext(ctx, cmd[0], cmd[1:]...) //nolint:gosec // user-supplied command is the contract
 	c.Stdout = &buf
 	c.Stderr = stderr
-	_ = c.Run() // child non-zero is expected (test failures, lint findings)
+	_ = c.Run() //nolint:errcheck // child non-zero is expected (test failures, lint findings)
 	if buf.Len() == 0 {
 		return 0
 	}

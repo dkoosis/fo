@@ -1,4 +1,5 @@
 // Strategy: extend BulletItem with optional *ClusterRender (per Task 0 orient).
+
 package view
 
 import (

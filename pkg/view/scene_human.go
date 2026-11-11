@@ -47,7 +47,7 @@ func RenderSceneHuman(w io.Writer, s scene.Scene) error {
 // only writes go to a strings.Builder, whose Write never fails.
 func RenderSceneHumanString(s scene.Scene) string {
 	var b strings.Builder
-	_ = RenderSceneHuman(&b, s)
+	_ = RenderSceneHuman(&b, s) //nolint:errcheck // strings.Builder writes never fail
 	return b.String()
 }
 

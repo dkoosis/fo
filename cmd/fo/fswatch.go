@@ -61,10 +61,10 @@ func matchOnePattern(rel, base, p string) bool {
 	if p == "" {
 		return false
 	}
-	if ok, _ := filepath.Match(p, base); ok {
+	if ok, _ := filepath.Match(p, base); ok { //nolint:errcheck // a malformed ignore pattern matches nothing
 		return true
 	}
-	if ok, _ := filepath.Match(p, rel); ok {
+	if ok, _ := filepath.Match(p, rel); ok { //nolint:errcheck // a malformed ignore pattern matches nothing
 		return true
 	}
 	if strings.ContainsAny(p, "*?[") {
@@ -118,7 +118,7 @@ func handleFsEvent(w *fsnotify.Watcher, ev fsnotify.Event, root string, gitignor
 	}
 	if ev.Op&fsnotify.Create != 0 {
 		if info, err := os.Stat(ev.Name); err == nil && info.IsDir() {
-			_ = addRecursive(w, ev.Name)
+			_ = addRecursive(w, ev.Name) //nolint:errcheck // best-effort watch of a new dir; a failure only loses live events there
 		}
 	}
 	return true

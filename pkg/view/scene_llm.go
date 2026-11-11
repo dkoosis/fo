@@ -37,7 +37,7 @@ func RenderSceneLLM(w io.Writer, s scene.Scene) error {
 // fails. Result round-trips through scene.Parse.
 func RenderSceneLLMString(s scene.Scene) string {
 	var b strings.Builder
-	_ = RenderSceneLLM(&b, s)
+	_ = RenderSceneLLM(&b, s) //nolint:errcheck // strings.Builder writes never fail
 	return b.String()
 }
 
