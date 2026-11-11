@@ -420,7 +420,10 @@ func (*aggregator) handleOutput(pkg *pkgState, e TestEvent) {
 func (a *aggregator) results() []TestPackageResult {
 	results := make([]TestPackageResult, 0, len(a.order))
 	for _, name := range a.order {
-		pkg := a.packages[name]
+		pkg, ok := a.packages[name]
+		if !ok {
+			continue
+		}
 		// Skip packages with no test activity
 		if pkg.passed == 0 && pkg.failed == 0 && pkg.skipped == 0 && pkg.buildError == "" && !pkg.panicked {
 			continue

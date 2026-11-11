@@ -87,20 +87,13 @@ func IsHeader(data []byte) bool {
 	headerPrefix := []byte(HeaderPrefix)
 	s := data
 	for {
-		nl := bytes.IndexByte(s, '\n')
-		var line []byte
-		if nl < 0 {
-			line = s
-			s = nil
-		} else {
-			line = s[:nl]
-			s = s[nl+1:]
-		}
+		line, rest, found := bytes.Cut(s, []byte{'\n'})
 		trimmed := bytes.TrimLeft(line, " \t\r")
 		if len(trimmed) == 0 {
-			if nl < 0 {
+			if !found {
 				return false
 			}
+			s = rest
 			continue
 		}
 		return bytes.HasPrefix(trimmed, headerPrefix)

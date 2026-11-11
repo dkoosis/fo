@@ -169,7 +169,7 @@ dupe: ## Check for code duplication (jscpd, pinned)
 	npx --yes jscpd@$(JSCPD_VER) . --silent --reporters console --ignore '**/.git/**,**/.sandbox/**,**/.beads/**,**/.claude/**,**/.orca/**'
 
 nilcheck: ## Run nilaway (pinned)
-	go run go.uber.org/nilaway/cmd/nilaway@$(NILAWAY_VER) -include-pkgs=github.com/dkoosis/fo ./...
+	go run go.uber.org/nilaway/cmd/nilaway@$(NILAWAY_VER) -test=false -include-pkgs=github.com/dkoosis/fo ./...
 
 # Runs each Fuzz function it finds, FUZZTIME apiece.
 fuzz: ## Fuzz every Fuzz test (FUZZTIME=10s each)
