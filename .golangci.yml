@@ -23,6 +23,7 @@ linters:
 
   enable:
     # Error handling
+    - dupl
     - err113
     - errchkjson
     - errorlint
@@ -65,10 +66,12 @@ linters:
     - gochecknoinits
     - goconst
     - gocritic
+    - godoclint
     - grouper
     - inamedparam
     - intrange
     - iotamixing
+    - loggercheck
     - misspell
     - modernize
     - nakedret
@@ -77,10 +80,14 @@ linters:
     - prealloc
     - recvcheck
     - revive
+    - sloglint
+    - sqlclosecheck
     - unconvert
     - unparam
+    - unqueryvet
     - usestdlibvars
     - wastedassign
+    - wrapcheck
 
     # Performance
     - mirror
@@ -97,6 +104,8 @@ linters:
 
   settings:
     errcheck:
+      # A deliberate discard names itself: //nolint:errcheck // reason.
+      check-blank: true
       exclude-functions:
         - (io.Closer).Close
         - (*os.File).Close
@@ -203,6 +212,13 @@ linters:
       - legacy
       - std-error-handling
     rules:
+      # check-blank applies to non-test code only (lintbrush baseline): a blank
+      # assignment in a _test.go file is not reported.
+      - path: _test\.go$
+        linters:
+          - errcheck
+        text: Error return value
+        source: '(^|[^A-Za-z0-9_.])_\s*(,\s*[A-Za-z0-9_]+\s*)*(:=|=[^=])|,\s*_\s*(:=|=[^=])'
       # Tests: relax security, complexity, ctx, unparam
       - linters: [gosec]
         path: _test\.go

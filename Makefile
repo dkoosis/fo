@@ -11,7 +11,7 @@
 .DEFAULT_GOAL := check
 
 .PHONY: help scan check audit audit-human audit-llm report deploy install build doctor \
-        vet lint test race fmt fmt-fix dupl vuln pack-drift selfcheck \
+        vet lint test race fuzz fmt fmt-fix dupe nilcheck deadcode omitempty vuln standard \
         qa-goldens qa-goldens-update \
         snipe-index baseline \
         lint-sarif clean issues \
@@ -20,11 +20,18 @@
 # ── Sandbox prebuilt versions ──
 # Keep in sync with what .sandbox/codex/setup.sh expects.
 # golangci-lint: the ONE fleet pin lives in .sandbox/project.conf
-# (conform-to-sdlc lint-pin rule) — read it, never write a second literal here.
+# (repo-standard lint-pin rule) — read it, never write a second literal here.
 GOLANGCI_LINT_VER ?= $(shell . ./.sandbox/project.conf 2>/dev/null && echo $$GOLANGCI_LINT_VERSION)
 GOFUMPT_VER       ?= v0.9.2
 GOIMPORTS_VER     ?= v0.39.0
 BAT_VER           ?= v0.25.0
+STANDARD_VER      := v0.4.0
+OMITEMPTYSCALAR_VER := v0.4.0
+GOVULNCHECK_VER   := v1.9.0
+DEADCODE_VER      := v0.52.0
+NILAWAY_VER       := v0.0.0-20260918162853-acb8859b9031
+JSCPD_VER         := 5.1.2
+FUZZTIME          ?= 10s
 SNIPE_SRC         ?= $(HOME)/Projects/snipe
 VERSION           ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
@@ -62,16 +69,15 @@ help: ## Show this help
 		/^## [^-]/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 4) } \
 		/^[a-zA-Z0-9_-]+:.*?## / { printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
-check: vet lint test build pack-drift selfcheck ## Full repo: vet + lint + test + build + pack-drift + conform-to-sdlc
+check: vet lint test build standard ## Full repo: vet + lint + test + build + repo-standard
 	@echo "=== check pass ==="
 
-# Dogfood the fleet gate (sd-th5.14): conform-to-sdlc is pinned as a go.mod tool
-# dependency (go.sum-verified); bumping the pin is a deliberate PR.
-selfcheck: ## Run conform-to-sdlc (fleet SDLC checker) against this repo
-	go tool conform-to-sdlc
+# Dogfood the fleet gate: repo-standard runs at a pinned version (go run <pkg>@VER).
+standard: ## Run repo-standard (fleet SDLC checker) against this repo
+	go run github.com/dkoosis/repo-standard/cmd/repo-standard@$(STANDARD_VER)
 
-audit: check snipe-index ## Exhaustive stream through fo (auto: human@TTY, llm piped)
-	@( $(REPORT_CMD) ) | fo || true
+audit: check race fuzz dupe nilcheck deadcode omitempty vuln ## Exhaustive gate: check + race + fuzz + dupe + nilcheck + deadcode + omitempty + vuln
+	@echo "=== audit pass ==="
 
 audit-human: snipe-index ## Force human-formatted audit
 	@( $(REPORT_CMD) ) | fo --format human || true
@@ -159,14 +165,35 @@ fmt: ## Check formatting (exits non-zero if unformatted)
 fmt-fix: ## Fix formatting in-place
 	gofmt -w .
 
-dupl: ## Check for code duplication (jscpd)
-	jscpd .
+dupe: ## Check for code duplication (jscpd, pinned)
+	npx --yes jscpd@$(JSCPD_VER) . --silent --reporters console --ignore '**/.git/**,**/.sandbox/**,**/.beads/**,**/.claude/**,**/.orca/**'
 
-vuln: ## Scan for known vulnerabilities
-	govulncheck ./...
+nilcheck: ## Run nilaway (pinned)
+	go run go.uber.org/nilaway/cmd/nilaway@$(NILAWAY_VER) -include-pkgs=github.com/dkoosis/fo ./...
 
-pack-drift: ## Fail if the copied bugclasses rules drifted from upstream (network-soft)
-	@.golangci-rules/check-pack-drift.sh
+# Runs each Fuzz function it finds, FUZZTIME apiece.
+fuzz: ## Fuzz every Fuzz test (FUZZTIME=10s each)
+	@set -e; \
+	for pkg in $$(go list ./...); do \
+		list=$$(go test -list '^Fuzz' $$pkg) || exit $$?; \
+		for f in $$(printf '%s\n' "$$list" | sed -n '/^Fuzz/p'); do \
+			echo "fuzz $$pkg $$f"; \
+			go test -run '^$$' -fuzz "^$$f$$" -fuzztime=$(FUZZTIME) $$pkg; \
+		done; \
+	done
+
+# deadcode lists each function no path from main reaches, and exits 0 either way,
+# so the target fails on any output.
+deadcode: ## Fail on any function unreachable from main (deadcode, pinned)
+	@out=$$(go run golang.org/x/tools/cmd/deadcode@$(DEADCODE_VER) ./cmd/fo) || { echo "deadcode: could not run"; exit 1; }; \
+	if [ -n "$$out" ]; then echo "$$out"; echo "deadcode: the functions above are unreachable; cut them"; exit 1; fi
+
+# omitemptyscalar exits 3 on a ,omitempty tag on a bool (a false lost on write).
+omitempty: ## Fail on a bool field tagged omitempty (omitemptyscalar, pinned)
+	go run github.com/dkoosis/repo-standard/cmd/omitemptyscalar@$(OMITEMPTYSCALAR_VER) ./...
+
+vuln: ## Scan for known vulnerabilities (govulncheck, pinned)
+	go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VER) ./...
 
 lint-sarif: vet ## Run linters with SARIF output
 	golangci-lint run --output.sarif.path=stdout ./...
