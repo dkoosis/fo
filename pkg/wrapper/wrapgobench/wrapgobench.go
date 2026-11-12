@@ -26,7 +26,7 @@ var goMaxProcsSuffixRe = regexp.MustCompile(`-\d+$`)
 
 func Convert(r io.Reader, w io.Writer) error {
 	if _, err := fmt.Fprintln(w, "# fo:metrics tool=gobench"); err != nil {
-		return err
+		return fmt.Errorf("write gobench header: %w", err)
 	}
 	br := bufio.NewReaderSize(r, 64*1024)
 	var dropped int
@@ -68,7 +68,7 @@ func emitBenchRow(w io.Writer, line string) error {
 		}
 		key := fmt.Sprintf("%s/%s", name, unitKey(unit))
 		if _, err := fmt.Fprintf(w, "%s %s %s\n", key, vTok, unit); err != nil {
-			return err
+			return fmt.Errorf("write gobench metric: %w", err)
 		}
 	}
 	return nil

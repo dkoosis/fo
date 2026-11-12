@@ -128,5 +128,5 @@ type slowWriter struct {
 
 func (s *slowWriter) Write(p []byte) (int, error) {
 	time.Sleep(s.delay)
-	return s.buf.Write(p)
+	return s.buf.Write(p) //nolint:wrapcheck // io.Writer passthrough in a test double
 }

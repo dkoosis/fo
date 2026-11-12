@@ -2,6 +2,7 @@ package state
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,9 +12,12 @@ func writeLegacyFlatMetrics(t *testing.T, path string, samples []MetricSample) e
 	t.Helper()
 	data, err := json.MarshalIndent(samples, "", "  ")
 	if err != nil {
-		return err
+		return fmt.Errorf("marshal samples: %w", err)
 	}
-	return os.WriteFile(path, data, 0o600)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return fmt.Errorf("write samples: %w", err)
+	}
+	return nil
 }
 
 const (

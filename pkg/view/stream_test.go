@@ -73,7 +73,7 @@ func (p *progressWriter) Write(b []byte) (int, error) {
 		default:
 		}
 	}
-	return n, err
+	return n, err //nolint:wrapcheck // io.Writer passthrough in a test double
 }
 
 func (p *progressWriter) Writes() int {

@@ -2,6 +2,7 @@ package state
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"path/filepath"
 )
@@ -24,8 +25,10 @@ func SaveFullLog(data []byte) (string, error) {
 	s := newStateStore()
 	path := s.fullLogPath()
 	err := s.writeAtomicTo(path, ".full.*.tmp", func(w io.Writer) error {
-		_, werr := w.Write(data)
-		return werr
+		if _, werr := w.Write(data); werr != nil {
+			return fmt.Errorf("write full log: %w", werr)
+		}
+		return nil
 	})
 	if err != nil && !errors.Is(err, ErrDurabilityDegraded) {
 		return "", err

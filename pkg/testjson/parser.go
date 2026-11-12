@@ -136,7 +136,7 @@ func drainLines(ctx context.Context, r io.ReadCloser, lines <-chan scanResult, f
 		select {
 		case <-ctx.Done():
 			_ = r.Close()
-			return malformed, ctx.Err()
+			return malformed, ctx.Err() //nolint:wrapcheck // callers compare against context.Canceled and DeadlineExceeded
 		case res, ok := <-lines:
 			if !ok {
 				return malformed, nil
@@ -410,7 +410,7 @@ func (*aggregator) handleOutput(pkg *pkgState, e TestEvent) {
 
 	if strings.Contains(output, "coverage:") && strings.Contains(output, "% of statements") {
 		var cov float64
-		_, _ = fmt.Sscanf(output, "coverage: %f%% of statements", &cov)
+		_, _ = fmt.Sscanf(output, "coverage: %f%% of statements", &cov) //nolint:errcheck // a non-matching line leaves cov at 0, which the next check skips
 		if cov > 0 {
 			pkg.coverage = cov
 		}
@@ -420,7 +420,10 @@ func (*aggregator) handleOutput(pkg *pkgState, e TestEvent) {
 func (a *aggregator) results() []TestPackageResult {
 	results := make([]TestPackageResult, 0, len(a.order))
 	for _, name := range a.order {
-		pkg := a.packages[name]
+		pkg, ok := a.packages[name]
+		if !ok {
+			continue
+		}
 		// Skip packages with no test activity
 		if pkg.passed == 0 && pkg.failed == 0 && pkg.skipped == 0 && pkg.buildError == "" && !pkg.panicked {
 			continue

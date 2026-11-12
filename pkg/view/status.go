@@ -25,7 +25,7 @@ type StatusRow struct {
 func RenderStatusLLM(w io.Writer, tool string, rows []StatusRow) error {
 	if tool != "" {
 		if _, err := fmt.Fprintf(w, "# %s\n", tool); err != nil {
-			return err
+			return fmt.Errorf("write status: %w", err)
 		}
 	}
 	labelMax := 0
@@ -37,7 +37,7 @@ func RenderStatusLLM(w io.Writer, tool string, rows []StatusRow) error {
 	for _, r := range rows {
 		extra := strings.TrimSpace(r.Value + " " + r.Note)
 		if _, err := fmt.Fprintf(w, "%-4s %-*s  %s\n", r.State, labelMax, r.Label, extra); err != nil {
-			return err
+			return fmt.Errorf("write status: %w", err)
 		}
 	}
 	return nil
@@ -48,7 +48,7 @@ func RenderStatusLLM(w io.Writer, tool string, rows []StatusRow) error {
 func RenderStatusHuman(w io.Writer, tool string, rows []StatusRow) error {
 	if tool != "" {
 		if _, err := fmt.Fprintf(w, "── %s ──\n", tool); err != nil {
-			return err
+			return fmt.Errorf("write status: %w", err)
 		}
 	}
 	var ok, fail, warn, skip int
@@ -65,7 +65,7 @@ func RenderStatusHuman(w io.Writer, tool string, rows []StatusRow) error {
 		}
 	}
 	if _, err := fmt.Fprintf(w, "%d ok · %d fail · %d warn · %d skip\n\n", ok, fail, warn, skip); err != nil {
-		return err
+		return fmt.Errorf("write status: %w", err)
 	}
 	return RenderStatusLLM(w, "", rows)
 }

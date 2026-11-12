@@ -104,7 +104,7 @@ func (b *Builder) WriteTo(w io.Writer) (int64, error) {
 	}
 	data, err := json.MarshalIndent(b.doc, "", "  ")
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("marshal sarif: %w", err)
 	}
 	data = append(data, '\n')
 	n, err := w.Write(data)

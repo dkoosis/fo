@@ -17,10 +17,10 @@ func RenderSceneLLM(w io.Writer, s scene.Scene) error {
 	}
 	for i, act := range s.Acts {
 		if _, err := fmt.Fprintln(w); err != nil {
-			return err
+			return fmt.Errorf("write scene separator: %w", err)
 		}
 		if _, err := fmt.Fprintf(w, "## %s · %s\n", act.Number, act.Title); err != nil {
-			return err
+			return fmt.Errorf("write scene act: %w", err)
 		}
 		if err := writeBeats(w, act.Beats); err != nil {
 			return err
@@ -37,7 +37,7 @@ func RenderSceneLLM(w io.Writer, s scene.Scene) error {
 // fails. Result round-trips through scene.Parse.
 func RenderSceneLLMString(s scene.Scene) string {
 	var b strings.Builder
-	_ = RenderSceneLLM(&b, s)
+	_ = RenderSceneLLM(&b, s) //nolint:errcheck // strings.Builder writes never fail
 	return b.String()
 }
 
@@ -61,13 +61,16 @@ func writeSceneHeader(w io.Writer, s scene.Scene) error {
 	}
 	b.WriteByte('\n')
 	_, err := io.WriteString(w, b.String())
-	return err
+	if err != nil {
+		return fmt.Errorf("write scene: %w", err)
+	}
+	return nil
 }
 
 func writeBeats(w io.Writer, beats []scene.Beat) error {
 	for _, beat := range beats {
 		if _, err := fmt.Fprintln(w); err != nil {
-			return err
+			return fmt.Errorf("write scene separator: %w", err)
 		}
 		switch beat.Kind {
 		case scene.BeatNarration:
@@ -85,25 +88,29 @@ func writeBeats(w io.Writer, beats []scene.Beat) error {
 
 func writeNarration(w io.Writer, text string) error {
 	if text == "" {
-		_, err := fmt.Fprintln(w, ">")
-		return err
+		if _, err := fmt.Fprintln(w, ">"); err != nil {
+			return fmt.Errorf("write scene body: %w", err)
+		}
+		return nil
 	}
-	_, err := fmt.Fprintf(w, "> %s\n", text)
-	return err
+	if _, err := fmt.Fprintf(w, "> %s\n", text); err != nil {
+		return fmt.Errorf("write scene text: %w", err)
+	}
+	return nil
 }
 
 func writeCommand(w io.Writer, c scene.Command) error {
 	if _, err := fmt.Fprintf(w, "@%s $ %s\n", c.Actor, c.Cmd); err != nil {
-		return err
+		return fmt.Errorf("write command line: %w", err)
 	}
 	for _, line := range c.Output {
 		if _, err := fmt.Fprintf(w, "  %s\n", line); err != nil {
-			return err
+			return fmt.Errorf("write command output: %w", err)
 		}
 	}
 	if c.Exit != 0 {
 		if _, err := fmt.Fprintf(w, "  (exit %d)\n", c.Exit); err != nil {
-			return err
+			return fmt.Errorf("write command exit: %w", err)
 		}
 	}
 	return nil

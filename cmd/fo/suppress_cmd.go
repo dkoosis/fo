@@ -217,10 +217,14 @@ func loadFile(path string) ([]suppress.Suppression, error) {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("open suppress file: %w", err)
 	}
 	defer f.Close()
-	return suppress.Parse(f)
+	rules, err := suppress.Parse(f)
+	if err != nil {
+		return nil, fmt.Errorf("parse suppress file: %w", err)
+	}
+	return rules, nil
 }
 
 // writeFile renders rules to path atomically (temp file + rename in the
@@ -228,7 +232,7 @@ func loadFile(path string) ([]suppress.Suppression, error) {
 func writeFile(path string, rules []suppress.Suppression) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return err
+		return fmt.Errorf("create suppress dir: %w", err)
 	}
 	var buf bytes.Buffer
 	for _, s := range rules {
@@ -237,22 +241,22 @@ func writeFile(path string, rules []suppress.Suppression) error {
 	}
 	tmp, err := os.CreateTemp(dir, ".ignore.tmp-*")
 	if err != nil {
-		return err
+		return fmt.Errorf("create temp suppress file: %w", err)
 	}
 	tmpName := tmp.Name()
 	cleanup := func() { _ = os.Remove(tmpName) }
 	if _, err := io.Copy(tmp, &buf); err != nil {
 		_ = tmp.Close()
 		cleanup()
-		return err
+		return fmt.Errorf("write temp suppress file: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
 		cleanup()
-		return err
+		return fmt.Errorf("close temp suppress file: %w", err)
 	}
 	if err := os.Rename(tmpName, path); err != nil {
 		cleanup()
-		return err
+		return fmt.Errorf("replace suppress file: %w", err)
 	}
 	return nil
 }

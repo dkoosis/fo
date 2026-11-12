@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,7 +30,7 @@ func TestStateReset_RemovesFile(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d, stderr=%q", code, stderr.String())
 	}
-	if _, err := os.Stat(p); !os.IsNotExist(err) {
+	if _, err := os.Stat(p); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("state file should be gone, err=%v", err)
 	}
 }

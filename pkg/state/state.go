@@ -238,13 +238,16 @@ func (s stateStore) writeAtomicTo(path, tmpPattern string, write func(io.Writer)
 func fsyncDir(dir string) error {
 	d, err := os.Open(dir) // dir is the parent of a caller-provided sidecar path
 	if err != nil {
-		return err
+		return fmt.Errorf("open state dir: %w", err)
 	}
 	if err := d.Sync(); err != nil {
 		_ = d.Close()
-		return err
+		return fmt.Errorf("sync state dir: %w", err)
 	}
-	return d.Close()
+	if err := d.Close(); err != nil {
+		return fmt.Errorf("close state dir: %w", err)
+	}
+	return nil
 }
 
 // Reset removes the sidecar file. Missing file is not an error —

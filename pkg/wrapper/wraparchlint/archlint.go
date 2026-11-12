@@ -39,6 +39,8 @@ func Convert(r io.Reader, w io.Writer) error {
 		b.AddResultWithFix("dependency-violation", "error", msg, d.FileRelativePath, 0, 0, fixCmd)
 	}
 
-	_, err = b.WriteTo(w)
-	return err
+	if _, err = b.WriteTo(w); err != nil {
+		return fmt.Errorf("write archlint sarif: %w", err)
+	}
+	return nil
 }

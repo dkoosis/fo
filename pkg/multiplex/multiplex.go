@@ -66,12 +66,6 @@ func (e *UnknownFormatError) Error() string {
 	)
 }
 
-// isDelimiter reports whether line is a valid section delimiter (recognized
-// format value).
-func isDelimiter(line []byte) bool {
-	return delimiterRe.Match(line)
-}
-
 // isDelimiterShape reports whether line has the shape of a section delimiter,
 // regardless of whether the format value is recognized.
 func isDelimiterShape(line []byte) bool {

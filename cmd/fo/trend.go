@@ -46,7 +46,7 @@ func runTrend(args []string, stdout, stderr io.Writer) int {
 		values[i] = float64(c)
 		total += c
 	}
-	if total == 0 {
+	if len(series) == 0 || total == 0 {
 		fmt.Fprintf(stderr, "fo trend: %s never appeared in the last %d run(s)\n", rule, len(series))
 		return 2
 	}

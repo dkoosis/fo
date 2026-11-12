@@ -4,6 +4,7 @@
 // patterns testscript does not express cleanly.
 //
 // Single-scenario e2e tests live in testdata/script/*.txtar (see TestScripts).
+
 package main
 
 import (

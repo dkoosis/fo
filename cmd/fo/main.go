@@ -1,4 +1,4 @@
-// fo renders build tool output as information-dense terminal visualizations.
+// Package main is fo; it renders build tool output as information-dense terminal visualizations.
 //
 // Usage:
 //

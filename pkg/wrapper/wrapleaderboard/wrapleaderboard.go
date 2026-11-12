@@ -106,7 +106,7 @@ func writeRow(w io.Writer, raw string) (bool, error) {
 		return false, err
 	}
 	if _, err := fmt.Fprintf(w, "%s %s\n", countTok, label); err != nil {
-		return false, err
+		return false, fmt.Errorf("write leaderboard row: %w", err)
 	}
 	return true, nil
 }
@@ -117,7 +117,10 @@ func writeHeader(w io.Writer, tool string) error {
 		header += " tool=" + tool
 	}
 	_, err := fmt.Fprintln(w, header)
-	return err
+	if err != nil {
+		return fmt.Errorf("write leaderboard header: %w", err)
+	}
+	return nil
 }
 
 func splitCountLabel(line string) (count, label string, err error) {

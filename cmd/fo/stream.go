@@ -239,7 +239,7 @@ type bufioReadCloser struct {
 
 func (b *bufioReadCloser) Close() error {
 	if b.closer != nil {
-		return b.closer.Close()
+		return b.closer.Close() //nolint:wrapcheck // io.Closer passthrough: the wrapped closer owns the error text
 	}
 	return nil
 }

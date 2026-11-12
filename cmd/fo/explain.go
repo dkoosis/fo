@@ -43,15 +43,16 @@ func runExplain(args []string, stdout, stderr io.Writer) int {
 	}
 
 	f, tr, ok := snap.Lookup(id)
-	if !ok {
+	if !ok || (f == nil && tr == nil) {
 		fmt.Fprintf(stderr, "fo explain: %s not found in the last run (handles expire when a new run overwrites them)\n", id)
 		return 2
 	}
 
 	t := resolveTheme("auto", stdout)
-	if f != nil {
+	switch {
+	case f != nil:
 		fmt.Fprint(stdout, explainFinding(f, t))
-	} else {
+	case tr != nil:
 		fmt.Fprint(stdout, explainTest(tr, t))
 	}
 	return 0
