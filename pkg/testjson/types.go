@@ -98,3 +98,19 @@ type FailedTest struct {
 	// and ToReport computes it on demand in that case.
 	StructuralDiffChecked bool
 }
+
+// TotalTests returns the total number of tests in this package.
+func (r *TestPackageResult) TotalTests() int {
+	return r.Passed + r.Failed + r.Skipped
+}
+
+// Status returns StatusPass, StatusFail, or StatusSkip for the package.
+func (r *TestPackageResult) Status() Status {
+	if r.BuildError != "" || r.Panicked || r.Failed > 0 {
+		return StatusFail
+	}
+	if r.Passed == 0 && r.Skipped > 0 {
+		return StatusSkip
+	}
+	return StatusPass
+}

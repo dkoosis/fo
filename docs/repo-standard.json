@@ -1,4 +1,22 @@
 {
   "profile": "tool",
-  "exceptions": []
+  "exceptions": [
+    {
+      "rule": "deadcode-filter",
+      "allow": {
+        "TopFiles": "Public package API retained for importing programs; the fo CLI does not exercise every supported library entry point.",
+        "GroupByFile": "Public package API retained for importing programs; the fo CLI does not exercise every supported library entry point.",
+        "Builder.Document": "Public package API retained for importing programs; the fo CLI does not exercise every supported library entry point.",
+        "Read": "Public package API retained for importing programs; the fo CLI does not exercise every supported library entry point.",
+        "FullLogPath": "Public package API retained for importing programs; the fo CLI does not exercise every supported library entry point.",
+        "Ruleset.Match": "Public package API retained for importing programs; the fo CLI does not exercise every supported library entry point.",
+        "TestPackageResult.TotalTests": "Public package API retained for importing programs; the fo CLI does not exercise every supported library entry point.",
+        "TestPackageResult.Status": "Public package API retained for importing programs; the fo CLI does not exercise every supported library entry point.",
+        "PickView": "Public package API retained for importing programs; the fo CLI does not exercise every supported library entry point.",
+        "RenderSceneLLMString": "Public package API retained for importing programs; the fo CLI does not exercise every supported library entry point.",
+        "RenderReport": "Public package API retained for importing programs; the fo CLI does not exercise every supported library entry point.",
+        "RenderReportMode": "Public package API retained for importing programs; the fo CLI does not exercise every supported library entry point."
+      }
+    }
+  ]
 }

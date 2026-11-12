@@ -9,6 +9,17 @@ import (
 	"github.com/dkoosis/fo/pkg/theme"
 )
 
+// RenderReport picks a view from r and writes the rendered string to w.
+// Batch arrival mode: caller has the complete Report.
+func RenderReport(w io.Writer, r report.Report, t theme.Theme, width int) error {
+	return RenderReportMode(w, r, t, width, ModeHuman)
+}
+
+// RenderReportMode is RenderReport with an explicit audience mode.
+func RenderReportMode(w io.Writer, r report.Report, t theme.Theme, width int, mode Mode) error {
+	return RenderReportModeWithExpand(w, r, t, width, mode, expandSet{})
+}
+
 // RenderReportModeWithExpand is RenderReportMode plus an --expand set.
 // LLM mode ignores the set (clusters always render fully).
 func RenderReportModeWithExpand(w io.Writer, r report.Report, t theme.Theme, width int, mode Mode, expand expandSet) error {

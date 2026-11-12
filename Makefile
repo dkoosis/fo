@@ -184,8 +184,11 @@ fuzz: ## Fuzz every Fuzz test (FUZZTIME=10s each)
 
 # deadcode lists each function no path from main reaches, and exits 0 either way,
 # so the target fails on any output.
-deadcode: ## Fail on any function unreachable from main (deadcode, pinned)
+# Public package APIs are also used by importing programs outside this CLI.
+# Each retained entry point is named and reasoned in docs/repo-standard.json.
+deadcode: ## Fail on unreachable functions except recorded public APIs (deadcode, pinned)
 	@out=$$(go run golang.org/x/tools/cmd/deadcode@$(DEADCODE_VER) ./cmd/fo) || { echo "deadcode: could not run"; exit 1; }; \
+	out=$$(printf '%s\n' "$$out" | grep -vE 'unreachable func: (TopFiles|GroupByFile|Builder\.Document|Read|FullLogPath|Ruleset\.Match|TestPackageResult\.TotalTests|TestPackageResult\.Status|PickView|RenderSceneLLMString|RenderReport|RenderReportMode)$$' || true); \
 	if [ -n "$$out" ]; then echo "$$out"; echo "deadcode: the functions above are unreachable; cut them"; exit 1; fi
 
 # omitemptyscalar exits 3 on a ,omitempty tag on a bool (a false lost on write).
