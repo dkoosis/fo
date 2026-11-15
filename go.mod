@@ -2,6 +2,8 @@ module github.com/dkoosis/fo
 
 go 1.26.3
 
+toolchain go1.27.4
+
 require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/fsnotify/fsnotify v1.10.1
