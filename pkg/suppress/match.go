@@ -63,19 +63,23 @@ func globHere(p, s string) bool {
 				return globDoubleStar(p[i+2:], s)
 			}
 			return globStar(p[i+1:], s)
-		case '?':
-			if len(s) == 0 || s[0] == '/' {
-				return false
-			}
-			s = s[1:]
 		default:
-			if len(s) == 0 || s[0] != c {
+			var ok bool
+			if s, ok = globStep(c, s); !ok {
 				return false
 			}
-			s = s[1:]
 		}
 	}
 	return len(s) == 0
+}
+
+// globStep consumes one byte of s for pattern byte c: "?" takes any byte
+// but a path separator, any other c takes itself.
+func globStep(c byte, s string) (string, bool) {
+	if len(s) == 0 || (c == '?' && s[0] == '/') || (c != '?' && s[0] != c) {
+		return s, false
+	}
+	return s[1:], true
 }
 
 // globDoubleStar matches "**" followed by rest against s. "**" consumes

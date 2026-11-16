@@ -169,10 +169,11 @@ func runWatcher(ctx context.Context, w *fsnotify.Watcher, root string, ignorePat
 			case <-ctx.Done():
 				return
 			}
-		case _, ok := <-w.Errors:
+		case err, ok := <-w.Errors:
 			if !ok {
 				return
 			}
+			_ = err // watcher errors are not actionable here; the next event retries
 		}
 	}
 }

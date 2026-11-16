@@ -19,9 +19,6 @@
 
 # ── Sandbox prebuilt versions ──
 # Keep in sync with what .sandbox/codex/setup.sh expects.
-# golangci-lint: the ONE fleet pin lives in .sandbox/project.conf
-# (repo-standard lint-pin rule) — read it, never write a second literal here.
-GOLANGCI_LINT_VER ?= $(shell . ./.sandbox/project.conf 2>/dev/null && echo $$GOLANGCI_LINT_VERSION)
 GOFUMPT_VER       ?= v0.9.2
 GOIMPORTS_VER     ?= v0.39.0
 BAT_VER           ?= v0.25.0

@@ -61,13 +61,11 @@ func Convert(r io.Reader, w io.Writer, opts Opts) error {
 		if oversize {
 			dropped++
 		} else {
-			wrote, perr := writeRow(bw, string(raw))
+			n, perr := countRow(bw, string(raw))
 			if perr != nil {
 				return perr
 			}
-			if wrote {
-				rows++
-			}
+			rows += n
 		}
 		if err == nil {
 			continue
@@ -92,6 +90,15 @@ func warnOversize(stderr io.Writer, dropped int) {
 		return
 	}
 	fmt.Fprintf(stderr, "wrap leaderboard: dropped %d line(s) exceeding %d bytes\n", dropped, lineread.MaxLineLen)
+}
+
+// countRow is writeRow as a count: 1 when a row was written, else 0.
+func countRow(w io.Writer, raw string) (int, error) {
+	wrote, err := writeRow(w, raw)
+	if wrote {
+		return 1, err
+	}
+	return 0, err
 }
 
 // writeRow parses a single input line and emits one tally row. Returns
