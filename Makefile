@@ -19,13 +19,9 @@
 
 # ── Sandbox prebuilt versions ──
 # Keep in sync with what .sandbox/codex/setup.sh expects.
-# golangci-lint: the ONE fleet pin lives in .sandbox/project.conf
-# (repo-standard lint-pin rule) — read it, never write a second literal here.
-GOLANGCI_LINT_VER ?= $(shell . ./.sandbox/project.conf 2>/dev/null && echo $$GOLANGCI_LINT_VERSION)
 GOFUMPT_VER       ?= v0.9.2
 GOIMPORTS_VER     ?= v0.39.0
 BAT_VER           ?= v0.25.0
-STANDARD_VER      := v0.4.0
 OMITEMPTYSCALAR_VER := v0.4.0
 GOVULNCHECK_VER   := v1.9.0
 DEADCODE_VER      := v0.52.0
@@ -72,9 +68,9 @@ help: ## Show this help
 check: vet lint test build standard ## Full repo: vet + lint + test + build + repo-standard
 	@echo "=== check pass ==="
 
-# Dogfood the fleet gate: repo-standard runs at a pinned version (go run <pkg>@VER).
-standard: ## Run repo-standard (fleet SDLC checker) against this repo
-	go run github.com/dkoosis/repo-standard/cmd/repo-standard@$(STANDARD_VER)
+# Dogfood the fleet gate: runs the current repo-standard main, no version pin.
+standard: ## Run the current repo-standard main (fleet SDLC checker) against this repo
+	GOPRIVATE=github.com/dkoosis/repo-standard go run github.com/dkoosis/repo-standard/cmd/repo-standard@main
 
 audit: check race fuzz dupe nilcheck deadcode omitempty vuln ## Exhaustive gate: check + race + fuzz + dupe + nilcheck + deadcode + omitempty + vuln
 	@echo "=== audit pass ==="
